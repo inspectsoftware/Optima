@@ -1,0 +1,121 @@
+<Window x:Class="COPSBootstrapper.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:COPSBootstrapper.App.ViewModels"
+        xmlns:views="clr-namespace:COPSBootstrapper.App.Views"
+        xmlns:conv="clr-namespace:COPSBootstrapper.App.Converters"
+        Title="COPS Bootstrapper"
+        Width="1280" Height="820" MinWidth="1040" MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Brush.Background}">
+  <Window.Resources>
+    <conv:StatusKindToBrushConverter x:Key="StatusKindToBrush" />
+
+    <DataTemplate DataType="{x:Type vm:HomeViewModel}">
+      <views:HomeView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:PlayViewModel}">
+      <views:PlayView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:PerformanceViewModel}">
+      <views:PerformanceView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:DisplayViewModel}">
+      <views:DisplayView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SystemViewModel}">
+      <views:SystemView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}">
+      <views:DiagnosticsView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:LogsViewModel}">
+      <views:LogsView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+      <views:SettingsView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:DeveloperViewModel}">
+      <views:DeveloperView />
+    </DataTemplate>
+  </Window.Resources>
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="216" />
+      <ColumnDefinition />
+    </Grid.ColumnDefinitions>
+
+    <!-- Sidebar -->
+    <Border Background="{StaticResource Brush.Surface}"
+            BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,1,0">
+      <DockPanel>
+        <!-- Brand -->
+        <StackPanel DockPanel.Dock="Top" Margin="20,22,20,18">
+          <TextBlock FontSize="17" FontWeight="Bold">
+            <Run Text="COPS" Foreground="{StaticResource Brush.Accent}" /><Run Text=" BOOTSTRAPPER" />
+          </TextBlock>
+          <TextBlock Text="Critical Ops · Google Play Games"
+                     FontSize="11" Foreground="{StaticResource Brush.TextMuted}" Margin="0,3,0,0" />
+        </StackPanel>
+
+        <!-- Footer: live game state -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="20,0,20,18">
+          <Separator />
+          <StackPanel Orientation="Horizontal">
+            <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0">
+              <Ellipse.Style>
+                <Style TargetType="Ellipse">
+                  <Setter Property="Fill" Value="{StaticResource Brush.TextMuted}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
+                      <Setter Property="Fill" Value="{StaticResource Brush.Success}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Ellipse.Style>
+            </Ellipse>
+            <TextBlock FontSize="12" Foreground="{StaticResource Brush.TextSecondary}">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                  <Setter Property="Text" Value="Game not running" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
+                      <Setter Property="Text" Value="Critical Ops running" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Navigation -->
+        <StackPanel>
+          <RadioButton Style="{StaticResource NavButton}" Content="HOME" IsChecked="True"
+                       Command="{Binding NavigateCommand}" CommandParameter="HOME" GroupName="Nav" />
+          <RadioButton Style="{StaticResource NavButton}" Content="PLAY"
+                       Command="{Binding NavigateCommand}" CommandParameter="PLAY" GroupName="Nav" />
+          <RadioButton Style="{StaticResource NavButton}" Content="PERFORMANCE"
+                       Command="{Binding NavigateCommand}" CommandParameter="PERFORMANCE" GroupName="Nav" />
+          <RadioButton Style="{StaticResource NavButton}" Content="DISPLAY"
+                       Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" GroupName="Nav" />
+          <RadioButton Style="{StaticResource NavButton}" Content="SYSTEM"
+                       Command="{Binding NavigateCommand}" CommandParameter="SYSTEM" GroupName="Nav" />
+          <RadioButton Style="{StaticResource NavButton}" Content="DIAGNOSTICS"
+                       Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" GroupName="Nav" />
+          <RadioButton Style="{StaticResource NavButton}" Content="LOGS"
+                       Command="{Binding NavigateCommand}" CommandParameter="LOGS" GroupName="Nav" />
+          <RadioButton Style="{StaticResource NavButton}" Content="SETTINGS"
+                       Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" GroupName="Nav" />
+          <RadioButton Style="{StaticResource NavButton}" Content="DEVELOPER"
+                       Command="{Binding NavigateCommand}" CommandParameter="DEVELOPER" GroupName="Nav"
+                       Visibility="{Binding DeveloperModeVisible, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Page host -->
+    <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" Margin="0" />
+  </Grid>
+</Window>

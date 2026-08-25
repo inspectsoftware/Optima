@@ -1,0 +1,42 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Palette: near-black base with a single orange accent — launcher / tooling aesthetic. -->
+  <Color x:Key="Color.Background">#FF0C0E12</Color>
+  <Color x:Key="Color.Surface">#FF13161C</Color>
+  <Color x:Key="Color.SurfaceRaised">#FF1A1E26</Color>
+  <Color x:Key="Color.SurfaceHover">#FF222732</Color>
+  <Color x:Key="Color.Border">#FF262C38</Color>
+  <Color x:Key="Color.Text">#FFE8EAEF</Color>
+  <Color x:Key="Color.TextSecondary">#FF9AA3B2</Color>
+  <Color x:Key="Color.TextMuted">#FF5D6675</Color>
+  <Color x:Key="Color.Accent">#FFFF6A2B</Color>
+  <Color x:Key="Color.AccentHover">#FFFF8248</Color>
+  <Color x:Key="Color.AccentPressed">#FFE85A1F</Color>
+  <Color x:Key="Color.Success">#FF3FCF6E</Color>
+  <Color x:Key="Color.Warning">#FFE8B33C</Color>
+  <Color x:Key="Color.Error">#FFE85B5B</Color>
+  <Color x:Key="Color.Info">#FF4C9BE8</Color>
+
+  <SolidColorBrush x:Key="Brush.Background" Color="{StaticResource Color.Background}" />
+  <SolidColorBrush x:Key="Brush.Surface" Color="{StaticResource Color.Surface}" />
+  <SolidColorBrush x:Key="Brush.SurfaceRaised" Color="{StaticResource Color.SurfaceRaised}" />
+  <SolidColorBrush x:Key="Brush.SurfaceHover" Color="{StaticResource Color.SurfaceHover}" />
+  <SolidColorBrush x:Key="Brush.Border" Color="{StaticResource Color.Border}" />
+  <SolidColorBrush x:Key="Brush.Text" Color="{StaticResource Color.Text}" />
+  <SolidColorBrush x:Key="Brush.TextSecondary" Color="{StaticResource Color.TextSecondary}" />
+  <SolidColorBrush x:Key="Brush.TextMuted" Color="{StaticResource Color.TextMuted}" />
+  <SolidColorBrush x:Key="Brush.Accent" Color="{StaticResource Color.Accent}" />
+  <SolidColorBrush x:Key="Brush.AccentHover" Color="{StaticResource Color.AccentHover}" />
+  <SolidColorBrush x:Key="Brush.AccentPressed" Color="{StaticResource Color.AccentPressed}" />
+  <SolidColorBrush x:Key="Brush.Success" Color="{StaticResource Color.Success}" />
+  <SolidColorBrush x:Key="Brush.Warning" Color="{StaticResource Color.Warning}" />
+  <SolidColorBrush x:Key="Brush.Error" Color="{StaticResource Color.Error}" />
+  <SolidColorBrush x:Key="Brush.Info" Color="{StaticResource Color.Info}" />
+
+  <FontFamily x:Key="Font.Main">Segoe UI Variable Display, Segoe UI</FontFamily>
+  <FontFamily x:Key="Font.Mono">Cascadia Mono, Consolas</FontFamily>
+
+  <CornerRadius x:Key="Radius.Card">10</CornerRadius>
+  <CornerRadius x:Key="Radius.Control">6</CornerRadius>
+</ResourceDictionary>
