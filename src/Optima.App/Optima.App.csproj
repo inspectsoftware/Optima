@@ -33,17 +33,25 @@
   </ItemGroup>
 
   <!-- Ship the elevated helper (and its dependencies) alongside the app executable.
-       Only files the app output does not already provide are copied, so the helper's
-       older transitive assemblies (e.g. TraceEvent's 6.x Microsoft.Extensions.*) can
-       never clobber the app's own newer ones. -->
+
+       The helper's own assemblies are copied unconditionally on every build: a stale
+       helper silently answers with old code, which is invisible because it runs in a
+       separate elevated process.
+
+       Its *dependencies* are only copied when absent, so the helper's older transitive
+       assemblies (TraceEvent drags in 6.x Microsoft.Extensions.*) can never overwrite
+       the app's own newer copies. -->
   <Target Name="CopyElevatedHelper" AfterTargets="Build">
     <ItemGroup>
-      <ElevatedFiles Include="..\Optima.Elevated\bin\$(Configuration)\$(TargetFramework)\**\*.*" />
-      <ElevatedFilesToCopy Include="@(ElevatedFiles)"
-                           Condition="!Exists('$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+      <ElevatedOwnFiles Include="..\Optima.Elevated\bin\$(Configuration)\$(TargetFramework)\Optima.Elevated.*" />
+      <ElevatedDependencies Include="..\Optima.Elevated\bin\$(Configuration)\$(TargetFramework)\**\*.*"
+                            Exclude="..\Optima.Elevated\bin\$(Configuration)\$(TargetFramework)\Optima.Elevated.*" />
+      <ElevatedDependenciesToCopy Include="@(ElevatedDependencies)"
+                                  Condition="!Exists('$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
     </ItemGroup>
-    <Copy SourceFiles="@(ElevatedFilesToCopy)"
-          DestinationFiles="@(ElevatedFilesToCopy->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(ElevatedOwnFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ElevatedDependenciesToCopy)"
+          DestinationFiles="@(ElevatedDependenciesToCopy->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

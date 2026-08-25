@@ -20,7 +20,35 @@ public static partial class InfFile
     private static partial Regex KeyValue();
 
     /// <summary>Parsed INF facts. Null fields mean the INF did not declare them.</summary>
-    public sealed record InfInfo(string? HardwareId, string? Provider, string? Description);
+    public sealed record InfInfo(
+        string? HardwareId,
+        string? Provider,
+        string? Description,
+        string? DeviceClass = null,
+        IReadOnlyList<string>? Architectures = null)
+    {
+        /// <summary>Target decorations found on the Models section, e.g. NTamd64, NTARM64.</summary>
+        public IReadOnlyList<string> Architectures { get; init; } = Architectures ?? [];
+
+        /// <summary>True when this package targets the given <see cref="System.Runtime.InteropServices.Architecture"/>.</summary>
+        public bool TargetsArchitecture(System.Runtime.InteropServices.Architecture architecture)
+        {
+            // An INF with no target decoration applies everywhere.
+            if (Architectures.Count == 0)
+            {
+                return true;
+            }
+            var token = architecture switch
+            {
+                System.Runtime.InteropServices.Architecture.X64 => "NTamd64",
+                System.Runtime.InteropServices.Architecture.Arm64 => "NTARM64",
+                System.Runtime.InteropServices.Architecture.X86 => "NTx86",
+                _ => null,
+            };
+            return token is not null
+                && Architectures.Any(a => a.StartsWith(token, StringComparison.OrdinalIgnoreCase));
+        }
+    }
 
     public static InfInfo Parse(string infText)
     {
@@ -28,13 +56,16 @@ public static partial class InfFile
         var strings = ReadStrings(sections);
 
         string? provider = null;
+        string? deviceClass = null;
         if (sections.TryGetValue("Version", out var version))
         {
             provider = Expand(FirstValue(version, "Provider"), strings);
+            deviceClass = Expand(FirstValue(version, "Class"), strings);
         }
 
         // [Manufacturer] maps a display name to one or more Models sections.
         var modelSectionNames = new List<string>();
+        var architectures = new List<string>();
         if (sections.TryGetValue("Manufacturer", out var manufacturer))
         {
             foreach (var line in manufacturer)
@@ -55,6 +86,7 @@ public static partial class InfFile
                 for (var i = 1; i < parts.Length; i++)
                 {
                     modelSectionNames.Add($"{parts[0]}.{parts[i]}");
+                    architectures.Add(parts[i]);
                 }
             }
         }
@@ -66,6 +98,11 @@ public static partial class InfFile
             {
                 continue;
             }
+
+            // A Models section can list several hardware ids for one device. Prefer a
+            // root-enumerated id, since that is the kind of node the installer creates;
+            // the alternates name a bus that would never appear on its own.
+            var candidates = new List<(string HardwareId, string Description)>();
             foreach (var line in models)
             {
                 var kv = KeyValue().Match(line);
@@ -75,17 +112,23 @@ public static partial class InfFile
                 }
                 // "%Desc% = Install, Root\MyDevice"
                 var parts = kv.Groups["value"].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 2)
+                if (parts.Length >= 2 && Expand(parts[1], strings) is { Length: > 0 } id)
                 {
-                    return new InfInfo(
-                        Expand(parts[1], strings),
-                        provider,
-                        Expand(kv.Groups["key"].Value, strings));
+                    candidates.Add((id, Expand(kv.Groups["key"].Value, strings) ?? string.Empty));
                 }
+            }
+
+            var rooted = candidates.FirstOrDefault(c => c.HardwareId.StartsWith(@"Root\", StringComparison.OrdinalIgnoreCase));
+            var chosen = rooted.HardwareId is not null ? rooted
+                       : candidates.Count > 0 ? candidates[0]
+                       : default;
+            if (chosen.HardwareId is not null)
+            {
+                return new InfInfo(chosen.HardwareId, provider, chosen.Description, deviceClass, architectures);
             }
         }
 
-        return new InfInfo(null, provider, null);
+        return new InfInfo(null, provider, null, deviceClass, architectures);
     }
 
     private static Dictionary<string, List<string>> SplitSections(string infText)

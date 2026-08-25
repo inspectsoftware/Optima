@@ -20,6 +20,8 @@ if (!pipeName.StartsWith("optima-elev-", StringComparison.Ordinal) || pipeName.L
     return 3;
 }
 
+HelperLog.Write($"helper starting, pipe={pipeName}, elevated={System.Security.Principal.WindowsIdentity.GetCurrent().Owner?.IsWellKnown(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid)}");
+
 await using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
 try
 {

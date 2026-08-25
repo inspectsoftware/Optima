@@ -36,12 +36,21 @@ public sealed partial class CommandExecutor : IAsyncDisposable
             Data = data ?? [],
             RequestId = request.RequestId,
         };
-        var fail = (string error) => new IpcResponse
+        var fail = (string error) =>
         {
-            Success = false,
-            Error = error,
-            RequestId = request.RequestId,
+            HelperLog.Write($"{request.Command} FAILED: {error}");
+            return new IpcResponse
+            {
+                Success = false,
+                Error = error,
+                RequestId = request.RequestId,
+            };
         };
+
+        HelperLog.Write($"{request.Command} received"
+            + (request.Args.Count > 0
+                ? " {" + string.Join(", ", request.Args.Select(a => $"{a.Key}={a.Value}")) + "}"
+                : string.Empty));
 
         switch (request.Command)
         {
@@ -132,12 +141,14 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 // Stage the package into the DriverStore first; this is where an unsigned
                 // or untrusted catalog is rejected, so report that plainly.
                 var (stageCode, stageOutput) = await RunProcessAsync("pnputil.exe", $"/add-driver \"{infPath}\" /install", ct);
+                HelperLog.Write($"pnputil /add-driver exit={stageCode}: {Truncate(stageOutput)}");
                 if (stageCode != 0)
                 {
                     return fail($"pnputil could not stage the driver package (exit {stageCode}). {Truncate(stageOutput)}");
                 }
 
                 var (created, reboot, createError) = DeviceInstaller.CreateRootDevice(hardwareId, infPath);
+                HelperLog.Write($"CreateRootDevice created={created} reboot={reboot} error={createError}");
                 return created
                     ? ok(new Dictionary<string, string> { ["restartRequired"] = reboot ? "1" : "0" })
                     : fail(createError);

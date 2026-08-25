@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Detection;
@@ -24,6 +25,7 @@ public sealed class VddDriverInstaller : IDriverInstaller
     private readonly PnpDeviceLocator _deviceLocator;
     private readonly SettingsService _settings;
     private readonly ILogger<VddDriverInstaller> _logger;
+    private string? _lastLoggedInfPath;
 
     public VddDriverInstaller(
         IElevationBroker elevation,
@@ -37,6 +39,12 @@ public sealed class VddDriverInstaller : IDriverInstaller
         _logger = logger;
     }
 
+    /// <summary>
+    /// Picks the driver package to install. A distribution can hold several INFs (per
+    /// architecture, and sometimes unrelated devices such as a virtual audio driver), so
+    /// selection is explicit rather than "first file found": the package must be
+    /// Display-class and must target this machine's architecture.
+    /// </summary>
     public DriverPackageInfo? FindBundledPackage()
     {
         var folder = Path.Combine(AppContext.BaseDirectory, BundledDriverFolder);
@@ -45,31 +53,63 @@ public sealed class VddDriverInstaller : IDriverInstaller
             return null;
         }
 
-        foreach (var inf in Directory.EnumerateFiles(folder, "*.inf", SearchOption.AllDirectories))
+        var osArchitecture = RuntimeInformation.OSArchitecture;
+        DriverPackageInfo? fallback = null;
+
+        foreach (var inf in Directory.EnumerateFiles(folder, "*.inf", SearchOption.AllDirectories).OrderBy(p => p))
         {
             try
             {
+                // ReadAllText honours the byte-order mark; these INFs are UTF-16.
                 var parsed = InfFile.Parse(File.ReadAllText(inf));
                 if (string.IsNullOrWhiteSpace(parsed.HardwareId))
                 {
-                    _logger.LogWarning("Ignoring {Inf}: no hardware id could be read from it", inf);
+                    _logger.LogDebug("Skipping {Inf}: no hardware id declared", inf);
                     continue;
                 }
 
-                var directory = Path.GetDirectoryName(inf)!;
-                return new DriverPackageInfo
+                // The installer creates a Display-class device node, so anything else in
+                // the folder (an audio driver, for instance) must not be selected.
+                if (!string.Equals(parsed.DeviceClass, "Display", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogDebug("Skipping {Inf}: class is {Class}, not Display", inf, parsed.DeviceClass);
+                    continue;
+                }
+
+                var package = new DriverPackageInfo
                 {
                     InfPath = inf,
                     HardwareId = parsed.HardwareId,
                     Provider = parsed.Provider ?? string.Empty,
                     DisplayName = parsed.Description ?? Path.GetFileNameWithoutExtension(inf),
-                    HasCatalog = Directory.EnumerateFiles(directory, "*.cat").Any(),
+                    HasCatalog = Directory.EnumerateFiles(Path.GetDirectoryName(inf)!, "*.cat").Any(),
                 };
+
+                if (parsed.TargetsArchitecture(osArchitecture))
+                {
+                    // Logged once per distinct package: the status loop calls this every few
+                    // seconds, and an Information line each time would drown the log.
+                    if (Interlocked.Exchange(ref _lastLoggedInfPath, inf) != inf)
+                    {
+                        _logger.LogInformation("Bundled driver selected: {Name} {HardwareId} for {Arch} ({Inf})",
+                            package.DisplayName, package.HardwareId, osArchitecture, inf);
+                    }
+                    return package;
+                }
+
+                // Keep one non-matching candidate so the UI can explain the mismatch
+                // instead of claiming nothing is bundled at all.
+                fallback ??= package;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 _logger.LogWarning(ex, "Could not read driver package {Inf}", inf);
             }
+        }
+
+        if (fallback is not null)
+        {
+            _logger.LogWarning("A bundled driver was found but none targets {Arch}", osArchitecture);
         }
         return null;
     }
