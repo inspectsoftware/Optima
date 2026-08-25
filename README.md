@@ -1,16 +1,16 @@
-# COPS Bootstrapper
+# Optima
 
 A Windows bootstrapper and performance-management launcher for **Critical Ops** running through
 **Google Play Games for PC**.
 
-COPS Bootstrapper is a completely separate desktop application. It never injects into the game,
+Optima is a completely separate desktop application. It never injects into the game,
 never modifies game binaries or memory, and never touches game networking or authentication. It
 orchestrates the *environment around* the game using documented Windows APIs: virtual display
 configuration, power plans, process scheduling, external performance measurement — and restores
 every temporary change when the game exits.
 
 ```
-Open COPS Bootstrapper → pick a profile → PLAY
+Open Optima → pick a profile → PLAY
   → virtual display configured (e.g. 1920x1080 @ 240 Hz)
   → Windows optimizations applied (power plan, priority, EcoQoS)
   → Critical Ops launches through Google Play Games
@@ -41,7 +41,7 @@ so the app reads as a terminal without becoming hard to read where it actually e
 - **Detection** — Google Play Games install (registry → protocol handler → known folders →
   manual path), installed games via `googleplaygames://` shortcut scanning, hardware/OS inventory,
   virtualization state. All detection rules are configuration-driven
-  (`%LOCALAPPDATA%\COPSBootstrapper\detection.json`) so Google Play Games updates can be absorbed
+  (`%LOCALAPPDATA%\Optima\detection.json`) so Google Play Games updates can be absorbed
   without a rebuild.
 - **Launching** — a strategy chain: protocol URI → `Bootstrapper.exe "<uri>"` → game shortcut →
   user-defined command. First one that works wins.
@@ -66,7 +66,7 @@ so the app reads as a terminal without becoming hard to read where it actually e
   are restored from a CCD topology snapshot (exact restore first, tolerant retry second) and an
   emergency-restore button lives on the Display page.
 - **Elevation** — the UI always runs non-elevated. A separate helper
-  (`COPSBootstrapper.Elevated.exe`) performs only whitelisted, argument-validated operations
+  (`Optima.Elevated.exe`) performs only whitelisted, argument-validated operations
   (display device toggle, driver pipe write, ETW session, bcdedit read) over a private,
   ACL-restricted named pipe with length-prefixed JSON frames.
 - **Diagnostics** — virtualization/hypervisor, Google Play Games, Critical Ops, virtual driver,
@@ -77,21 +77,21 @@ so the app reads as a terminal without becoming hard to read where it actually e
 ## Solution layout
 
 ```
-COPSBootstrapper.slnx
+Optima.slnx
 src/
-  COPSBootstrapper.Core             pure logic: models, interfaces, orchestrator, statistics,
+  Optima.Core             pure logic: models, interfaces, orchestrator, statistics,
                                     detection engine, recovery, IPC framing (no Windows deps)
-  COPSBootstrapper.Platform.Windows Win32/WMI implementations: display (CDS + CCD), power,
+  Optima.Platform.Windows Win32/WMI implementations: display (CDS + CCD), power,
                                     processes, probes, launchers, elevation broker
-  COPSBootstrapper.Driver           virtual display providers (MttVdd, Mock) + settings editor
-  COPSBootstrapper.Monitoring       hardware monitor, NVML, ETW metrics client, SQLite store
-  COPSBootstrapper.Elevated         the elevated helper (whitelisted commands, ETW host)
-  COPSBootstrapper.App              WPF UI (MVVM, CommunityToolkit.Mvvm, Serilog, DI)
+  Optima.Driver           virtual display providers (MttVdd, Mock) + settings editor
+  Optima.Monitoring       hardware monitor, NVML, ETW metrics client, SQLite store
+  Optima.Elevated         the elevated helper (whitelisted commands, ETW host)
+  Optima.App              WPF UI (MVVM, CommunityToolkit.Mvvm, Serilog, DI)
 tests/
-  COPSBootstrapper.Tests            xunit suite (statistics, detection, orchestrator, recovery,
+  Optima.Tests            xunit suite (statistics, detection, orchestrator, recovery,
                                     VDD settings editing, IPC framing, providers)
 tools/
-  COPSBootstrapper.LiveCheck        CLI smoke-check for the display stack on real hardware
+  Optima.LiveCheck        CLI smoke-check for the display stack on real hardware
 ```
 
 ## Building
@@ -106,7 +106,7 @@ dotnet test
 Run the app:
 
 ```bash
-dotnet run --project src/COPSBootstrapper.App
+dotnet run --project src/Optima.App
 ```
 
 ### Publishing a self-contained build
@@ -114,15 +114,15 @@ dotnet run --project src/COPSBootstrapper.App
 The app and the elevated helper must land in the same folder:
 
 ```bash
-dotnet publish src/COPSBootstrapper.App -c Release -r win-x64 --self-contained -o publish
-dotnet publish src/COPSBootstrapper.Elevated -c Release -r win-x64 --self-contained -o publish
+dotnet publish src/Optima.App -c Release -r win-x64 --self-contained -o publish
+dotnet publish src/Optima.Elevated -c Release -r win-x64 --self-contained -o publish
 ```
 
-`publish/CopsBootstrapper.exe` is the application.
+`publish/Optima.exe` is the application.
 
 ## Data & configuration
 
-Everything lives under `%LOCALAPPDATA%\COPSBootstrapper\`:
+Everything lives under `%LOCALAPPDATA%\Optima\`:
 
 | File / folder    | Purpose                                                       |
 |------------------|---------------------------------------------------------------|

@@ -1,0 +1,141 @@
+<UserControl x:Class="Optima.App.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:Optima.App.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}">
+
+      <TextBlock Text="CRITICAL OPS" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="google play games · custom bootstrapper" Style="{StaticResource Text.PageSubtitle}" />
+
+      <!-- STATUS / SYSTEM side by side -->
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="28" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <HeaderedContentControl Style="{StaticResource Section}" Header="STATUS">
+          <HeaderedContentControl.Tag>
+            <Button Style="{StaticResource GhostButton}" Content="refresh"
+                    Command="{Binding Status.RefreshCommand}" Padding="6,0" />
+          </HeaderedContentControl.Tag>
+          <StackPanel>
+            <ContentControl Content="{Binding Status.GooglePlayGames}" ContentTemplate="{StaticResource StatusItemTemplate}" />
+            <ContentControl Content="{Binding Status.CriticalOps}" ContentTemplate="{StaticResource StatusItemTemplate}" />
+            <ContentControl Content="{Binding Status.VirtualDisplay}" ContentTemplate="{StaticResource StatusItemTemplate}" />
+            <ContentControl Content="{Binding Status.Virtualization}" ContentTemplate="{StaticResource StatusItemTemplate}" />
+            <ContentControl Content="{Binding Status.Display}" ContentTemplate="{StaticResource StatusItemTemplate}" />
+          </StackPanel>
+        </HeaderedContentControl>
+
+        <HeaderedContentControl Grid.Column="2" Style="{StaticResource Section}" Header="SYSTEM">
+          <StackPanel>
+            <Grid Margin="0,3">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="GPU" Style="{StaticResource Text.Label}" />
+              <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+              <TextBlock Grid.Column="2" Text="{Binding GpuText}" Style="{StaticResource Text.Value}" />
+            </Grid>
+            <Grid Margin="0,3">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="CPU" Style="{StaticResource Text.Label}" />
+              <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+              <TextBlock Grid.Column="2" Text="{Binding CpuText}" Style="{StaticResource Text.Value}" />
+            </Grid>
+            <Grid Margin="0,3">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="RAM" Style="{StaticResource Text.Label}" />
+              <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+              <TextBlock Grid.Column="2" Text="{Binding RamText}" Style="{StaticResource Text.Value}" />
+            </Grid>
+            <Grid Margin="0,3">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="OS" Style="{StaticResource Text.Label}" />
+              <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+              <TextBlock Grid.Column="2" Text="{Binding WindowsText}" Style="{StaticResource Text.Value}" />
+            </Grid>
+          </StackPanel>
+        </HeaderedContentControl>
+      </Grid>
+
+      <!-- Live meters -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PERFORMANCE">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="28" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition /><RowDefinition />
+          </Grid.RowDefinitions>
+
+          <!-- CPU -->
+          <StackPanel Orientation="Horizontal" Margin="0,4">
+            <TextBlock Text="CPU" Style="{StaticResource Text.Label}" Width="42" />
+            <ctl:AsciiBar Value="{Binding CpuPercent}" Maximum="100" Cells="18" />
+            <TextBlock Text="{Binding CpuUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" />
+          </StackPanel>
+          <!-- GPU -->
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,4">
+            <TextBlock Text="GPU" Style="{StaticResource Text.Label}" Width="42" />
+            <ctl:AsciiBar Value="{Binding GpuPercent}" Maximum="100" Cells="18" />
+            <TextBlock Text="{Binding GpuUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" />
+            <TextBlock Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <!-- RAM -->
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,4">
+            <TextBlock Text="RAM" Style="{StaticResource Text.Label}" Width="42" />
+            <ctl:AsciiBar Value="{Binding RamPercent}" Maximum="100" Cells="18" />
+            <TextBlock Text="{Binding RamUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" />
+          </StackPanel>
+          <!-- Unbounded values stay numeric -->
+          <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="0,4">
+            <TextBlock Text="FPS" Style="{StaticResource Text.Label}" Width="42" />
+            <TextBlock Text="{Binding FpsText}" Style="{StaticResource Text.Value}"
+                       Foreground="{StaticResource Brush.Accent}" MinWidth="52" />
+            <TextBlock Text="FRAMETIME" Style="{StaticResource Text.Label}" Margin="16,0,8,0" />
+            <TextBlock Text="{Binding FrametimeText}" Style="{StaticResource Text.Value}" />
+          </StackPanel>
+        </Grid>
+      </HeaderedContentControl>
+
+      <!-- Primary action -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="LAUNCH">
+        <Border Style="{StaticResource Callout}" Padding="16,14">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="{Binding Play.SelectedProfile.Name, FallbackValue='NO PROFILE'}"
+                         FontSize="{StaticResource Type.Title}" Foreground="{StaticResource Brush.Accent}" />
+              <TextBlock Text="{Binding Play.SelectedProfileSummary}" Style="{StaticResource Text.Label}"
+                         Margin="0,4,0,0" />
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                          Visibility="{Binding Play.IsSessionActive, Converter={StaticResource BoolToVis}}">
+                <ctl:AsciiSpinner Cells="12" Margin="0,0,10,0" />
+                <TextBlock Text="{Binding Play.PhaseText}" Style="{StaticResource Text.Micro}"
+                           Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
+            <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
+                    Content="{Binding Play.PlayButtonText}"
+                    Command="{Binding Play.PlayCommand}" MinWidth="270" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,141 @@
+<Window x:Class="Optima.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Optima.App.ViewModels"
+        xmlns:views="clr-namespace:Optima.App.Views"
+        xmlns:ctl="clr-namespace:Optima.App.Controls"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Optima"
+        Width="1240" Height="800" MinWidth="980" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Brush.Background}"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+  <!-- Custom caption, but WindowChrome keeps snap layouts, Aero Snap and resize native. -->
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="6"
+                        CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Window.InputBindings>
+    <KeyBinding Modifiers="Alt" Key="D1" Command="{Binding NavigateCommand}" CommandParameter="HOME" />
+    <KeyBinding Modifiers="Alt" Key="D2" Command="{Binding NavigateCommand}" CommandParameter="PLAY" />
+    <KeyBinding Modifiers="Alt" Key="D3" Command="{Binding NavigateCommand}" CommandParameter="PERFORMANCE" />
+    <KeyBinding Modifiers="Alt" Key="D4" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
+    <KeyBinding Modifiers="Alt" Key="D5" Command="{Binding NavigateCommand}" CommandParameter="SYSTEM" />
+    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
+    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="LOGS" />
+    <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
+    <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DEVELOPER" />
+  </Window.InputBindings>
+
+  <Window.Resources>
+    <DataTemplate DataType="{x:Type vm:HomeViewModel}"><views:HomeView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:PlayViewModel}"><views:PlayView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:PerformanceViewModel}"><views:PerformanceView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:DisplayViewModel}"><views:DisplayView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SystemViewModel}"><views:SystemView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}"><views:DiagnosticsView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:LogsViewModel}"><views:LogsView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:DeveloperViewModel}"><views:DeveloperView /></DataTemplate>
+  </Window.Resources>
+
+  <!--
+    Border compensates for the overhang WindowChrome leaves when maximized.
+    The TextElement.* values here are the app-wide text defaults: they inherit down the
+    tree (including into ContentPresenter-generated text) without overriding any control
+    that sets its own, which an implicit TextBlock style would have done.
+  -->
+  <Border x:Name="RootBorder" Background="{StaticResource Brush.Background}"
+          TextElement.Foreground="{StaticResource Brush.Text}"
+          TextElement.FontFamily="{StaticResource Font.Mono}"
+          TextElement.FontSize="{StaticResource Type.Body}">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="32" />
+        <RowDefinition />
+      </Grid.RowDefinitions>
+
+      <ctl:TitleBar x:Name="Caption" Grid.Row="0"
+                    Breadcrumb="{Binding Breadcrumb}"
+                    SessionTag="{Binding Play.SessionTag}" />
+
+      <Grid Grid.Row="1">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="190" />
+          <ColumnDefinition />
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar -->
+        <Border Background="{StaticResource Brush.Surface}"
+                BorderBrush="{StaticResource Brush.Hairline}" BorderThickness="0,0,1,0">
+          <DockPanel>
+            <!-- Footer: live game state -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,14">
+              <Rectangle Height="1" Fill="{StaticResource Brush.Hairline}" Margin="0,0,0,10" />
+              <TextBlock FontFamily="{StaticResource Font.Mono}" FontSize="{StaticResource Type.Micro}">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+                    <Setter Property="Text" Value="[ NOT RUNNING ]" />
+                    <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
+                        <Setter Property="Text" Value="[ RUNNING ]" />
+                        <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+              <TextBlock Text="critical ops" Style="{StaticResource Text.Micro}"
+                         Foreground="{StaticResource Brush.Hairline}" Margin="0,2,0,0" />
+            </StackPanel>
+
+            <!-- Navigation, bound to NavItems so the active marker tracks every route. -->
+            <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,12,0,0">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Style="{StaticResource NavButton}"
+                          Content="{Binding Key}" Tag="{Binding Index}"
+                          HorizontalAlignment="Stretch"
+                          Command="{Binding DataContext.NavigateCommand,
+                                    RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                          CommandParameter="{Binding Key}">
+                    <Button.Visibility>
+                      <!-- Only the DEVELOPER row is conditional; the rest are always shown. -->
+                      <MultiBinding Converter="{StaticResource NavItemVisibility}">
+                        <Binding Path="Key" />
+                        <Binding Path="DataContext.DeveloperModeVisible"
+                                 RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                      </MultiBinding>
+                    </Button.Visibility>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DockPanel>
+        </Border>
+
+        <!-- Page host, with a short cross-fade on navigation -->
+        <ContentControl Grid.Column="1" Content="{Binding CurrentPage, NotifyOnTargetUpdated=True}">
+          <ContentControl.Style>
+            <Style TargetType="ContentControl">
+              <Style.Triggers>
+                <EventTrigger RoutedEvent="Binding.TargetUpdated">
+                  <BeginStoryboard>
+                    <Storyboard>
+                      <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                       From="0" To="1" Duration="0:0:0.12" />
+                    </Storyboard>
+                  </BeginStoryboard>
+                </EventTrigger>
+              </Style.Triggers>
+            </Style>
+          </ContentControl.Style>
+        </ContentControl>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

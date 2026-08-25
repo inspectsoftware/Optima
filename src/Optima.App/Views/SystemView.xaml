@@ -1,0 +1,47 @@
+<UserControl x:Class="Optima.App.Views.SystemView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="920" HorizontalAlignment="Left">
+
+      <TextBlock Text="SYSTEM" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="hardware inventory and virtualization state" Style="{StaticResource Text.PageSubtitle}" />
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="HARDWARE">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding RefreshCommand}" Padding="6,0" />
+        </HeaderedContentControl.Tag>
+        <ItemsControl ItemsSource="{Binding HardwareRows}" ItemTemplate="{StaticResource InfoRowTemplate}" />
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="VIRTUALIZATION">
+        <StackPanel>
+          <ItemsControl ItemsSource="{Binding VirtualizationRows}" ItemTemplate="{StaticResource InfoRowTemplate}" />
+          <TextBlock Style="{StaticResource Text.Prose}" Margin="0,10,0,0" MaxWidth="720" HorizontalAlignment="Left"
+                     Text="If firmware virtualization is disabled it must be enabled in the BIOS/UEFI — Windows cannot change it, and this application never modifies firmware or boot settings." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="MONITORS">
+        <ItemsControl ItemsSource="{Binding Displays}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource TableRow}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="170" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
+                  <TextBlock Grid.Column="1" Text="{Binding FriendlyName}" Style="{StaticResource Text.Cell}" />
+                  <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" Style="{StaticResource Text.Cell}" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

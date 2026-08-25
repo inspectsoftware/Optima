@@ -1,0 +1,257 @@
+<UserControl x:Class="Optima.App.Views.PerformanceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1000" HorizontalAlignment="Left">
+
+      <TextBlock Text="PERFORMANCE" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="profiles · session history · benchmark comparison" Style="{StaticResource Text.PageSubtitle}" />
+
+      <!-- Profile list + editor -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PROFILES">
+        <HeaderedContentControl.Tag>
+          <StackPanel Orientation="Horizontal">
+            <Button Style="{StaticResource GhostButton}" Content="import" Command="{Binding ImportProfileCommand}" Padding="6,0" />
+            <Button Style="{StaticResource GhostButton}" Content="export" Command="{Binding ExportProfileCommand}" Padding="6,0" />
+          </StackPanel>
+        </HeaderedContentControl.Tag>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="270" />
+            <ColumnDefinition Width="24" />
+            <ColumnDefinition />
+          </Grid.ColumnDefinitions>
+
+          <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" MaxHeight="270">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="0,3">
+                  <TextBlock Text="{Binding Name}" Style="{StaticResource Text.Value}" />
+                  <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Prose}"
+                             FontSize="{StaticResource Type.Micro}" Foreground="{StaticResource Brush.TextMuted}"
+                             MaxWidth="230" HorizontalAlignment="Left" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <StackPanel Grid.Column="2">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="140" />
+                <ColumnDefinition />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                <RowDefinition /><RowDefinition /><RowDefinition />
+              </Grid.RowDefinitions>
+
+              <TextBlock Text="name" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+              <TextBox Grid.Column="1" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4" />
+
+              <TextBlock Grid.Row="1" Text="virtual display" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+              <CheckBox Grid.Row="1" Grid.Column="1" IsChecked="{Binding EditVirtualDisplay}" VerticalAlignment="Center" Margin="0,4"
+                        Content="enable for this profile" />
+
+              <TextBlock Grid.Row="2" Text="resolution" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+              <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,4">
+                <TextBox Text="{Binding EditWidth}" Width="64" />
+                <TextBlock Text="x" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+                <TextBox Text="{Binding EditHeight}" Width="64" />
+                <TextBlock Text="@" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+                <TextBox Text="{Binding EditRefreshRate}" Width="52" />
+                <TextBlock Text="Hz" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+              </StackPanel>
+
+              <TextBlock Grid.Row="3" Text="power plan" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+              <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding PowerPlanOptions}"
+                        SelectedItem="{Binding EditPowerPlan}" Width="210" HorizontalAlignment="Left" Margin="0,4" />
+
+              <TextBlock Grid.Row="4" Text="process priority" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+              <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding PriorityOptions}"
+                        SelectedItem="{Binding EditPriority}" Width="210" HorizontalAlignment="Left" Margin="0,4" />
+
+              <TextBlock Grid.Row="5" Text="power throttling" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+              <CheckBox Grid.Row="5" Grid.Column="1" Content="disable for game processes"
+                        IsChecked="{Binding EditDisableThrottling}" VerticalAlignment="Center" Margin="0,4" />
+
+              <TextBlock Grid.Row="6" Text="close before launch" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4"
+                         ToolTip="Comma-separated process names. Only these are ever closed, and only when this profile runs." />
+              <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding EditCleanupList}" Margin="0,4"
+                       ToolTip="e.g. Discord, SteamWebHelper — system and Google Play Games processes are always refused" />
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+              <Button Style="{StaticResource PrimaryButton}" Padding="16,7" FontSize="{StaticResource Type.Label}"
+                      Content="SAVE PROFILE" Command="{Binding SaveProfileCommand}" Margin="0,0,8,0" />
+              <Button Style="{StaticResource SecondaryButton}" Content="delete" Command="{Binding DeleteProfileCommand}" />
+            </StackPanel>
+            <TextBlock Text="{Binding EditorStatus}" Style="{StaticResource Text.Prose}"
+                       Foreground="{StaticResource Brush.Warn}" Margin="0,8,0,0" MaxWidth="560" HorizontalAlignment="Left"
+                       Visibility="{Binding EditorStatus, Converter={StaticResource EmptyToCollapsed}}" />
+          </StackPanel>
+        </Grid>
+      </HeaderedContentControl>
+
+      <!-- Per-setting disclosure -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="WHAT EACH SETTING DOES">
+        <ItemsControl ItemsSource="{Binding Explanations}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Expander Margin="0,1">
+                <Expander.Header>
+                  <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Value}" />
+                </Expander.Header>
+                <Grid Margin="0,4,0,10">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110" />
+                    <ColumnDefinition />
+                  </Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                  </Grid.RowDefinitions>
+                  <TextBlock Text="changes" Style="{StaticResource Text.Label}" Margin="0,3" />
+                  <TextBlock Grid.Column="1" Text="{Binding WhatItChanges}" Style="{StaticResource Text.Prose}"
+                             MaxWidth="700" HorizontalAlignment="Left" Margin="0,3" />
+                  <TextBlock Grid.Row="1" Text="benefit" Style="{StaticResource Text.Label}" Margin="0,3" />
+                  <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PotentialBenefit}" Style="{StaticResource Text.Prose}"
+                             Foreground="{StaticResource Brush.Ok}" MaxWidth="700" HorizontalAlignment="Left" Margin="0,3" />
+                  <TextBlock Grid.Row="2" Text="downside" Style="{StaticResource Text.Label}" Margin="0,3" />
+                  <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PotentialDownside}" Style="{StaticResource Text.Prose}"
+                             Foreground="{StaticResource Brush.Warn}" MaxWidth="700" HorizontalAlignment="Left" Margin="0,3" />
+                  <TextBlock Grid.Row="3" Text="requires" Style="{StaticResource Text.Label}" Margin="0,3" />
+                  <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,3">
+                    <TextBlock Text="[ RESTART ]" FontSize="{StaticResource Type.Micro}"
+                               Foreground="{StaticResource Brush.Warn}" Margin="0,0,10,0"
+                               Visibility="{Binding RequiresRestart, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock Text="[ ADMIN ]" FontSize="{StaticResource Type.Micro}"
+                               Foreground="{StaticResource Brush.Warn}"
+                               Visibility="{Binding RequiresAdministrator, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock Text="[ NOTHING ]" FontSize="{StaticResource Type.Micro}"
+                               Foreground="{StaticResource Brush.TextMuted}">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                          <Style.Triggers>
+                            <MultiDataTrigger>
+                              <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding RequiresRestart}" Value="False" />
+                                <Condition Binding="{Binding RequiresAdministrator}" Value="False" />
+                              </MultiDataTrigger.Conditions>
+                              <Setter Property="Visibility" Value="Visible" />
+                            </MultiDataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                  </StackPanel>
+                </Grid>
+              </Expander>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </HeaderedContentControl>
+
+      <!-- Benchmark comparison -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="BENCHMARK COMPARISON">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding CompareProfileA}"
+                      DisplayMemberPath="Name" Width="200" />
+            <TextBlock Text="vs" Margin="12,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+            <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding CompareProfileB}"
+                      DisplayMemberPath="Name" Width="200" />
+            <Button Style="{StaticResource SecondaryButton}" Content="compare" Command="{Binding CompareCommand}"
+                    Margin="12,0,0,0" />
+          </StackPanel>
+
+          <StackPanel Visibility="{Binding Comparison, Converter={StaticResource NullToCollapsed}}" Margin="0,14,0,0">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="170" /><ColumnDefinition Width="150" /><ColumnDefinition Width="150" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition /><RowDefinition /><RowDefinition />
+              </Grid.RowDefinitions>
+              <TextBlock Grid.Column="1" Text="{Binding Comparison.ProfileA}" Style="{StaticResource Text.TableHeader}" />
+              <TextBlock Grid.Column="2" Text="{Binding Comparison.ProfileB}" Style="{StaticResource Text.TableHeader}" />
+              <TextBlock Grid.Row="1" Text="average fps" Style="{StaticResource Text.Label}" Margin="0,4" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Comparison.StatsA.AverageFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Comparison.StatsB.AverageFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Text="1% low" Style="{StaticResource Text.Label}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Comparison.StatsA.OnePercentLowFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Comparison.StatsB.OnePercentLowFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+            </Grid>
+            <TextBlock Text="{Binding Comparison.Verdict}" Margin="0,12,0,0"
+                       MaxWidth="720" HorizontalAlignment="Left">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Prose}">
+                  <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Comparison.IsStatisticallyMeaningful}" Value="True">
+                      <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </StackPanel>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <!-- Session history -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="SESSION HISTORY">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding RefreshSessionsCommand}" Padding="6,0" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <Grid Margin="0,0,0,2">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="130" /><ColumnDefinition Width="180" /><ColumnDefinition Width="90" />
+              <ColumnDefinition Width="110" /><ColumnDefinition Width="90" /><ColumnDefinition Width="110" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="started" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="1" Text="profile" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="2" Text="duration" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="3" Text="avg fps" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="4" Text="1% low" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="5" Text="p99" Style="{StaticResource Text.TableHeader}" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Sessions}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="130" /><ColumnDefinition Width="180" /><ColumnDefinition Width="90" />
+                      <ColumnDefinition Width="110" /><ColumnDefinition Width="90" /><ColumnDefinition Width="110" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding StartedAt, StringFormat={}{0:MM-dd HH:mm}}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="1" Text="{Binding ProfileName}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Duration, StringFormat={}{0:hh\\:mm\\:ss}}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="3" Text="{Binding Stats.AverageFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="4" Text="{Binding Stats.OnePercentLowFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="5" Text="{Binding Stats.P99FrametimeMs, StringFormat={}{0:F1} ms}" Style="{StaticResource Text.Cell}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="no sessions recorded yet — play a round first" Margin="0,8,0,0">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Sessions.Count}" Value="0">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </StackPanel>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,81 @@
+<UserControl x:Class="Optima.App.Views.DiagnosticsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:Optima.App.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}">
+
+      <TextBlock Text="DIAGNOSTICS" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="environment checks · each result carries a reason and a fix"
+                 Style="{StaticResource Text.PageSubtitle}" />
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="CHECKS">
+        <HeaderedContentControl.Tag>
+          <StackPanel Orientation="Horizontal">
+            <ctl:AsciiSpinner Cells="10" Margin="0,0,12,0"
+                              Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}" />
+            <Button Style="{StaticResource SecondaryButton}" Content="run all"
+                    Command="{Binding RunAllCommand}" Padding="10,3" />
+          </StackPanel>
+        </HeaderedContentControl.Tag>
+
+        <StackPanel>
+          <!--
+            One line per check, appended as each completes. The reason trails dimmed on
+            the same row; the fix line only appears under a WARN or FAIL.
+          -->
+          <ItemsControl ItemsSource="{Binding Results}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="0,3">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" MinWidth="16" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="{Binding Status, Converter={StaticResource DiagStatusTag}}"
+                               Foreground="{Binding Status, Converter={StaticResource DiagStatusBrush}}"
+                               FontSize="{StaticResource Type.Label}" />
+                    <TextBlock Grid.Column="1" Text="{Binding CheckName}" Style="{StaticResource Text.Value}"
+                               Margin="10,0,0,0" />
+                    <Rectangle Grid.Column="2" Style="{StaticResource Leader}" />
+                    <TextBlock Grid.Column="3" Text="{Binding Reason}" Style="{StaticResource Text.Prose}"
+                               Foreground="{StaticResource Brush.TextMuted}"
+                               FontSize="{StaticResource Type.Micro}"
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="440" />
+                  </Grid>
+
+                  <!-- Fix, shown only where there is a problem to fix -->
+                  <StackPanel Orientation="Horizontal" Margin="0,3,0,2"
+                              Visibility="{Binding Status, Converter={StaticResource DiagStatusIsProblem}}">
+                    <TextBlock Text="&#x2514;" Foreground="{StaticResource Brush.Hairline}"
+                               Margin="6,0,8,0" VerticalAlignment="Top" />
+                    <TextBlock Text="{Binding RecommendedFix}" Style="{StaticResource Text.Prose}"
+                               Foreground="{StaticResource Brush.Warn}" MaxWidth="720" />
+                  </StackPanel>
+
+                  <Expander Header="details" Margin="24,0,0,4"
+                            Visibility="{Binding Details, Converter={StaticResource EmptyToCollapsed}}">
+                    <TextBlock Text="{Binding Details}" Style="{StaticResource Text.Micro}"
+                               Foreground="{StaticResource Brush.TextSecondary}"
+                               TextWrapping="Wrap" TextTrimming="None" />
+                  </Expander>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- Cursor block while checks are still arriving -->
+          <TextBlock Text="&#x258C;" Foreground="{StaticResource Brush.TextMuted}" Margin="0,4,0,0"
+                     Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}" />
+
+          <TextBlock Text="{Binding Summary}" Style="{StaticResource Text.Value}" Margin="0,12,0,0"
+                     Visibility="{Binding Summary, Converter={StaticResource EmptyToCollapsed}}" />
+        </StackPanel>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
