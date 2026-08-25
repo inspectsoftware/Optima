@@ -43,6 +43,11 @@ public sealed partial class HomeViewModel : ObservableObject
     [ObservableProperty] private string _frametimeText = "---";
     [ObservableProperty] private string _gpuTempText = string.Empty;
 
+    // Numeric counterparts driving the ASCII meters; the strings above are what gets read.
+    [ObservableProperty] private double _cpuPercent;
+    [ObservableProperty] private double _gpuPercent;
+    [ObservableProperty] private double _ramPercent;
+
     private DateTimeOffset _lastFpsSample = DateTimeOffset.MinValue;
 
     public async Task InitializeAsync(CancellationToken ct = default)
@@ -64,8 +69,14 @@ public sealed partial class HomeViewModel : ObservableObject
         {
             CpuUsage = $"{metrics.CpuUtilizationPercent:F0}%";
             GpuUsage = $"{metrics.GpuUtilizationPercent:F0}%";
-            RamUsage = $"{metrics.RamUsedBytes / (1024.0 * 1024 * 1024):F1} GB";
-            GpuTempText = metrics.GpuTemperatureCelsius is { } temp ? $"{temp:F0} °C" : string.Empty;
+            RamUsage = $"{metrics.RamUsedBytes / (1024.0 * 1024 * 1024):F1}G";
+            GpuTempText = metrics.GpuTemperatureCelsius is { } temp ? $"{temp:F0}°C" : string.Empty;
+
+            CpuPercent = metrics.CpuUtilizationPercent;
+            GpuPercent = metrics.GpuUtilizationPercent;
+            RamPercent = metrics.RamTotalBytes > 0
+                ? 100.0 * metrics.RamUsedBytes / metrics.RamTotalBytes
+                : 0;
 
             // FPS goes stale when the game stops presenting.
             if (DateTimeOffset.UtcNow - _lastFpsSample > TimeSpan.FromSeconds(5))

@@ -24,6 +24,8 @@ public sealed partial class LogsViewModel : ObservableObject
         Entries = App.LogSink.Entries;
         FilteredView = CollectionViewSource.GetDefaultView(Entries);
         FilteredView.Filter = FilterEntry;
+        LineCount = Entries.Count;
+        Entries.CollectionChanged += (_, _) => LineCount = Entries.Count;
     }
 
     public ObservableCollection<LogEntry> Entries { get; }
@@ -33,6 +35,11 @@ public sealed partial class LogsViewModel : ObservableObject
     [ObservableProperty] private string _selectedLevel = "TRACE";
     [ObservableProperty] private string _searchText = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;
+
+    /// <summary>When on, the view scrolls to follow new entries as they arrive.</summary>
+    [ObservableProperty] private bool _tailEnabled = true;
+
+    [ObservableProperty] private int _lineCount;
 
     partial void OnSelectedLevelChanged(string value) => FilteredView.Refresh();
     partial void OnSearchTextChanged(string value) => FilteredView.Refresh();

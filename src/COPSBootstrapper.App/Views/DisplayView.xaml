@@ -1,140 +1,165 @@
 <UserControl x:Class="COPSBootstrapper.App.Views.DisplayView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:COPSBootstrapper.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="28,24" MaxWidth="900" HorizontalAlignment="Left">
-      <TextBlock Text="DISPLAY" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="Virtual display control and attached monitors"
-                 Foreground="{StaticResource Brush.TextMuted}" FontSize="13" Margin="0,0,0,20" />
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="940" HorizontalAlignment="Left">
 
-      <!-- Virtual display -->
-      <Border Style="{StaticResource Card}">
+      <TextBlock Text="DISPLAY" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="virtual display control and attached monitors" Style="{StaticResource Text.PageSubtitle}" />
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="VIRTUAL DISPLAY">
         <StackPanel>
-          <TextBlock Text="VIRTUAL DISPLAY" Style="{StaticResource Text.SectionHeader}" />
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel>
-              <TextBlock Text="{Binding ProviderName}" FontSize="14" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding ProviderCapabilities}" Style="{StaticResource Text.Label}" FontSize="11" Margin="0,3,0,0" />
-              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0">
-                  <Ellipse.Style>
-                    <Style TargetType="Ellipse">
-                      <Setter Property="Fill" Value="{StaticResource Brush.TextMuted}" />
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding ProviderName}" FontSize="{StaticResource Type.Title}"
+                           Foreground="{StaticResource Brush.Text}" />
+                <TextBlock Margin="12,0,0,0" VerticalAlignment="Center"
+                           FontSize="{StaticResource Type.Label}">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+                      <Setter Property="Text" Value="[ OFF ]" />
+                      <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
                       <Style.Triggers>
                         <DataTrigger Binding="{Binding VirtualDisplayActive}" Value="True">
-                          <Setter Property="Fill" Value="{StaticResource Brush.Success}" />
+                          <Setter Property="Text" Value="[ ACTIVE ]" />
+                          <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
                         </DataTrigger>
                       </Style.Triggers>
                     </Style>
-                  </Ellipse.Style>
-                </Ellipse>
-                <TextBlock Text="{Binding VirtualDisplayModeText}" Style="{StaticResource Text.Value}" />
+                  </TextBlock.Style>
+                </TextBlock>
               </StackPanel>
+              <TextBlock Text="{Binding ProviderCapabilities}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0" />
+              <TextBlock Text="{Binding VirtualDisplayModeText, StringFormat='mode · {0}'}"
+                         Style="{StaticResource Text.Value}" Margin="0,6,0,0" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-              <Button Style="{StaticResource SecondaryButton}" Content="Enable"
+              <Button Style="{StaticResource SecondaryButton}" Content="enable"
                       Command="{Binding EnableVirtualDisplayCommand}" Margin="0,0,8,0" />
-              <Button Style="{StaticResource SecondaryButton}" Content="Disable"
+              <Button Style="{StaticResource SecondaryButton}" Content="disable"
                       Command="{Binding DisableVirtualDisplayCommand}" />
             </StackPanel>
           </Grid>
 
-          <Separator />
+          <Rectangle Height="1" Fill="{StaticResource Brush.Hairline}" Margin="0,14" />
 
-          <TextBlock Text="MODE PRESETS" Style="{StaticResource Text.SectionHeader}" />
-          <StackPanel Orientation="Horizontal">
-            <ComboBox ItemsSource="{Binding ModePresets}" SelectedItem="{Binding SelectedPreset}" Width="220" />
-            <Button Style="{StaticResource SecondaryButton}" Content="Apply preset"
-                    Command="{Binding ApplyPresetCommand}" Margin="10,0,0,0" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="preset" Style="{StaticResource Text.Label}" VerticalAlignment="Center"
+                       Width="70" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+              <ComboBox ItemsSource="{Binding ModePresets}" SelectedItem="{Binding SelectedPreset}" Width="210" />
+              <Button Style="{StaticResource SecondaryButton}" Content="apply"
+                      Command="{Binding ApplyPresetCommand}" Margin="10,0,0,0" />
+            </StackPanel>
+          </Grid>
+
+          <Grid Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="custom" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Width="70" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+              <TextBox Text="{Binding CustomWidth}" Width="64" />
+              <TextBlock Text="x" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding CustomHeight}" Width="64" />
+              <TextBlock Text="@" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding CustomRefreshRate}" Width="52" />
+              <TextBlock Text="Hz" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+              <Button Style="{StaticResource SecondaryButton}" Content="apply"
+                      Command="{Binding ApplyCustomModeCommand}" Margin="10,0,0,0" />
+            </StackPanel>
+          </Grid>
+
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
+                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+            <ctl:AsciiSpinner Cells="12" Margin="0,0,10,0" />
+            <TextBlock Text="working" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
           </StackPanel>
 
-          <TextBlock Text="CUSTOM MODE" Style="{StaticResource Text.SectionHeader}" Margin="0,16,0,8" />
-          <StackPanel Orientation="Horizontal">
-            <TextBox Text="{Binding CustomWidth}" Width="70" />
-            <TextBlock Text="×" Margin="6,0" VerticalAlignment="Center" />
-            <TextBox Text="{Binding CustomHeight}" Width="70" />
-            <TextBlock Text="@" Margin="6,0" VerticalAlignment="Center" />
-            <TextBox Text="{Binding CustomRefreshRate}" Width="52" />
-            <TextBlock Text="Hz" Margin="6,0" VerticalAlignment="Center" />
-            <Button Style="{StaticResource SecondaryButton}" Content="Apply custom mode"
-                    Command="{Binding ApplyCustomModeCommand}" Margin="10,0,0,0" />
-          </StackPanel>
-
-          <ProgressBar IsIndeterminate="True" Margin="0,12,0,0"
-                       Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
-          <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource Brush.Warning}" FontSize="12"
-                     TextWrapping="Wrap" Margin="0,10,0,0"
+          <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Text.Prose}"
+                     Foreground="{StaticResource Brush.Warn}" Margin="0,10,0,0" MaxWidth="760"
+                     HorizontalAlignment="Left"
                      Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToCollapsed}}" />
 
-          <Border Background="#221A0E" BorderBrush="{StaticResource Brush.Warning}" BorderThickness="1"
-                  CornerRadius="6" Padding="12" Margin="0,12,0,0"
+          <!-- Safety net: the topology captured before any change can always be put back -->
+          <Border Style="{StaticResource Callout}" BorderBrush="{StaticResource Brush.Warn}" Margin="0,12,0,0"
                   Visibility="{Binding CanEmergencyRestore, Converter={StaticResource BoolToVis}}">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition />
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
-              <TextBlock Text="Display configuration was changed this session. If anything looks wrong, restore the previous layout."
-                         FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="[WARN] display configuration changed this session"
+                           Foreground="{StaticResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
+                <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" MaxWidth="560"
+                           HorizontalAlignment="Left"
+                           Text="If anything looks wrong, this puts the previous layout back immediately." />
+              </StackPanel>
               <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="EMERGENCY RESTORE"
-                      Command="{Binding EmergencyRestoreCommand}" Margin="10,0,0,0" />
+                      Command="{Binding EmergencyRestoreCommand}" Margin="12,0,0,0" VerticalAlignment="Center" />
             </Grid>
           </Border>
         </StackPanel>
-      </Border>
+      </HeaderedContentControl>
 
-      <!-- Attached displays -->
-      <Border Style="{StaticResource Card}" Margin="0,16,0,0">
-        <StackPanel>
-          <Grid>
-            <TextBlock Text="ATTACHED DISPLAYS" Style="{StaticResource Text.SectionHeader}" />
-            <Button Style="{StaticResource SecondaryButton}" Content="Refresh" HorizontalAlignment="Right"
-                    Command="{Binding RefreshCommand}" />
-          </Grid>
-          <ItemsControl ItemsSource="{Binding Displays}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Border BorderBrush="{StaticResource Brush.Border}" BorderThickness="0,0,0,1" Padding="0,8">
-                  <Grid>
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="130" /><ColumnDefinition /><ColumnDefinition Width="150" />
-                      <ColumnDefinition Width="80" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding DeviceName}" FontFamily="{StaticResource Font.Mono}" FontSize="12" />
-                    <TextBlock Grid.Column="1" Text="{Binding AdapterName}" FontSize="12" />
-                    <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" FontSize="12" />
-                    <TextBlock Grid.Column="3" FontSize="12" Foreground="{StaticResource Brush.TextMuted}">
-                      <TextBlock.Style>
-                        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                          <Setter Property="Text" Value="inactive" />
-                          <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsPrimary}" Value="True">
-                              <Setter Property="Text" Value="primary" />
-                              <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
-                            </DataTrigger>
-                            <MultiDataTrigger>
-                              <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding IsActive}" Value="True" />
-                                <Condition Binding="{Binding IsPrimary}" Value="False" />
-                              </MultiDataTrigger.Conditions>
-                              <Setter Property="Text" Value="active" />
-                              <Setter Property="Foreground" Value="{StaticResource Brush.Success}" />
-                            </MultiDataTrigger>
-                          </Style.Triggers>
-                        </Style>
-                      </TextBlock.Style>
-                    </TextBlock>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </Border>
+      <HeaderedContentControl Style="{StaticResource Section}" Header="ATTACHED DISPLAYS">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding RefreshCommand}" Padding="6,0" />
+        </HeaderedContentControl.Tag>
+        <ItemsControl ItemsSource="{Binding Displays}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource TableRow}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="128" />
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="92" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
+                  <TextBlock Grid.Column="1" Text="{Binding AdapterName}" Style="{StaticResource Text.Cell}" />
+                  <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" Style="{StaticResource Text.Cell}" />
+                  <TextBlock Grid.Column="3" FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+                        <Setter Property="Text" Value="[ ---- ]" />
+                        <Setter Property="Foreground" Value="{StaticResource Brush.Hairline}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding IsPrimary}" Value="True">
+                            <Setter Property="Text" Value="[ PRIMARY ]" />
+                            <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+                          </DataTrigger>
+                          <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                              <Condition Binding="{Binding IsActive}" Value="True" />
+                              <Condition Binding="{Binding IsPrimary}" Value="False" />
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Text" Value="[ ACTIVE ]" />
+                            <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                          </MultiDataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </HeaderedContentControl>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

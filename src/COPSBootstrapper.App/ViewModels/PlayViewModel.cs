@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using COPSBootstrapper.Core.Configuration;
@@ -17,6 +18,7 @@ public sealed partial class PlayViewModel : ObservableObject
     private readonly StatusViewModel _status;
     private readonly ILogger<PlayViewModel> _logger;
     private CancellationTokenSource? _sessionCts;
+    private DispatcherTimer? _elapsedTimer;
 
     public PlayViewModel(
         LaunchOrchestrator orchestrator,
@@ -41,9 +43,19 @@ public sealed partial class PlayViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PlayButtonText))]
+    [NotifyPropertyChangedFor(nameof(SessionTag))]
     [NotifyCanExecuteChangedFor(nameof(PlayCommand))]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
     private bool _isSessionActive;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SessionTag))]
+    private TimeSpan _sessionElapsed;
+
+    /// <summary>Title-bar state tag, visible from every page.</summary>
+    public string SessionTag => IsSessionActive
+        ? $"[ RUNNING {SessionElapsed:mm\\:ss} ]"
+        : "[ IDLE ]";
 
     [ObservableProperty]
     private string _phaseText = string.Empty;
@@ -100,6 +112,15 @@ public sealed partial class PlayViewModel : ObservableObject
         _sessionCts = new CancellationTokenSource();
         var profile = SelectedProfile;
 
+        var startedAt = DateTimeOffset.UtcNow;
+        SessionElapsed = TimeSpan.Zero;
+        _elapsedTimer = new DispatcherTimer(DispatcherPriority.Normal, Application.Current.Dispatcher)
+        {
+            Interval = TimeSpan.FromSeconds(1),
+        };
+        _elapsedTimer.Tick += (_, _) => SessionElapsed = DateTimeOffset.UtcNow - startedAt;
+        _elapsedTimer.Start();
+
         try
         {
             var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, _sessionCts.Token));
@@ -125,6 +146,8 @@ public sealed partial class PlayViewModel : ObservableObject
         }
         finally
         {
+            _elapsedTimer?.Stop();
+            _elapsedTimer = null;
             IsSessionActive = false;
             _sessionCts?.Dispose();
             _sessionCts = null;

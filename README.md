@@ -18,6 +18,24 @@ Open COPS Bootstrapper → pick a profile → PLAY
   → game closes → original system state restored → session statistics
 ```
 
+## Interface
+
+A black, monochrome, restrained-terminal UI. White is the only accent; hue appears solely inside
+status tags (`[ OK ]` / `[WARN]` / `[FAIL]`), which is roughly two percent of the pixels on screen.
+Structure and data are set in Cascadia Mono and the proportional face is reserved for running prose,
+so the app reads as a terminal without becoming hard to read where it actually explains something.
+
+- **Custom window chrome** via `WindowChrome` — native snap, resize and Aero Snap are preserved.
+  The caption carries a breadcrumb and a live `[ RUNNING mm:ss ]` session tag.
+- **Numbered navigation** wired to real **Alt+1…9** shortcuts, with a `>` prompt marker on the
+  active row that follows navigation from any source.
+- **ASCII meters** (`████████░░░░`) beside — never instead of — the numeric readouts.
+- **Dot-leader rows** connecting every label to its value, from one shared row template.
+- **Contrast floor of 4.5:1 (WCAG AA)** on the dimmest text, verified against rendered pixels
+  (`#757D88` on `#07080A` measures 4.81:1) so no gray is too dim to read.
+- Every WPF control is re-templated — scrollbars, ComboBox popups, ListBox selection, checkboxes
+  (`[X]` / `[ ]`), expanders and progress indicators. No stock Windows chrome leaks through.
+
 ## Features
 
 - **Detection** — Google Play Games install (registry → protocol handler → known folders →

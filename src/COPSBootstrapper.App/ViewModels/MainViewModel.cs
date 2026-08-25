@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -7,6 +8,24 @@ using COPSBootstrapper.Core.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace COPSBootstrapper.App.ViewModels;
+
+/// <summary>One sidebar row. <see cref="Key"/> doubles as the navigation command parameter.</summary>
+public sealed partial class NavItem : ObservableObject
+{
+    public NavItem(string index, string key)
+    {
+        Index = index;
+        Key = key;
+    }
+
+    /// <summary>Row number shown left of the label; also the Alt+N shortcut it answers to.</summary>
+    public string Index { get; }
+
+    public string Key { get; }
+
+    [ObservableProperty]
+    private bool _isActive;
+}
 
 /// <summary>
 /// Application shell: sidebar navigation, startup sequence (crash recovery prompt → first-run
@@ -76,9 +95,36 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _developerModeVisible;
 
+    /// <summary>Path-style label for the current page, shown in the title bar.</summary>
+    [ObservableProperty]
+    private string _breadcrumb = "~/home";
+
+    /// <summary>
+    /// Sidebar rows. Data-driven rather than hand-written elements so the active marker
+    /// follows every navigation route — mouse, Alt+N shortcut, or a programmatic jump.
+    /// </summary>
+    public ObservableCollection<NavItem> NavItems { get; } =
+    [
+        new("01", "HOME") { IsActive = true },
+        new("02", "PLAY"),
+        new("03", "PERFORMANCE"),
+        new("04", "DISPLAY"),
+        new("05", "SYSTEM"),
+        new("06", "DIAGNOSTICS"),
+        new("07", "LOGS"),
+        new("08", "SETTINGS"),
+        new("09", "DEVELOPER"),
+    ];
+
     [RelayCommand]
     private async Task NavigateAsync(string page)
     {
+        Breadcrumb = "~/" + page.ToLowerInvariant();
+        foreach (var item in NavItems)
+        {
+            item.IsActive = string.Equals(item.Key, page, StringComparison.OrdinalIgnoreCase);
+        }
+
         CurrentPage = page switch
         {
             "HOME" => Home,

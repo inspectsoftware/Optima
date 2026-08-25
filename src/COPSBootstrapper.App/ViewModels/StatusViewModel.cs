@@ -25,7 +25,7 @@ public sealed partial class StatusItem : ObservableObject
     public string Label { get; }
 
     [ObservableProperty]
-    private string _value = "Checking…";
+    private string _value = "····";
 
     [ObservableProperty]
     private StatusKind _kind = StatusKind.Unknown;
@@ -71,32 +71,34 @@ public sealed partial class StatusViewModel : ObservableObject
     {
         try
         {
+            // Values render inside bracket tags, so status words are upper-case by design.
             DetectedPlatform = await _detector.DetectPlatformAsync(ct);
             Set(GooglePlayGames,
-                DetectedPlatform is null ? "Not found" : DetectedPlatform.ServiceRunning ? "Ready" : "Installed",
+                DetectedPlatform is null ? "NOT FOUND" : DetectedPlatform.ServiceRunning ? "READY" : "INSTALLED",
                 DetectedPlatform is null ? StatusKind.Bad : StatusKind.Good);
 
             DetectedGame = await _detector.DetectTargetGameAsync(ct);
             Set(CriticalOps,
-                DetectedGame is null ? "Not installed" : "Installed",
+                DetectedGame is null ? "NOT INSTALLED" : "INSTALLED",
                 DetectedGame is null ? StatusKind.Bad : StatusKind.Good);
 
             var vddAvailable = await _virtualDisplay.IsAvailableAsync(ct);
             var vddActive = vddAvailable && await _virtualDisplay.IsDisplayActiveAsync(ct);
             Set(VirtualDisplay,
-                !vddAvailable ? "Not detected" : vddActive ? "Active" : "Ready",
+                !vddAvailable ? "NOT DETECTED" : vddActive ? "ACTIVE" : "READY",
                 !vddAvailable ? StatusKind.Warning : StatusKind.Good);
 
             var virtualization = await _systemInfo.GetVirtualizationStateAsync(ct);
             var virtOk = virtualization.HypervisorPresent == true || virtualization.FirmwareVirtualizationEnabled == true;
             Set(Virtualization,
-                virtOk ? "Enabled" : "Disabled",
+                virtOk ? "ENABLED" : "DISABLED",
                 virtOk ? StatusKind.Good : StatusKind.Bad);
 
+            // Not a status word — a measurement — so it keeps its natural casing.
             var displays = (await _systemInfo.GetInventoryAsync(ct)).Displays;
             var primary = displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault(d => d.IsActive);
             Set(Display,
-                primary is null ? "Unknown" : primary.CurrentMode.ToString(),
+                primary is null ? "UNKNOWN" : primary.CurrentMode.ToString(),
                 primary is null ? StatusKind.Warning : StatusKind.Good);
 
             GameIsRunning = await _processMonitor.GetGameStateAsync(ct) == GameRuntimeState.Running;
