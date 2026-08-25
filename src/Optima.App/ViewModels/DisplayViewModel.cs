@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
@@ -58,6 +59,7 @@ public sealed partial class DisplayViewModel : ObservableObject
     // Driver install state. Drives the actionable banner shown when no device exists.
     [ObservableProperty] private bool _driverMissing;
     [ObservableProperty] private bool _canInstallDriver;
+    [ObservableProperty] private string _driverBannerText = string.Empty;
     [ObservableProperty] private string _driverPackageText = string.Empty;
     [ObservableProperty] private bool _restartRequired;
 
@@ -110,14 +112,44 @@ public sealed partial class DisplayViewModel : ObservableObject
         DriverMissing = state != DriverState.Installed;
         CanInstallDriver = state == DriverState.NotInstalledPackageAvailable;
 
-        DriverPackageText = state switch
+        // The banner must not promise an install when there is nothing to install from,
+        // so the headline changes with the state rather than only the fine print.
+        DriverBannerText = state switch
         {
-            DriverState.NotInstalledPackageAvailable when _driverInstaller.FindBundledPackage() is { } p
-                => $"bundled package: {p.DisplayName}" + (p.HasCatalog ? string.Empty : "  (unsigned, Windows will refuse it)"),
+            DriverState.NotInstalledPackageAvailable
+                => "Optima can install the driver for you. It needs one administrator approval, and adds a display device Windows can render to.",
             DriverState.NotInstalledNoPackage
-                => $"no driver package is bundled with this build (expected in the '{VddDriverInstaller.BundledDriverFolder}' folder)",
+                => $"No driver package ships with this build, so there is nothing to install yet. Put one in the '{VddDriverInstaller.BundledDriverFolder}' folder beside Optima.exe and this becomes a one-click install. Everything else works without it; virtual display features fall back to the mock provider.",
             _ => string.Empty,
         };
+
+        DriverPackageText = state == DriverState.NotInstalledPackageAvailable
+            && _driverInstaller.FindBundledPackage() is { } package
+                ? $"bundled package: {package.DisplayName}"
+                    + (package.HasCatalog ? string.Empty : "  (unsigned, Windows will refuse it)")
+                : string.Empty;
+    }
+
+    /// <summary>
+    /// Opens the folder a driver package belongs in, creating it if needed. Turns the
+    /// "nothing bundled" state into something actionable instead of a dead end.
+    /// </summary>
+    [RelayCommand]
+    private void OpenDriversFolder()
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, VddDriverInstaller.BundledDriverFolder);
+        try
+        {
+            Directory.CreateDirectory(folder);
+            using var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+            StatusMessage = string.Empty;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            _logger.LogWarning(ex, "Could not open the drivers folder at {Folder}", folder);
+            StatusMessage = $"Could not open {folder}.";
+        }
     }
 
     /// <summary>Installs the bundled driver so the user never has to touch Device Manager.</summary>

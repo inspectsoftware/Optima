@@ -107,16 +107,23 @@
               <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="[WARN] no virtual display device"
                            Foreground="{StaticResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
-                <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" MaxWidth="620"
-                           HorizontalAlignment="Left"
-                           Text="Optima can install the driver for you. It needs one administrator approval, and adds a display device Windows can render to." />
+                <TextBlock Text="{Binding DriverBannerText}" Style="{StaticResource Text.Prose}"
+                           Margin="0,4,0,0" MaxWidth="620" HorizontalAlignment="Left" />
                 <TextBlock Text="{Binding DriverPackageText}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0"
                            Visibility="{Binding DriverPackageText, Converter={StaticResource EmptyToCollapsed}}" />
               </StackPanel>
+              <!-- Only offer the install when there is something to install from; otherwise
+                   offer the folder to put a package in, rather than an unpressable button. -->
               <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
                       Padding="16,8" FontSize="{StaticResource Type.Label}"
                       Content="INSTALL DRIVER" Command="{Binding InstallDriverCommand}"
-                      IsEnabled="{Binding CanInstallDriver}" Margin="12,0,0,0" VerticalAlignment="Center" />
+                      Margin="12,0,0,0" VerticalAlignment="Center"
+                      Visibility="{Binding CanInstallDriver, Converter={StaticResource BoolToVis}}" />
+              <Button Grid.Column="1" Style="{StaticResource SecondaryButton}"
+                      Padding="14,8" Content="open drivers folder"
+                      Command="{Binding OpenDriversFolderCommand}"
+                      Margin="12,0,0,0" VerticalAlignment="Center"
+                      Visibility="{Binding CanInstallDriver, Converter={StaticResource InverseBoolToVis}}" />
             </Grid>
           </Border>
 
