@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace Optima.Elevated;
 
 /// <summary>
-/// Creates and removes root-enumerated device nodes via SetupAPI — the work `devcon install`
+/// Creates and removes root-enumerated device nodes via SetupAPI, the work `devcon install`
 /// does, done in-process so no WDK tool has to be redistributed.
 ///
 /// This is required because an IddCx virtual display is enumerated by ROOT rather than by a
@@ -12,7 +12,7 @@ namespace Optima.Elevated;
 /// </summary>
 internal static class DeviceInstaller
 {
-    // {4d36e968-e325-11ce-bfc1-08002be10318} — the Display device class.
+    // {4d36e968-e325-11ce-bfc1-08002be10318} is the Display device class.
     private static readonly Guid DisplayClassGuid = new("4d36e968-e325-11ce-bfc1-08002be10318");
 
     private const uint DICD_GENERATE_ID = 0x00000001;

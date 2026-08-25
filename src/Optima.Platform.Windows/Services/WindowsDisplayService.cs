@@ -197,7 +197,7 @@ public sealed class WindowsDisplayService : IDisplayService
             var paths = MemoryMarshal.Cast<byte, DISPLAYCONFIG_PATH_INFO>(pathBytes).ToArray();
             var modes = MemoryMarshal.Cast<byte, DISPLAYCONFIG_MODE_INFO>(modeBytes).ToArray();
 
-            // Exact restore first — SDC_ALLOW_CHANGES lets Windows remap unusual refresh rates
+            // Exact restore first, because SDC_ALLOW_CHANGES lets Windows remap unusual refresh rates
             // (e.g. a virtual display idling at 999 Hz), so it is only the fallback.
             var result = SetDisplayConfig((uint)paths.Length, paths, (uint)modes.Length, modes,
                 SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG);
@@ -259,7 +259,7 @@ public sealed class WindowsDisplayService : IDisplayService
 
     private static (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) QueryActiveTopology()
     {
-        // Buffer sizes can change between the two calls (hotplug) — retry a few times.
+        // Buffer sizes can change between the two calls (hotplug), so retry a few times.
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var sizeResult = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out var pathCount, out var modeCount);

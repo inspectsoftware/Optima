@@ -3,7 +3,7 @@ using Optima.Driver;
 using Optima.Platform.Windows.Services;
 using Microsoft.Extensions.Logging;
 
-// Optima.LiveCheck — developer smoke-check for the display stack against real hardware.
+// Optima.LiveCheck is a developer smoke-check for the display stack against real hardware.
 // Non-destructive: captures the display topology first, applies one mode to the virtual display,
 // then restores the captured topology and verifies the round-trip. Never touches physical panels.
 
@@ -21,7 +21,7 @@ foreach (var display in displays)
 var vdd = displays.FirstOrDefault(d => d.IsActive && d.AdapterName.Contains("Virtual Display", StringComparison.OrdinalIgnoreCase));
 if (vdd is null)
 {
-    Console.WriteLine("No active virtual display found — enable it first (Device Manager or the app).");
+    Console.WriteLine("No active virtual display found. Enable it first (Device Manager or the app).");
     return 2;
 }
 

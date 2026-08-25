@@ -16,7 +16,7 @@ internal static partial class DisplayNative
     internal const int DISP_CHANGE_BADMODE = -2;
     internal const int DISP_CHANGE_FAILED = -1;
 
-    internal const int CDS_UPDATEREGISTRY = 0x01; // deliberately never used — changes stay temporary
+    internal const int CDS_UPDATEREGISTRY = 0x01; // deliberately never used, changes stay temporary
     internal const int CDS_TEST = 0x02;
 
     internal const int DM_PELSWIDTH = 0x80000;

@@ -109,7 +109,7 @@ internal static class PowerNative
         var result = PowerDuplicateScheme(IntPtr.Zero, ref source, out var destPtr);
         if (result != ERROR_SUCCESS)
         {
-            // Template not available (e.g. Home SKU restrictions) — fall back to High Performance.
+            // Template not available (e.g. Home SKU restrictions), so fall back to High Performance.
             return HighPerformanceScheme;
         }
         try

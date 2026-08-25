@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Optima.Core.Detection;
 
 /// <summary>
-/// Minimal INF reader — just enough to learn the hardware id a root-enumerated driver
+/// Minimal INF reader, just enough to learn the hardware id a root-enumerated driver
 /// must be installed against, plus the provider/description for display.
 ///
 /// Root devices do not appear on their own, so installing one means creating the node
@@ -44,7 +44,7 @@ public static partial class InfFile
                 {
                     continue;
                 }
-                // "%Mfg% = Models, NTamd64.10.0..." — the section is the first value, the
+                // "%Mfg% = Models, NTamd64.10.0...": the section is the first value, the
                 // rest are target decorations that suffix it (Models.NTamd64.10.0).
                 var parts = kv.Groups["value"].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 0)
@@ -59,7 +59,7 @@ public static partial class InfFile
             }
         }
 
-        // Prefer a decorated (architecture-specific) section — that is what Windows uses.
+        // Prefer a decorated (architecture-specific) section; that is what Windows uses.
         foreach (var name in modelSectionNames.OrderByDescending(n => n.Count(c => c == '.')))
         {
             if (!sections.TryGetValue(name, out var models))

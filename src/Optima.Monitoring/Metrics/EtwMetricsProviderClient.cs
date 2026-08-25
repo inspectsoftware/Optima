@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Monitoring.Metrics;
 
 /// <summary>
-/// FPS / frametime provider (§12–13) backed by the elevated helper's ETW present trace.
+/// FPS / frametime provider (§12-13) backed by the elevated helper's ETW present trace.
 /// This process never touches the game: it only receives per-second samples over IPC and the
 /// aggregate statistics when the trace stops.
 /// </summary>
@@ -116,7 +116,7 @@ public sealed class EtwMetricsProviderClient : IPerformanceMetricsProvider
             {
                 return _finalStats;
             }
-            // Session still running — best-effort stats from live per-second frametimes.
+            // Session still running, so best-effort stats from live per-second frametimes.
             return FrametimeStatistics.Compute(_liveFrametimes);
         }
     }

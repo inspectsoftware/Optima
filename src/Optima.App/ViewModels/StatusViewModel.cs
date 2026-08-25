@@ -85,7 +85,7 @@ public sealed partial class StatusViewModel : ObservableObject
                 DetectedGame is null ? "NOT INSTALLED" : "INSTALLED",
                 DetectedGame is null ? StatusKind.Bad : StatusKind.Good);
 
-            // Device presence is the authority — a leftover settings file from a driver that
+            // Device presence is the authority. A leftover settings file from a driver that
             // has since been uninstalled would otherwise report READY with no device at all.
             var driverState = await _driverInstaller.GetStateAsync(ct);
             if (driverState != DriverState.Installed)
@@ -106,7 +106,7 @@ public sealed partial class StatusViewModel : ObservableObject
                 virtOk ? "ENABLED" : "DISABLED",
                 virtOk ? StatusKind.Good : StatusKind.Bad);
 
-            // Not a status word — a measurement — so it keeps its natural casing.
+            // Not a status word but a measurement, so it keeps its natural casing.
             var displays = (await _systemInfo.GetInventoryAsync(ct)).Displays;
             var primary = displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault(d => d.IsActive);
             Set(Display,

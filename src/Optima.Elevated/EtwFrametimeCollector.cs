@@ -8,7 +8,7 @@ namespace Optima.Elevated;
 
 /// <summary>
 /// External frametime capture (§12/§13): a real-time ETW session on the Microsoft-Windows-DXGI
-/// provider records IDXGISwapChain::Present events for one process id — the PresentMon approach.
+/// provider records IDXGISwapChain::Present events for one process id, the PresentMon approach.
 /// Nothing is injected into any process; this only listens to events Windows already emits.
 /// Publishes one "etwSample" event per second (fps + average frametime) and returns aggregate
 /// statistics on stop.
@@ -59,7 +59,7 @@ public sealed class EtwFrametimeCollector : IDisposable
             }
             catch (Exception)
             {
-                // Session disposed or lost — processing simply ends.
+                // Session disposed or lost, so processing simply ends.
             }
         })
         {
@@ -118,7 +118,7 @@ public sealed class EtwFrametimeCollector : IDisposable
         {
             if (_presentsInWindow == 0)
             {
-                return; // game paused / minimized — publish nothing rather than zeros
+                return; // game paused / minimized, so publish nothing rather than zeros
             }
             fps = _presentsInWindow;
             avgFrametime = _frametimeSumInWindow / _presentsInWindow;

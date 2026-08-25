@@ -80,7 +80,7 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
                 {
-                    _logger.LogWarning(ex, "Could not fully optimize process {Pid} — partial settings remain and will be restored", processId);
+                    _logger.LogWarning(ex, "Could not fully optimize process {Pid}, partial settings remain and will be restored", processId);
                 }
 
                 return snapshot;
@@ -97,7 +97,7 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
             }
             catch (ArgumentException)
             {
-                return; // Process already gone — nothing to restore.
+                return; // Process already gone, nothing to restore.
             }
 
             using (process)

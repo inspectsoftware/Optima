@@ -19,7 +19,7 @@ public interface IPerformanceMonitor : IAsyncDisposable
 }
 
 /// <summary>
-/// External FPS / frametime source (§12–13). Never injects into the game —
+/// External FPS / frametime source (§12-13). Never injects into the game;
 /// implementations use ETW present statistics or stay mocked.
 /// </summary>
 public interface IPerformanceMetricsProvider : IAsyncDisposable

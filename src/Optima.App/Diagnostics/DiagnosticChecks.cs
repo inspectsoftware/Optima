@@ -23,7 +23,7 @@ public sealed class VirtualizationCheck : IDiagnosticCheck
             {
                 CheckName = Name,
                 Status = DiagnosticStatus.Pass,
-                Reason = "A hypervisor is running — hardware virtualization is active.",
+                Reason = "A hypervisor is running, so hardware virtualization is active.",
             };
         }
         if (state.FirmwareVirtualizationEnabled == true)
@@ -71,7 +71,7 @@ public sealed class WindowsHypervisorCheck : IDiagnosticCheck
                 : "No Windows hypervisor feature (Hyper-V / Virtual Machine Platform / Windows Hypervisor Platform) is enabled.",
             RecommendedFix = anyPlatform
                 ? string.Empty
-                : "Turn on 'Virtual Machine Platform' in Windows Features (OptionalFeatures.exe) and restart — Google Play Games requires it.",
+                : "Turn on 'Virtual Machine Platform' in Windows Features (OptionalFeatures.exe) and restart. Google Play Games requires it.",
         };
     }
 
@@ -115,7 +115,7 @@ public sealed class GooglePlayGamesCheck : IDiagnosticCheck
                 + (platform.ServiceRunning ? " (service running)." : " (service not running)."),
             RecommendedFix = platform.ProtocolHandlerRegistered
                 ? string.Empty
-                : "The googleplaygames:// protocol is not registered — open Google Play Games once to repair it.",
+                : "The googleplaygames:// protocol is not registered. Open Google Play Games once to repair it.",
             Details = $"Bootstrapper: {platform.BootstrapperPath}\nClient: {platform.ClientPath}\nEmulator: {platform.EmulatorPath}",
         };
     }
@@ -177,7 +177,7 @@ public sealed class VirtualDriverCheck : IDiagnosticCheck
                 Status = DiagnosticStatus.Warning,
                 Reason = driverState == DriverState.NotInstalledPackageAvailable
                     ? "No virtual display device is present, but a driver package is bundled and ready to install."
-                    : "No virtual display device is present and no driver package is bundled — the mock provider will be used.",
+                    : "No virtual display device is present and no driver package is bundled, so the mock provider will be used.",
                 RecommendedFix = driverState == DriverState.NotInstalledPackageAvailable
                     ? "Open the Display page and choose Install Driver (one administrator prompt)."
                     : $"Add a driver package to the '{VddDriverInstaller.BundledDriverFolder}' folder next to Optima.exe, or install one yourself.",
@@ -191,7 +191,7 @@ public sealed class VirtualDriverCheck : IDiagnosticCheck
             {
                 CheckName = Name,
                 Status = DiagnosticStatus.Warning,
-                Reason = "A display device exists but the driver is not responding — the mock provider will be used.",
+                Reason = "A display device exists but the driver is not responding, so the mock provider will be used.",
                 RecommendedFix = "Reinstall the virtual display driver from the Display page.",
             };
         }
@@ -278,7 +278,7 @@ public sealed class DiskSpaceCheck : IDiagnosticCheck
             CheckName = Name,
             Status = freeGb >= 10 ? DiagnosticStatus.Pass : freeGb >= 3 ? DiagnosticStatus.Warning : DiagnosticStatus.Fail,
             Reason = $"{freeGb:F1} GB free on {drive.Name}",
-            RecommendedFix = freeGb >= 10 ? string.Empty : "Free up disk space — game updates and the emulator image need room.",
+            RecommendedFix = freeGb >= 10 ? string.Empty : "Free up disk space. Game updates and the emulator image need room.",
         });
     }
 }
@@ -300,7 +300,7 @@ public sealed class AdminPermissionsCheck : IDiagnosticCheck
             ? "The app is running elevated (works, but not required)."
             : helperPresent
                 ? "Running non-elevated with the elevated helper available (recommended setup)."
-                : "The elevated helper executable is missing — device toggling and frametime capture will be unavailable.";
+                : "The elevated helper executable is missing, so device toggling and frametime capture will be unavailable.";
         return Task.FromResult(new DiagnosticResult
         {
             CheckName = Name,

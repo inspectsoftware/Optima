@@ -25,7 +25,7 @@ public static class BenchmarkComparer
         string verdict;
         if (samplesA.Length < 30 || samplesB.Length < 30)
         {
-            verdict = "Not enough data for a reliable comparison — play a few minutes under each profile.";
+            verdict = "Not enough data for a reliable comparison. Play a few minutes under each profile.";
         }
         else
         {
@@ -34,7 +34,7 @@ public static class BenchmarkComparer
             meaningful = t > 1.96 && relativeEffect >= 0.02;
             verdict = meaningful
                 ? $"{(delta > 0 ? profileB : profileA)} is measurably faster ({Math.Abs(delta):F1} FPS average difference)."
-                : "The measured difference is within run-to-run noise — no real advantage detected.";
+                : "The measured difference is within run-to-run noise, so no real advantage detected.";
         }
 
         return new BenchmarkComparison

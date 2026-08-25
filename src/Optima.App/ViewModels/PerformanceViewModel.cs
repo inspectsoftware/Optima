@@ -94,7 +94,7 @@ public sealed partial class PerformanceViewModel : ObservableObject
         EditPriority = value.Performance.Priority;
         EditDisableThrottling = value.Performance.DisablePowerThrottling;
         EditCleanupList = string.Join(", ", value.Performance.CleanupProcessNames);
-        EditorStatus = value.IsBuiltIn ? "Built-in profile — saving creates a copy under the new name." : string.Empty;
+        EditorStatus = value.IsBuiltIn ? "Built-in profile. Saving creates a copy under the new name." : string.Empty;
     }
 
     [RelayCommand]

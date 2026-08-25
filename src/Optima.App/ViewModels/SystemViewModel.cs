@@ -39,7 +39,7 @@ public sealed partial class SystemViewModel : ObservableObject
             foreach (var gpu in inventory.Gpus)
             {
                 var vram = gpu.VramBytes > 0 ? $", {gpu.VramBytes / (1024.0 * 1024 * 1024):F0} GB VRAM" : string.Empty;
-                HardwareRows.Add(new InfoRow($"GPU ({gpu.Vendor})", $"{gpu.Name} — driver {gpu.DriverVersion}{vram}"));
+                HardwareRows.Add(new InfoRow($"GPU ({gpu.Vendor})", $"{gpu.Name}, driver {gpu.DriverVersion}{vram}"));
             }
             HardwareRows.Add(new InfoRow("RAM", $"{inventory.TotalRamBytes / (1024.0 * 1024 * 1024):F0} GB"));
             HardwareRows.Add(new InfoRow("Windows", inventory.WindowsVersion));

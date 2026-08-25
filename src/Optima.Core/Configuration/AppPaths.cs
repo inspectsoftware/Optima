@@ -8,7 +8,7 @@ public sealed class AppPaths
     {
     }
 
-    /// <summary>Test constructor — points all paths at an arbitrary root.</summary>
+    /// <summary>Test constructor. Points all paths at an arbitrary root.</summary>
     public AppPaths(string root)
     {
         Root = root;

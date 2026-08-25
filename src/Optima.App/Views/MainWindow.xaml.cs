@@ -19,8 +19,8 @@ public partial class MainWindow : Window
     /// <summary>
     /// A WindowChrome window sized to Maximized extends past the work area on every edge,
     /// which clips the caption row and the right column. The overhang is measured against
-    /// the monitor the window is actually on rather than assumed from SystemParameters —
-    /// that keeps it correct across monitors with different DPI.
+    /// the monitor the window is actually on rather than assumed from SystemParameters, which
+    /// keeps it correct across monitors with different DPI.
     /// </summary>
     private void ApplyMaximizedCompensation()
     {

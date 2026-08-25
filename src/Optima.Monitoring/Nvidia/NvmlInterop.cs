@@ -4,7 +4,7 @@ namespace Optima.Monitoring.Nvidia;
 
 /// <summary>
 /// Minimal binding to NVIDIA's documented NVML management library (nvml.dll ships with the
-/// GeForce driver). Used only for reading temperature / clocks / utilization — never for
+/// GeForce driver). Used only for reading temperature / clocks / utilization, never for
 /// modifying driver state (§11). All calls degrade gracefully when the library is missing.
 /// </summary>
 internal static class NvmlInterop
@@ -112,7 +112,7 @@ public sealed class NvmlGpuReader : IDisposable
             }
             catch (Exception)
             {
-                // Driver unloaded underneath us — nothing to do.
+                // Driver unloaded underneath us, nothing to do.
             }
         }
     }

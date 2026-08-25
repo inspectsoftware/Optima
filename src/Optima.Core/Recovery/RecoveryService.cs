@@ -7,7 +7,7 @@ namespace Optima.Core.Recovery;
 
 /// <summary>
 /// Implements the crash-recovery contract (§18/§19): the snapshot is persisted before any
-/// mutation, updated as the session progresses, and restored best-effort — every restore step
+/// mutation, updated as the session progresses, and restored best-effort: every restore step
 /// runs even if an earlier one fails, and failures are logged rather than thrown.
 /// </summary>
 public sealed class RecoveryService : IRecoveryService
@@ -104,7 +104,7 @@ public sealed class RecoveryService : IRecoveryService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed restoring {What} — continuing with remaining restore steps", what);
+            _logger.LogError(ex, "Failed restoring {What}, continuing with remaining restore steps", what);
         }
     }
 }

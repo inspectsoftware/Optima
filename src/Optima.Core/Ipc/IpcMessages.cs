@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Optima.Core.Ipc;
 
 /// <summary>
-/// Commands the elevated helper accepts (§20). This is a closed whitelist — the helper
+/// Commands the elevated helper accepts (§20). This is a closed whitelist; the helper
 /// rejects anything not in this enum, and validates every argument per command.
 /// </summary>
 public enum IpcCommand

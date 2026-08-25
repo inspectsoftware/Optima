@@ -65,7 +65,7 @@ public class IpcFramingTests
     [Fact]
     public async Task ReadFrame_HostileLengthHeader_IsRejected()
     {
-        // Length prefix claims 512 MB — must be rejected before any allocation.
+        // Length prefix claims 512 MB, must be rejected before any allocation.
         using var stream = new MemoryStream([0x00, 0x00, 0x00, 0x20, 0x01, 0x02]);
         await Assert.ThrowsAsync<InvalidDataException>(() => IpcFraming.ReadFrameAsync<IpcRequest>(stream));
     }

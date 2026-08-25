@@ -73,7 +73,7 @@ public static class SettingExplanations
             Title = "Background application cleanup",
             WhatItChanges = "Closes the specific applications you listed (and only those) before launching the game.",
             PotentialBenefit = "Frees RAM, CPU and GPU cycles from overlays, updaters and RGB software.",
-            PotentialDownside = "The closed applications stay closed — anything unsaved in them is lost. Nothing is ever closed unless you explicitly added it to the list.",
+            PotentialDownside = "The closed applications stay closed, so anything unsaved in them is lost. Nothing is ever closed unless you explicitly added it to the list.",
             RequiresRestart = false,
             RequiresAdministrator = false,
         },

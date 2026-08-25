@@ -7,7 +7,7 @@ namespace Optima.Core.Detection;
 
 /// <summary>
 /// Rule-driven detection (§4/§29). All OS access goes through the injected probes so the
-/// evaluation order — registry → known folders → protocol handler → processes → manual path —
+/// evaluation order (registry → known folders → protocol handler → processes → manual path)
 /// is unit-testable with fakes. Platform.Windows provides the real probes.
 /// </summary>
 public sealed class GameDetectionEngine : IGameDetector

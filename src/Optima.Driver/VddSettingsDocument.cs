@@ -43,7 +43,7 @@ public sealed class VddSettingsDocument
         GetOrAdd(gpu, "friendlyname").Value = name;
     }
 
-    /// <summary>Global refresh rates — replicated by the driver across all resolutions.</summary>
+    /// <summary>Global refresh rates, replicated by the driver across all resolutions.</summary>
     public IReadOnlyList<int> GlobalRefreshRates
         => Root.Element("global")?.Elements("g_refresh_rate")
             .Select(e => int.TryParse(e.Value, out var r) ? r : 0)
@@ -109,7 +109,7 @@ public sealed class VddSettingsDocument
 
         if (!GetAdvertisedModes().Contains(mode))
         {
-            // Resolution exists but not at this refresh rate — add a global refresh rate,
+            // Resolution exists but not at this refresh rate, so add a global refresh rate,
             // which the driver replicates to every resolution.
             var global = GetOrAdd(Root, "global");
             global.Add(new XElement("g_refresh_rate", mode.RefreshRate));

@@ -210,7 +210,7 @@ public sealed partial class CommandExecutor : IAsyncDisposable
     /// <summary>
     /// A driver package may only be installed from inside the application's own directory.
     /// The helper is elevated while its caller is not, so accepting an arbitrary path would
-    /// let a non-elevated process install any driver it liked — a privilege-escalation hole.
+    /// let a non-elevated process install any driver it liked, which is a privilege-escalation hole.
     /// Constraining installs to files shipped beside the app closes it.
     /// </summary>
     private static bool IsAcceptableInfPath(string path)

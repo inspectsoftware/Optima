@@ -60,7 +60,7 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
             }
 
             // Note: when a hypervisor is already running, Win32_Processor reports firmware VT
-            // as false/null because the hypervisor owns it — treat "hypervisor present" as proof.
+            // as false/null because the hypervisor owns it, so treat "hypervisor present" as proof.
             if (hypervisorPresent == true)
             {
                 firmware = true;
@@ -122,7 +122,7 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
         }
         catch (Exception ex) when (ex is ManagementException or System.Runtime.InteropServices.COMException)
         {
-            _logger.LogError(ex, "WMI inventory query failed — returning partial inventory");
+            _logger.LogError(ex, "WMI inventory query failed, returning partial inventory");
         }
 
         return new SystemInventory

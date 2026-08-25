@@ -88,7 +88,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
     public override async Task InitializeAsync(CancellationToken ct = default)
     {
         // A leftover marker means a previous session modified the driver settings and crashed
-        // before restoring them — put the original file back before doing anything else.
+        // before restoring them, so put the original file back before doing anything else.
         await RestoreSettingsFromMarkerAsync(ct).ConfigureAwait(false);
 
         var settingsPath = await GetSettingsPathAsync(ct).ConfigureAwait(false);
@@ -186,7 +186,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
                     }
                     document.Save(settingsPath);
                     _settingsChanged = true;
-                    _logger.LogInformation("Added {Mode} to vdd_settings.xml — reloading driver", mode);
+                    _logger.LogInformation("Added {Mode} to vdd_settings.xml, reloading driver", mode);
                     await ReloadDriverAsync(ct).ConfigureAwait(false);
                     await Task.Delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
                 }
@@ -203,7 +203,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
                             $"Or add {mode.Width}x{mode.Height} @ {mode.RefreshRate} Hz to the settings file manually");
                     }
                     _logger.LogWarning(ex,
-                        "Cannot update vdd_settings.xml without elevation — using closest advertised mode {Closest} instead of {Requested}",
+                        "Cannot update vdd_settings.xml without elevation, using closest advertised mode {Closest} instead of {Requested}",
                         closest, mode);
                     mode = closest.Value;
                 }
@@ -269,7 +269,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                _logger.LogError(ex, "Could not restore vdd_settings.xml — backup remains at {Backup}", _backupPath);
+                _logger.LogError(ex, "Could not restore vdd_settings.xml, backup remains at {Backup}", _backupPath);
             }
         }
         else
@@ -310,7 +310,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            _logger.LogError(ex, "Crash-recovery restore of vdd_settings.xml failed — marker kept for the next attempt");
+            _logger.LogError(ex, "Crash-recovery restore of vdd_settings.xml failed, marker kept for the next attempt");
         }
     }
 
@@ -336,7 +336,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or TimeoutException)
         {
-            _logger.LogWarning(ex, "Direct pipe write failed — retrying through the elevated helper");
+            _logger.LogWarning(ex, "Direct pipe write failed, retrying through the elevated helper");
         }
 
         if (!await _elevation.EnsureStartedAsync(ct).ConfigureAwait(false))

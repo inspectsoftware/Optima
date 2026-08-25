@@ -10,7 +10,7 @@ namespace Optima.App.ViewModels;
 
 /// <summary>
 /// DISPLAY page (§6/§7): attached displays, virtual display control, mode presets and custom
-/// modes, with a safety net — the topology is captured before any change and an emergency
+/// modes, with a safety net: the topology is captured before any change and an emergency
 /// restore button puts everything back.
 /// </summary>
 public sealed partial class DisplayViewModel : ObservableObject
@@ -43,10 +43,10 @@ public sealed partial class DisplayViewModel : ObservableObject
     public ObservableCollection<DisplayMode> SupportedModes { get; } = [];
     public IReadOnlyList<DisplayMode> ModePresets => Presets;
 
-    [ObservableProperty] private string _providerName = "—";
+    [ObservableProperty] private string _providerName = "---";
     [ObservableProperty] private string _providerCapabilities = string.Empty;
     [ObservableProperty] private bool _virtualDisplayActive;
-    [ObservableProperty] private string _virtualDisplayModeText = "—";
+    [ObservableProperty] private string _virtualDisplayModeText = "---";
     [ObservableProperty] private DisplayMode? _selectedPreset;
     [ObservableProperty] private int _customWidth = 1920;
     [ObservableProperty] private int _customHeight = 1080;
@@ -55,7 +55,7 @@ public sealed partial class DisplayViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _canEmergencyRestore;
 
-    // Driver install state — drives the actionable banner shown when no device exists.
+    // Driver install state. Drives the actionable banner shown when no device exists.
     [ObservableProperty] private bool _driverMissing;
     [ObservableProperty] private bool _canInstallDriver;
     [ObservableProperty] private string _driverPackageText = string.Empty;
@@ -100,7 +100,7 @@ public sealed partial class DisplayViewModel : ObservableObject
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Display refresh failed");
-            StatusMessage = "Could not read display information — see Logs.";
+            StatusMessage = "Could not read display information. See Logs.";
         }
     }
 
@@ -113,7 +113,7 @@ public sealed partial class DisplayViewModel : ObservableObject
         DriverPackageText = state switch
         {
             DriverState.NotInstalledPackageAvailable when _driverInstaller.FindBundledPackage() is { } p
-                => $"bundled package: {p.DisplayName}" + (p.HasCatalog ? string.Empty : "  (unsigned — Windows will refuse it)"),
+                => $"bundled package: {p.DisplayName}" + (p.HasCatalog ? string.Empty : "  (unsigned, Windows will refuse it)"),
             DriverState.NotInstalledNoPackage
                 => $"no driver package is bundled with this build (expected in the '{VddDriverInstaller.BundledDriverFolder}' folder)",
             _ => string.Empty,
@@ -192,7 +192,7 @@ public sealed partial class DisplayViewModel : ObservableObject
     {
         if (_safetyTopology is null)
         {
-            StatusMessage = "Nothing to restore — no display change was made this session.";
+            StatusMessage = "Nothing to restore. No display change was made this session.";
             return;
         }
         await _displayService.RestoreTopologyAsync(_safetyTopology, ct);
@@ -239,7 +239,7 @@ public sealed partial class DisplayViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Display operation failed");
-            StatusMessage = "The display operation failed — see Logs for details.";
+            StatusMessage = "The display operation failed. See Logs for details.";
         }
         finally
         {

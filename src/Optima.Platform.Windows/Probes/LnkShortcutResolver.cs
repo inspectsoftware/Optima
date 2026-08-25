@@ -7,7 +7,7 @@ namespace Optima.Platform.Windows.Probes;
 /// <summary>
 /// Extracts protocol URIs from .lnk shortcuts by scanning the raw bytes for UTF-16 URI text.
 /// Google Play Games game shortcuts embed the launch URI (e.g. googleplaygames://launch/?id=...)
-/// rather than a conventional target path, so WScript-style resolution returns nothing for them —
+/// rather than a conventional target path, so WScript-style resolution returns nothing for them;
 /// a byte scan is the dependable, dependency-free way to read these.
 /// </summary>
 public sealed partial class LnkShortcutResolver : IShortcutResolver
@@ -35,7 +35,7 @@ public sealed partial class LnkShortcutResolver : IShortcutResolver
             return match.Value;
         }
 
-        // Some shortcuts store strings as ANSI — fall back to a single-byte decode.
+        // Some shortcuts store strings as ANSI, so fall back to a single-byte decode.
         var ansi = Encoding.Latin1.GetString(bytes);
         match = UriPattern().Match(ansi);
         return match.Success ? match.Value : null;

@@ -44,7 +44,7 @@ public abstract class VirtualDisplayProviderBase : IVirtualDisplayProvider
     public async Task SetRefreshRateAsync(int refreshRate, CancellationToken ct = default)
     {
         var current = await GetCurrentModeAsync(ct).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("No current mode — enable the virtual display first.");
+            ?? throw new InvalidOperationException("No current mode. Enable the virtual display first.");
         await SetModeAsync(current with { RefreshRate = refreshRate }, ct).ConfigureAwait(false);
     }
 }

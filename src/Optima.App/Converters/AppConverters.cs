@@ -82,7 +82,7 @@ public sealed class DiagnosticStatusToTagConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>True for Warning/Fail — drives the indented fix line, which never shows under a pass.</summary>
+/// <summary>True for Warning/Fail. Drives the indented fix line, which never shows under a pass.</summary>
 public sealed class DiagnosticStatusIsProblemConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

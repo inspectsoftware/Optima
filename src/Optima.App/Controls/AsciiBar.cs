@@ -6,7 +6,7 @@ using System.Windows.Media;
 namespace Optima.App.Controls;
 
 /// <summary>
-/// A bounded meter drawn as block characters — <c>████████░░░░░░░░</c>.
+/// A bounded meter drawn as block characters: <c>████████░░░░░░░░</c>.
 /// Numbers are always shown beside one of these, never replaced by it: the bar gives
 /// shape at a glance, the number is what actually gets read.
 /// </summary>
@@ -136,7 +136,7 @@ public sealed class AsciiSpinner : Control
         };
         _timer.Tick += (_, _) => Advance();
 
-        // Only animate while actually on screen — an off-screen page must not keep a timer alive.
+        // Only animate while actually on screen; an off-screen page must not keep a timer alive.
         IsVisibleChanged += (_, e) =>
         {
             if ((bool)e.NewValue)

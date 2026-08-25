@@ -27,7 +27,7 @@ public sealed class InAppLogSink : ILogEventSink
             logEvent.Timestamp,
             ShortLevel(logEvent.Level),
             SourceName(logEvent),
-            logEvent.RenderMessage() + (logEvent.Exception is { } ex ? $" — {ex.GetType().Name}: {ex.Message}" : string.Empty));
+            logEvent.RenderMessage() + (logEvent.Exception is { } ex ? $" ({ex.GetType().Name}: {ex.Message})" : string.Empty));
 
         var dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is null)

@@ -60,7 +60,7 @@ public static class FrametimeStatistics
     private static double LowFps(double[] sortedAscendingFrametimes, double fraction)
     {
         var count = Math.Max(1, (int)Math.Floor(sortedAscendingFrametimes.Length * fraction));
-        // Slowest frames are the largest frametimes — the end of the ascending array.
+        // Slowest frames are the largest frametimes, at the end of the ascending array.
         var slowest = sortedAscendingFrametimes.AsSpan(sortedAscendingFrametimes.Length - count, count);
         double sum = 0;
         foreach (var t in slowest)

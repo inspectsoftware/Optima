@@ -101,7 +101,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>
     /// Sidebar rows. Data-driven rather than hand-written elements so the active marker
-    /// follows every navigation route — mouse, Alt+N shortcut, or a programmatic jump.
+    /// follows every navigation route: mouse, Alt+N shortcut, or a programmatic jump.
     /// </summary>
     public ObservableCollection<NavItem> NavItems { get; } =
     [

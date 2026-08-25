@@ -2,7 +2,7 @@ using System.IO.Pipes;
 using Optima.Core.Ipc;
 using Optima.Elevated;
 
-// Optima.Elevated — the only elevated part of the application (§20).
+// Optima.Elevated is the only elevated part of the application (§20).
 // It connects back to the named pipe hosted by the non-elevated UI, then executes a small,
 // closed set of validated commands. It never shows UI and exits when the pipe closes.
 
@@ -42,7 +42,7 @@ await using var executor = new CommandExecutor(async evt =>
     }
     catch (Exception ex) when (ex is IOException or ObjectDisposedException)
     {
-        // Pipe gone — main loop will notice and exit.
+        // Pipe gone, main loop will notice and exit.
     }
     finally
     {
@@ -57,7 +57,7 @@ try
         var request = await IpcFraming.ReadFrameAsync<IpcRequest>(pipe, shutdownCts.Token);
         if (request is null)
         {
-            break; // clean EOF — bootstrapper exited
+            break; // clean EOF, bootstrapper exited
         }
 
         IpcResponse response;
@@ -93,7 +93,7 @@ try
 }
 catch (Exception ex) when (ex is IOException or EndOfStreamException or OperationCanceledException)
 {
-    // Connection lost or shutting down — fall through to cleanup.
+    // Connection lost or shutting down, fall through to cleanup.
 }
 
 return 0;

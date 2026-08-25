@@ -3,7 +3,7 @@
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
   <!--
-    Design tokens. Nothing in this file draws anything — it only names values.
+    Design tokens. Nothing in this file draws anything; it only names values.
     Palette is true monochrome: white is the accent, and hue appears ONLY inside
     status tags. Text steps are chosen so the dimmest one still clears WCAG AA
     (4.5:1) against Color.Background.

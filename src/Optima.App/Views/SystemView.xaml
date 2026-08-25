@@ -18,7 +18,7 @@
         <StackPanel>
           <ItemsControl ItemsSource="{Binding VirtualizationRows}" ItemTemplate="{StaticResource InfoRowTemplate}" />
           <TextBlock Style="{StaticResource Text.Prose}" Margin="0,10,0,0" MaxWidth="720" HorizontalAlignment="Left"
-                     Text="If firmware virtualization is disabled it must be enabled in the BIOS/UEFI — Windows cannot change it, and this application never modifies firmware or boot settings." />
+                     Text="If firmware virtualization is disabled it must be enabled in the BIOS/UEFI. Windows cannot change it, and this application never modifies firmware or boot settings." />
         </StackPanel>
       </HeaderedContentControl>
 

@@ -95,7 +95,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Emergency restore failed — the recovery prompt will appear on next start");
+            Log.Error(ex, "Emergency restore failed; the recovery prompt will appear on next start");
         }
     }
 

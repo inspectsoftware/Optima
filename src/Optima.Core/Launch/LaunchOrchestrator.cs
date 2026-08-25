@@ -116,7 +116,7 @@ public sealed class LaunchOrchestrator
                     "Run detection again from the Diagnostics page");
             }
 
-            // Snapshot exists on disk from here on — any crash is recoverable.
+            // Snapshot exists on disk from here on, so any crash is recoverable.
             await _recovery.SavePendingAsync(snapshot, ct).ConfigureAwait(false);
 
             // ---- Performance profile --------------------------------------------------
@@ -241,7 +241,7 @@ public sealed class LaunchOrchestrator
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _logger.LogWarning(ex, "Frametime capture unavailable — continuing without FPS metrics");
+                    _logger.LogWarning(ex, "Frametime capture unavailable, continuing without FPS metrics");
                 }
             }
 
@@ -268,18 +268,18 @@ public sealed class LaunchOrchestrator
             };
             await _sessionStore.SaveSessionAsync(session, CancellationToken.None).ConfigureAwait(false);
 
-            Report(LaunchPhase.Completed, "Session complete — settings restored.");
+            Report(LaunchPhase.Completed, "Session complete. Settings restored.");
             return new LaunchResult { Success = true, Session = session };
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("Session cancelled — restoring system state");
+            _logger.LogWarning("Session cancelled, restoring system state");
             if (metricsStarted)
             {
                 await _metrics.StopAsync().ConfigureAwait(false);
             }
             await _recovery.RestoreAsync(snapshot, CancellationToken.None).ConfigureAwait(false);
-            Report(LaunchPhase.Completed, "Cancelled — settings restored.");
+            Report(LaunchPhase.Completed, "Cancelled. Settings restored.");
             return Fail("CANCELLED", "The session was cancelled.", "All temporary settings were restored.");
         }
         catch (OptimaException ex)

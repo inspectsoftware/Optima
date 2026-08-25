@@ -109,7 +109,7 @@
                            Foreground="{StaticResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
                 <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" MaxWidth="620"
                            HorizontalAlignment="Left"
-                           Text="Optima can install the driver for you — it needs one administrator approval, and adds a display device Windows can render to." />
+                           Text="Optima can install the driver for you. It needs one administrator approval, and adds a display device Windows can render to." />
                 <TextBlock Text="{Binding DriverPackageText}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0"
                            Visibility="{Binding DriverPackageText, Converter={StaticResource EmptyToCollapsed}}" />
               </StackPanel>

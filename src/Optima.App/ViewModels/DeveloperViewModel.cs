@@ -9,7 +9,7 @@ namespace Optima.App.ViewModels;
 
 /// <summary>
 /// DEVELOPER page (§28): raw detected processes, resolved paths, driver capabilities and
-/// helper status — the first place to look after a Google Play Games update changes behavior.
+/// helper status. The first place to look after a Google Play Games update changes behavior.
 /// </summary>
 public sealed partial class DeveloperViewModel : ObservableObject
 {

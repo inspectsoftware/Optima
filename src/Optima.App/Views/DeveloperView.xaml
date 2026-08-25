@@ -60,7 +60,7 @@
       <HeaderedContentControl Style="{StaticResource Section}" Header="ACTIVE DETECTION RULES">
         <StackPanel>
           <TextBlock Style="{StaticResource Text.Prose}" Margin="0,0,0,8" MaxWidth="720" HorizontalAlignment="Left"
-                     Text="Override these by editing detection.json in the application data folder — process names and paths are matched from configuration, never hardcoded." />
+                     Text="Override these by editing detection.json in the application data folder. Process names and paths are matched from configuration, never hardcoded." />
           <Border Background="#FF050608" BorderBrush="{StaticResource Brush.Hairline}" BorderThickness="1" Padding="12">
             <TextBox Text="{Binding DetectionRulesJson, Mode=OneWay}" IsReadOnly="True"
                      FontSize="{StaticResource Type.Micro}" TextWrapping="Wrap"

@@ -99,7 +99,7 @@ public sealed class VddDriverInstaller : IDriverInstaller
                 SuggestedFixes =
                 [
                     $"Place a virtual display driver package (.inf, .cat and its files) in the '{BundledDriverFolder}' folder next to Optima.exe",
-                    "Or install a virtual display driver yourself — Optima will detect and use it",
+                    "Or install a virtual display driver yourself and Optima will detect and use it",
                 ],
             });
         }
@@ -142,7 +142,7 @@ public sealed class VddDriverInstaller : IDriverInstaller
                 Explanation = response.Error,
                 SuggestedFixes =
                 [
-                    "Confirm the bundled driver package is digitally signed — Windows refuses unsigned driver packages",
+                    "Confirm the bundled driver package is digitally signed, since Windows refuses unsigned driver packages",
                     "Check that the package targets 64-bit Windows 11",
                     "See the Logs page for the exact installer error",
                 ],
@@ -205,7 +205,7 @@ public sealed class VddDriverInstaller : IDriverInstaller
 
     /// <summary>
     /// Writes the driver's settings file when it is missing. The driver reads it from a fixed
-    /// location under C:\, which needs administrator rights to create — hence the helper.
+    /// location under C:\, which needs administrator rights to create, hence the helper.
     /// An existing file is never overwritten.
     /// </summary>
     private async Task EnsureSettingsFileAsync(CancellationToken ct)

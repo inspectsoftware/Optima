@@ -31,8 +31,8 @@ public sealed partial class SetupWizardViewModel : ObservableObject
         await Diagnostics.InitializeAsync();
         IsDetecting = false;
         Headline = Status.CriticalOps.Kind == StatusKind.Good
-            ? "Everything found — you're ready to play."
-            : "Setup finished — check the notes below.";
+            ? "Everything found. You're ready to play."
+            : "Setup finished. Check the notes below.";
     }
 
     [RelayCommand]

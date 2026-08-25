@@ -8,7 +8,7 @@ public sealed record AppSettings
     public bool DeveloperMode { get; init; }
     public string MinimumLogLevel { get; init; } = "Information";
 
-    /// <summary>"Auto", "MttVdd" or "Mock" — which virtual display provider to use.</summary>
+    /// <summary>"Auto", "MttVdd" or "Mock": which virtual display provider to use.</summary>
     public string VirtualDisplayProvider { get; init; } = "Auto";
 
     /// <summary>Enable the external ETW frametime provider (requires the elevated helper).</summary>

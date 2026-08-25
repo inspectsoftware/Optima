@@ -7,7 +7,7 @@ namespace Optima.Platform.Windows.Launchers;
 
 /// <summary>
 /// Strategy 1 (§5): ShellExecute the googleplaygames:// launch URI so Windows routes it through
-/// the registered protocol handler — the same path the official Start-menu shortcut takes.
+/// the registered protocol handler, the same path the official Start-menu shortcut takes.
 /// </summary>
 public sealed class ProtocolUriLauncher : IGameLauncher
 {

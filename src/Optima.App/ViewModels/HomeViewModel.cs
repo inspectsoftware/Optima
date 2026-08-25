@@ -31,14 +31,14 @@ public sealed partial class HomeViewModel : ObservableObject
     public StatusViewModel Status { get; }
     public PlayViewModel Play { get; }
 
-    [ObservableProperty] private string _gpuText = "—";
-    [ObservableProperty] private string _cpuText = "—";
-    [ObservableProperty] private string _ramText = "—";
-    [ObservableProperty] private string _windowsText = "—";
+    [ObservableProperty] private string _gpuText = "---";
+    [ObservableProperty] private string _cpuText = "---";
+    [ObservableProperty] private string _ramText = "---";
+    [ObservableProperty] private string _windowsText = "---";
 
-    [ObservableProperty] private string _cpuUsage = "—";
-    [ObservableProperty] private string _gpuUsage = "—";
-    [ObservableProperty] private string _ramUsage = "—";
+    [ObservableProperty] private string _cpuUsage = "---";
+    [ObservableProperty] private string _gpuUsage = "---";
+    [ObservableProperty] private string _ramUsage = "---";
     [ObservableProperty] private string _fpsText = "---";
     [ObservableProperty] private string _frametimeText = "---";
     [ObservableProperty] private string _gpuTempText = string.Empty;

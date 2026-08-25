@@ -10,7 +10,7 @@ namespace Optima.Platform.Windows.Services;
 
 /// <summary>
 /// Watches Google Play Games / emulator / game processes by polling (§9). Process names come
-/// from configurable detection rules — never hardcoded (§29). "Game running" means a visible
+/// from configurable detection rules, never hardcoded (§29). "Game running" means a visible
 /// top-level window whose title matches the configured pattern while the emulator process lives.
 /// </summary>
 public sealed class WindowsProcessMonitor : IProcessMonitor
@@ -54,7 +54,7 @@ public sealed class WindowsProcessMonitor : IProcessMonitor
                     }
                     catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
                     {
-                        // Access denied / exited — start time stays unknown.
+                        // Access denied / exited, so start time stays unknown.
                     }
 
                     tracked.Add(new TrackedProcess
@@ -127,7 +127,7 @@ public sealed class WindowsProcessMonitor : IProcessMonitor
                 return;
             }
 
-            // The emulator can outlive the game — the window disappearing is the real exit signal,
+            // The emulator can outlive the game, so the window disappearing is the real exit signal,
             // debounced so brief mode switches / focus changes do not end the session early.
             absentPolls = GameWindowPresent(rules) ? 0 : absentPolls + 1;
             if (absentPolls >= ExitConfirmationPolls)

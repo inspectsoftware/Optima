@@ -57,7 +57,7 @@ public sealed partial class DiagnosticsViewModel : ObservableObject
                     {
                         CheckName = check.Name,
                         Status = DiagnosticStatus.Fail,
-                        Reason = "The check itself failed — see Logs.",
+                        Reason = "The check itself failed. See Logs.",
                     };
                 }
                 Results.Add(result);
@@ -68,8 +68,8 @@ public sealed partial class DiagnosticsViewModel : ObservableObject
             var failed = Results.Count(r => r.Status == DiagnosticStatus.Fail);
             Summary = (failed, warned) switch
             {
-                (0, 0) => $"All good — {passed}/{Results.Count} checks passed.",
-                (0, _) => $"{passed}/{Results.Count} passed, {warned} warning(s) — nothing blocking.",
+                (0, 0) => $"All good. {passed}/{Results.Count} checks passed.",
+                (0, _) => $"{passed}/{Results.Count} passed, {warned} warning(s), nothing blocking.",
                 (_, 0) => $"{failed} check(s) need attention.",
                 _ => $"{failed} check(s) need attention, {warned} warning(s).",
             };

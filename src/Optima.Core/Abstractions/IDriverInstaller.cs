@@ -26,7 +26,7 @@ public sealed record DriverPackageInfo
 
     public string DisplayName { get; init; } = string.Empty;
 
-    /// <summary>True when a .cat sits beside the .inf — its absence guarantees the install will be rejected.</summary>
+    /// <summary>True when a .cat sits beside the .inf. Its absence guarantees the install will be rejected.</summary>
     public bool HasCatalog { get; init; }
 }
 

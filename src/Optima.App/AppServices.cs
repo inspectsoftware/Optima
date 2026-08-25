@@ -19,7 +19,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.App;
 
-/// <summary>Composition root — the UI / services / platform / driver split of §25 wired together.</summary>
+/// <summary>Composition root: the UI / services / platform / driver split of §25 wired together.</summary>
 public static class AppServices
 {
     public static void Register(IServiceCollection services, AppPaths paths)
@@ -74,7 +74,7 @@ public static class AppServices
         services.AddSingleton<IGameLauncher, CustomCommandLauncher>();
         services.AddSingleton<LaunchOrchestrator>();
 
-        // ---- Monitoring (§12–14) ----
+        // ---- Monitoring (§12-14) ----
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();
         services.AddSingleton<IPerformanceMetricsProvider, EtwMetricsProviderClient>();
         services.AddSingleton<ISessionStore, SqliteSessionStore>();

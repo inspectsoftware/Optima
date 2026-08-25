@@ -213,7 +213,7 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
             {
-                // Process exited or access denied — skip it this tick.
+                // Process exited or access denied, so skip it this tick.
             }
         }
         return (Math.Clamp(cpuPercent, 0, 100), ramBytes);
@@ -247,7 +247,7 @@ public sealed class HardwareMonitor : IPerformanceMonitor
                 }
                 catch (InvalidOperationException)
                 {
-                    // Instance disappeared (process exited) — rebuild next tick.
+                    // Instance disappeared (process exited), so rebuild next tick.
                     DisposeGpuCounters();
                     return 0;
                 }
@@ -273,7 +273,7 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         }
         catch (Exception)
         {
-            // WMI unavailable — frequency will simply read 0.
+            // WMI unavailable, so frequency will simply read 0.
         }
         return 0;
     }

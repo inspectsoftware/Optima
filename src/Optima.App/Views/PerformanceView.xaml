@@ -79,7 +79,7 @@
               <TextBlock Grid.Row="6" Text="close before launch" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4"
                          ToolTip="Comma-separated process names. Only these are ever closed, and only when this profile runs." />
               <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding EditCleanupList}" Margin="0,4"
-                       ToolTip="e.g. Discord, SteamWebHelper — system and Google Play Games processes are always refused" />
+                       ToolTip="e.g. Discord, SteamWebHelper. System and Google Play Games processes are always refused" />
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
@@ -238,7 +238,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBlock Text="no sessions recorded yet — play a round first" Margin="0,8,0,0">
+          <TextBlock Text="no sessions recorded yet · play a round first" Margin="0,8,0,0">
             <TextBlock.Style>
               <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
                 <Setter Property="Visibility" Value="Collapsed" />

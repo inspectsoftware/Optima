@@ -64,7 +64,7 @@ public sealed class WindowsPowerProfileService : IPowerProfileService
                 return scheme;
             }
         }
-        // Nothing matching — the built-in GUID still activates the hidden scheme on most systems.
+        // Nothing matching, but the built-in GUID still activates the hidden scheme on most systems.
         return PowerNative.HighPerformanceScheme;
     }
 }

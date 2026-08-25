@@ -146,7 +146,7 @@ public sealed class ElevationBrokerClient : IElevationBroker
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
-            _logger.LogError(ex, "IPC send failed — helper connection lost");
+            _logger.LogError(ex, "IPC send failed, helper connection lost");
             return new IpcResponse { Success = false, Error = "Connection to the elevated helper was lost.", RequestId = id };
         }
         finally
@@ -167,7 +167,7 @@ public sealed class ElevationBrokerClient : IElevationBroker
                 var envelope = await IpcFraming.ReadFrameAsync<IpcEnvelope>(pipe, ct).ConfigureAwait(false);
                 if (envelope is null)
                 {
-                    break; // clean EOF — helper exited
+                    break; // clean EOF, helper exited
                 }
 
                 if (envelope.Response is { } response)
