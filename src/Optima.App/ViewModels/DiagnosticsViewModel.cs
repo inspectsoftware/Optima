@@ -64,10 +64,15 @@ public sealed partial class DiagnosticsViewModel : ObservableObject
             }
 
             var passed = Results.Count(r => r.Status == DiagnosticStatus.Pass);
+            var warned = Results.Count(r => r.Status == DiagnosticStatus.Warning);
             var failed = Results.Count(r => r.Status == DiagnosticStatus.Fail);
-            Summary = failed == 0
-                ? $"All good — {passed}/{Results.Count} checks passed."
-                : $"{failed} check(s) need attention.";
+            Summary = (failed, warned) switch
+            {
+                (0, 0) => $"All good — {passed}/{Results.Count} checks passed.",
+                (0, _) => $"{passed}/{Results.Count} passed, {warned} warning(s) — nothing blocking.",
+                (_, 0) => $"{failed} check(s) need attention.",
+                _ => $"{failed} check(s) need attention, {warned} warning(s).",
+            };
         }
         finally
         {

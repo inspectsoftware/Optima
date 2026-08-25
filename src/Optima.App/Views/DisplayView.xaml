@@ -43,7 +43,11 @@
               <Button Style="{StaticResource SecondaryButton}" Content="enable"
                       Command="{Binding EnableVirtualDisplayCommand}" Margin="0,0,8,0" />
               <Button Style="{StaticResource SecondaryButton}" Content="disable"
-                      Command="{Binding DisableVirtualDisplayCommand}" />
+                      Command="{Binding DisableVirtualDisplayCommand}" Margin="0,0,8,0" />
+              <Button Style="{StaticResource GhostButton}" Content="uninstall driver"
+                      Command="{Binding UninstallDriverCommand}"
+                      Visibility="{Binding DriverMissing, Converter={StaticResource InverseBoolToVis}}"
+                      ToolTip="Removes the virtual display device Optima installed" />
             </StackPanel>
           </Grid>
 
@@ -91,6 +95,37 @@
                      Foreground="{StaticResource Brush.Warn}" Margin="0,10,0,0" MaxWidth="760"
                      HorizontalAlignment="Left"
                      Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToCollapsed}}" />
+
+          <!-- No driver device: offer to install the bundled package rather than dead-ending. -->
+          <Border Style="{StaticResource Callout}" Margin="0,12,0,0"
+                  Visibility="{Binding DriverMissing, Converter={StaticResource BoolToVis}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="[WARN] no virtual display device"
+                           Foreground="{StaticResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
+                <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" MaxWidth="620"
+                           HorizontalAlignment="Left"
+                           Text="Optima can install the driver for you — it needs one administrator approval, and adds a display device Windows can render to." />
+                <TextBlock Text="{Binding DriverPackageText}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0"
+                           Visibility="{Binding DriverPackageText, Converter={StaticResource EmptyToCollapsed}}" />
+              </StackPanel>
+              <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
+                      Padding="16,8" FontSize="{StaticResource Type.Label}"
+                      Content="INSTALL DRIVER" Command="{Binding InstallDriverCommand}"
+                      IsEnabled="{Binding CanInstallDriver}" Margin="12,0,0,0" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+
+          <Border Style="{StaticResource Callout}" BorderBrush="{StaticResource Brush.Warn}" Margin="0,10,0,0"
+                  Visibility="{Binding RestartRequired, Converter={StaticResource BoolToVis}}">
+            <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="760" HorizontalAlignment="Left"
+                       Foreground="{StaticResource Brush.Warn}"
+                       Text="Windows asked for a restart to finish installing the display driver. The virtual display will not appear until you restart." />
+          </Border>
 
           <!-- Safety net: the topology captured before any change can always be put back -->
           <Border Style="{StaticResource Callout}" BorderBrush="{StaticResource Brush.Warn}" Margin="0,12,0,0"

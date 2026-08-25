@@ -116,6 +116,75 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 return ok(summary);
             }
 
+            case IpcCommand.InstallDriver:
+            {
+                if (!request.Args.TryGetValue("infPath", out var infPath) || !IsAcceptableInfPath(infPath))
+                {
+                    return fail("Driver package path is not acceptable.");
+                }
+                if (!request.Args.TryGetValue("hardwareId", out var hardwareId)
+                    || hardwareId.Length is 0 or > 200
+                    || !SafeInstanceIdPattern().IsMatch(hardwareId))
+                {
+                    return fail("Invalid hardware id.");
+                }
+
+                // Stage the package into the DriverStore first; this is where an unsigned
+                // or untrusted catalog is rejected, so report that plainly.
+                var (stageCode, stageOutput) = await RunProcessAsync("pnputil.exe", $"/add-driver \"{infPath}\" /install", ct);
+                if (stageCode != 0)
+                {
+                    return fail($"pnputil could not stage the driver package (exit {stageCode}). {Truncate(stageOutput)}");
+                }
+
+                var (created, reboot, createError) = DeviceInstaller.CreateRootDevice(hardwareId, infPath);
+                return created
+                    ? ok(new Dictionary<string, string> { ["restartRequired"] = reboot ? "1" : "0" })
+                    : fail(createError);
+            }
+
+            case IpcCommand.UninstallDriver:
+            {
+                if (!request.Args.TryGetValue("hardwareId", out var hardwareId)
+                    || hardwareId.Length is 0 or > 200
+                    || !SafeInstanceIdPattern().IsMatch(hardwareId))
+                {
+                    return fail("Invalid hardware id.");
+                }
+
+                var (succeeded, removed, removeError) = DeviceInstaller.RemoveRootDevices(hardwareId);
+                if (!succeeded)
+                {
+                    return fail(removeError);
+                }
+                return ok(new Dictionary<string, string> { ["removed"] = removed.ToString(CultureInfo.InvariantCulture) });
+            }
+
+            case IpcCommand.EnsureVddSettings:
+            {
+                if (!request.Args.TryGetValue("path", out var settingsPath) || !IsAcceptableSettingsPath(settingsPath))
+                {
+                    return fail("Settings path is not acceptable.");
+                }
+                if (!request.Args.TryGetValue("content", out var content) || content.Length is 0 or > 64 * 1024)
+                {
+                    return fail("Settings content is missing or too large.");
+                }
+
+                var directory = Path.GetDirectoryName(settingsPath);
+                if (directory is not null)
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                // Never clobber a configuration the user already has.
+                if (File.Exists(settingsPath))
+                {
+                    return ok(new Dictionary<string, string> { ["created"] = "0" });
+                }
+                await File.WriteAllTextAsync(settingsPath, content, ct);
+                return ok(new Dictionary<string, string> { ["created"] = "1" });
+            }
+
             case IpcCommand.ReadBcdVirtualization:
             {
                 var (exitCode, output) = await RunProcessAsync("bcdedit.exe", "/enum {current}", ct);
@@ -135,6 +204,62 @@ public sealed partial class CommandExecutor : IAsyncDisposable
 
             default:
                 return fail($"Command {request.Command} is not supported.");
+        }
+    }
+
+    /// <summary>
+    /// A driver package may only be installed from inside the application's own directory.
+    /// The helper is elevated while its caller is not, so accepting an arbitrary path would
+    /// let a non-elevated process install any driver it liked — a privilege-escalation hole.
+    /// Constraining installs to files shipped beside the app closes it.
+    /// </summary>
+    private static bool IsAcceptableInfPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 400)
+        {
+            return false;
+        }
+        if (!path.EndsWith(".inf", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string full, root;
+        try
+        {
+            full = Path.GetFullPath(path);
+            root = Path.GetFullPath(AppContext.BaseDirectory);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+
+        if (!root.EndsWith(Path.DirectorySeparatorChar))
+        {
+            root += Path.DirectorySeparatorChar;
+        }
+        // GetFullPath already normalized any "..", so a prefix test is sound here.
+        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full);
+    }
+
+    /// <summary>
+    /// Restricts the writable settings file to the driver's own well-known filename, so this
+    /// command cannot be turned into an arbitrary elevated file write.
+    /// </summary>
+    private static bool IsAcceptableSettingsPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 400)
+        {
+            return false;
+        }
+        try
+        {
+            return string.Equals(Path.GetFileName(Path.GetFullPath(path)), "vdd_settings.xml", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
         }
     }
 

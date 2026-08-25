@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
 using Optima.Core.Models;
+using Optima.Driver;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
@@ -22,13 +23,19 @@ public sealed partial class DisplayViewModel : ObservableObject
 
     private readonly IVirtualDisplayProvider _provider;
     private readonly IDisplayService _displayService;
+    private readonly IDriverInstaller _driverInstaller;
     private readonly ILogger<DisplayViewModel> _logger;
     private string? _safetyTopology;
 
-    public DisplayViewModel(IVirtualDisplayProvider provider, IDisplayService displayService, ILogger<DisplayViewModel> logger)
+    public DisplayViewModel(
+        IVirtualDisplayProvider provider,
+        IDisplayService displayService,
+        IDriverInstaller driverInstaller,
+        ILogger<DisplayViewModel> logger)
     {
         _provider = provider;
         _displayService = displayService;
+        _driverInstaller = driverInstaller;
         _logger = logger;
     }
 
@@ -48,6 +55,12 @@ public sealed partial class DisplayViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _canEmergencyRestore;
 
+    // Driver install state — drives the actionable banner shown when no device exists.
+    [ObservableProperty] private bool _driverMissing;
+    [ObservableProperty] private bool _canInstallDriver;
+    [ObservableProperty] private string _driverPackageText = string.Empty;
+    [ObservableProperty] private bool _restartRequired;
+
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         await RefreshAsync(ct);
@@ -64,8 +77,10 @@ public sealed partial class DisplayViewModel : ObservableObject
                 Displays.Add(display);
             }
 
-            ProviderName = _provider.Name;
+            // Capabilities first: provider selection is lazy, and reading Name before it
+            // resolves would report "(not selected yet)".
             var capabilities = await _provider.GetCapabilitiesAsync(ct);
+            ProviderName = _provider.Name;
             ProviderCapabilities =
                 $"Custom modes: {YesNo(capabilities.SupportsCustomModes)} · GPU pinning: {YesNo(capabilities.SupportsGpuPinning)} · " +
                 $"Enable/disable: {YesNo(capabilities.SupportsEnableDisable)} · Needs admin: {YesNo(capabilities.RequiresElevation)}";
@@ -79,6 +94,8 @@ public sealed partial class DisplayViewModel : ObservableObject
             {
                 SupportedModes.Add(supported);
             }
+
+            await RefreshDriverStateAsync(ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -86,6 +103,49 @@ public sealed partial class DisplayViewModel : ObservableObject
             StatusMessage = "Could not read display information — see Logs.";
         }
     }
+
+    private async Task RefreshDriverStateAsync(CancellationToken ct)
+    {
+        var state = await _driverInstaller.GetStateAsync(ct);
+        DriverMissing = state != DriverState.Installed;
+        CanInstallDriver = state == DriverState.NotInstalledPackageAvailable;
+
+        DriverPackageText = state switch
+        {
+            DriverState.NotInstalledPackageAvailable when _driverInstaller.FindBundledPackage() is { } p
+                => $"bundled package: {p.DisplayName}" + (p.HasCatalog ? string.Empty : "  (unsigned — Windows will refuse it)"),
+            DriverState.NotInstalledNoPackage
+                => $"no driver package is bundled with this build (expected in the '{VddDriverInstaller.BundledDriverFolder}' folder)",
+            _ => string.Empty,
+        };
+    }
+
+    /// <summary>Installs the bundled driver so the user never has to touch Device Manager.</summary>
+    [RelayCommand]
+    private Task InstallDriverAsync() => GuardedAsync(async ct =>
+    {
+        var result = await _driverInstaller.InstallAsync(ct);
+        if (result.Success)
+        {
+            RestartRequired = result.RestartRequired;
+            StatusMessage = result.RestartRequired
+                ? "Driver installed. Restart Windows to finish setting up the virtual display."
+                : "Virtual display driver installed.";
+        }
+        else if (result.Error is { } error)
+        {
+            StatusMessage = $"{error.Title} {error.SuggestedFixes.FirstOrDefault()}";
+        }
+    });
+
+    [RelayCommand]
+    private Task UninstallDriverAsync() => GuardedAsync(async ct =>
+    {
+        var result = await _driverInstaller.UninstallAsync(ct);
+        StatusMessage = result.Success
+            ? "Virtual display driver removed."
+            : $"{result.Error?.Title} {result.Error?.SuggestedFixes.FirstOrDefault()}";
+    });
 
     [RelayCommand]
     private Task EnableVirtualDisplayAsync() => GuardedAsync(async ct =>

@@ -21,6 +21,12 @@ public enum IpcCommand
     StopEtw,
     /// <summary>Read bcdedit hypervisorlaunchtype (diagnostics only, no modification).</summary>
     ReadBcdVirtualization,
+    /// <summary>Stage a bundled driver package and create its root device node.</summary>
+    InstallDriver,
+    /// <summary>Remove the device node created by InstallDriver and unstage the package.</summary>
+    UninstallDriver,
+    /// <summary>Create the virtual display driver's settings file if it is missing.</summary>
+    EnsureVddSettings,
     Shutdown,
 }
 

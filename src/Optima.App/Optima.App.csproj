@@ -24,6 +24,14 @@
     <ProjectReference Include="..\Optima.Elevated\Optima.Elevated.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <!-- Ship the bundled driver package (if the repo's drivers/ folder has one) next to the
+       executable, so IDriverInstaller can find and install it at runtime. -->
+  <ItemGroup>
+    <None Include="..\..\drivers\**\*.*" Exclude="..\..\drivers\README.md"
+          Link="drivers\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- Ship the elevated helper (and its dependencies) alongside the app executable.
        Only files the app output does not already provide are copied, so the helper's
        older transitive assemblies (e.g. TraceEvent's 6.x Microsoft.Extensions.*) can

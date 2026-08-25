@@ -1,6 +1,7 @@
 using System.IO;
 using Optima.Core.Abstractions;
 using Optima.Core.Models;
+using Optima.Driver;
 
 namespace Optima.App.Diagnostics;
 
@@ -152,13 +153,37 @@ public sealed class CriticalOpsCheck : IDiagnosticCheck
 public sealed class VirtualDriverCheck : IDiagnosticCheck
 {
     private readonly IVirtualDisplayProvider _provider;
-    public VirtualDriverCheck(IVirtualDisplayProvider provider) => _provider = provider;
+    private readonly IDriverInstaller _installer;
+
+    public VirtualDriverCheck(IVirtualDisplayProvider provider, IDriverInstaller installer)
+    {
+        _provider = provider;
+        _installer = installer;
+    }
 
     public string Name => "Virtual Display Driver";
     public int Order => 50;
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
+        // Device state is the authority here; the provider can look "available" from a
+        // leftover settings file long after the device itself has been removed.
+        var driverState = await _installer.GetStateAsync(ct);
+        if (driverState != DriverState.Installed)
+        {
+            return new DiagnosticResult
+            {
+                CheckName = Name,
+                Status = DiagnosticStatus.Warning,
+                Reason = driverState == DriverState.NotInstalledPackageAvailable
+                    ? "No virtual display device is present, but a driver package is bundled and ready to install."
+                    : "No virtual display device is present and no driver package is bundled — the mock provider will be used.",
+                RecommendedFix = driverState == DriverState.NotInstalledPackageAvailable
+                    ? "Open the Display page and choose Install Driver (one administrator prompt)."
+                    : $"Add a driver package to the '{VddDriverInstaller.BundledDriverFolder}' folder next to Optima.exe, or install one yourself.",
+            };
+        }
+
         var available = await _provider.IsAvailableAsync(ct);
         if (!available)
         {
@@ -166,8 +191,8 @@ public sealed class VirtualDriverCheck : IDiagnosticCheck
             {
                 CheckName = Name,
                 Status = DiagnosticStatus.Warning,
-                Reason = "No virtual display driver was detected — the mock provider will be used.",
-                RecommendedFix = "Install a virtual display driver (e.g. the IddCx Virtual Display Driver) to unlock high-refresh virtual displays.",
+                Reason = "A display device exists but the driver is not responding — the mock provider will be used.",
+                RecommendedFix = "Reinstall the virtual display driver from the Display page.",
             };
         }
 

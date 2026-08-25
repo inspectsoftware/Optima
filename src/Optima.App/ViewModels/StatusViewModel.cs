@@ -36,6 +36,7 @@ public sealed partial class StatusViewModel : ObservableObject
 {
     private readonly IGameDetector _detector;
     private readonly IVirtualDisplayProvider _virtualDisplay;
+    private readonly IDriverInstaller _driverInstaller;
     private readonly ISystemInfoService _systemInfo;
     private readonly IProcessMonitor _processMonitor;
     private readonly ILogger<StatusViewModel> _logger;
@@ -43,12 +44,14 @@ public sealed partial class StatusViewModel : ObservableObject
     public StatusViewModel(
         IGameDetector detector,
         IVirtualDisplayProvider virtualDisplay,
+        IDriverInstaller driverInstaller,
         ISystemInfoService systemInfo,
         IProcessMonitor processMonitor,
         ILogger<StatusViewModel> logger)
     {
         _detector = detector;
         _virtualDisplay = virtualDisplay;
+        _driverInstaller = driverInstaller;
         _systemInfo = systemInfo;
         _processMonitor = processMonitor;
         _logger = logger;
@@ -82,11 +85,20 @@ public sealed partial class StatusViewModel : ObservableObject
                 DetectedGame is null ? "NOT INSTALLED" : "INSTALLED",
                 DetectedGame is null ? StatusKind.Bad : StatusKind.Good);
 
-            var vddAvailable = await _virtualDisplay.IsAvailableAsync(ct);
-            var vddActive = vddAvailable && await _virtualDisplay.IsDisplayActiveAsync(ct);
-            Set(VirtualDisplay,
-                !vddAvailable ? "NOT DETECTED" : vddActive ? "ACTIVE" : "READY",
-                !vddAvailable ? StatusKind.Warning : StatusKind.Good);
+            // Device presence is the authority — a leftover settings file from a driver that
+            // has since been uninstalled would otherwise report READY with no device at all.
+            var driverState = await _driverInstaller.GetStateAsync(ct);
+            if (driverState != DriverState.Installed)
+            {
+                Set(VirtualDisplay,
+                    driverState == DriverState.NotInstalledPackageAvailable ? "NOT INSTALLED" : "NO DRIVER",
+                    StatusKind.Warning);
+            }
+            else
+            {
+                var vddActive = await _virtualDisplay.IsDisplayActiveAsync(ct);
+                Set(VirtualDisplay, vddActive ? "ACTIVE" : "READY", StatusKind.Good);
+            }
 
             var virtualization = await _systemInfo.GetVirtualizationStateAsync(ct);
             var virtOk = virtualization.HypervisorPresent == true || virtualization.FirmwareVirtualizationEnabled == true;

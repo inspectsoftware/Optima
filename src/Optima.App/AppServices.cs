@@ -62,6 +62,7 @@ public static class AppServices
         services.AddSingleton<MockVirtualDisplayProvider>();
         services.AddSingleton<SelectingVirtualDisplayProvider>();
         services.AddSingleton<IVirtualDisplayProvider>(sp => sp.GetRequiredService<SelectingVirtualDisplayProvider>());
+        services.AddSingleton<IDriverInstaller, VddDriverInstaller>();
 
         // ---- Recovery / safety (§18/§19) ----
         services.AddSingleton<IRecoveryService, RecoveryService>();

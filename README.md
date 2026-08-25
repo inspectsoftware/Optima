@@ -45,6 +45,12 @@ so the app reads as a terminal without becoming hard to read where it actually e
   without a rebuild.
 - **Launching** — a strategy chain: protocol URI → `Bootstrapper.exe "<uri>"` → game shortcut →
   user-defined command. First one that works wins.
+- **Bundled driver install** — a virtual display driver package placed in `drivers/` travels
+  inside the build and is installed on demand from the Display page: one administrator prompt,
+  no Device Manager and no `devcon`. Optima stages the package with `pnputil`, creates the
+  **root-enumerated device node** via SetupAPI (the step that package staging alone does not
+  do, and the usual reason a manual install is needed), and writes a default `vdd_settings.xml`
+  without overwriting an existing one. Uninstall reverses it. See [drivers/README.md](drivers/README.md).
 - **Virtual display control** — provider abstraction with a full implementation for the IddCx
   "Virtual Display Driver" (MikeTheTech-style): non-destructive `vdd_settings.xml` editing with
   automatic backup, `RELOAD_DRIVER` over the driver's control pipe, device enable/disable through
@@ -138,8 +144,11 @@ Everything lives under `%LOCALAPPDATA%\Optima\`:
 
 - **Google Play Games for PC** with Critical Ops installed.
 - For high-refresh virtual display modes: an IddCx virtual display driver
-  (`vdd_settings.xml` + `MTTVirtualDisplayPipe` control pipe). Without one, the app runs with the
-  mock provider and all display features remain usable in simulation.
+  (`vdd_settings.xml` + `MTTVirtualDisplayPipe` control pipe). Ship one in `drivers/` and Optima
+  installs it for the user automatically; without one, the app runs with the mock provider and
+  all display features remain usable in simulation.
+- Driver packages must be signed by a publisher the machine trusts — Windows rejects unsigned
+  packages, and Optima will not disable signature enforcement or install certificates for you.
 - FPS/frametime capture and virtual-display device toggling need one UAC approval for the
   elevated helper; everything else runs non-elevated. If the prompt is declined the session
   continues without those features.
