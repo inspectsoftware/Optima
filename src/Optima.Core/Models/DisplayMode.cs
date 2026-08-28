@@ -5,7 +5,9 @@ public readonly record struct DisplayMode(int Width, int Height, int RefreshRate
 {
     public override string ToString() => $"{Width}x{Height} @ {RefreshRate} Hz";
 
-    public bool IsValid => Width >= 640 && Height >= 480 && RefreshRate >= 24 && RefreshRate <= 1000;
+    // 500 Hz comfortably covers real hardware while rejecting the 999/9999 placeholder
+    // rates virtual display drivers ship in their default settings files.
+    public bool IsValid => Width >= 640 && Height >= 480 && RefreshRate >= 24 && RefreshRate <= 500;
 }
 
 /// <summary>Identifies one attached display and its current mode.</summary>

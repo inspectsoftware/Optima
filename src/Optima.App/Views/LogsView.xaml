@@ -15,7 +15,8 @@
 
     <StackPanel Margin="22,18,22,0">
       <TextBlock Text="LOGS" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="structured application log · newest at the bottom" Style="{StaticResource Text.PageSubtitle}" />
+      <TextBlock Text="structured application log · newest at the bottom · alt+f9 toggles the floating console"
+                 Style="{StaticResource Text.PageSubtitle}" />
     </StackPanel>
 
     <!-- Filter line, styled as a command prompt -->

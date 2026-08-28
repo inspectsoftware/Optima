@@ -51,11 +51,48 @@ so the app reads as a terminal without becoming hard to read where it actually e
   **root-enumerated device node** via SetupAPI (the step that package staging alone does not
   do, and the usual reason a manual install is needed), and writes a default `vdd_settings.xml`
   without overwriting an existing one. Uninstall reverses it. See [drivers/README.md](drivers/README.md).
-- **Virtual display control**: provider abstraction with a full implementation for the IddCx
-  "Virtual Display Driver" (MikeTheTech-style): non-destructive `vdd_settings.xml` editing with
-  automatic backup, `RELOAD_DRIVER` over the driver's control pipe, device enable/disable through
-  the elevated helper, Windows-side mode switching that is never written to the registry.
-  A fully functional mock provider backs tests and machines without the driver.
+- **Optima Virtualization** (virtual display control): provider abstraction with a full
+  implementation for the bundled IddCx virtual display driver: non-destructive `vdd_settings.xml`
+  editing with automatic backup, `RELOAD_DRIVER` over the driver's control pipe, device
+  enable/disable through the elevated helper, Windows-side mode switching that is never written
+  to the registry. A fully functional mock provider backs tests and machines without the driver.
+  The driver itself is the open-source **Virtual Display Driver** by MikeTheTech (MIT licensed,
+  see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)); the Windows device keeps its upstream
+  name since the signed package ships unmodified.
+- **Display list editing**: the attached-displays list supports custom names, manual ordering
+  and hiding rows (including a one-click "hide inactive" filter for phantom 0x0 outputs). All
+  cosmetic and Optima-only, persisted in `config.json`; Windows display config is untouched.
+  Custom names follow the display across the whole UI, including the HOME `Display` readout,
+  which tracks the display the game will actually render on (the virtual display when active).
+- **Kill switch**: one click (or **Ctrl+Alt+K** from anywhere, even in-game) hard-terminates the
+  emulator process tree, no confirmation. **Alt+F9** toggles a floating, always-on-top log
+  console that appears over the game without stealing focus.
+- **FPS overlay**: **Alt+F10** (or automatically during sessions, when enabled in Settings)
+  shows a small always-on-top FPS/frametime readout over the borderless game. The window is
+  click-through and never activates, so it cannot interfere with input; data comes from the
+  same external ETW trace as session statistics. Corner, opacity and an optional
+  ping/jitter/loss line are configurable. Capture no longer assumes the emulator process
+  presents the frames: every game-related process is a candidate and the trace reports
+  whichever one actually presents, with a Developer-page probe that lists presenting
+  processes when capture is silent.
+- **Watch mode** (off by default): with Optima in the tray, starting Critical Ops outside
+  Optima applies the full selected profile automatically (power plan, virtual display,
+  process tuning) and restores everything when the game exits. Sessions are recorded like
+  PLAY sessions; FPS capture joins only when the elevated helper is already running, so
+  watch mode never causes a surprise UAC prompt. Toggle it from Settings or the tray menu.
+- **Network quality**: passive ping/jitter/loss measurement during sessions, preferring the
+  game's own remote endpoints (read from the connection table, nothing is intercepted) and
+  falling back to a configurable reference host with an explicit "[ REF HOST ] link quality"
+  label. Live readout on the SYSTEM page and optionally on the overlay; per-session averages
+  land in history.
+- **Windows tweaks**: a curated catalog of the widely published gaming tweaks (Game DVR off,
+  Win32PrioritySeparation, SystemResponsiveness, network throttling, MMCSS games task, HAGS,
+  mouse acceleration, accessibility hotkeys, and more), each with an individual on/off toggle
+  on the Performance page. Unlike profile settings these persist until turned off. Every tweak
+  shows what it changes, its benefit and its downside before you enable it; the original
+  registry values are captured before the first write and restored on disable, and a
+  "revert all" button undoes everything. HKLM writes go through the elevated helper's
+  whitelist: the IPC payload carries only a catalog tweak id, never arbitrary registry paths.
 - **Performance profiles**: Default / Balanced / Competitive presets plus custom profiles
   (power plan, process priority, CPU affinity, EcoQoS power throttling, opt-in background app
   cleanup). Every setting documents what it changes, its benefit, its downside, and whether it
@@ -64,8 +101,19 @@ so the app reads as a terminal without becoming hard to read where it actually e
   performance counters as fallback) and external FPS/frametime capture via an ETW present trace
   (DXGI provider, the PresentMon approach; nothing runs inside the game). Session history in
   SQLite with average / 1% low / 0.1% low FPS and P95/P99 frametimes.
+- **SESSIONS page** (Alt+0): trends over recent sessions as inline sparklines, the full
+  history table (with launch kind, network quality, and a `[ CFG ]` marker whenever the
+  profile content or tweak set changed between sessions), and a per-session drill-down that
+  renders the stored per-second FPS series. Session rows record the enabled tweak ids and a
+  content hash of the profile, so a renamed profile trends together and an edited one
+  visibly breaks the trend.
 - **Benchmark mode** compares two profiles across sessions with a Welch-test noise guard:
   differences inside run-to-run noise are reported as *no real advantage*, not as gains.
+- **Guided benchmark**: a wizard on the SESSIONS page runs "A vs B over N runs each" with
+  alternating profiles, counts only runs that produced FPS data, refuses to continue if
+  tweaks or profiles change mid-plan, and reports a per-run Welch verdict (each run's
+  average FPS is one observation, with Welch-Satterthwaite degrees of freedom) ahead of the
+  pooled per-second view, which overstates significance on autocorrelated frame data.
 - **Safety**: a recovery snapshot is persisted to disk *before* any system change and updated as
   the session progresses. Crashes are detected on next start with a *Restore previous system
   settings* prompt; driver-settings edits carry their own on-disk crash marker. Display changes
@@ -75,6 +123,10 @@ so the app reads as a terminal without becoming hard to read where it actually e
   (`Optima.Elevated.exe`) performs only whitelisted, argument-validated operations
   (display device toggle, driver pipe write, ETW session, bcdedit read) over a private,
   ACL-restricted named pipe with length-prefixed JSON frames.
+- **Update log**: an in-app page that renders [CHANGELOG.md](CHANGELOG.md) (shipped next to
+  the executable) plus the exact version and build timestamp of the running binary, so
+  "which build am I on and what changed" has an answer inside the app. Add an entry to the
+  changelog with each change; `publish.ps1` ships it automatically.
 - **Diagnostics**: virtualization/hypervisor, Google Play Games, Critical Ops, virtual driver,
   refresh rate, GPU driver, disk space, admin availability, each with status, reason, and a
   recommended fix. A hidden Developer page shows raw processes, resolved paths, driver
@@ -117,14 +169,30 @@ dotnet run --project src/Optima.App
 
 ### Publishing a self-contained build
 
-The app and the elevated helper must land in the same folder:
+One command produces (or refreshes) the runnable build:
 
-```bash
-dotnet publish src/Optima.App -c Release -r win-x64 --self-contained -o publish
-dotnet publish src/Optima.Elevated -c Release -r win-x64 --self-contained -o publish
+```powershell
+.\publish.ps1
 ```
 
-`publish/Optima.exe` is the application.
+`publish/Optima.exe` is the application; add `-Run` to start it right after. The script
+stops any running instance (which would lock the files), cleans `publish/` so stale
+binaries from earlier publishes cannot mix in, and publishes the elevated helper and then
+the app into the same folder, in that order so the app's newer shared dependencies win.
+Run it again after every change you want in `Optima.exe`; a build alone only updates
+`bin/`, never the publish folder.
+
+## Developing without the real game
+
+Two developer conveniences make every game-dependent feature testable on any machine:
+
+- **Mock FPS provider** (Settings → "mock fps provider", restart applies it): replaces the
+  ETW trace with a deterministic synthetic feed, so the overlay, session statistics and the
+  guided benchmark all run without the elevated helper or the game.
+- **Fake game via detection overrides**: edit `%LOCALAPPDATA%\Optima\detection.json` and set
+  `"emulatorProcessPatterns": ["^notepad$"]` and `"gameWindowTitlePattern": "Notepad"`.
+  Launching Notepad then exercises watch mode attach/restore, the overlay lifecycle and
+  session recording end to end; closing it restores everything.
 
 ## Data & configuration
 

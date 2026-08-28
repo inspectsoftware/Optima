@@ -16,9 +16,14 @@ public enum IpcCommand
     DisableDevice,
     /// <summary>Write one whitelisted command string to the virtual display driver control pipe.</summary>
     WriteVddPipe,
-    /// <summary>Start the ETW present-statistics session for a given process id.</summary>
+    /// <summary>Start the ETW present-statistics session for a set of candidate process ids.</summary>
     StartEtw,
     StopEtw,
+    /// <summary>
+    /// Run a short unfiltered DXGI present trace and return per-process present counts.
+    /// Diagnostics only: answers "which process actually presents frames" when capture is silent.
+    /// </summary>
+    RunEtwProbe,
     /// <summary>Read bcdedit hypervisorlaunchtype (diagnostics only, no modification).</summary>
     ReadBcdVirtualization,
     /// <summary>Stage a bundled driver package and create its root device node.</summary>
@@ -27,6 +32,8 @@ public enum IpcCommand
     UninstallDriver,
     /// <summary>Create the virtual display driver's settings file if it is missing.</summary>
     EnsureVddSettings,
+    /// <summary>Write the HKLM values of one catalog tweak (restricted to TweakCatalog paths).</summary>
+    ApplyTweakValues,
     Shutdown,
 }
 

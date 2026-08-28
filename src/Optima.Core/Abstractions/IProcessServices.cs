@@ -35,6 +35,19 @@ public interface IProcessMonitor
     Task WaitForGameExitAsync(CancellationToken ct = default);
 }
 
+/// <summary>Outcome of a game kill request.</summary>
+public sealed record GameKillResult(bool Killed, string Message);
+
+/// <summary>
+/// Hard-kills the emulator process tree hosting the game. A deliberate user action, kept
+/// separate from <see cref="IBackgroundCleanupService"/>, whose never-touch list protects
+/// these exact processes from the cleanup feature.
+/// </summary>
+public interface IGameTerminator
+{
+    Task<GameKillResult> KillGameAsync(CancellationToken ct = default);
+}
+
 /// <summary>Applies reversible scheduling tweaks to processes (§9). Every change returns its undo state.</summary>
 public interface IProcessOptimizer
 {

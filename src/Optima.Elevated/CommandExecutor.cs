@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO.Pipes;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Optima.Core.Ipc;
+using Optima.Core.Models;
 
 namespace Optima.Elevated;
 
@@ -97,18 +99,45 @@ public sealed partial class CommandExecutor : IAsyncDisposable
 
             case IpcCommand.StartEtw:
             {
-                if (!request.Args.TryGetValue("pid", out var pidText)
-                    || !int.TryParse(pidText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pid)
-                    || pid <= 0)
+                // "pids" is the current form (comma-separated candidates); "pid" stays accepted.
+                var pidsText = request.Args.TryGetValue("pids", out var multi) ? multi
+                    : request.Args.TryGetValue("pid", out var single) ? single
+                    : null;
+                if (pidsText is null)
                 {
                     return fail("Invalid process id.");
                 }
+                var parts = pidsText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var pids = new List<int>();
+                foreach (var part in parts)
+                {
+                    if (!int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pid) || pid <= 0)
+                    {
+                        return fail("Invalid process id.");
+                    }
+                    pids.Add(pid);
+                }
+                if (pids.Count is 0 or > 16)
+                {
+                    return fail("Between 1 and 16 process ids are required.");
+                }
+
+                var intervalMs = 1000;
+                if (request.Args.TryGetValue("intervalMs", out var intervalText))
+                {
+                    if (!int.TryParse(intervalText, NumberStyles.Integer, CultureInfo.InvariantCulture, out intervalMs)
+                        || intervalMs is < 250 or > 2000)
+                    {
+                        return fail("intervalMs must be between 250 and 2000.");
+                    }
+                }
+
                 if (_etw is not null)
                 {
                     return fail("An ETW session is already running.");
                 }
 
-                _etw = new EtwFrametimeCollector(pid, _publishEvent);
+                _etw = new EtwFrametimeCollector(pids, intervalMs, _publishEvent);
                 _etw.Start();
                 return ok(null);
             }
@@ -123,6 +152,30 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 _etw.Dispose();
                 _etw = null;
                 return ok(summary);
+            }
+
+            case IpcCommand.RunEtwProbe:
+            {
+                var durationSeconds = 10;
+                if (request.Args.TryGetValue("durationSeconds", out var durationText))
+                {
+                    if (!int.TryParse(durationText, NumberStyles.Integer, CultureInfo.InvariantCulture, out durationSeconds)
+                        || durationSeconds is < 3 or > 30)
+                    {
+                        return fail("durationSeconds must be between 3 and 30.");
+                    }
+                }
+                if (_etw is not null)
+                {
+                    return fail("An ETW session is already running; stop it before probing.");
+                }
+
+                var counts = await EtwPresentProbe.RunAsync(TimeSpan.FromSeconds(durationSeconds), ct);
+                var data = counts.ToDictionary(
+                    kv => $"pid:{kv.Key.ToString(CultureInfo.InvariantCulture)}",
+                    kv => kv.Value.ToString(CultureInfo.InvariantCulture));
+                data["durationSeconds"] = durationSeconds.ToString(CultureInfo.InvariantCulture);
+                return ok(data);
             }
 
             case IpcCommand.InstallDriver:
@@ -168,7 +221,22 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 {
                     return fail(removeError);
                 }
-                return ok(new Dictionary<string, string> { ["removed"] = removed.ToString(CultureInfo.InvariantCulture) });
+
+                // With the device gone, also drop the staged package from the DriverStore so
+                // this is a real uninstall rather than a device removal that leaves the driver
+                // behind. Best effort: the device removal already succeeded, so a DriverStore
+                // hiccup is logged instead of failing the whole operation.
+                var packagesDeleted = 0;
+                if (request.Args.TryGetValue("infName", out var infName) && IsSafeInfName(infName))
+                {
+                    packagesDeleted = await DeleteStagedDriverPackagesAsync(infName, ct);
+                }
+
+                return ok(new Dictionary<string, string>
+                {
+                    ["removed"] = removed.ToString(CultureInfo.InvariantCulture),
+                    ["packagesDeleted"] = packagesDeleted.ToString(CultureInfo.InvariantCulture),
+                });
             }
 
             case IpcCommand.EnsureVddSettings:
@@ -194,6 +262,80 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 }
                 await File.WriteAllTextAsync(settingsPath, content, ct);
                 return ok(new Dictionary<string, string> { ["created"] = "1" });
+            }
+
+            case IpcCommand.ApplyTweakValues:
+            {
+                // The payload never carries key paths or value names: only a catalog tweak id
+                // plus data for that tweak's own HKLM values. An arbitrary elevated registry
+                // write through this pipe is therefore impossible; the worst a malicious
+                // caller can do is toggle a documented tweak.
+                if (!request.Args.TryGetValue("tweakId", out var tweakId)
+                    || TweakCatalog.Find(tweakId) is not { } definition)
+                {
+                    return fail("Unknown tweak id.");
+                }
+                if (!request.Args.TryGetValue("values", out var valuesJson) || valuesJson.Length is 0 or > 8 * 1024)
+                {
+                    return fail("Missing or oversized values payload.");
+                }
+
+                Dictionary<string, string?>? targets;
+                try
+                {
+                    targets = JsonSerializer.Deserialize<Dictionary<string, string?>>(valuesJson);
+                }
+                catch (JsonException)
+                {
+                    return fail("Values payload is not valid JSON.");
+                }
+                if (targets is null || targets.Count == 0)
+                {
+                    return fail("Values payload is empty.");
+                }
+
+                // Validate everything before writing anything.
+                var writes = new List<(TweakValue Value, string? Data)>();
+                foreach (var (key, data) in targets)
+                {
+                    var value = definition.Values.FirstOrDefault(v =>
+                        v.Hive == TweakHive.LocalMachine && string.Equals(TweakCatalog.ValueKey(v), key, StringComparison.Ordinal));
+                    if (value is null)
+                    {
+                        return fail($"Value '{key}' is not an HKLM value of tweak '{tweakId}'.");
+                    }
+                    if (data is { Length: > 256 })
+                    {
+                        return fail("Value data is too long.");
+                    }
+                    if (data is not null && value.Kind == TweakValueKind.Dword
+                        && !uint.TryParse(data, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                    {
+                        return fail($"'{data}' is not a valid DWORD for '{key}'.");
+                    }
+                    writes.Add((value, data));
+                }
+
+                foreach (var (value, data) in writes)
+                {
+                    using var key = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(value.KeyPath);
+                    if (data is null)
+                    {
+                        key.DeleteValue(value.ValueName, throwOnMissingValue: false);
+                    }
+                    else if (value.Kind == TweakValueKind.Dword)
+                    {
+                        key.SetValue(value.ValueName,
+                            unchecked((int)uint.Parse(data, NumberStyles.Integer, CultureInfo.InvariantCulture)),
+                            Microsoft.Win32.RegistryValueKind.DWord);
+                    }
+                    else
+                    {
+                        key.SetValue(value.ValueName, data, Microsoft.Win32.RegistryValueKind.String);
+                    }
+                    HelperLog.Write($"Tweak '{tweakId}': {TweakCatalog.ValueKey(value)} = {data ?? "<deleted>"}");
+                }
+                return ok(null);
             }
 
             case IpcCommand.ReadBcdVirtualization:
@@ -299,6 +441,65 @@ public sealed partial class CommandExecutor : IAsyncDisposable
             }
             return false;
         }, ct);
+
+    /// <summary>
+    /// The original INF filename (e.g. MttVDD.inf) used to locate the staged package; a plain
+    /// filename only, so the argument can never smuggle a path or extra pnputil switches.
+    /// </summary>
+    private static bool IsSafeInfName(string name)
+        => name.Length is > 4 and <= 100 && SafeInfNamePattern().IsMatch(name);
+
+    [GeneratedRegex(@"^[A-Za-z0-9_.\-]+\.inf$", RegexOptions.IgnoreCase)]
+    private static partial Regex SafeInfNamePattern();
+
+    /// <summary>
+    /// Deletes every DriverStore package whose original INF name matches <paramref name="infName"/>.
+    /// </summary>
+    private static async Task<int> DeleteStagedDriverPackagesAsync(string infName, CancellationToken ct)
+    {
+        var (enumCode, enumOutput) = await RunProcessAsync("pnputil.exe", "/enum-drivers", ct);
+        if (enumCode != 0)
+        {
+            HelperLog.Write($"pnputil /enum-drivers exit={enumCode}: {Truncate(enumOutput)}");
+            return 0;
+        }
+
+        var deleted = 0;
+        foreach (var published in FindPublishedDriverNames(enumOutput, infName))
+        {
+            var (delCode, delOutput) = await RunProcessAsync("pnputil.exe", $"/delete-driver {published} /uninstall /force", ct);
+            HelperLog.Write($"pnputil /delete-driver {published} exit={delCode}: {Truncate(delOutput)}");
+            if (delCode == 0)
+            {
+                deleted++;
+            }
+        }
+        return deleted;
+    }
+
+    /// <summary>
+    /// Extracts the oemNN.inf published names of packages whose original INF is
+    /// <paramref name="originalInfName"/>. Matching is done on the values, never on
+    /// pnputil's field labels, because those are localized.
+    /// </summary>
+    internal static IReadOnlyList<string> FindPublishedDriverNames(string pnputilOutput, string originalInfName)
+    {
+        var results = new List<string>();
+        // pnputil separates driver entries with blank lines.
+        foreach (var block in pnputilOutput.Split(["\r\n\r\n", "\n\n"], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!block.Contains(originalInfName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            var match = Regex.Match(block, @"\boem\d+\.inf\b", RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                results.Add(match.Value.ToLowerInvariant());
+            }
+        }
+        return results.Distinct().ToList();
+    }
 
     private static async Task<(int ExitCode, string Output)> RunProcessAsync(string fileName, string arguments, CancellationToken ct)
     {

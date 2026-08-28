@@ -41,8 +41,12 @@ public sealed class EtwMetricsProviderClient : IPerformanceMetricsProvider
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
         => (await _settings.GetSettingsAsync(ct).ConfigureAwait(false)).EnableFrametimeCapture;
 
-    public async Task StartAsync(int processId, CancellationToken ct = default)
+    public async Task StartAsync(IReadOnlyList<int> processIds, CancellationToken ct = default)
     {
+        if (processIds.Count == 0)
+        {
+            throw new ArgumentException("At least one process id is required.", nameof(processIds));
+        }
         if (!await _elevation.EnsureStartedAsync(ct).ConfigureAwait(false))
         {
             throw new InvalidOperationException("The elevated helper is required for frametime capture and was not started.");
@@ -51,7 +55,7 @@ public sealed class EtwMetricsProviderClient : IPerformanceMetricsProvider
         var response = await _elevation.SendAsync(new IpcRequest
         {
             Command = IpcCommand.StartEtw,
-            Args = { ["pid"] = processId.ToString(CultureInfo.InvariantCulture) },
+            Args = { ["pids"] = string.Join(',', processIds.Select(p => p.ToString(CultureInfo.InvariantCulture))) },
         }, ct).ConfigureAwait(false);
 
         if (!response.Success)
@@ -67,7 +71,7 @@ public sealed class EtwMetricsProviderClient : IPerformanceMetricsProvider
             _liveFpsSamples.Clear();
             _liveFrametimes.Clear();
         }
-        _logger.LogInformation("Frametime capture started for PID {Pid}", processId);
+        _logger.LogInformation("Frametime capture started for candidate PIDs {Pids}", string.Join(", ", processIds));
     }
 
     public async Task StopAsync()

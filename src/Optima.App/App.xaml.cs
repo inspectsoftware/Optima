@@ -1,10 +1,12 @@
 using System.Windows;
 using System.Windows.Threading;
 using Optima.App.Logging;
+using Optima.App.Services;
 using Optima.App.ViewModels;
 using Optima.App.Views;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
+using Optima.Core.Launch;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
@@ -16,6 +18,10 @@ namespace Optima.App;
 public partial class App : Application
 {
     private IHost? _host;
+    private GlobalHotkeys? _hotkeys;
+    private TrayService? _tray;
+    private ConsoleWindow? _console;
+    private OverlayController? _overlay;
 
     public static LoggingLevelSwitch LogLevelSwitch { get; } = new(LogEventLevel.Information);
     public static InAppLogSink LogSink { get; } = new();
@@ -60,9 +66,54 @@ public partial class App : Application
         var mainViewModel = _host.Services.GetRequiredService<MainViewModel>();
         var window = new MainWindow { DataContext = mainViewModel };
         MainWindow = window;
+        // The hidden console window must not keep the app alive after the main window closes.
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
         window.Show();
 
+        _hotkeys = new GlobalHotkeys(window);
+        _hotkeys.ConsoleRequested += ToggleConsole;
+        _hotkeys.KillGameRequested += KillGameFromHotkey;
+
+        _overlay = new OverlayController(
+            _host.Services.GetRequiredService<OverlayViewModel>(),
+            _host.Services.GetRequiredService<IGameWindowLocator>(),
+            _host.Services.GetRequiredService<SettingsService>(),
+            _host.Services.GetRequiredService<LaunchOrchestrator>(),
+            _host.Services.GetRequiredService<INetworkQualityMonitor>());
+        _hotkeys.OverlayRequested += () => _overlay!.Toggle();
+
+        _tray = new TrayService(window, _host.Services.GetRequiredService<SettingsService>());
+        _tray.AttachOrchestrator(_host.Services.GetRequiredService<LaunchOrchestrator>());
+        // Same route as Ctrl+Alt+K, so the result text lands in the UI either way.
+        _tray.TerminateGameRequested += KillGameFromHotkey;
+        _tray.NavigateRequested += page =>
+        {
+            _tray!.ShowMainWindow();
+            _ = mainViewModel.NavigateCommand.ExecuteAsync(page);
+        };
+
         _ = mainViewModel.InitializeAsync();
+    }
+
+    /// <summary>Global Alt+F9: floating log console over whatever is on screen, without stealing focus.</summary>
+    private void ToggleConsole()
+    {
+        if (_console is { IsVisible: true })
+        {
+            _console.Hide();
+            return;
+        }
+        // Ownerless on purpose: the console must be able to sit on top of the game, not the app.
+        _console ??= new ConsoleWindow { DataContext = _host!.Services.GetRequiredService<LogsViewModel>() };
+        _console.Show();
+    }
+
+    /// <summary>Global Ctrl+Alt+K routes through the same command as the kill buttons, so the
+    /// result text lands in the UI either way.</summary>
+    private void KillGameFromHotkey()
+    {
+        var play = _host!.Services.GetRequiredService<PlayViewModel>();
+        _ = play.KillGameCommand.ExecuteAsync(null);
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
@@ -101,6 +152,9 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _hotkeys?.Dispose();
+        _overlay?.Dispose();
+        _tray?.Dispose();
         try
         {
             _host?.StopAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();

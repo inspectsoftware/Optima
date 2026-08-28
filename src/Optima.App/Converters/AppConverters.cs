@@ -28,6 +28,16 @@ public sealed class StatusKindToBrushConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>Bool negation for IsEnabled-style bindings ("editable while no plan is active").</summary>
+public sealed class InverseBoolConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is not true;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is not true;
+}
+
 public sealed class DiagnosticStatusToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

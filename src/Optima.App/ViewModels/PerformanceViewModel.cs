@@ -4,34 +4,64 @@ using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
-using Optima.Core.Statistics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace Optima.App.ViewModels;
 
+/// <summary>One toggleable Windows tweak row, grouped by category on the PERFORMANCE page.</summary>
+public sealed partial class TweakRowViewModel : ObservableObject
+{
+    public TweakRowViewModel(TweakDefinition definition, TweakStatus status)
+    {
+        Definition = definition;
+        _status = status;
+    }
+
+    public TweakDefinition Definition { get; }
+    public string Name => Definition.Name;
+    public string WhatItChanges => Definition.WhatItChanges;
+    public string PotentialBenefit => Definition.PotentialBenefit;
+    public string PotentialDownside => Definition.PotentialDownside;
+    public bool RequiresElevation => Definition.RequiresElevation;
+    public bool RequiresRestart => Definition.RequiresRestart;
+    public bool IsModerateRisk => Definition.Risk == TweakRisk.Moderate;
+
+    [ObservableProperty] private TweakStatus _status;
+}
+
+public sealed record TweakGroupViewModel(string Category, IReadOnlyList<TweakRowViewModel> Tweaks);
+
 /// <summary>
-/// PERFORMANCE page (§8/§13/§14/§22): profile editing with full per-setting disclosure,
-/// session history, and benchmark comparison with the statistical noise guard.
+/// PERFORMANCE page (§8/§22): the Windows tweak catalog with per-tweak toggles and profile
+/// editing with full per-setting disclosure. Session history and benchmark comparison live
+/// on the SESSIONS page.
 /// </summary>
 public sealed partial class PerformanceViewModel : ObservableObject
 {
     private readonly ProfileService _profiles;
-    private readonly ISessionStore _sessions;
+    private readonly ITweakService _tweaks;
     private readonly PlayViewModel _play;
     private readonly ILogger<PerformanceViewModel> _logger;
 
-    public PerformanceViewModel(ProfileService profiles, ISessionStore sessions, PlayViewModel play, ILogger<PerformanceViewModel> logger)
+    public PerformanceViewModel(
+        ProfileService profiles,
+        ITweakService tweaks,
+        PlayViewModel play,
+        ILogger<PerformanceViewModel> logger)
     {
         _profiles = profiles;
-        _sessions = sessions;
+        _tweaks = tweaks;
         _play = play;
         _logger = logger;
     }
 
     public ObservableCollection<LaunchProfile> Profiles { get; } = [];
-    public ObservableCollection<SessionRecord> Sessions { get; } = [];
+    public ObservableCollection<TweakGroupViewModel> TweakGroups { get; } = [];
     public IReadOnlyList<SettingExplanation> Explanations => SettingExplanations.All;
+
+    [ObservableProperty] private string _tweaksStatus = string.Empty;
+    [ObservableProperty] private bool _tweaksBusy;
 
     public IReadOnlyList<PowerPlanKind> PowerPlanOptions { get; } = Enum.GetValues<PowerPlanKind>();
     public IReadOnlyList<ProcessPriorityLevel> PriorityOptions { get; } = Enum.GetValues<ProcessPriorityLevel>();
@@ -49,15 +79,100 @@ public sealed partial class PerformanceViewModel : ObservableObject
     [ObservableProperty] private string _editCleanupList = string.Empty;
     [ObservableProperty] private string _editorStatus = string.Empty;
 
-    // ---- Benchmark compare ----
-    [ObservableProperty] private LaunchProfile? _compareProfileA;
-    [ObservableProperty] private LaunchProfile? _compareProfileB;
-    [ObservableProperty] private BenchmarkComparison? _comparison;
-
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         await ReloadProfilesAsync(ct);
-        await ReloadSessionsAsync(ct);
+        await ReloadTweaksAsync(ct);
+    }
+
+    [RelayCommand]
+    private async Task ReloadTweaksAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var states = await _tweaks.GetStatesAsync(ct);
+            TweakGroups.Clear();
+            foreach (var group in states.GroupBy(s => s.Definition.Category))
+            {
+                TweakGroups.Add(new TweakGroupViewModel(
+                    group.Key.ToUpperInvariant(),
+                    group.Select(s => new TweakRowViewModel(s.Definition, s.Status)).ToList()));
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Reading tweak states failed");
+            TweaksStatus = "Could not read the current tweak states. See Logs.";
+        }
+    }
+
+    /// <summary>Enabled and Mixed both toggle to off; only a clean Disabled toggles to on.</summary>
+    [RelayCommand]
+    private async Task ToggleTweakAsync(TweakRowViewModel row)
+    {
+        if (TweaksBusy)
+        {
+            return;
+        }
+        TweaksBusy = true;
+        var enable = row.Status == TweakStatus.Disabled;
+        try
+        {
+            var state = await _tweaks.SetEnabledAsync(row.Definition.Id, enable);
+            row.Status = state.Status;
+            TweaksStatus = enable
+                ? $"'{row.Name}' enabled." + (row.RequiresRestart ? " Takes full effect after a Windows restart." : string.Empty)
+                : $"'{row.Name}' disabled; original values restored.";
+        }
+        catch (OptimaException ex)
+        {
+            TweaksStatus = $"{ex.Error.Title} {ex.Error.SuggestedFixes.FirstOrDefault()}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Toggling tweak {Tweak} failed", row.Definition.Id);
+            TweaksStatus = "The tweak change failed. See Logs.";
+        }
+        finally
+        {
+            TweaksBusy = false;
+        }
+    }
+
+    /// <summary>The panic button: reverts every applied tweak to its captured original.</summary>
+    [RelayCommand]
+    private async Task DisableAllTweaksAsync()
+    {
+        if (TweaksBusy)
+        {
+            return;
+        }
+        TweaksBusy = true;
+        var reverted = 0;
+        try
+        {
+            foreach (var row in TweakGroups.SelectMany(g => g.Tweaks)
+                         .Where(r => r.Status is TweakStatus.Enabled or TweakStatus.Mixed))
+            {
+                var state = await _tweaks.SetEnabledAsync(row.Definition.Id, enable: false);
+                row.Status = state.Status;
+                reverted++;
+            }
+            TweaksStatus = reverted == 0 ? "No tweaks are enabled." : $"Reverted {reverted} tweak(s) to original values.";
+        }
+        catch (OptimaException ex)
+        {
+            TweaksStatus = $"{ex.Error.Title} {ex.Error.SuggestedFixes.FirstOrDefault()}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Disabling all tweaks failed");
+            TweaksStatus = "Reverting tweaks failed part-way. See Logs.";
+        }
+        finally
+        {
+            TweaksBusy = false;
+        }
     }
 
     private async Task ReloadProfilesAsync(CancellationToken ct = default)
@@ -68,15 +183,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
             Profiles.Add(profile);
         }
         SelectedProfile ??= Profiles.FirstOrDefault();
-    }
-
-    private async Task ReloadSessionsAsync(CancellationToken ct = default)
-    {
-        Sessions.Clear();
-        foreach (var session in await _sessions.GetSessionsAsync(50, ct))
-        {
-            Sessions.Add(session);
-        }
     }
 
     partial void OnSelectedProfileChanged(LaunchProfile? value)
@@ -196,18 +302,4 @@ public sealed partial class PerformanceViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private async Task RefreshSessionsAsync() => await ReloadSessionsAsync();
-
-    [RelayCommand]
-    private async Task CompareAsync()
-    {
-        if (CompareProfileA is null || CompareProfileB is null)
-        {
-            return;
-        }
-        var sessionsA = await _sessions.GetSessionsByProfileAsync(CompareProfileA.Name);
-        var sessionsB = await _sessions.GetSessionsByProfileAsync(CompareProfileB.Name);
-        Comparison = BenchmarkComparer.Compare(CompareProfileA.Name, sessionsA, CompareProfileB.Name, sessionsB);
-    }
 }

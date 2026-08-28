@@ -54,7 +54,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         _logger = logger;
     }
 
-    public override string Name => "Virtual Display Driver (MikeTheTech)";
+    public override string Name => "Optima Virtualization";
 
     /// <summary>Path of the backup taken before we first rewrote the driver settings, if any.</summary>
     public string? SettingsBackupPath => _settingsChanged ? _backupPath : null;
@@ -164,53 +164,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
 
     public override async Task SetModeAsync(DisplayMode mode, CancellationToken ct = default)
     {
-        var settingsPath = await GetSettingsPathAsync(ct).ConfigureAwait(false);
-
-        // 1. Make sure the driver advertises the mode; reload it when the settings change.
-        //    When the settings file cannot be rewritten (it usually needs admin), fail safely
-        //    by snapping to the closest mode the driver already advertises (§7).
-        if (File.Exists(settingsPath))
-        {
-            var document = VddSettingsDocument.Load(settingsPath);
-            var advertised = document.GetAdvertisedModes();
-            if (!advertised.Contains(mode))
-            {
-                try
-                {
-                    document.EnsureMode(mode);
-                    if (_backupPath is not null)
-                    {
-                        // Persist the pending-change marker BEFORE the edit so even a crash right
-                        // after the write is recoverable on the next start (§18).
-                        await File.WriteAllLinesAsync(MarkerPath, [_backupPath, settingsPath], ct).ConfigureAwait(false);
-                    }
-                    document.Save(settingsPath);
-                    _settingsChanged = true;
-                    _logger.LogInformation("Added {Mode} to vdd_settings.xml, reloading driver", mode);
-                    await ReloadDriverAsync(ct).ConfigureAwait(false);
-                    await Task.Delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
-                {
-                    var closest = ClosestAdvertisedMode(advertised, mode);
-                    if (closest is null)
-                    {
-                        throw OptimaException.From("VDD_SETTINGS_LOCKED",
-                            "The driver settings file could not be updated.",
-                            $"Writing {settingsPath} requires administrator access and no similar mode is available.",
-                            ex,
-                            "Run the app once as administrator to add the mode",
-                            $"Or add {mode.Width}x{mode.Height} @ {mode.RefreshRate} Hz to the settings file manually");
-                    }
-                    _logger.LogWarning(ex,
-                        "Cannot update vdd_settings.xml without elevation, using closest advertised mode {Closest} instead of {Requested}",
-                        closest, mode);
-                    mode = closest.Value;
-                }
-            }
-        }
-
-        // 2. Apply the mode on the Windows side (temporary; never persisted to the registry).
         var display = await GetDisplayInfoAsync(ct).ConfigureAwait(false)
             ?? throw OptimaException.From("VDD_NO_DISPLAY",
                 "The virtual display is not active.",
@@ -218,8 +171,152 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
                 null,
                 "Enable the virtual display first");
 
+        // 1. Make sure the driver actually advertises the mode. The Windows mode list of the
+        //    live display is the source of truth here, not vdd_settings.xml: the file can list
+        //    a mode the driver never loaded (edited by an earlier session that never reloaded,
+        //    or restored behind the driver's back), and trusting it skips the reload, after
+        //    which Windows quietly lands on whatever the driver prefers instead (e.g. its
+        //    999 Hz placeholder mode).
+        var liveModes = await _displayService.GetSupportedModesAsync(display.DeviceName, ct).ConfigureAwait(false);
+        if (!liveModes.Contains(mode))
+        {
+            mode = await MakeDriverAdvertiseModeAsync(mode, ct).ConfigureAwait(false);
+
+            // The reload detaches and re-attaches the monitor, so re-resolve it.
+            display = await GetDisplayInfoAsync(ct).ConfigureAwait(false)
+                ?? throw OptimaException.From("VDD_NO_DISPLAY",
+                    "The virtual display did not come back after the driver reload.",
+                    "The driver was reloaded to pick up the new mode but its display never re-attached.",
+                    null,
+                    "Enable the virtual display again from the Display page");
+        }
+
+        // 2. Apply the mode on the Windows side (temporary; never persisted to the registry).
         await _displayService.ApplyModeAsync(display.DeviceName, mode, ct).ConfigureAwait(false);
+
+        // 3. The driver can still snap back to its preferred mode while it finishes
+        //    re-attaching, silently undoing the change; verify instead of assuming.
+        await VerifyModeAppliedAsync(mode, ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Rewrites vdd_settings.xml when needed and reloads the driver until it advertises
+    /// <paramref name="mode"/>. When the settings file cannot be rewritten (it usually needs
+    /// admin), fails safely by snapping to the closest mode already advertised (§7).
+    /// </summary>
+    private async Task<DisplayMode> MakeDriverAdvertiseModeAsync(DisplayMode mode, CancellationToken ct)
+    {
+        var settingsPath = await GetSettingsPathAsync(ct).ConfigureAwait(false);
+        if (!File.Exists(settingsPath))
+        {
+            return mode; // nothing to edit; ApplyModeAsync's CDS_TEST will judge the mode
+        }
+
+        var document = VddSettingsDocument.Load(settingsPath);
+        try
+        {
+            if (document.EnsureMode(mode))
+            {
+                if (_backupPath is not null)
+                {
+                    // Persist the pending-change marker BEFORE the edit so even a crash right
+                    // after the write is recoverable on the next start (§18).
+                    await File.WriteAllLinesAsync(MarkerPath, [_backupPath, settingsPath], ct).ConfigureAwait(false);
+                }
+                document.Save(settingsPath);
+                _settingsChanged = true;
+                _logger.LogInformation("Added {Mode} to vdd_settings.xml, reloading driver", mode);
+            }
+
+            // Reload even when the XML already listed the mode: the driver has not picked it
+            // up yet, or the mode would already be in the live Windows mode list.
+            await ReloadDriverAsync(ct).ConfigureAwait(false);
+            if (!await WaitForAdvertisedModeAsync(mode, TimeSpan.FromSeconds(10), ct).ConfigureAwait(false))
+            {
+                _logger.LogWarning("Driver still does not advertise {Mode} after a reload; applying it anyway", mode);
+            }
+            return mode;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            var closest = ClosestAdvertisedMode(document.GetAdvertisedModes(), mode);
+            if (closest is null)
+            {
+                throw OptimaException.From("VDD_SETTINGS_LOCKED",
+                    "The driver settings file could not be updated.",
+                    $"Writing {settingsPath} requires administrator access and no similar mode is available.",
+                    ex,
+                    "Run the app once as administrator to add the mode",
+                    $"Or add {mode.Width}x{mode.Height} @ {mode.RefreshRate} Hz to the settings file manually");
+            }
+            _logger.LogWarning(ex,
+                "Cannot update vdd_settings.xml without elevation, using closest advertised mode {Closest} instead of {Requested}",
+                closest, mode);
+            return closest.Value;
+        }
+    }
+
+    /// <summary>Polls until the live display's Windows mode list contains <paramref name="mode"/>.</summary>
+    private async Task<bool> WaitForAdvertisedModeAsync(DisplayMode mode, TimeSpan timeout, CancellationToken ct)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            // The display can be mid re-attach and briefly gone; keep polling through that.
+            if (await GetDisplayInfoAsync(ct).ConfigureAwait(false) is { } display)
+            {
+                var modes = await _displayService.GetSupportedModesAsync(display.DeviceName, ct).ConfigureAwait(false);
+                if (modes.Contains(mode))
+                {
+                    return true;
+                }
+            }
+            await Task.Delay(500, ct).ConfigureAwait(false);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Confirms the display actually runs at <paramref name="requested"/>, re-applying once if
+    /// the driver reverted it, and failing loudly rather than reporting a mode it never granted.
+    /// </summary>
+    private async Task VerifyModeAppliedAsync(DisplayMode requested, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(3);
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                if (IsModeApplied(await GetCurrentModeAsync(ct).ConfigureAwait(false), requested))
+                {
+                    return;
+                }
+                await Task.Delay(500, ct).ConfigureAwait(false);
+            }
+
+            if (attempt == 0 && await GetDisplayInfoAsync(ct).ConfigureAwait(false) is { } display)
+            {
+                _logger.LogWarning("Virtual display settled at {Actual} instead of {Requested}; re-applying",
+                    display.CurrentMode, requested);
+                await _displayService.ApplyModeAsync(display.DeviceName, requested, ct).ConfigureAwait(false);
+            }
+        }
+
+        var actual = await GetCurrentModeAsync(ct).ConfigureAwait(false);
+        throw OptimaException.From("VDD_MODE_NOT_APPLIED",
+            $"The virtual display is running at {actual?.ToString() ?? "an unknown mode"} instead of {requested}.",
+            "Windows accepted the mode change but the driver reverted to its own preferred mode.",
+            null,
+            "Apply the mode again",
+            "Check the refresh rates listed in vdd_settings.xml, then reload the driver");
+    }
+
+    /// <summary>GDI rounds fractional rates (239.96 reads back as 239), so allow 1 Hz of slack.</summary>
+    private static bool IsModeApplied(DisplayMode? current, DisplayMode requested)
+        => current is { } mode
+            && mode.Width == requested.Width
+            && mode.Height == requested.Height
+            && Math.Abs(mode.RefreshRate - requested.RefreshRate) <= 1;
 
     public override async Task<IReadOnlyList<DisplayMode>> GetSupportedModesAsync(CancellationToken ct = default)
     {
@@ -228,9 +325,11 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         if (display is not null)
         {
             var windowsModes = await _displayService.GetSupportedModesAsync(display.DeviceName, ct).ConfigureAwait(false);
-            if (windowsModes.Count > 0)
+            // Do not offer the driver's 999/9999 placeholder rates as if they were real modes.
+            var plausible = windowsModes.Where(m => m.IsValid).ToList();
+            if (plausible.Count > 0)
             {
-                return windowsModes;
+                return plausible;
             }
         }
 

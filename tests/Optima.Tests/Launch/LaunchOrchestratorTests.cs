@@ -22,7 +22,9 @@ public sealed class LaunchOrchestratorTests : IDisposable
     private readonly FakeProcessOptimizer _processOptimizer = new();
     private readonly FakeCleanup _cleanup = new();
     private readonly FakeMetrics _metrics = new();
+    private readonly FakeNetworkMonitor _network = new();
     private readonly FakeSessionStore _sessionStore = new();
+    private readonly FakeTweakService _tweaks = new();
 
     public LaunchOrchestratorTests()
     {
@@ -36,7 +38,7 @@ public sealed class LaunchOrchestratorTests : IDisposable
 
     private LaunchOrchestrator CreateOrchestrator() => new(
         _detector, [_launcher], _virtualDisplay, _displayService, _power,
-        _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _sessionStore,
+        _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
         NullLogger<LaunchOrchestrator>.Instance);
 
     private static LaunchProfile CompetitiveProfile => new()
@@ -175,6 +177,70 @@ public sealed class LaunchOrchestratorTests : IDisposable
         await CreateOrchestrator().RunSessionAsync(profile);
 
         Assert.Equal(["Discord", "SomeUpdater"], _cleanup.Closed);
+    }
+
+    [Fact]
+    public async Task Attach_HappyPath_AppliesProfileMonitorsAndRestores()
+    {
+        _metrics.Available = true;
+
+        var result = await CreateOrchestrator().AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: true);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Session);
+        Assert.Equal(LaunchKind.Watch, result.Session.LaunchKind);
+
+        // The full profile went on and came off again, without any launch.
+        Assert.Contains("apply:HighPerformance", _power.Log);
+        Assert.Contains("restore", _power.Log);
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Contains("restoreOriginal", _virtualDisplay.Log);
+        Assert.Equal([4242], _processOptimizer.Applied);
+        Assert.Equal([4242], _processOptimizer.Restored);
+        Assert.True(_metrics.Started);
+        Assert.Single(_sessionStore.Saved);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task Attach_CaptureNotAllowed_RecordsSessionWithoutMetrics()
+    {
+        _metrics.Available = true;
+
+        var result = await CreateOrchestrator().AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false);
+
+        Assert.True(result.Success);
+        Assert.False(_metrics.Started);
+        var saved = Assert.Single(_sessionStore.Saved);
+        Assert.False(saved.Stats.HasData);
+    }
+
+    [Fact]
+    public async Task Attach_WhilePlaySessionRuns_IsRejected()
+    {
+        _processMonitor.ExitAfter = TimeSpan.FromMilliseconds(600);
+        var orchestrator = CreateOrchestrator();
+
+        var play = orchestrator.RunSessionAsync(CompetitiveProfile);
+        await Task.Delay(150);
+        var attach = await orchestrator.AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: true);
+
+        Assert.Equal("SESSION_ACTIVE", attach.Error?.Code);
+        Assert.True((await play).Success);
+    }
+
+    [Fact]
+    public async Task RunSession_WhileAttached_IsRejected()
+    {
+        _processMonitor.ExitAfter = TimeSpan.FromMilliseconds(600);
+        var orchestrator = CreateOrchestrator();
+
+        var attach = orchestrator.AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false);
+        await Task.Delay(150);
+        var play = await orchestrator.RunSessionAsync(CompetitiveProfile);
+
+        Assert.Equal("SESSION_ACTIVE", play.Error?.Code);
+        Assert.True((await attach).Success);
     }
 
     public void Dispose()

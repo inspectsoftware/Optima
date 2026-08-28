@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
+using Optima.Core.Configuration;
 using Optima.Core.Models;
 using Microsoft.Extensions.Logging;
 
@@ -39,6 +40,7 @@ public sealed partial class StatusViewModel : ObservableObject
     private readonly IDriverInstaller _driverInstaller;
     private readonly ISystemInfoService _systemInfo;
     private readonly IProcessMonitor _processMonitor;
+    private readonly SettingsService _settings;
     private readonly ILogger<StatusViewModel> _logger;
 
     public StatusViewModel(
@@ -47,6 +49,7 @@ public sealed partial class StatusViewModel : ObservableObject
         IDriverInstaller driverInstaller,
         ISystemInfoService systemInfo,
         IProcessMonitor processMonitor,
+        SettingsService settings,
         ILogger<StatusViewModel> logger)
     {
         _detector = detector;
@@ -54,13 +57,14 @@ public sealed partial class StatusViewModel : ObservableObject
         _driverInstaller = driverInstaller;
         _systemInfo = systemInfo;
         _processMonitor = processMonitor;
+        _settings = settings;
         _logger = logger;
     }
 
     public StatusItem GooglePlayGames { get; } = new("Google Play Games");
     public StatusItem CriticalOps { get; } = new("Critical Ops");
-    public StatusItem VirtualDisplay { get; } = new("Virtual Display");
-    public StatusItem Virtualization { get; } = new("Virtualization");
+    public StatusItem VirtualDisplay { get; } = new("Optima Virtualization");
+    public StatusItem Virtualization { get; } = new("VT-x");
     public StatusItem Display { get; } = new("Display");
 
     [ObservableProperty]
@@ -107,11 +111,25 @@ public sealed partial class StatusViewModel : ObservableObject
                 virtOk ? StatusKind.Good : StatusKind.Bad);
 
             // Not a status word but a measurement, so it keeps its natural casing.
-            var displays = (await _systemInfo.GetInventoryAsync(ct)).Displays;
-            var primary = displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault(d => d.IsActive);
-            Set(Display,
-                primary is null ? "UNKNOWN" : primary.CurrentMode.ToString(),
-                primary is null ? StatusKind.Warning : StatusKind.Good);
+            // The readout answers "which display drives the FPS cap": the virtual display
+            // whenever it is attached (that is where the game renders during an uncapped
+            // session), otherwise the physical primary.
+            var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
+            var virtualInfo = await _virtualDisplay.GetDisplayInfoAsync(ct);
+            if (virtualInfo is not null)
+            {
+                var name = DisplayPresentation.CustomName(virtualInfo, overrides) ?? "virtual";
+                Set(Display, $"{virtualInfo.CurrentMode} on {name}", StatusKind.Good);
+            }
+            else
+            {
+                var displays = (await _systemInfo.GetInventoryAsync(ct)).Displays;
+                var primary = displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault(d => d.IsActive);
+                var name = primary is null ? null : DisplayPresentation.CustomName(primary, overrides) ?? "primary";
+                Set(Display,
+                    primary is null ? "UNKNOWN" : $"{primary.CurrentMode} on {name}",
+                    primary is null ? StatusKind.Warning : StatusKind.Good);
+            }
 
             GameIsRunning = await _processMonitor.GetGameStateAsync(ct) == GameRuntimeState.Running;
         }

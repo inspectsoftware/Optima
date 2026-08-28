@@ -22,6 +22,21 @@
         </StackPanel>
       </HeaderedContentControl>
 
+      <HeaderedContentControl Style="{StaticResource Section}" Header="NETWORK">
+        <StackPanel>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Connection quality" Style="{StaticResource Text.Label}" />
+            <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+            <TextBlock Grid.Column="2" Text="{Binding NetworkStatus}" Style="{StaticResource Text.Value}" />
+          </Grid>
+          <TextBlock Style="{StaticResource Text.Prose}" Margin="0,10,0,0" MaxWidth="720" HorizontalAlignment="Left"
+                     Text="Measured passively with pings while a game session runs. Game endpoints are preferred; when none answer, the reference host from Settings is measured instead and the readout reflects link quality rather than game-server latency." />
+        </StackPanel>
+      </HeaderedContentControl>
+
       <HeaderedContentControl Style="{StaticResource Section}" Header="MONITORS">
         <ItemsControl ItemsSource="{Binding Displays}">
           <ItemsControl.ItemTemplate>
@@ -34,8 +49,8 @@
                     <ColumnDefinition Width="170" />
                   </Grid.ColumnDefinitions>
                   <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
-                  <TextBlock Grid.Column="1" Text="{Binding FriendlyName}" Style="{StaticResource Text.Cell}" />
-                  <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" Style="{StaticResource Text.Cell}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" Style="{StaticResource Text.Cell}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Mode}" Style="{StaticResource Text.Cell}" />
                 </Grid>
               </Border>
             </DataTemplate>

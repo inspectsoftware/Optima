@@ -12,4 +12,7 @@ public interface ISessionStore
     Task<IReadOnlyList<SessionRecord>> GetSessionsAsync(int limit = 50, CancellationToken ct = default);
 
     Task<IReadOnlyList<SessionRecord>> GetSessionsByProfileAsync(string profileName, CancellationToken ct = default);
+
+    /// <summary>Fetches specific sessions by row id (guided benchmark result sets).</summary>
+    Task<IReadOnlyList<SessionRecord>> GetSessionsByIdsAsync(IReadOnlyList<long> ids, CancellationToken ct = default);
 }

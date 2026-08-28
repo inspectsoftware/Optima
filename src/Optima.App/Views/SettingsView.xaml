@@ -14,7 +14,7 @@
             <ColumnDefinition />
           </Grid.ColumnDefinitions>
           <Grid.RowDefinitions>
-            <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+            <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
           </Grid.RowDefinitions>
 
           <TextBlock Text="virtual display provider" Style="{StaticResource Text.Label}"
@@ -38,6 +38,67 @@
           <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding DeveloperMode}"
                     VerticalAlignment="Center" Margin="0,5"
                     Content="show the DEVELOPER page (alt+9)" />
+
+          <TextBlock Grid.Row="4" Text="keep in tray" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding KeepInTrayOnClose}"
+                    VerticalAlignment="Center" Margin="0,5"
+                    Content="closing the window keeps Optima in the tray (quit via EXIT in the tray menu)" />
+
+          <TextBlock Grid.Row="5" Text="mock fps provider" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding UseMockMetricsProvider}"
+                    VerticalAlignment="Center" Margin="0,5"
+                    Content="developer: synthetic fps data instead of the ETW trace (applies after restart)" />
+        </Grid>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="OVERLAY AND WATCH MODE">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210" />
+            <ColumnDefinition />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+          </Grid.RowDefinitions>
+
+          <TextBlock Text="fps overlay" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <CheckBox Grid.Column="1" IsChecked="{Binding OverlayEnabled}"
+                    VerticalAlignment="Center" Margin="0,5"
+                    Content="show fps over the game while a session runs (alt+f10 toggles it any time)" />
+
+          <TextBlock Grid.Row="1" Text="overlay corner" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding CornerOptions}" SelectedItem="{Binding OverlayCorner}"
+                    Width="210" HorizontalAlignment="Left" Margin="0,5" />
+
+          <TextBlock Grid.Row="2" Text="overlay opacity" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding OpacityOptions}" SelectedItem="{Binding OverlayOpacity}"
+                    Width="210" HorizontalAlignment="Left" Margin="0,5" />
+
+          <TextBlock Grid.Row="3" Text="overlay network line" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding OverlayShowNetwork}"
+                    VerticalAlignment="Center" Margin="0,5"
+                    Content="show ping · jitter · loss below the fps readout" />
+
+          <TextBlock Grid.Row="4" Text="network reference host" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding NetworkReferenceHost}" Width="210"
+                   HorizontalAlignment="Left" Margin="0,5"
+                   ToolTip="pinged for link quality when no game endpoint answers ICMP" />
+
+          <TextBlock Grid.Row="5" Text="watch mode" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,5">
+            <CheckBox IsChecked="{Binding EnableWatchMode}" VerticalAlignment="Center"
+                      Content="apply the selected profile automatically when the game starts outside Optima" />
+            <TextBlock Style="{StaticResource Text.Micro}" Margin="24,3,0,0" MaxWidth="560" HorizontalAlignment="Left" TextWrapping="Wrap"
+                       Text="applies the full profile including the virtual display, so the screen can visibly reconfigure when the game is detected · everything is restored when the game exits" />
+          </StackPanel>
         </Grid>
       </HeaderedContentControl>
 

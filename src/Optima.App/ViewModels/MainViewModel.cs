@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Optima.App.Views;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
+using Optima.Core.Launch;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
@@ -38,41 +39,48 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IPerformanceMonitor _monitor;
     private readonly ISessionStore _sessionStore;
     private readonly IProcessMonitor _processMonitor;
+    private readonly GameWatchService _gameWatch;
     private readonly ILogger<MainViewModel> _logger;
 
     public MainViewModel(
         HomeViewModel home,
         PlayViewModel play,
         PerformanceViewModel performance,
+        SessionsViewModel sessions,
         DisplayViewModel display,
         SystemViewModel system,
         DiagnosticsViewModel diagnostics,
         LogsViewModel logs,
         SettingsViewModel settingsPage,
         DeveloperViewModel developer,
+        UpdateLogViewModel updateLog,
         StatusViewModel status,
         IRecoveryService recovery,
         SettingsService settings,
         IPerformanceMonitor monitor,
         ISessionStore sessionStore,
         IProcessMonitor processMonitor,
+        GameWatchService gameWatch,
         ILogger<MainViewModel> logger)
     {
         Home = home;
         Play = play;
         Performance = performance;
+        Sessions = sessions;
         Display = display;
         System = system;
         Diagnostics = diagnostics;
         Logs = logs;
         SettingsPage = settingsPage;
         Developer = developer;
+        UpdateLog = updateLog;
         Status = status;
         _recovery = recovery;
         _settings = settings;
         _monitor = monitor;
         _sessionStore = sessionStore;
         _processMonitor = processMonitor;
+        _gameWatch = gameWatch;
         _logger = logger;
         _currentPage = home;
         _settings.SettingsChanged += (_, s) => DeveloperModeVisible = s.DeveloperMode;
@@ -81,12 +89,14 @@ public sealed partial class MainViewModel : ObservableObject
     public HomeViewModel Home { get; }
     public PlayViewModel Play { get; }
     public PerformanceViewModel Performance { get; }
+    public SessionsViewModel Sessions { get; }
     public DisplayViewModel Display { get; }
     public SystemViewModel System { get; }
     public DiagnosticsViewModel Diagnostics { get; }
     public LogsViewModel Logs { get; }
     public SettingsViewModel SettingsPage { get; }
     public DeveloperViewModel Developer { get; }
+    public UpdateLogViewModel UpdateLog { get; }
     public StatusViewModel Status { get; }
 
     [ObservableProperty]
@@ -114,6 +124,8 @@ public sealed partial class MainViewModel : ObservableObject
         new("07", "LOGS"),
         new("08", "SETTINGS"),
         new("09", "DEVELOPER"),
+        new("10", "SESSIONS"),
+        new("11", "UPDATE LOG"),
     ];
 
     [RelayCommand]
@@ -130,12 +142,14 @@ public sealed partial class MainViewModel : ObservableObject
             "HOME" => Home,
             "PLAY" => Play,
             "PERFORMANCE" => Performance,
+            "SESSIONS" => Sessions,
             "DISPLAY" => Display,
             "SYSTEM" => System,
             "DIAGNOSTICS" => Diagnostics,
             "LOGS" => Logs,
             "SETTINGS" => SettingsPage,
             "DEVELOPER" => Developer,
+            "UPDATE LOG" => UpdateLog,
             _ => Home,
         };
 
@@ -146,6 +160,9 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 case PerformanceViewModel p:
                     await p.InitializeAsync();
+                    break;
+                case SessionsViewModel sess:
+                    await sess.InitializeAsync();
                     break;
                 case DisplayViewModel d:
                     await d.InitializeAsync();
@@ -161,6 +178,9 @@ public sealed partial class MainViewModel : ObservableObject
                     break;
                 case DeveloperViewModel dev:
                     await dev.RefreshAsync();
+                    break;
+                case UpdateLogViewModel log:
+                    await log.InitializeAsync();
                     break;
             }
         }
@@ -215,6 +235,7 @@ public sealed partial class MainViewModel : ObservableObject
             await Home.InitializeAsync();
             await Play.InitializeAsync();
             await _monitor.StartAsync();
+            await _gameWatch.StartAsync();
 
             // 5. Keep the "running" badge and game process ids current.
             _ = Task.Run(BackgroundStatusLoopAsync);

@@ -8,7 +8,7 @@
       <TextBlock Text="DISPLAY" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="virtual display control and attached monitors" Style="{StaticResource Text.PageSubtitle}" />
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="VIRTUAL DISPLAY">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="OPTIMA VIRTUALIZATION">
         <StackPanel>
           <Grid>
             <Grid.ColumnDefinitions>
@@ -158,9 +158,17 @@
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="ATTACHED DISPLAYS">
         <HeaderedContentControl.Tag>
-          <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding RefreshCommand}" Padding="6,0" />
+          <StackPanel Orientation="Horizontal">
+            <CheckBox Content="hide inactive" IsChecked="{Binding HideInactive}"
+                      FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center" Margin="0,0,12,0"
+                      ToolTip="Hide attached outputs that are not driving a desktop (0x0 @ 0 Hz)" />
+            <CheckBox Content="show hidden" IsChecked="{Binding ShowHidden}"
+                      FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center" Margin="0,0,12,0"
+                      ToolTip="Reveal displays you removed from this list" />
+            <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding RefreshCommand}" Padding="6,0" />
+          </StackPanel>
         </HeaderedContentControl.Tag>
-        <ItemsControl ItemsSource="{Binding Displays}">
+        <ItemsControl ItemsSource="{Binding DisplayRows}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <Border Style="{StaticResource TableRow}">
@@ -168,11 +176,39 @@
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="128" />
                     <ColumnDefinition />
-                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="150" />
                     <ColumnDefinition Width="92" />
+                    <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
                   <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
-                  <TextBlock Grid.Column="1" Text="{Binding AdapterName}" Style="{StaticResource Text.Cell}" />
+
+                  <!-- Name cell: custom name when set (original in the tooltip), or an inline editor. -->
+                  <TextBlock Grid.Column="1" Text="{Binding DisplayedName}" ToolTip="{Binding OriginalName}"
+                             Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Cell}">
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                  <TextBox Grid.Column="1" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                           Margin="0,0,10,0" VerticalAlignment="Center"
+                           Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                           ToolTip="Leave empty to restore the original name">
+                    <TextBox.InputBindings>
+                      <KeyBinding Key="Return"
+                                  Command="{Binding DataContext.SaveNameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                  CommandParameter="{Binding}" />
+                      <KeyBinding Key="Escape"
+                                  Command="{Binding DataContext.CancelRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                  CommandParameter="{Binding}" />
+                    </TextBox.InputBindings>
+                  </TextBox>
+
                   <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" Style="{StaticResource Text.Cell}" />
                   <TextBlock Grid.Column="3" FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center">
                     <TextBlock.Style>
@@ -192,10 +228,55 @@
                             <Setter Property="Text" Value="[ ACTIVE ]" />
                             <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
                           </MultiDataTrigger>
+                          <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                            <Setter Property="Text" Value="[ HIDDEN ]" />
+                            <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                          </DataTrigger>
                         </Style.Triggers>
                       </Style>
                     </TextBlock.Style>
                   </TextBlock>
+
+                  <!-- Row controls: reorder / rename / hide, swapping to save / cancel while editing. -->
+                  <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
+                      <Button Style="{StaticResource GhostButton}" Content="&#x2191;" Padding="5,0" ToolTip="Move up"
+                              Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                      <Button Style="{StaticResource GhostButton}" Content="&#x2193;" Padding="5,0" ToolTip="Move down"
+                              Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                      <Button Style="{StaticResource GhostButton}" Content="rename" Padding="5,0"
+                              Command="{Binding DataContext.StartRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                      <Button Padding="5,0"
+                              Command="{Binding DataContext.ToggleHiddenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}">
+                        <Button.Style>
+                          <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                            <Setter Property="Content" Value="hide" />
+                            <Setter Property="ToolTip" Value="Remove this display from the list (Optima only; Windows is untouched)" />
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                <Setter Property="Content" Value="unhide" />
+                                <Setter Property="ToolTip" Value="Put this display back in the list" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Button.Style>
+                      </Button>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
+                      <Button Style="{StaticResource GhostButton}" Content="save" Padding="5,0"
+                              Command="{Binding DataContext.SaveNameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                      <Button Style="{StaticResource GhostButton}" Content="cancel" Padding="5,0"
+                              Command="{Binding DataContext.CancelRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </StackPanel>
                 </Grid>
               </Border>
             </DataTemplate>

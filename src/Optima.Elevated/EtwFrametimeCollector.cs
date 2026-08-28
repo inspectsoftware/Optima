@@ -8,10 +8,11 @@ namespace Optima.Elevated;
 
 /// <summary>
 /// External frametime capture (§12/§13): a real-time ETW session on the Microsoft-Windows-DXGI
-/// provider records IDXGISwapChain::Present events for one process id, the PresentMon approach.
-/// Nothing is injected into any process; this only listens to events Windows already emits.
-/// Publishes one "etwSample" event per second (fps + average frametime) and returns aggregate
-/// statistics on stop.
+/// provider records IDXGISwapChain::Present events for a set of candidate process ids, the
+/// PresentMon approach. Nothing is injected into any process; this only listens to events
+/// Windows already emits. The presenter is not always the emulator process itself, so each
+/// window reports whichever candidate presented the most frames (see PresentWindowAggregator).
+/// Publishes one "etwSample" event per interval and returns aggregate statistics on stop.
 /// </summary>
 public sealed class EtwFrametimeCollector : IDisposable
 {
@@ -20,23 +21,22 @@ public sealed class EtwFrametimeCollector : IDisposable
     // Present_Start (42) and PresentMultiplaneOverlay_Start (55) mark a frame presentation.
     private static readonly int[] PresentStartEventIds = [42, 55];
 
-    private readonly int _processId;
+    private readonly HashSet<int> _candidatePids;
+    private readonly int _intervalMs;
     private readonly Func<IpcEvent, Task> _publish;
     private readonly object _lock = new();
-    private readonly List<double> _frametimesMs = [];
-    private readonly List<double> _fpsSamples = [];
+    private readonly PresentWindowAggregator _aggregator;
 
     private TraceEventSession? _session;
     private Thread? _processingThread;
     private Timer? _sampleTimer;
-    private double _lastPresentMs = -1;
-    private int _presentsInWindow;
-    private double _frametimeSumInWindow;
 
-    public EtwFrametimeCollector(int processId, Func<IpcEvent, Task> publish)
+    public EtwFrametimeCollector(IReadOnlyCollection<int> candidatePids, int intervalMs, Func<IpcEvent, Task> publish)
     {
-        _processId = processId;
+        _candidatePids = [.. candidatePids];
+        _intervalMs = intervalMs;
         _publish = publish;
+        _aggregator = new PresentWindowAggregator(candidatePids, intervalMs);
     }
 
     public void Start()
@@ -68,14 +68,15 @@ public sealed class EtwFrametimeCollector : IDisposable
         };
         _processingThread.Start();
 
-        _sampleTimer = new Timer(PublishSample, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        var interval = TimeSpan.FromMilliseconds(_intervalMs);
+        _sampleTimer = new Timer(PublishSample, null, interval, interval);
     }
 
     private void OnAnyEvent(TraceEvent ev)
     {
         // Dynamic.All only sees manifest-resolved events; AllEvents is the safety net that
         // matches by provider + event id even when the manifest lookup fails.
-        if (ev.ProviderGuid != DxgiProvider || ev.ProcessID != _processId)
+        if (ev.ProviderGuid != DxgiProvider || !_candidatePids.Contains(ev.ProcessID))
         {
             return;
         }
@@ -83,7 +84,10 @@ public sealed class EtwFrametimeCollector : IDisposable
         {
             return;
         }
-        RecordPresent(ev.TimeStampRelativeMSec);
+        lock (_lock)
+        {
+            _aggregator.RecordPresent(ev.ProcessID, ev.TimeStampRelativeMSec);
+        }
     }
 
     private void OnEvent(TraceEvent ev)
@@ -91,40 +95,16 @@ public sealed class EtwFrametimeCollector : IDisposable
         // Handled by OnAnyEvent; subscribing Dynamic.All keeps manifest parsing active.
     }
 
-    private void RecordPresent(double timestampMs)
-    {
-        lock (_lock)
-        {
-            if (_lastPresentMs >= 0)
-            {
-                var delta = timestampMs - _lastPresentMs;
-                // Discard nonsense: paused game (>2 s) or duplicate/out-of-order timestamps.
-                if (delta > 0.05 && delta < 2000)
-                {
-                    _frametimesMs.Add(delta);
-                    _presentsInWindow++;
-                    _frametimeSumInWindow += delta;
-                }
-            }
-            _lastPresentMs = timestampMs;
-        }
-    }
-
     private void PublishSample(object? state)
     {
-        double fps;
-        double avgFrametime;
+        PresentWindowSample? sample;
         lock (_lock)
         {
-            if (_presentsInWindow == 0)
-            {
-                return; // game paused / minimized, so publish nothing rather than zeros
-            }
-            fps = _presentsInWindow;
-            avgFrametime = _frametimeSumInWindow / _presentsInWindow;
-            _fpsSamples.Add(fps);
-            _presentsInWindow = 0;
-            _frametimeSumInWindow = 0;
+            sample = _aggregator.CompleteWindow();
+        }
+        if (sample is null)
+        {
+            return; // game paused / minimized, so publish nothing rather than zeros
         }
 
         _ = _publish(new IpcEvent
@@ -132,8 +112,9 @@ public sealed class EtwFrametimeCollector : IDisposable
             Kind = "etwSample",
             Data =
             {
-                ["fps"] = fps.ToString("F1", CultureInfo.InvariantCulture),
-                ["frametimeMs"] = avgFrametime.ToString("F3", CultureInfo.InvariantCulture),
+                ["fps"] = sample.Fps.ToString("F1", CultureInfo.InvariantCulture),
+                ["frametimeMs"] = sample.AverageFrametimeMs.ToString("F3", CultureInfo.InvariantCulture),
+                ["pid"] = sample.ProcessId.ToString(CultureInfo.InvariantCulture),
             },
         });
     }
@@ -148,15 +129,13 @@ public sealed class EtwFrametimeCollector : IDisposable
         _processingThread?.Join(TimeSpan.FromSeconds(5));
         _processingThread = null;
 
-        List<double> frametimes;
-        List<double> fpsSamples;
+        PresentCaptureResult result;
         lock (_lock)
         {
-            frametimes = [.. _frametimesMs];
-            fpsSamples = [.. _fpsSamples];
+            result = _aggregator.Complete();
         }
 
-        var stats = FrametimeStatistics.Compute(frametimes);
+        var stats = FrametimeStatistics.Compute(result.FrametimesMs);
         return new Dictionary<string, string>
         {
             ["sampleCount"] = stats.SampleCount.ToString(CultureInfo.InvariantCulture),
@@ -166,7 +145,8 @@ public sealed class EtwFrametimeCollector : IDisposable
             ["averageFrametimeMs"] = stats.AverageFrametimeMs.ToString("R", CultureInfo.InvariantCulture),
             ["p95FrametimeMs"] = stats.P95FrametimeMs.ToString("R", CultureInfo.InvariantCulture),
             ["p99FrametimeMs"] = stats.P99FrametimeMs.ToString("R", CultureInfo.InvariantCulture),
-            ["fpsSamples"] = string.Join(',', fpsSamples.Select(s => s.ToString("F1", CultureInfo.InvariantCulture))),
+            ["fpsSamples"] = string.Join(',', result.FpsSamples.Select(s => s.ToString("F1", CultureInfo.InvariantCulture))),
+            ["dominantPid"] = result.DominantProcessId.ToString(CultureInfo.InvariantCulture),
         };
     }
 

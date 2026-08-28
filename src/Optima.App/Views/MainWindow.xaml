@@ -6,6 +6,7 @@
         xmlns:ctl="clr-namespace:Optima.App.Controls"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Optima"
+        Icon="/Assets/optima.ico"
         Width="1240" Height="800" MinWidth="980" MinHeight="640"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource Brush.Background}"
@@ -28,18 +29,21 @@
     <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="LOGS" />
     <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
     <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DEVELOPER" />
+    <KeyBinding Modifiers="Alt" Key="D0" Command="{Binding NavigateCommand}" CommandParameter="SESSIONS" />
   </Window.InputBindings>
 
   <Window.Resources>
     <DataTemplate DataType="{x:Type vm:HomeViewModel}"><views:HomeView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:PlayViewModel}"><views:PlayView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:PerformanceViewModel}"><views:PerformanceView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SessionsViewModel}"><views:SessionsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:DisplayViewModel}"><views:DisplayView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SystemViewModel}"><views:SystemView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}"><views:DiagnosticsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:LogsViewModel}"><views:LogsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:DeveloperViewModel}"><views:DeveloperView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:UpdateLogViewModel}"><views:UpdateLogView /></DataTemplate>
   </Window.Resources>
 
   <!--

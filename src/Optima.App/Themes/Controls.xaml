@@ -12,6 +12,7 @@
   <!-- ============================================================== CONVERTERS -->
   <BooleanToVisibilityConverter x:Key="BoolToVis" />
   <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+  <conv:InverseBoolConverter x:Key="InverseBool" />
   <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
   <conv:EmptyStringToCollapsedConverter x:Key="EmptyToCollapsed" />
   <conv:StatusKindToBrushConverter x:Key="StatusKindBrush" />
@@ -729,6 +730,46 @@
       <Setter.Value>
         <ControlTemplate TargetType="Separator">
           <Rectangle Height="1" Fill="{TemplateBinding Background}" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Used by the tray icon menu (TrayService); templates drop the stock icon/check
+       gutter, which has no place in a text-only menu. -->
+  <Style TargetType="ContextMenu">
+    <Setter Property="Background" Value="{StaticResource Brush.Surface}" />
+    <Setter Property="HasDropShadow" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ContextMenu">
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{StaticResource Brush.HairlineStrong}" BorderThickness="1"
+                  Padding="4">
+            <ItemsPresenter />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{StaticResource Brush.Text}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Mono}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Label}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="MenuItem">
+          <Border x:Name="Root" Background="Transparent" Padding="10,6">
+            <ContentPresenter ContentSource="Header" RecognizesAccessKey="False"
+                              TextElement.Foreground="{TemplateBinding Foreground}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Root" Property="Background" Value="{StaticResource Brush.SurfaceHover}" />
+              <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>
     </Setter>

@@ -37,6 +37,16 @@
             <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="cancel session"
                     Command="{Binding CancelCommand}" />
           </Grid>
+
+          <!-- The kill switch: instant, no confirmation, tree included. -->
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Style="{StaticResource SecondaryButton}" Content="kill game"
+                    Command="{Binding KillGameCommand}"
+                    ToolTip="Instantly terminates the Critical Ops emulator process tree (Ctrl+Alt+K works anywhere)" />
+            <TextBlock Text="{Binding KillStatusText}" Style="{StaticResource Text.Micro}"
+                       Foreground="{StaticResource Brush.Warn}" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Visibility="{Binding KillStatusText, Converter={StaticResource EmptyToCollapsed}}" />
+          </StackPanel>
         </StackPanel>
       </HeaderedContentControl>
 

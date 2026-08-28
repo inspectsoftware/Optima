@@ -2,25 +2,61 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
+using Optima.Core.Configuration;
 using Optima.Core.Models;
 
 namespace Optima.App.ViewModels;
 
 public sealed record InfoRow(string Label, string Value);
 
-/// <summary>SYSTEM page (§4/§11/§16): hardware inventory + virtualization facts.</summary>
+public sealed record MonitorRow(string DeviceName, string Name, string Mode);
+
+/// <summary>SYSTEM page (§4/§11/§16): hardware inventory, virtualization facts, live network quality.</summary>
 public sealed partial class SystemViewModel : ObservableObject
 {
-    private readonly ISystemInfoService _systemInfo;
+    private static readonly TimeSpan NetworkStaleness = TimeSpan.FromSeconds(5);
+    private const string NetworkIdleText = "not measuring · starts with a game session";
 
-    public SystemViewModel(ISystemInfoService systemInfo)
+    private readonly ISystemInfoService _systemInfo;
+    private readonly SettingsService _settings;
+    private DateTimeOffset _lastNetworkSample = DateTimeOffset.MinValue;
+
+    public SystemViewModel(ISystemInfoService systemInfo, SettingsService settings, INetworkQualityMonitor network)
     {
         _systemInfo = systemInfo;
+        _settings = settings;
+        network.SampleArrived += OnNetworkSample;
+
+        var staleness = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2),
+        };
+        staleness.Tick += (_, _) =>
+        {
+            if (DateTimeOffset.Now - _lastNetworkSample > NetworkStaleness)
+            {
+                NetworkStatus = NetworkIdleText;
+            }
+        };
+        staleness.Start();
+    }
+
+    [ObservableProperty] private string _networkStatus = NetworkIdleText;
+
+    private void OnNetworkSample(object? sender, NetworkQualitySample sample)
+    {
+        // Raised on the ping loop thread; marshal before touching bound properties.
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            _lastNetworkSample = DateTimeOffset.Now;
+            var suffix = sample.IsReferenceHost ? " [ REF HOST ] link quality" : $" · {sample.Target}";
+            NetworkStatus = $"{sample.PingMs:F0} ms · {sample.JitterMs:F1} ms jitter · {sample.PacketLossPct:F1}% loss{suffix}";
+        });
     }
 
     public ObservableCollection<InfoRow> HardwareRows { get; } = [];
     public ObservableCollection<InfoRow> VirtualizationRows { get; } = [];
-    public ObservableCollection<DisplayInfo> Displays { get; } = [];
+    public ObservableCollection<MonitorRow> Displays { get; } = [];
 
     [ObservableProperty] private bool _isLoading;
 
@@ -52,10 +88,15 @@ public sealed partial class SystemViewModel : ObservableObject
             VirtualizationRows.Add(new InfoRow("Virtual Machine Platform", Tri(virtualization.VirtualMachinePlatformEnabled)));
             VirtualizationRows.Add(new InfoRow("Windows Hypervisor Platform", Tri(virtualization.WindowsHypervisorPlatformEnabled)));
 
+            // Same naming layer as the DISPLAY page: a custom name follows the display everywhere.
+            var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
             Displays.Clear();
             foreach (var display in inventory.Displays)
             {
-                Displays.Add(display);
+                Displays.Add(new MonitorRow(
+                    display.DeviceName,
+                    DisplayPresentation.CustomName(display, overrides) ?? display.FriendlyName,
+                    display.CurrentMode.ToString()));
             }
         }
         finally

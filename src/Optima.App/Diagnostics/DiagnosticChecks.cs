@@ -161,7 +161,7 @@ public sealed class VirtualDriverCheck : IDiagnosticCheck
         _installer = installer;
     }
 
-    public string Name => "Virtual Display Driver";
+    public string Name => "Optima Virtualization";
     public int Order => 50;
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)

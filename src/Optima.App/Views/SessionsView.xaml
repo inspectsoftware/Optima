@@ -1,0 +1,246 @@
+<UserControl x:Class="Optima.App.Views.SessionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:Optima.App.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1020" HorizontalAlignment="Left">
+
+      <TextBlock Text="SESSIONS" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="history and trends of every recorded session · fps over time · benchmark comparison"
+                 Style="{StaticResource Text.PageSubtitle}" />
+
+      <!-- Trends -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="TRENDS">
+        <StackPanel>
+          <TextBlock Text="{Binding TrendSparkline}" FontFamily="{StaticResource Font.Mono}"
+                     FontSize="{StaticResource Type.Title}" Foreground="{StaticResource Brush.Text}"
+                     Visibility="{Binding HasTrend, Converter={StaticResource BoolToVis}}" />
+          <TextBlock Text="{Binding TrendLegend}" Style="{StaticResource Text.Micro}" Margin="0,4,0,0" />
+
+          <ItemsControl ItemsSource="{Binding ProfileTrends}" Margin="0,12,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,3">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" /><ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="110" /><ColumnDefinition Width="110" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding ProfileName}" Style="{StaticResource Text.Label}" />
+                  <ctl:AsciiBar Grid.Column="1" Value="{Binding AverageFps}" Maximum="{Binding BarMaximum}" Cells="20"
+                                VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Text="{Binding AverageText}" Style="{StaticResource Text.Value}" Margin="12,0,0,0" />
+                  <TextBlock Grid.Column="3" Text="{Binding CountText}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <!-- History -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="HISTORY">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding ReloadCommand}" Padding="6,0" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <Grid Margin="0,0,0,2">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="92" /><ColumnDefinition Width="150" /><ColumnDefinition Width="84" />
+              <ColumnDefinition Width="78" /><ColumnDefinition Width="66" /><ColumnDefinition Width="66" />
+              <ColumnDefinition Width="78" /><ColumnDefinition Width="170" /><ColumnDefinition Width="66" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="started" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="1" Text="profile" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="2" Text="kind" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="3" Text="duration" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="4" Text="avg" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="5" Text="1% low" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="6" Text="p99" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="7" Text="network" Style="{StaticResource Text.TableHeader}" />
+            <TextBlock Grid.Column="8" Text="config" Style="{StaticResource Text.TableHeader}" />
+          </Grid>
+          <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}"
+                   MaxHeight="360" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                   BorderThickness="0" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="92" /><ColumnDefinition Width="150" /><ColumnDefinition Width="84" />
+                      <ColumnDefinition Width="78" /><ColumnDefinition Width="66" /><ColumnDefinition Width="66" />
+                      <ColumnDefinition Width="78" /><ColumnDefinition Width="170" /><ColumnDefinition Width="66" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding StartedText}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="1" Text="{Binding ProfileName}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="2" Text="{Binding KindTag}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="3" Text="{Binding DurationText}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="4" Text="{Binding AvgFpsText}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="5" Text="{Binding OnePercentLowText}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="6" Text="{Binding P99Text}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="7" Text="{Binding NetworkText}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="8" Text="{Binding ConfigTag}" Style="{StaticResource Text.CellDim}"
+                               Foreground="{StaticResource Brush.Warn}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Text="no sessions recorded yet · play a round first" Margin="0,8,0,0">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Rows.Count}" Value="0">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <!-- Detail -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="DETAIL"
+                              Visibility="{Binding SelectedRow, Converter={StaticResource NullToCollapsed}}">
+        <StackPanel>
+          <ItemsControl ItemsSource="{Binding DetailRows}" ItemTemplate="{StaticResource InfoRowTemplate}" MaxWidth="560" HorizontalAlignment="Left" />
+          <TextBlock Text="{Binding DetailTweaks}" Style="{StaticResource Text.Micro}" Margin="0,8,0,0" />
+          <ItemsControl ItemsSource="{Binding DetailSparklineLines}" Margin="0,12,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" FontFamily="{StaticResource Font.Mono}"
+                           FontSize="{StaticResource Type.Body}" Foreground="{StaticResource Brush.Text}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="{Binding DetailSparklineLegend}" Style="{StaticResource Text.Micro}" Margin="0,4,0,0" />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <!-- Guided benchmark -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="GUIDED BENCHMARK">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Prose}" Margin="0,0,0,10" MaxWidth="720" HorizontalAlignment="Left"
+                     Text="Compares two profiles over alternating real sessions. Each run launches the game and counts when you quit it; tweak or profile changes mid-plan abort the comparison. The verdict uses each run's average FPS as one observation, which is the honest unit for run-to-run noise." />
+
+          <StackPanel Orientation="Horizontal">
+            <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding Guided.ProfileA}"
+                      DisplayMemberPath="Name" Width="180" IsEnabled="{Binding Guided.PlanActive, Converter={StaticResource InverseBool}}" />
+            <TextBlock Text="vs" Margin="10,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+            <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding Guided.ProfileB}"
+                      DisplayMemberPath="Name" Width="180" IsEnabled="{Binding Guided.PlanActive, Converter={StaticResource InverseBool}}" />
+            <TextBlock Text="runs each" Margin="14,0,6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+            <ComboBox ItemsSource="{Binding Guided.RunOptions}" SelectedItem="{Binding Guided.RunsPerProfile}"
+                      Width="70" IsEnabled="{Binding Guided.PlanActive, Converter={StaticResource InverseBool}}" />
+            <Button Style="{StaticResource SecondaryButton}" Content="start plan" Command="{Binding Guided.StartPlanCommand}"
+                    Margin="12,0,0,0" IsEnabled="{Binding Guided.PlanActive, Converter={StaticResource InverseBool}}" />
+          </StackPanel>
+
+          <StackPanel Visibility="{Binding Guided.PlanActive, Converter={StaticResource BoolToVis}}" Margin="0,12,0,0">
+            <TextBlock Text="{Binding Guided.Progress}" Style="{StaticResource Text.Value}" />
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Content="START NEXT RUN"
+                      Command="{Binding Guided.RunNextCommand}" IsEnabled="{Binding Guided.CanRunNext}" />
+              <Button Style="{StaticResource GhostButton}" Content="cancel plan" Command="{Binding Guided.CancelPlanCommand}"
+                      Margin="10,0,0,0" Padding="6,0" VerticalAlignment="Center" />
+            </StackPanel>
+          </StackPanel>
+
+          <TextBlock Text="{Binding Guided.Status}" Style="{StaticResource Text.Micro}" Margin="0,8,0,0"
+                     Visibility="{Binding Guided.Status, Converter={StaticResource EmptyToCollapsed}}" />
+
+          <ItemsControl ItemsSource="{Binding Guided.RunLog}" Margin="0,8,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" Style="{StaticResource Text.Micro}" Margin="0,1" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <StackPanel Visibility="{Binding Guided.PerRunResult, Converter={StaticResource NullToCollapsed}}" Margin="0,12,0,0">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="170" /><ColumnDefinition Width="150" /><ColumnDefinition Width="150" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition /><RowDefinition /><RowDefinition />
+              </Grid.RowDefinitions>
+              <TextBlock Grid.Column="1" Text="{Binding Guided.PerRunResult.ProfileA}" Style="{StaticResource Text.TableHeader}" />
+              <TextBlock Grid.Column="2" Text="{Binding Guided.PerRunResult.ProfileB}" Style="{StaticResource Text.TableHeader}" />
+              <TextBlock Grid.Row="1" Text="mean of run averages" Style="{StaticResource Text.Label}" Margin="0,4" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Guided.PerRunResult.MeanFpsA, StringFormat={}{0:F1}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Guided.PerRunResult.MeanFpsB, StringFormat={}{0:F1}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Text="runs counted" Style="{StaticResource Text.Label}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Guided.PerRunResult.RunsA}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Guided.PerRunResult.RunsB}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+            </Grid>
+            <TextBlock Text="{Binding Guided.PerRunResult.Verdict}" Margin="0,10,0,0"
+                       MaxWidth="720" HorizontalAlignment="Left">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Prose}">
+                  <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Guided.PerRunResult.IsStatisticallyMeaningful}" Value="True">
+                      <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding Guided.PooledResult.Verdict, StringFormat=distribution view (pooled samples): {0}}"
+                       Style="{StaticResource Text.Micro}" Margin="0,6,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <!-- Benchmark comparison -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="BENCHMARK COMPARISON">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding CompareProfileA}"
+                      DisplayMemberPath="Name" Width="200" />
+            <TextBlock Text="vs" Margin="12,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+            <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding CompareProfileB}"
+                      DisplayMemberPath="Name" Width="200" />
+            <Button Style="{StaticResource SecondaryButton}" Content="compare" Command="{Binding CompareCommand}"
+                    Margin="12,0,0,0" />
+          </StackPanel>
+
+          <StackPanel Visibility="{Binding Comparison, Converter={StaticResource NullToCollapsed}}" Margin="0,14,0,0">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="170" /><ColumnDefinition Width="150" /><ColumnDefinition Width="150" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition /><RowDefinition /><RowDefinition />
+              </Grid.RowDefinitions>
+              <TextBlock Grid.Column="1" Text="{Binding Comparison.ProfileA}" Style="{StaticResource Text.TableHeader}" />
+              <TextBlock Grid.Column="2" Text="{Binding Comparison.ProfileB}" Style="{StaticResource Text.TableHeader}" />
+              <TextBlock Grid.Row="1" Text="average fps" Style="{StaticResource Text.Label}" Margin="0,4" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Comparison.StatsA.AverageFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Comparison.StatsB.AverageFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Text="1% low" Style="{StaticResource Text.Label}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Comparison.StatsA.OnePercentLowFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+              <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Comparison.StatsB.OnePercentLowFps, StringFormat={}{0:F0}}" Style="{StaticResource Text.Cell}" Margin="0,4" />
+            </Grid>
+            <TextBlock Text="{Binding Comparison.Verdict}" Margin="0,12,0,0"
+                       MaxWidth="720" HorizontalAlignment="Left">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Prose}">
+                  <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Comparison.IsStatisticallyMeaningful}" Value="True">
+                      <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </StackPanel>
+        </StackPanel>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

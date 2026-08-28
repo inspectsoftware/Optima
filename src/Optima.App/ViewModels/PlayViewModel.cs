@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Launch;
 using Optima.Core.Models;
@@ -16,6 +17,7 @@ public sealed partial class PlayViewModel : ObservableObject
     private readonly ProfileService _profiles;
     private readonly SettingsService _settings;
     private readonly StatusViewModel _status;
+    private readonly IGameTerminator _terminator;
     private readonly ILogger<PlayViewModel> _logger;
     private CancellationTokenSource? _sessionCts;
     private DispatcherTimer? _elapsedTimer;
@@ -25,12 +27,14 @@ public sealed partial class PlayViewModel : ObservableObject
         ProfileService profiles,
         SettingsService settings,
         StatusViewModel status,
+        IGameTerminator terminator,
         ILogger<PlayViewModel> logger)
     {
         _orchestrator = orchestrator;
         _profiles = profiles;
         _settings = settings;
         _status = status;
+        _terminator = terminator;
         _logger = logger;
         _orchestrator.ProgressChanged += OnProgress;
     }
@@ -159,6 +163,31 @@ public sealed partial class PlayViewModel : ObservableObject
 
     [RelayCommand(CanExecute = nameof(IsSessionActive))]
     private void Cancel() => _sessionCts?.Cancel();
+
+    [ObservableProperty]
+    private string _killStatusText = string.Empty;
+
+    /// <summary>
+    /// One click, no confirmation: hard-kills the emulator process tree. Also bound to the
+    /// global Ctrl+Alt+K hotkey, since the moment a kill switch is needed is usually the
+    /// moment the game is hung fullscreen.
+    /// </summary>
+    [RelayCommand]
+    private async Task KillGameAsync()
+    {
+        KillStatusText = "killing...";
+        try
+        {
+            var result = await _terminator.KillGameAsync();
+            KillStatusText = result.Message;
+            await _status.RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Kill game failed");
+            KillStatusText = "kill failed. See Logs.";
+        }
+    }
 
     private void OnProgress(object? sender, LaunchProgress progress)
     {

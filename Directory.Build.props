@@ -8,8 +8,8 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <InvariantGlobalization>false</InvariantGlobalization>
     <NeutralLanguage>en</NeutralLanguage>
-    <Company>COPS Bootstrapper</Company>
-    <Product>COPS Bootstrapper</Product>
+    <Company>Optima</Company>
+    <Product>Optima</Product>
     <Version>0.1.0</Version>
   </PropertyGroup>
 </Project>

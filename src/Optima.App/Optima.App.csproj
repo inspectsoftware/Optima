@@ -6,7 +6,11 @@
     <AssemblyName>Optima</AssemblyName>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\optima.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\optima.ico" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
@@ -29,6 +33,12 @@
   <ItemGroup>
     <None Include="..\..\drivers\**\*.*" Exclude="..\..\drivers\README.md"
           Link="drivers\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- The bundled driver is MIT licensed; the license text must travel with the binaries. -->
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md"
+          CopyToOutputDirectory="PreserveNewest" />
+    <!-- The UPDATE LOG page renders this at runtime. -->
+    <None Include="..\..\CHANGELOG.md" Link="CHANGELOG.md"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

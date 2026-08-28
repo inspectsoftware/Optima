@@ -153,11 +153,13 @@ internal sealed class FakeMetrics : IPerformanceMetricsProvider
     public event EventHandler<(double Fps, double FrametimeMs)>? SampleArrived { add { } remove { } }
 
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(Available);
-    public Task StartAsync(int processId, CancellationToken ct = default)
+    public Task StartAsync(IReadOnlyList<int> processIds, CancellationToken ct = default)
     {
         Started = true;
+        StartedPids = processIds;
         return Task.CompletedTask;
     }
+    public IReadOnlyList<int> StartedPids { get; private set; } = [];
     public Task StopAsync()
     {
         Stopped = true;
@@ -181,6 +183,39 @@ internal sealed class FakeSessionStore : ISessionStore
         => Task.FromResult<IReadOnlyList<SessionRecord>>(Saved);
     public Task<IReadOnlyList<SessionRecord>> GetSessionsByProfileAsync(string profileName, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<SessionRecord>>(Saved.Where(s => s.ProfileName == profileName).ToList());
+    public Task<IReadOnlyList<SessionRecord>> GetSessionsByIdsAsync(IReadOnlyList<long> ids, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<SessionRecord>>(Saved.Where(s => ids.Contains(s.Id)).ToList());
+}
+
+internal sealed class FakeNetworkMonitor : INetworkQualityMonitor
+{
+    public bool Started { get; private set; }
+    public bool Stopped { get; private set; }
+    public NetworkQualityStats? StatsToReturn { get; set; }
+
+    public NetworkQualitySample? Latest => null;
+    public event EventHandler<NetworkQualitySample>? SampleArrived { add { } remove { } }
+
+    public Task StartAsync(IReadOnlyList<int> processIds, CancellationToken ct = default)
+    {
+        Started = true;
+        return Task.CompletedTask;
+    }
+    public Task<NetworkQualityStats?> StopAsync()
+    {
+        Stopped = true;
+        return Task.FromResult(StatsToReturn);
+    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+internal sealed class FakeTweakService : ITweakService
+{
+    public List<TweakState> States { get; } = [];
+    public Task<IReadOnlyList<TweakState>> GetStatesAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<TweakState>>(States);
+    public Task<TweakState> SetEnabledAsync(string tweakId, bool enable, CancellationToken ct = default)
+        => throw new NotSupportedException();
 }
 
 internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider

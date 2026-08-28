@@ -28,9 +28,12 @@ Optima performs the install itself, so neither is needed, and `devcon` comes fro
 whose licence restricts redistribution. The distribution's virtual *audio* driver is also
 excluded, being unrelated to this application.
 
-**Before distributing a build, confirm the upstream licence permits redistribution and add
-the required attribution.** This repository vendors the binaries for convenience; it does
-not grant you any rights to them.
+The upstream project is MIT licensed (Copyright (c) 2024 Virtual Display); the license text
+and attribution ship in [`THIRD-PARTY-NOTICES.md`](../THIRD-PARTY-NOTICES.md) at the repo root,
+which the build copies next to `Optima.exe`. Keep that file with any redistributed build: the
+MIT license requires the notice to travel with the binaries. The signed driver package itself
+is redistributed unmodified, so the Windows-level device keeps its upstream name
+("Virtual Display Driver") even though the feature is branded Optima Virtualization in the UI.
 
 ## How the package is chosen
 

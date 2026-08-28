@@ -28,8 +28,12 @@ public interface IPerformanceMetricsProvider : IAsyncDisposable
 
     Task<bool> IsAvailableAsync(CancellationToken ct = default);
 
-    /// <summary>Begins collecting present statistics for the given process id.</summary>
-    Task StartAsync(int processId, CancellationToken ct = default);
+    /// <summary>
+    /// Begins collecting present statistics for a set of candidate process ids. The presenter
+    /// is not always the emulator process itself, so callers pass every tracked game-related
+    /// pid and the collector reports whichever candidate actually presents frames.
+    /// </summary>
+    Task StartAsync(IReadOnlyList<int> processIds, CancellationToken ct = default);
 
     Task StopAsync();
 

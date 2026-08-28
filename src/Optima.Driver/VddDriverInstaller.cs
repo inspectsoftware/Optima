@@ -225,7 +225,12 @@ public sealed class VddDriverInstaller : IDriverInstaller
         var response = await _elevation.SendAsync(new IpcRequest
         {
             Command = IpcCommand.UninstallDriver,
-            Args = { ["hardwareId"] = package.HardwareId },
+            Args =
+            {
+                ["hardwareId"] = package.HardwareId,
+                // Lets the helper also delete the staged package from the DriverStore.
+                ["infName"] = Path.GetFileName(package.InfPath),
+            },
         }, ct).ConfigureAwait(false);
 
         if (!response.Success)
@@ -239,7 +244,8 @@ public sealed class VddDriverInstaller : IDriverInstaller
             });
         }
 
-        _logger.LogInformation("Virtual display driver removed ({Count} device(s))", response.Data.GetValueOrDefault("removed"));
+        _logger.LogInformation("Virtual display driver removed ({Count} device(s), {Packages} driver package(s))",
+            response.Data.GetValueOrDefault("removed"), response.Data.GetValueOrDefault("packagesDeleted", "0"));
         return DriverInstallResult.Ok();
     }
 

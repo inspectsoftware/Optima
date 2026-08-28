@@ -1,0 +1,30 @@
+<Window x:Class="Optima.App.Views.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Optima Overlay"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        Topmost="True" ShowActivated="False" ShowInTaskbar="False"
+        UseLayoutRounding="True">
+  <!-- Ownerless, click-through, never activated: sits over the borderless game without
+       touching it. Extended styles are applied in code behind on SourceInitialized. -->
+  <Border Background="#CC07080A" BorderBrush="#33FFFFFF" BorderThickness="1" Padding="10,6">
+    <StackPanel>
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Text="{Binding FpsText}" FontFamily="{StaticResource Font.Mono}"
+                   FontSize="{StaticResource Type.Display}" FontWeight="Bold"
+                   Foreground="{StaticResource Brush.Text}" />
+        <TextBlock Text=" fps" FontFamily="{StaticResource Font.Mono}"
+                   FontSize="{StaticResource Type.Label}" VerticalAlignment="Bottom" Margin="0,0,0,3"
+                   Foreground="{StaticResource Brush.TextSecondary}" />
+        <TextBlock Text="{Binding FrametimeText}" FontFamily="{StaticResource Font.Mono}"
+                   FontSize="{StaticResource Type.Label}" VerticalAlignment="Bottom" Margin="10,0,0,3"
+                   Foreground="{StaticResource Brush.TextSecondary}" />
+      </StackPanel>
+      <TextBlock Text="{Binding NetworkText}" FontFamily="{StaticResource Font.Mono}"
+                 FontSize="{StaticResource Type.Micro}" Margin="0,3,0,0"
+                 Foreground="{StaticResource Brush.TextSecondary}"
+                 Visibility="{Binding NetworkVisible, Converter={StaticResource BoolToVis}}" />
+    </StackPanel>
+  </Border>
+</Window>

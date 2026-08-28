@@ -99,19 +99,16 @@
             <ctl:AsciiBar Value="{Binding RamPercent}" Maximum="100" Cells="18" />
             <TextBlock Text="{Binding RamUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" />
           </StackPanel>
-          <!-- Unbounded values stay numeric -->
-          <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="0,4">
-            <TextBlock Text="FPS" Style="{StaticResource Text.Label}" Width="42" />
-            <TextBlock Text="{Binding FpsText}" Style="{StaticResource Text.Value}"
-                       Foreground="{StaticResource Brush.Accent}" MinWidth="52" />
-            <TextBlock Text="FRAMETIME" Style="{StaticResource Text.Label}" Margin="16,0,8,0" />
-            <TextBlock Text="{Binding FrametimeText}" Style="{StaticResource Text.Value}" />
-          </StackPanel>
         </Grid>
       </HeaderedContentControl>
 
       <!-- Primary action -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="LAUNCH">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="kill game" Padding="6,0"
+                  Command="{Binding Play.KillGameCommand}"
+                  ToolTip="Instantly terminates the Critical Ops emulator process tree (Ctrl+Alt+K works anywhere)" />
+        </HeaderedContentControl.Tag>
         <Border Style="{StaticResource Callout}" Padding="16,14">
           <Grid>
             <Grid.ColumnDefinitions>
@@ -129,6 +126,9 @@
                 <TextBlock Text="{Binding Play.PhaseText}" Style="{StaticResource Text.Micro}"
                            Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center" />
               </StackPanel>
+              <TextBlock Text="{Binding Play.KillStatusText}" Style="{StaticResource Text.Micro}"
+                         Foreground="{StaticResource Brush.Warn}" Margin="0,6,0,0"
+                         Visibility="{Binding Play.KillStatusText, Converter={StaticResource EmptyToCollapsed}}" />
             </StackPanel>
             <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
                     Content="{Binding Play.PlayButtonText}"

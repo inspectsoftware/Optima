@@ -10,6 +10,7 @@ using Optima.Driver;
 using Optima.Driver.Providers;
 using Optima.Monitoring;
 using Optima.Monitoring.Metrics;
+using Optima.Monitoring.Network;
 using Optima.Platform.Windows.Elevation;
 using Optima.Platform.Windows.Launchers;
 using Optima.Platform.Windows.Probes;
@@ -53,6 +54,8 @@ public static class AppServices
         services.AddSingleton<IPowerProfileService, WindowsPowerProfileService>();
         services.AddSingleton<IProcessMonitor, WindowsProcessMonitor>();
         services.AddSingleton<IProcessOptimizer, WindowsProcessOptimizer>();
+        services.AddSingleton<IGameTerminator, WindowsGameTerminator>();
+        services.AddSingleton<ITweakService, WindowsTweakService>();
         services.AddSingleton<IBackgroundCleanupService, WindowsBackgroundCleanupService>();
         services.AddSingleton<PnpDeviceLocator>();
         services.AddSingleton<IElevationBroker, ElevationBrokerClient>();
@@ -73,11 +76,21 @@ public static class AppServices
         services.AddSingleton<IGameLauncher, ShortcutLauncher>();
         services.AddSingleton<IGameLauncher, CustomCommandLauncher>();
         services.AddSingleton<LaunchOrchestrator>();
+        services.AddSingleton<GameWatchService>();
 
         // ---- Monitoring (§12-14) ----
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();
-        services.AddSingleton<IPerformanceMetricsProvider, EtwMetricsProviderClient>();
+        services.AddSingleton<EtwMetricsProviderClient>();
+        services.AddSingleton(_ => new MockMetricsProvider());
+        // Developer setting: swap the ETW provider for the deterministic mock (restart applies it).
+        services.AddSingleton<IPerformanceMetricsProvider>(sp =>
+            sp.GetRequiredService<SettingsService>().GetSettingsAsync().GetAwaiter().GetResult().UseMockMetricsProvider
+                ? sp.GetRequiredService<MockMetricsProvider>()
+                : sp.GetRequiredService<EtwMetricsProviderClient>());
         services.AddSingleton<ISessionStore, SqliteSessionStore>();
+        services.AddSingleton<IGameWindowLocator, WindowsGameWindowLocator>();
+        services.AddSingleton<IRemoteEndpointSource, WindowsEndpointDiscovery>();
+        services.AddSingleton<INetworkQualityMonitor, NetworkQualityMonitor>();
 
         // ---- Diagnostics (§15/§16) ----
         services.AddSingleton<IDiagnosticCheck, VirtualizationCheck>();
@@ -96,11 +109,15 @@ public static class AppServices
         services.AddSingleton<HomeViewModel>();
         services.AddSingleton<PlayViewModel>();
         services.AddSingleton<PerformanceViewModel>();
+        services.AddSingleton<SessionsViewModel>();
+        services.AddSingleton<GuidedBenchmarkViewModel>();
         services.AddSingleton<DisplayViewModel>();
         services.AddSingleton<SystemViewModel>();
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DeveloperViewModel>();
+        services.AddSingleton<UpdateLogViewModel>();
+        services.AddSingleton<OverlayViewModel>();
     }
 }

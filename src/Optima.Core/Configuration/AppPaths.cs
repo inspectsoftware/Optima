@@ -20,6 +20,7 @@ public sealed class AppPaths
         RecoveryDirectory = Path.Combine(root, "recovery");
         PendingSnapshotFile = Path.Combine(RecoveryDirectory, "pending-session.json");
         BackupsDirectory = Path.Combine(root, "backups");
+        TweaksBackupFile = Path.Combine(BackupsDirectory, "tweaks-original-values.json");
     }
 
     public string Root { get; }
@@ -31,6 +32,9 @@ public sealed class AppPaths
     public string RecoveryDirectory { get; }
     public string PendingSnapshotFile { get; }
     public string BackupsDirectory { get; }
+
+    /// <summary>Original registry values captured before a Windows tweak is first applied.</summary>
+    public string TweaksBackupFile { get; }
 
     public void EnsureCreated()
     {

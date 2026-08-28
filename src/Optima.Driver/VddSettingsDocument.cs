@@ -61,7 +61,7 @@ public sealed class VddSettingsDocument
 
     /// <summary>
     /// Every mode the driver will advertise: each listed resolution × (its own refresh rate + all
-    /// global refresh rates). Bogus placeholder rates (e.g. 9999) are filtered by IsValid.
+    /// global refresh rates). Bogus placeholder rates (e.g. 999 or 9999) are filtered by IsValid.
     /// </summary>
     public IReadOnlyList<DisplayMode> GetAdvertisedModes()
     {

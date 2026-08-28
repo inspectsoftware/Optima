@@ -43,8 +43,8 @@ public class VddSettingsDocumentTests
         Assert.Contains(new DisplayMode(1920, 1080, 60), modes);
         Assert.Contains(new DisplayMode(1920, 1080, 144), modes);
         Assert.Contains(new DisplayMode(2560, 1440, 144), modes);
-        // 9999 Hz placeholder and 30 Hz own-rate below 24-1000 validity are handled:
-        Assert.DoesNotContain(modes, m => m.RefreshRate > 1000);
+        // 9999 Hz placeholder and 30 Hz own-rate outside the 24-500 validity range are handled:
+        Assert.DoesNotContain(modes, m => m.RefreshRate > 500);
     }
 
     [Fact]

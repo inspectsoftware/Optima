@@ -57,6 +57,18 @@
         </StackPanel>
       </HeaderedContentControl>
 
+      <HeaderedContentControl Style="{StaticResource Section}" Header="ETW PRESENT PROBE">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="run probe (10s)" Command="{Binding RunEtwProbeCommand}" Padding="6,0" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Prose}" Margin="0,0,0,8" MaxWidth="720" HorizontalAlignment="Left"
+                     Text="Counts DXGI present events per process with no filter. If FPS capture stays silent during a session, run this while the game is up: the process with the highest count is the real presenter." />
+          <TextBlock Text="{Binding EtwProbeStatus}" Style="{StaticResource Text.Micro}" Margin="0,0,0,6" />
+          <ItemsControl ItemsSource="{Binding EtwProbeResults}" ItemTemplate="{StaticResource InfoRowTemplate}" />
+        </StackPanel>
+      </HeaderedContentControl>
+
       <HeaderedContentControl Style="{StaticResource Section}" Header="ACTIVE DETECTION RULES">
         <StackPanel>
           <TextBlock Style="{StaticResource Text.Prose}" Margin="0,0,0,8" MaxWidth="720" HorizontalAlignment="Left"

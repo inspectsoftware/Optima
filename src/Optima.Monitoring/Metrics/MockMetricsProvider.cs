@@ -29,7 +29,7 @@ public sealed class MockMetricsProvider : IPerformanceMetricsProvider
 
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(true);
 
-    public Task StartAsync(int processId, CancellationToken ct = default)
+    public Task StartAsync(IReadOnlyList<int> processIds, CancellationToken ct = default)
     {
         lock (_lock)
         {
