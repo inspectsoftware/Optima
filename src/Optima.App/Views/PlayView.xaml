@@ -5,8 +5,8 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="900" HorizontalAlignment="Left">
 
-      <TextBlock Text="PLAY" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="pick a profile · everything is restored when the game exits"
+      <TextBlock Text="Play" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Pick a profile · everything is restored when the game exits"
                  Style="{StaticResource Text.PageSubtitle}" />
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="PROFILE">
@@ -33,7 +33,7 @@
             </Grid.ColumnDefinitions>
             <ctl:AsciiSpinner Cells="14" Margin="0,0,12,0" />
             <TextBlock Grid.Column="1" Text="{Binding PhaseText}" Style="{StaticResource Text.Value}"
-                       Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center" />
+                       Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" />
             <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="cancel session"
                     Command="{Binding CancelCommand}" />
           </Grid>
@@ -44,7 +44,7 @@
                     Command="{Binding KillGameCommand}"
                     ToolTip="Instantly terminates the Critical Ops emulator process tree (Ctrl+Alt+K works anywhere)" />
             <TextBlock Text="{Binding KillStatusText}" Style="{StaticResource Text.Micro}"
-                       Foreground="{StaticResource Brush.Warn}" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Foreground="{DynamicResource Brush.Warn}" VerticalAlignment="Center" Margin="12,0,0,0"
                        Visibility="{Binding KillStatusText, Converter={StaticResource EmptyToCollapsed}}" />
           </StackPanel>
         </StackPanel>
@@ -69,19 +69,19 @@
               <TextBlock Text="1% LOW" Style="{StaticResource Text.Label}" />
               <TextBlock Text="{Binding LastSession.Stats.OnePercentLowFps, StringFormat={}{0:F0}}"
                          Style="{StaticResource Text.Metric}" FontSize="20"
-                         Foreground="{StaticResource Brush.Text}" />
+                         Foreground="{DynamicResource Brush.Text}" />
             </StackPanel>
             <StackPanel Margin="0,0,16,0">
               <TextBlock Text="0.1% LOW" Style="{StaticResource Text.Label}" />
               <TextBlock Text="{Binding LastSession.Stats.PointOnePercentLowFps, StringFormat={}{0:F0}}"
                          Style="{StaticResource Text.Metric}" FontSize="20"
-                         Foreground="{StaticResource Brush.Text}" />
+                         Foreground="{DynamicResource Brush.Text}" />
             </StackPanel>
             <StackPanel>
               <TextBlock Text="P99 FRAMETIME" Style="{StaticResource Text.Label}" />
               <TextBlock Text="{Binding LastSession.Stats.P99FrametimeMs, StringFormat={}{0:F1} ms}"
                          Style="{StaticResource Text.Metric}" FontSize="20"
-                         Foreground="{StaticResource Brush.Text}" />
+                         Foreground="{DynamicResource Brush.Text}" />
             </StackPanel>
           </UniformGrid>
           <TextBlock Style="{StaticResource Text.Prose}" Margin="0,10,0,0" MaxWidth="700" HorizontalAlignment="Left"
@@ -93,13 +93,13 @@
       <!-- Friendly error -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="ERROR"
                               Visibility="{Binding LastError, Converter={StaticResource NullToCollapsed}}">
-        <Border Style="{StaticResource Callout}" BorderBrush="{StaticResource Brush.Fail}">
+        <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Fail}">
           <StackPanel>
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="[FAIL]" Foreground="{StaticResource Brush.Fail}"
+              <TextBlock Text="[FAIL]" Foreground="{DynamicResource Brush.Fail}"
                          FontSize="{StaticResource Type.Label}" Margin="0,0,10,0" />
               <TextBlock Text="{Binding LastError.Title}" FontSize="{StaticResource Type.Title}"
-                         Foreground="{StaticResource Brush.Text}" TextWrapping="Wrap" />
+                         Foreground="{DynamicResource Brush.Text}" TextWrapping="Wrap" />
             </StackPanel>
             <TextBlock Text="{Binding LastError.Explanation}" Style="{StaticResource Text.Prose}"
                        Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" />
@@ -107,10 +107,10 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <StackPanel Orientation="Horizontal" Margin="0,2">
-                    <TextBlock Text="&#x2514;" Foreground="{StaticResource Brush.Hairline}" Margin="0,0,8,0"
+                    <TextBlock Text="&#x2514;" Foreground="{DynamicResource Brush.Hairline}" Margin="0,0,8,0"
                                VerticalAlignment="Top" />
                     <TextBlock Text="{Binding}" Style="{StaticResource Text.Prose}"
-                               Foreground="{StaticResource Brush.Warn}" MaxWidth="680" />
+                               Foreground="{DynamicResource Brush.Warn}" MaxWidth="680" />
                   </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

@@ -5,8 +5,8 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="940" HorizontalAlignment="Left">
 
-      <TextBlock Text="DISPLAY" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="virtual display control and attached monitors" Style="{StaticResource Text.PageSubtitle}" />
+      <TextBlock Text="Display" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Virtual display control and attached monitors" Style="{StaticResource Text.PageSubtitle}" />
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="OPTIMA VIRTUALIZATION">
         <StackPanel>
@@ -18,17 +18,17 @@
             <StackPanel>
               <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{Binding ProviderName}" FontSize="{StaticResource Type.Title}"
-                           Foreground="{StaticResource Brush.Text}" />
+                           Foreground="{DynamicResource Brush.Text}" />
                 <TextBlock Margin="12,0,0,0" VerticalAlignment="Center"
                            FontSize="{StaticResource Type.Label}">
                   <TextBlock.Style>
                     <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
                       <Setter Property="Text" Value="[ OFF ]" />
-                      <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                      <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
                       <Style.Triggers>
                         <DataTrigger Binding="{Binding VirtualDisplayActive}" Value="True">
                           <Setter Property="Text" Value="[ ACTIVE ]" />
-                          <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                          <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
                         </DataTrigger>
                       </Style.Triggers>
                     </Style>
@@ -51,7 +51,7 @@
             </StackPanel>
           </Grid>
 
-          <Rectangle Height="1" Fill="{StaticResource Brush.Hairline}" Margin="0,14" />
+          <Rectangle Height="1" Fill="{DynamicResource Brush.Hairline}" Margin="0,14" />
 
           <Grid>
             <Grid.ColumnDefinitions>
@@ -92,7 +92,7 @@
           </StackPanel>
 
           <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Text.Prose}"
-                     Foreground="{StaticResource Brush.Warn}" Margin="0,10,0,0" MaxWidth="760"
+                     Foreground="{DynamicResource Brush.Warn}" Margin="0,10,0,0" MaxWidth="760"
                      HorizontalAlignment="Left"
                      Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToCollapsed}}" />
 
@@ -106,7 +106,7 @@
               </Grid.ColumnDefinitions>
               <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="[WARN] no virtual display device"
-                           Foreground="{StaticResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
+                           Foreground="{DynamicResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
                 <TextBlock Text="{Binding DriverBannerText}" Style="{StaticResource Text.Prose}"
                            Margin="0,4,0,0" MaxWidth="620" HorizontalAlignment="Left" />
                 <TextBlock Text="{Binding DriverPackageText}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0"
@@ -116,7 +116,7 @@
                    offer the folder to put a package in, rather than an unpressable button. -->
               <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
                       Padding="16,8" FontSize="{StaticResource Type.Label}"
-                      Content="INSTALL DRIVER" Command="{Binding InstallDriverCommand}"
+                      Content="Install driver" Command="{Binding InstallDriverCommand}"
                       Margin="12,0,0,0" VerticalAlignment="Center"
                       Visibility="{Binding CanInstallDriver, Converter={StaticResource BoolToVis}}" />
               <Button Grid.Column="1" Style="{StaticResource SecondaryButton}"
@@ -127,15 +127,15 @@
             </Grid>
           </Border>
 
-          <Border Style="{StaticResource Callout}" BorderBrush="{StaticResource Brush.Warn}" Margin="0,10,0,0"
+          <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,10,0,0"
                   Visibility="{Binding RestartRequired, Converter={StaticResource BoolToVis}}">
             <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="760" HorizontalAlignment="Left"
-                       Foreground="{StaticResource Brush.Warn}"
+                       Foreground="{DynamicResource Brush.Warn}"
                        Text="Windows asked for a restart to finish installing the display driver. The virtual display will not appear until you restart." />
           </Border>
 
           <!-- Safety net: the topology captured before any change can always be put back -->
-          <Border Style="{StaticResource Callout}" BorderBrush="{StaticResource Brush.Warn}" Margin="0,12,0,0"
+          <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,12,0,0"
                   Visibility="{Binding CanEmergencyRestore, Converter={StaticResource BoolToVis}}">
             <Grid>
               <Grid.ColumnDefinitions>
@@ -144,12 +144,12 @@
               </Grid.ColumnDefinitions>
               <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="[WARN] display configuration changed this session"
-                           Foreground="{StaticResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
+                           Foreground="{DynamicResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
                 <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" MaxWidth="560"
                            HorizontalAlignment="Left"
                            Text="If anything looks wrong, this puts the previous layout back immediately." />
               </StackPanel>
-              <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="EMERGENCY RESTORE"
+              <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Emergency restore"
                       Command="{Binding EmergencyRestoreCommand}" Margin="12,0,0,0" VerticalAlignment="Center" />
             </Grid>
           </Border>
@@ -189,7 +189,7 @@
                       <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Cell}">
                         <Style.Triggers>
                           <DataTrigger Binding="{Binding IsHidden}" Value="True">
-                            <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
                           </DataTrigger>
                         </Style.Triggers>
                       </Style>
@@ -214,11 +214,11 @@
                     <TextBlock.Style>
                       <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
                         <Setter Property="Text" Value="[ ---- ]" />
-                        <Setter Property="Foreground" Value="{StaticResource Brush.Hairline}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.Hairline}" />
                         <Style.Triggers>
                           <DataTrigger Binding="{Binding IsPrimary}" Value="True">
                             <Setter Property="Text" Value="[ PRIMARY ]" />
-                            <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
                           </DataTrigger>
                           <MultiDataTrigger>
                             <MultiDataTrigger.Conditions>
@@ -226,11 +226,11 @@
                               <Condition Binding="{Binding IsPrimary}" Value="False" />
                             </MultiDataTrigger.Conditions>
                             <Setter Property="Text" Value="[ ACTIVE ]" />
-                            <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
                           </MultiDataTrigger>
                           <DataTrigger Binding="{Binding IsHidden}" Value="True">
                             <Setter Property="Text" Value="[ HIDDEN ]" />
-                            <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
                           </DataTrigger>
                         </Style.Triggers>
                       </Style>

@@ -3,10 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="clr-namespace:Optima.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Style="{StaticResource PageRoot}">
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1010" HorizontalAlignment="Left">
 
-      <TextBlock Text="CRITICAL OPS" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="google play games · custom bootstrapper" Style="{StaticResource Text.PageSubtitle}" />
+      <TextBlock Text="Critical Ops" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Google Play Games · custom bootstrapper" Style="{StaticResource Text.PageSubtitle}" />
 
       <!-- STATUS / SYSTEM side by side -->
       <Grid>
@@ -38,7 +38,7 @@
               </Grid.ColumnDefinitions>
               <TextBlock Text="GPU" Style="{StaticResource Text.Label}" />
               <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
-              <TextBlock Grid.Column="2" Text="{Binding GpuText}" Style="{StaticResource Text.Value}" />
+              <TextBlock Grid.Column="2" Text="{Binding GpuText}" Style="{StaticResource Text.Value}" MaxWidth="330" />
             </Grid>
             <Grid Margin="0,3">
               <Grid.ColumnDefinitions>
@@ -46,7 +46,7 @@
               </Grid.ColumnDefinitions>
               <TextBlock Text="CPU" Style="{StaticResource Text.Label}" />
               <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
-              <TextBlock Grid.Column="2" Text="{Binding CpuText}" Style="{StaticResource Text.Value}" />
+              <TextBlock Grid.Column="2" Text="{Binding CpuText}" Style="{StaticResource Text.Value}" MaxWidth="330" />
             </Grid>
             <Grid Margin="0,3">
               <Grid.ColumnDefinitions>
@@ -54,7 +54,7 @@
               </Grid.ColumnDefinitions>
               <TextBlock Text="RAM" Style="{StaticResource Text.Label}" />
               <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
-              <TextBlock Grid.Column="2" Text="{Binding RamText}" Style="{StaticResource Text.Value}" />
+              <TextBlock Grid.Column="2" Text="{Binding RamText}" Style="{StaticResource Text.Value}" MaxWidth="330" />
             </Grid>
             <Grid Margin="0,3">
               <Grid.ColumnDefinitions>
@@ -62,7 +62,7 @@
               </Grid.ColumnDefinitions>
               <TextBlock Text="OS" Style="{StaticResource Text.Label}" />
               <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
-              <TextBlock Grid.Column="2" Text="{Binding WindowsText}" Style="{StaticResource Text.Value}" />
+              <TextBlock Grid.Column="2" Text="{Binding WindowsText}" Style="{StaticResource Text.Value}" MaxWidth="330" />
             </Grid>
           </StackPanel>
         </HeaderedContentControl>
@@ -81,24 +81,33 @@
           </Grid.RowDefinitions>
 
           <!-- CPU -->
-          <StackPanel Orientation="Horizontal" Margin="0,4">
-            <TextBlock Text="CPU" Style="{StaticResource Text.Label}" Width="42" />
-            <ctl:AsciiBar Value="{Binding CpuPercent}" Maximum="100" Cells="18" />
-            <TextBlock Text="{Binding CpuUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" />
-          </StackPanel>
+          <Grid Margin="0,5">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="42" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="CPU" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+            <ctl:AsciiBar Grid.Column="1" Value="{Binding CpuPercent}" Maximum="100" Cells="18" />
+            <TextBlock Grid.Column="2" Text="{Binding CpuUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" VerticalAlignment="Center" />
+          </Grid>
           <!-- GPU -->
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,4">
-            <TextBlock Text="GPU" Style="{StaticResource Text.Label}" Width="42" />
-            <ctl:AsciiBar Value="{Binding GpuPercent}" Maximum="100" Cells="18" />
-            <TextBlock Text="{Binding GpuUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" />
-            <TextBlock Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
-          </StackPanel>
+          <Grid Grid.Column="2" Margin="0,5">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="42" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="GPU" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+            <ctl:AsciiBar Grid.Column="1" Value="{Binding GpuPercent}" Maximum="100" Cells="18" />
+            <TextBlock Grid.Column="2" Text="{Binding GpuUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="3" Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
+          </Grid>
           <!-- RAM -->
-          <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,4">
-            <TextBlock Text="RAM" Style="{StaticResource Text.Label}" Width="42" />
-            <ctl:AsciiBar Value="{Binding RamPercent}" Maximum="100" Cells="18" />
-            <TextBlock Text="{Binding RamUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" />
-          </StackPanel>
+          <Grid Grid.Row="1" Margin="0,5">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="42" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="RAM" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+            <ctl:AsciiBar Grid.Row="0" Grid.Column="1" Value="{Binding RamPercent}" Maximum="100" Cells="18" />
+            <TextBlock Grid.Column="2" Text="{Binding RamUsage}" Style="{StaticResource Text.Value}" Margin="10,0,0,0" MinWidth="46" VerticalAlignment="Center" />
+          </Grid>
         </Grid>
       </HeaderedContentControl>
 
@@ -117,17 +126,17 @@
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center">
               <TextBlock Text="{Binding Play.SelectedProfile.Name, FallbackValue='NO PROFILE'}"
-                         FontSize="{StaticResource Type.Title}" Foreground="{StaticResource Brush.Accent}" />
+                         FontSize="{StaticResource Type.Title}" Foreground="{DynamicResource Brush.Accent}" />
               <TextBlock Text="{Binding Play.SelectedProfileSummary}" Style="{StaticResource Text.Label}"
                          Margin="0,4,0,0" />
               <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
                           Visibility="{Binding Play.IsSessionActive, Converter={StaticResource BoolToVis}}">
                 <ctl:AsciiSpinner Cells="12" Margin="0,0,10,0" />
                 <TextBlock Text="{Binding Play.PhaseText}" Style="{StaticResource Text.Micro}"
-                           Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Center" />
+                           Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" />
               </StackPanel>
               <TextBlock Text="{Binding Play.KillStatusText}" Style="{StaticResource Text.Micro}"
-                         Foreground="{StaticResource Brush.Warn}" Margin="0,6,0,0"
+                         Foreground="{DynamicResource Brush.Warn}" Margin="0,6,0,0"
                          Visibility="{Binding Play.KillStatusText, Converter={StaticResource EmptyToCollapsed}}" />
             </StackPanel>
             <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"

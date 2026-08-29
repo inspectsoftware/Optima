@@ -1,11 +1,14 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using Optima.App.Services;
 
 namespace Optima.App.Views;
 
 public partial class MainWindow : Window
 {
+    private bool _backdropActive;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -14,7 +17,47 @@ public partial class MainWindow : Window
             ApplyMaximizedCompensation();
             Caption.SyncMaximizeGlyph();
         };
+        SourceInitialized += (_, _) => ApplyWindowDressing(ThemeService.CurrentTheme);
+        ThemeService.ThemeApplied += ApplyWindowDressing;
+        Closed += (_, _) => ThemeService.ThemeApplied -= ApplyWindowDressing;
     }
+
+    /// <summary>
+    /// Asks DWM for the acrylic system backdrop and the theme-matched caption. When the
+    /// backdrop is unavailable (older Windows), the translucent window ground would sit
+    /// on nothing, so it falls back to the solid background brush.
+    /// </summary>
+    private void ApplyWindowDressing(string theme)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ApplyWindowDressing(theme));
+            return;
+        }
+
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var dark = !string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        _ = DwmSetWindowAttribute(handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+
+        var backdrop = DWMSBT_TRANSIENTWINDOW;
+        _backdropActive = DwmSetWindowAttribute(handle, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int)) == 0;
+
+        // Translucent ground over acrylic; solid ground when there is nothing behind it.
+        RootBorder.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty,
+            _backdropActive ? "Brush.WindowGround" : "Brush.Background");
+    }
+
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+    private const int DWMSBT_TRANSIENTWINDOW = 3;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     /// <summary>
     /// A WindowChrome window sized to Maximized extends past the work area on every edge,

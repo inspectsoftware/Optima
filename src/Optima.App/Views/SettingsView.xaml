@@ -4,8 +4,68 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="820" HorizontalAlignment="Left">
 
-      <TextBlock Text="SETTINGS" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Settings" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="%LOCALAPPDATA%\Optima" Style="{StaticResource Text.PageSubtitle}" />
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="APPEARANCE">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210" />
+            <ColumnDefinition />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition /><RowDefinition /><RowDefinition />
+          </Grid.RowDefinitions>
+
+          <TextBlock Text="theme" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding Theme}"
+                    Width="210" HorizontalAlignment="Left" Margin="0,5" />
+
+          <TextBlock Grid.Row="1" Text="accent" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,5">
+            <ItemsControl ItemsSource="{Binding AccentPresets}" VerticalAlignment="Center">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Command="{Binding DataContext.SelectAccentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                          CommandParameter="{Binding}" Cursor="Hand"
+                          ToolTip="{Binding Name}" Margin="0,0,7,0">
+                    <Button.Template>
+                      <ControlTemplate TargetType="Button">
+                        <Border x:Name="Swatch" Width="22" Height="22" CornerRadius="7"
+                                Background="{Binding Hex, Converter={StaticResource HexToBrush}}"
+                                BorderBrush="{DynamicResource Brush.Glass.Highlight}" BorderThickness="1" />
+                        <ControlTemplate.Triggers>
+                          <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Swatch" Property="BorderBrush" Value="{DynamicResource Brush.Text}" />
+                            <Setter TargetName="Swatch" Property="BorderThickness" Value="2" />
+                          </Trigger>
+                        </ControlTemplate.Triggers>
+                      </ControlTemplate>
+                    </Button.Template>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBox Text="{Binding AccentColor, UpdateSourceTrigger=PropertyChanged}" Width="92"
+                     Margin="6,0,0,0" VerticalAlignment="Center"
+                     ToolTip="Custom accent as #RRGGBB" />
+            <Border Width="22" Height="22" CornerRadius="7" Margin="8,0,0,0" VerticalAlignment="Center"
+                    Background="{Binding AccentColor, Converter={StaticResource HexToBrush}}"
+                    BorderBrush="{DynamicResource Brush.Glass.Border}" BorderThickness="1"
+                    ToolTip="Preview of the accent that will apply on save" />
+          </StackPanel>
+
+          <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource Text.Micro}" Margin="0,2,0,4"
+                     Text="Theme and accent apply the moment you save · no restart needed" />
+        </Grid>
+      </HeaderedContentControl>
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="GENERAL">
         <Grid>
@@ -37,7 +97,7 @@
                      VerticalAlignment="Center" Margin="0,5" />
           <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding DeveloperMode}"
                     VerticalAlignment="Center" Margin="0,5"
-                    Content="show the DEVELOPER page (alt+9)" />
+                    Content="show the DEVELOPER page (Alt+D)" />
 
           <TextBlock Grid.Row="4" Text="keep in tray" Style="{StaticResource Text.Label}"
                      VerticalAlignment="Center" Margin="0,5" />
@@ -134,8 +194,8 @@
 
       <StackPanel Orientation="Horizontal">
         <Button Style="{StaticResource PrimaryButton}" Padding="18,8" FontSize="{StaticResource Type.Label}"
-                Content="SAVE SETTINGS" Command="{Binding SaveCommand}" />
-        <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource Brush.Ok}"
+                Content="Save settings" Command="{Binding SaveCommand}" />
+        <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource Brush.Ok}"
                    FontSize="{StaticResource Type.Label}" VerticalAlignment="Center" Margin="14,0,0,0" />
       </StackPanel>
     </StackPanel>

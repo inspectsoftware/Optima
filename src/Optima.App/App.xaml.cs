@@ -22,6 +22,7 @@ public partial class App : Application
     private TrayService? _tray;
     private ConsoleWindow? _console;
     private OverlayController? _overlay;
+    private ThemeService? _theme;
 
     public static LoggingLevelSwitch LogLevelSwitch { get; } = new(LogEventLevel.Information);
     public static InAppLogSink LogSink { get; } = new();
@@ -62,6 +63,11 @@ public partial class App : Application
         _host.Start();
         Log.Information("Optima starting (version {Version})",
             typeof(App).Assembly.GetName().Version);
+
+        var settingsService = _host.Services.GetRequiredService<SettingsService>();
+        _theme = new ThemeService(settingsService);
+        // Theme must be on the wall before the first window paints.
+        _theme.Initialize(settingsService.GetSettingsAsync().GetAwaiter().GetResult());
 
         var mainViewModel = _host.Services.GetRequiredService<MainViewModel>();
         var window = new MainWindow { DataContext = mainViewModel };
@@ -155,6 +161,7 @@ public partial class App : Application
         _hotkeys?.Dispose();
         _overlay?.Dispose();
         _tray?.Dispose();
+        _theme?.Dispose();
         try
         {
             _host?.StopAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();

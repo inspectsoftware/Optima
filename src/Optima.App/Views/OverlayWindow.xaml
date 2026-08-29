@@ -7,23 +7,27 @@
         Topmost="True" ShowActivated="False" ShowInTaskbar="False"
         UseLayoutRounding="True">
   <!-- Ownerless, click-through, never activated: sits over the borderless game without
-       touching it. Extended styles are applied in code behind on SourceInitialized. -->
-  <Border Background="#CC07080A" BorderBrush="#33FFFFFF" BorderThickness="1" Padding="10,6">
+       touching it. Extended styles are applied in code behind on SourceInitialized.
+       Overlay brushes are theme-invariant (always dark) for in-game readability;
+       text brushes resolve against the dark palette values in both themes by design. -->
+  <Border Background="{StaticResource Brush.Overlay.Ground}"
+          BorderBrush="{StaticResource Brush.Overlay.Border}" BorderThickness="1"
+          CornerRadius="10" Padding="11,7">
     <StackPanel>
       <StackPanel Orientation="Horizontal">
         <TextBlock Text="{Binding FpsText}" FontFamily="{StaticResource Font.Mono}"
                    FontSize="{StaticResource Type.Display}" FontWeight="Bold"
-                   Foreground="{StaticResource Brush.Text}" />
+                   Foreground="{DynamicResource Brush.Text}" />
         <TextBlock Text=" fps" FontFamily="{StaticResource Font.Mono}"
                    FontSize="{StaticResource Type.Label}" VerticalAlignment="Bottom" Margin="0,0,0,3"
-                   Foreground="{StaticResource Brush.TextSecondary}" />
+                   Foreground="{DynamicResource Brush.TextSecondary}" />
         <TextBlock Text="{Binding FrametimeText}" FontFamily="{StaticResource Font.Mono}"
                    FontSize="{StaticResource Type.Label}" VerticalAlignment="Bottom" Margin="10,0,0,3"
-                   Foreground="{StaticResource Brush.TextSecondary}" />
+                   Foreground="{DynamicResource Brush.TextSecondary}" />
       </StackPanel>
       <TextBlock Text="{Binding NetworkText}" FontFamily="{StaticResource Font.Mono}"
                  FontSize="{StaticResource Type.Micro}" Margin="0,3,0,0"
-                 Foreground="{StaticResource Brush.TextSecondary}"
+                 Foreground="{DynamicResource Brush.TextSecondary}"
                  Visibility="{Binding NetworkVisible, Converter={StaticResource BoolToVis}}" />
     </StackPanel>
   </Border>

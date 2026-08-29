@@ -13,16 +13,20 @@ namespace Optima.App.ViewModels;
 /// <summary>One sidebar row. <see cref="Key"/> doubles as the navigation command parameter.</summary>
 public sealed partial class NavItem : ObservableObject
 {
-    public NavItem(string index, string key)
+    public NavItem(string index, string key, string? sectionHeader = null)
     {
         Index = index;
         Key = key;
+        SectionHeader = sectionHeader ?? "";
     }
 
     /// <summary>Row number shown left of the label; also the Alt+N shortcut it answers to.</summary>
     public string Index { get; }
 
     public string Key { get; }
+
+    /// <summary>Group label rendered above this row when it opens a new sidebar section.</summary>
+    public string SectionHeader { get; }
 
     [ObservableProperty]
     private bool _isActive;
@@ -115,17 +119,17 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<NavItem> NavItems { get; } =
     [
-        new("01", "HOME") { IsActive = true },
+        new("01", "HOME", "LAUNCH") { IsActive = true },
         new("02", "PLAY"),
-        new("03", "PERFORMANCE"),
-        new("04", "DISPLAY"),
+        new("03", "PERFORMANCE", "MONITOR"),
+        new("04", "SESSIONS"),
         new("05", "SYSTEM"),
-        new("06", "DIAGNOSTICS"),
-        new("07", "LOGS"),
-        new("08", "SETTINGS"),
-        new("09", "DEVELOPER"),
-        new("10", "SESSIONS"),
-        new("11", "UPDATE LOG"),
+        new("06", "DISPLAY", "CONFIGURE"),
+        new("07", "SETTINGS"),
+        new("08", "DIAGNOSTICS", "SUPPORT"),
+        new("09", "LOGS"),
+        new("10", "UPDATE LOG"),
+        new("11", "DEVELOPER"),
     ];
 
     [RelayCommand]

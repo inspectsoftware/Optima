@@ -5,22 +5,22 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Welcome to Optima"
         Width="660" Height="640" WindowStartupLocation="CenterOwner"
-        Background="{StaticResource Brush.Background}" ResizeMode="NoResize"
+        Background="{DynamicResource Brush.Background}" ResizeMode="NoResize"
         UseLayoutRounding="True">
 
   <!-- Same chrome as the main window, so the wizard cannot end up with a light title bar. -->
   <shell:WindowChrome.WindowChrome>
-    <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="0"
+    <shell:WindowChrome CaptionHeight="36" ResizeBorderThickness="0"
                         CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
   </shell:WindowChrome.WindowChrome>
 
-  <Border Background="{StaticResource Brush.Background}"
-          TextElement.Foreground="{StaticResource Brush.Text}"
+  <Border Background="{DynamicResource Brush.Background}"
+          TextElement.Foreground="{DynamicResource Brush.Text}"
           TextElement.FontFamily="{StaticResource Font.Mono}"
           TextElement.FontSize="{StaticResource Type.Body}">
     <Grid>
       <Grid.RowDefinitions>
-        <RowDefinition Height="32" />
+        <RowDefinition Height="36" />
         <RowDefinition Height="Auto" />
         <RowDefinition />
         <RowDefinition Height="Auto" />
@@ -29,7 +29,7 @@
       <ctl:TitleBar Grid.Row="0" ShowMinimize="False" ShowMaximize="False" />
 
       <StackPanel Grid.Row="1" Margin="24,20,24,0">
-        <TextBlock Text="FIRST RUN" Style="{StaticResource Text.PageTitle}" />
+        <TextBlock Text="First run" Style="{StaticResource Text.PageTitle}" />
         <TextBlock Text="{Binding Headline}" Style="{StaticResource Text.PageSubtitle}" />
         <StackPanel Orientation="Horizontal" Margin="0,0,0,4"
                     Visibility="{Binding IsDetecting, Converter={StaticResource BoolToVis}}">
@@ -77,9 +77,9 @@
         </StackPanel>
       </ScrollViewer>
 
-      <Border Grid.Row="3" BorderBrush="{StaticResource Brush.Hairline}" BorderThickness="0,1,0,0"
-              Background="{StaticResource Brush.Surface}" Padding="24,14">
-        <Button Style="{StaticResource PrimaryButton}" Content="GET STARTED"
+      <Border Grid.Row="3" BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,1,0,0"
+              Background="{DynamicResource Brush.Surface}" Padding="24,14">
+        <Button Style="{StaticResource PrimaryButton}" Content="Get started"
                 Command="{Binding FinishCommand}" HorizontalAlignment="Right" MinWidth="190" Padding="20,9" />
       </Border>
     </Grid>

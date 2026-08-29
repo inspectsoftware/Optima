@@ -4,8 +4,8 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1000" HorizontalAlignment="Left">
 
-      <TextBlock Text="PERFORMANCE" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="windows tweaks · profiles · per-setting disclosure" Style="{StaticResource Text.PageSubtitle}" />
+      <TextBlock Text="Performance" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Windows tweaks · profiles · per-setting disclosure" Style="{StaticResource Text.PageSubtitle}" />
 
       <!-- Windows tweak catalog: persistent per-tweak toggles, originals captured before
            any write, individually reversible. -->
@@ -52,15 +52,15 @@
                                   <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
                                       <Setter Property="Content" Value="[ OFF ]" />
-                                      <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                                      <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
                                       <Style.Triggers>
                                         <DataTrigger Binding="{Binding Status}" Value="Enabled">
                                           <Setter Property="Content" Value="[ ON ]" />
-                                          <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                                          <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding Status}" Value="Mixed">
                                           <Setter Property="Content" Value="[ MIXED ]" />
-                                          <Setter Property="Foreground" Value="{StaticResource Brush.Warn}" />
+                                          <Setter Property="Foreground" Value="{DynamicResource Brush.Warn}" />
                                         </DataTrigger>
                                       </Style.Triggers>
                                     </Style>
@@ -69,13 +69,13 @@
                                 <TextBlock Text="{Binding Name}" Style="{StaticResource Text.Value}"
                                            VerticalAlignment="Center" Margin="10,0,0,0" />
                                 <TextBlock Text="[ ADMIN ]" FontSize="{StaticResource Type.Micro}"
-                                           Foreground="{StaticResource Brush.Warn}" VerticalAlignment="Center" Margin="10,0,0,0"
+                                           Foreground="{DynamicResource Brush.Warn}" VerticalAlignment="Center" Margin="10,0,0,0"
                                            Visibility="{Binding RequiresElevation, Converter={StaticResource BoolToVis}}" />
                                 <TextBlock Text="[ RESTART ]" FontSize="{StaticResource Type.Micro}"
-                                           Foreground="{StaticResource Brush.Warn}" VerticalAlignment="Center" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Brush.Warn}" VerticalAlignment="Center" Margin="8,0,0,0"
                                            Visibility="{Binding RequiresRestart, Converter={StaticResource BoolToVis}}" />
                                 <TextBlock Text="[ MODERATE ]" FontSize="{StaticResource Type.Micro}"
-                                           Foreground="{StaticResource Brush.TextMuted}" VerticalAlignment="Center" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Brush.TextMuted}" VerticalAlignment="Center" Margin="8,0,0,0"
                                            ToolTip="Worth reading the downside before enabling"
                                            Visibility="{Binding IsModerateRisk, Converter={StaticResource BoolToVis}}" />
                               </StackPanel>
@@ -93,10 +93,10 @@
                                          MaxWidth="680" HorizontalAlignment="Left" Margin="0,3" />
                               <TextBlock Grid.Row="1" Text="benefit" Style="{StaticResource Text.Label}" Margin="0,3" />
                               <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PotentialBenefit}" Style="{StaticResource Text.Prose}"
-                                         Foreground="{StaticResource Brush.Ok}" MaxWidth="680" HorizontalAlignment="Left" Margin="0,3" />
+                                         Foreground="{DynamicResource Brush.Ok}" MaxWidth="680" HorizontalAlignment="Left" Margin="0,3" />
                               <TextBlock Grid.Row="2" Text="downside" Style="{StaticResource Text.Label}" Margin="0,3" />
                               <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PotentialDownside}" Style="{StaticResource Text.Prose}"
-                                         Foreground="{StaticResource Brush.Warn}" MaxWidth="680" HorizontalAlignment="Left" Margin="0,3" />
+                                         Foreground="{DynamicResource Brush.Warn}" MaxWidth="680" HorizontalAlignment="Left" Margin="0,3" />
                             </Grid>
                           </Expander>
                         </Border>
@@ -109,7 +109,7 @@
           </ItemsControl>
 
           <TextBlock Text="{Binding TweaksStatus}" Style="{StaticResource Text.Prose}"
-                     Foreground="{StaticResource Brush.Warn}" Margin="0,8,0,0" MaxWidth="760" HorizontalAlignment="Left"
+                     Foreground="{DynamicResource Brush.Warn}" Margin="0,8,0,0" MaxWidth="760" HorizontalAlignment="Left"
                      Visibility="{Binding TweaksStatus, Converter={StaticResource EmptyToCollapsed}}" />
         </StackPanel>
       </HeaderedContentControl>
@@ -136,7 +136,7 @@
                 <StackPanel Margin="0,3">
                   <TextBlock Text="{Binding Name}" Style="{StaticResource Text.Value}" />
                   <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Prose}"
-                             FontSize="{StaticResource Type.Micro}" Foreground="{StaticResource Brush.TextMuted}"
+                             FontSize="{StaticResource Type.Micro}" Foreground="{DynamicResource Brush.TextMuted}"
                              MaxWidth="230" HorizontalAlignment="Left" />
                 </StackPanel>
               </DataTemplate>
@@ -191,11 +191,11 @@
 
             <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
               <Button Style="{StaticResource PrimaryButton}" Padding="16,7" FontSize="{StaticResource Type.Label}"
-                      Content="SAVE PROFILE" Command="{Binding SaveProfileCommand}" Margin="0,0,8,0" />
+                      Content="Save profile" Command="{Binding SaveProfileCommand}" Margin="0,0,8,0" />
               <Button Style="{StaticResource SecondaryButton}" Content="delete" Command="{Binding DeleteProfileCommand}" />
             </StackPanel>
             <TextBlock Text="{Binding EditorStatus}" Style="{StaticResource Text.Prose}"
-                       Foreground="{StaticResource Brush.Warn}" Margin="0,8,0,0" MaxWidth="560" HorizontalAlignment="Left"
+                       Foreground="{DynamicResource Brush.Warn}" Margin="0,8,0,0" MaxWidth="560" HorizontalAlignment="Left"
                        Visibility="{Binding EditorStatus, Converter={StaticResource EmptyToCollapsed}}" />
           </StackPanel>
         </Grid>
@@ -223,20 +223,20 @@
                              MaxWidth="700" HorizontalAlignment="Left" Margin="0,3" />
                   <TextBlock Grid.Row="1" Text="benefit" Style="{StaticResource Text.Label}" Margin="0,3" />
                   <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PotentialBenefit}" Style="{StaticResource Text.Prose}"
-                             Foreground="{StaticResource Brush.Ok}" MaxWidth="700" HorizontalAlignment="Left" Margin="0,3" />
+                             Foreground="{DynamicResource Brush.Ok}" MaxWidth="700" HorizontalAlignment="Left" Margin="0,3" />
                   <TextBlock Grid.Row="2" Text="downside" Style="{StaticResource Text.Label}" Margin="0,3" />
                   <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PotentialDownside}" Style="{StaticResource Text.Prose}"
-                             Foreground="{StaticResource Brush.Warn}" MaxWidth="700" HorizontalAlignment="Left" Margin="0,3" />
+                             Foreground="{DynamicResource Brush.Warn}" MaxWidth="700" HorizontalAlignment="Left" Margin="0,3" />
                   <TextBlock Grid.Row="3" Text="requires" Style="{StaticResource Text.Label}" Margin="0,3" />
                   <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,3">
                     <TextBlock Text="[ RESTART ]" FontSize="{StaticResource Type.Micro}"
-                               Foreground="{StaticResource Brush.Warn}" Margin="0,0,10,0"
+                               Foreground="{DynamicResource Brush.Warn}" Margin="0,0,10,0"
                                Visibility="{Binding RequiresRestart, Converter={StaticResource BoolToVis}}" />
                     <TextBlock Text="[ ADMIN ]" FontSize="{StaticResource Type.Micro}"
-                               Foreground="{StaticResource Brush.Warn}"
+                               Foreground="{DynamicResource Brush.Warn}"
                                Visibility="{Binding RequiresAdministrator, Converter={StaticResource BoolToVis}}" />
                     <TextBlock Text="[ NOTHING ]" FontSize="{StaticResource Type.Micro}"
-                               Foreground="{StaticResource Brush.TextMuted}">
+                               Foreground="{DynamicResource Brush.TextMuted}">
                       <TextBlock.Style>
                         <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
                           <Setter Property="Visibility" Value="Collapsed" />

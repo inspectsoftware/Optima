@@ -9,27 +9,33 @@
         Icon="/Assets/optima.ico"
         Width="1240" Height="800" MinWidth="980" MinHeight="640"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource Brush.Background}"
+        Background="Transparent"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Ideal">
 
-  <!-- Custom caption, but WindowChrome keeps snap layouts, Aero Snap and resize native. -->
+  <!--
+    Custom caption, but WindowChrome keeps snap layouts, Aero Snap and resize native.
+    GlassFrameThickness -1 turns the whole client area into a DWM sheet so the system
+    acrylic backdrop (applied in code-behind) can show through the translucent ground;
+    when the backdrop is unavailable the code-behind swaps the ground to a solid brush.
+  -->
   <shell:WindowChrome.WindowChrome>
-    <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="6"
-                        CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+    <shell:WindowChrome CaptionHeight="36" ResizeBorderThickness="6"
+                        CornerRadius="0" GlassFrameThickness="-1" UseAeroCaptionButtons="False" />
   </shell:WindowChrome.WindowChrome>
 
   <Window.InputBindings>
     <KeyBinding Modifiers="Alt" Key="D1" Command="{Binding NavigateCommand}" CommandParameter="HOME" />
     <KeyBinding Modifiers="Alt" Key="D2" Command="{Binding NavigateCommand}" CommandParameter="PLAY" />
     <KeyBinding Modifiers="Alt" Key="D3" Command="{Binding NavigateCommand}" CommandParameter="PERFORMANCE" />
-    <KeyBinding Modifiers="Alt" Key="D4" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
+    <KeyBinding Modifiers="Alt" Key="D4" Command="{Binding NavigateCommand}" CommandParameter="SESSIONS" />
     <KeyBinding Modifiers="Alt" Key="D5" Command="{Binding NavigateCommand}" CommandParameter="SYSTEM" />
-    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
-    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="LOGS" />
-    <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
-    <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DEVELOPER" />
-    <KeyBinding Modifiers="Alt" Key="D0" Command="{Binding NavigateCommand}" CommandParameter="SESSIONS" />
+    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
+    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
+    <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
+    <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="LOGS" />
+    <KeyBinding Modifiers="Alt" Key="D0" Command="{Binding NavigateCommand}" CommandParameter="UPDATE LOG" />
+    <KeyBinding Modifiers="Alt" Key="D" Command="{Binding NavigateCommand}" CommandParameter="DEVELOPER" />
   </Window.InputBindings>
 
   <Window.Resources>
@@ -52,13 +58,13 @@
     tree (including into ContentPresenter-generated text) without overriding any control
     that sets its own, which an implicit TextBlock style would have done.
   -->
-  <Border x:Name="RootBorder" Background="{StaticResource Brush.Background}"
-          TextElement.Foreground="{StaticResource Brush.Text}"
+  <Border x:Name="RootBorder" Background="{DynamicResource Brush.WindowGround}"
+          TextElement.Foreground="{DynamicResource Brush.Text}"
           TextElement.FontFamily="{StaticResource Font.Mono}"
           TextElement.FontSize="{StaticResource Type.Body}">
     <Grid>
       <Grid.RowDefinitions>
-        <RowDefinition Height="32" />
+        <RowDefinition Height="36" />
         <RowDefinition />
       </Grid.RowDefinitions>
 
@@ -68,54 +74,75 @@
 
       <Grid Grid.Row="1">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="190" />
+          <ColumnDefinition Width="204" />
           <ColumnDefinition />
         </Grid.ColumnDefinitions>
 
-        <!-- Sidebar -->
-        <Border Background="{StaticResource Brush.Surface}"
-                BorderBrush="{StaticResource Brush.Hairline}" BorderThickness="0,0,1,0">
+        <!-- Sidebar: a glass rail over the backdrop. -->
+        <Border Background="{DynamicResource Brush.Glass.Surface1}"
+                BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,0,1,0">
           <DockPanel>
             <!-- Footer: live game state -->
-            <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,14">
-              <Rectangle Height="1" Fill="{StaticResource Brush.Hairline}" Margin="0,0,0,10" />
-              <TextBlock FontFamily="{StaticResource Font.Mono}" FontSize="{StaticResource Type.Micro}">
-                <TextBlock.Style>
-                  <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
-                    <Setter Property="Text" Value="[ NOT RUNNING ]" />
-                    <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
-                    <Style.Triggers>
-                      <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
-                        <Setter Property="Text" Value="[ RUNNING ]" />
-                        <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
-                      </DataTrigger>
-                    </Style.Triggers>
-                  </Style>
-                </TextBlock.Style>
-              </TextBlock>
+            <StackPanel DockPanel.Dock="Bottom" Margin="16,0,16,14">
+              <Rectangle Height="1" Fill="{DynamicResource Brush.Hairline}" Margin="0,0,0,10" />
+              <StackPanel Orientation="Horizontal">
+                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="1,1,7,0">
+                  <Ellipse.Style>
+                    <Style TargetType="Ellipse">
+                      <Setter Property="Fill" Value="{DynamicResource Brush.TextMuted}" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
+                          <Setter Property="Fill" Value="{DynamicResource Brush.Ok}" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Ellipse.Style>
+                </Ellipse>
+                <TextBlock FontFamily="{StaticResource Font.Mono}" FontSize="{StaticResource Type.Micro}">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+                      <Setter Property="Text" Value="NOT RUNNING" />
+                      <Setter Property="FontSize" Value="{StaticResource Type.Micro}" />
+                      <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
+                          <Setter Property="Text" Value="RUNNING" />
+                          <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+              </StackPanel>
               <TextBlock Text="critical ops" Style="{StaticResource Text.Micro}"
-                         Foreground="{StaticResource Brush.Hairline}" Margin="0,2,0,0" />
+                         Foreground="{DynamicResource Brush.TextMuted}" Opacity="0.55" Margin="15,2,0,0" />
             </StackPanel>
 
-            <!-- Navigation, bound to NavItems so the active marker tracks every route. -->
-            <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,12,0,0">
+            <!-- Navigation, bound to NavItems so the active marker tracks every route.
+                 A row whose SectionHeader is set opens a new labelled group. -->
+            <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,10,0,0">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Button Style="{StaticResource NavButton}"
-                          Content="{Binding Key}" Tag="{Binding Index}"
-                          HorizontalAlignment="Stretch"
-                          Command="{Binding DataContext.NavigateCommand,
-                                    RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                          CommandParameter="{Binding Key}">
-                    <Button.Visibility>
-                      <!-- Only the DEVELOPER row is conditional; the rest are always shown. -->
-                      <MultiBinding Converter="{StaticResource NavItemVisibility}">
-                        <Binding Path="Key" />
-                        <Binding Path="DataContext.DeveloperModeVisible"
-                                 RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
-                      </MultiBinding>
-                    </Button.Visibility>
-                  </Button>
+                  <StackPanel>
+                    <TextBlock Text="{Binding SectionHeader}" Style="{StaticResource Text.SectionHeader}"
+                               Margin="22,12,0,5" Opacity="0.8"
+                               Visibility="{Binding SectionHeader, Converter={StaticResource EmptyToCollapsed}}" />
+                    <Button Style="{StaticResource NavButton}"
+                            Content="{Binding Key}" Tag="{Binding Index}"
+                            HorizontalAlignment="Stretch"
+                            Command="{Binding DataContext.NavigateCommand,
+                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding Key}">
+                      <Button.Visibility>
+                        <!-- Only the DEVELOPER row is conditional; the rest are always shown. -->
+                        <MultiBinding Converter="{StaticResource NavItemVisibility}">
+                          <Binding Path="Key" />
+                          <Binding Path="DataContext.DeveloperModeVisible"
+                                   RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                        </MultiBinding>
+                      </Button.Visibility>
+                    </Button>
+                  </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
@@ -131,7 +158,7 @@
                   <BeginStoryboard>
                     <Storyboard>
                       <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                       From="0" To="1" Duration="0:0:0.12" />
+                                       From="0" To="1" Duration="0:0:0.16" />
                     </Storyboard>
                   </BeginStoryboard>
                 </EventTrigger>

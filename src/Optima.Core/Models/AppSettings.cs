@@ -5,6 +5,12 @@ public sealed record AppSettings
 {
     public bool FirstRunCompleted { get; init; }
     public string SelectedProfileName { get; init; } = "Default";
+
+    /// <summary>"Dark" or "Light" interface theme.</summary>
+    public string Theme { get; init; } = "Dark";
+
+    /// <summary>Accent color as #RRGGBB; the hover/pressed/glow family is derived from it.</summary>
+    public string AccentColor { get; init; } = "#E8B45A";
     public bool DeveloperMode { get; init; }
     public string MinimumLogLevel { get; init; } = "Information";
 

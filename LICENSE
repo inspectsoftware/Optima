@@ -1,0 +1,29 @@
+Optima License
+
+Copyright (c) 2026 Aureum. All rights reserved under the Optima holder.
+
+This is a source-visible, proprietary work. It is not open source.
+
+Permitted:
+- Viewing and studying this source code.
+- Building and running Optima from this source for personal, non-commercial use.
+- Downloading and using the official release builds.
+
+Not permitted without prior written permission from the copyright holder:
+- Redistributing this source code or modified versions of it.
+- Publishing forks, derivative launchers, or rebranded builds.
+- Commercial use of any part of this work.
+
+Third-party components bundled with Optima remain under their own licenses; see
+THIRD-PARTY-NOTICES.md, which ships with every build. Nothing in this license
+restricts the rights granted by those third-party licenses for those components.
+
+This software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability, fitness
+for a particular purpose and noninfringement. In no event shall the copyright
+holder be liable for any claim, damages or other liability arising from the use
+of this software.
+
+Optima is an independent project. It is not affiliated with, endorsed by, or
+sponsored by Critical Force Oy or Google LLC. Critical Ops and Google Play Games
+are trademarks of their respective owners.

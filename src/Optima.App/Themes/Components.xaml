@@ -1,4 +1,4 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:ctl="clr-namespace:Optima.App.Controls">
 
@@ -12,10 +12,9 @@
   <!--
     A borderless section: an all-caps header, a hairline rule running to the right
     edge, an optional action slot (bind to Tag), then the body.
-    Replaces the bordered Card used 27 times.
   -->
   <Style x:Key="Section" TargetType="HeaderedContentControl">
-    <Setter Property="Margin" Value="0,0,0,18" />
+    <Setter Property="Margin" Value="0,0,0,20" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="HeaderedContentControl">
@@ -28,23 +27,30 @@
               </Grid.ColumnDefinitions>
               <TextBlock Text="{TemplateBinding Header}" Style="{StaticResource Text.SectionHeader}" />
               <Rectangle Grid.Column="1" Height="1" Margin="10,0,10,0" VerticalAlignment="Center"
-                         Fill="{StaticResource Brush.Hairline}" />
+                         Fill="{DynamicResource Brush.Hairline}" />
               <ContentPresenter Grid.Column="2" Content="{TemplateBinding Tag}" VerticalAlignment="Center" />
             </Grid>
-            <ContentPresenter Margin="0,9,0,0" />
+            <ContentPresenter Margin="0,10,0,0" />
           </StackPanel>
         </ControlTemplate>
       </Setter.Value>
     </Setter>
   </Style>
 
-  <!-- A framed variant for callouts that genuinely need an edge (warnings, errors). -->
-  <Style x:Key="Callout" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource Brush.Surface}" />
-    <Setter Property="BorderBrush" Value="{StaticResource Brush.HairlineStrong}" />
-    <Setter Property="BorderThickness" Value="1,1,1,1" />
-    <Setter Property="Padding" Value="14,12" />
+  <!-- Raised glass card: the default vessel for grouped content in the glass language. -->
+  <Style x:Key="GlassCard" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Glass.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}" />
+    <Setter Property="Padding" Value="16,14" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
+  </Style>
+
+  <!-- A framed variant for callouts that genuinely need an edge (warnings, errors). -->
+  <Style x:Key="Callout" TargetType="Border" BasedOn="{StaticResource GlassCard}">
+    <Setter Property="Background" Value="{DynamicResource Brush.Glass.Surface2}" />
+    <Setter Property="Padding" Value="14,12" />
   </Style>
 
   <!-- =============================================================== DOT LEADER -->
@@ -53,7 +59,7 @@
     repeated "·" glyphs: it fills any width exactly and never wraps or clips.
   -->
   <Style x:Key="Leader" TargetType="Rectangle">
-    <Setter Property="Fill" Value="{StaticResource Brush.DotLeader}" />
+    <Setter Property="Fill" Value="{DynamicResource Brush.DotLeader}" />
     <Setter Property="Height" Value="5" />
     <Setter Property="VerticalAlignment" Value="Bottom" />
     <Setter Property="Margin" Value="8,0,8,3" />
@@ -76,7 +82,7 @@
     </Grid>
   </DataTemplate>
 
-  <!-- Same row, value rendered as a bracket tag tinted by StatusKind. -->
+  <!-- Same row, value rendered as a status-tinted chip. -->
   <DataTemplate x:Key="StatusItemTemplate">
     <Grid Margin="0,3">
       <Grid.ColumnDefinitions>
@@ -86,70 +92,94 @@
       </Grid.ColumnDefinitions>
       <TextBlock Text="{Binding Label}" Style="{StaticResource Text.Label}" />
       <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
-      <TextBlock Grid.Column="2"
-                 Text="{Binding Value, StringFormat='[ {0} ]'}"
-                 FontSize="{StaticResource Type.Label}"
-                 Foreground="{Binding Kind, Converter={StaticResource StatusKindBrush}}" />
+      <Border Grid.Column="2" CornerRadius="{StaticResource Radius.Chip}"
+              BorderThickness="1" Padding="9,2,9,3" VerticalAlignment="Center"
+              Background="{DynamicResource Brush.Glass.Surface1}"
+              BorderBrush="{Binding Kind, Converter={StaticResource StatusKindBrush}}">
+        <TextBlock Text="{Binding Value}"
+                   FontFamily="{StaticResource Font.Mono}"
+                   FontSize="{StaticResource Type.Micro}"
+                   Foreground="{Binding Kind, Converter={StaticResource StatusKindBrush}}" />
+      </Border>
     </Grid>
   </DataTemplate>
 
   <!-- ================================================================== TABLES -->
   <!-- Shared row chrome for the ItemsControl tables (processes, monitors, sessions). -->
   <Style x:Key="TableRow" TargetType="Border">
-    <Setter Property="BorderBrush" Value="{StaticResource Brush.Hairline}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Hairline}" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
     <Setter Property="Padding" Value="0,6" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
   </Style>
 
   <Style x:Key="Text.TableHeader" TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
-    <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
     <Setter Property="Margin" Value="0,0,0,4" />
   </Style>
 
   <Style x:Key="Text.Cell" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
     <Setter Property="FontSize" Value="{StaticResource Type.Label}" />
-    <Setter Property="Foreground" Value="{StaticResource Brush.Text}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
   <Style x:Key="Text.CellDim" TargetType="TextBlock" BasedOn="{StaticResource Text.Cell}">
-    <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
   </Style>
 
-  <!-- ============================================================ ASCII METERS -->
+  <!-- ================================================================== METERS -->
   <!--
-    Filled run and track are separate runs so the lit portion can be white while the
-    remainder stays a hairline gray, since a single-color bar reads as noise.
+    AsciiBar / AsciiSpinner keep their historical class names and API (Value, Maximum,
+    Cells; the block-text properties are still produced but unused), so no view or
+    view-model changes. Only the templates changed: the bar is now a smooth accent
+    track, the spinner a rotating arc animated purely in XAML.
   -->
   <Style TargetType="ctl:AsciiBar">
-    <Setter Property="Foreground" Value="{StaticResource Brush.Text}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="MinWidth" Value="90" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ctl:AsciiBar">
-          <TextBlock FontFamily="{StaticResource Font.Mono}"
-                     FontSize="{StaticResource Type.Label}"
-                     TextTrimming="None" VerticalAlignment="Center">
-            <Run Text="{Binding FilledText, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
-                 Foreground="{TemplateBinding Foreground}" />
-            <Run Text="{Binding EmptyText, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
-                 Foreground="{StaticResource Brush.HairlineStrong}" />
-          </TextBlock>
+          <ProgressBar Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+                       Maximum="{Binding Maximum, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+                       Foreground="{TemplateBinding Foreground}"
+                       IsTabStop="False" Focusable="False" />
         </ControlTemplate>
       </Setter.Value>
     </Setter>
   </Style>
 
   <Style TargetType="ctl:AsciiSpinner">
-    <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ctl:AsciiSpinner">
-          <TextBlock Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
-                     Foreground="{TemplateBinding Foreground}"
-                     FontFamily="{StaticResource Font.Mono}"
-                     FontSize="{StaticResource Type.Label}"
-                     TextTrimming="None" VerticalAlignment="Center" />
+          <Grid RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform>
+              <RotateTransform x:Name="SpinTransform" />
+            </Grid.RenderTransform>
+            <Ellipse Stroke="{DynamicResource Brush.Glass.Border}" StrokeThickness="2.5" />
+            <!-- Quarter arc drawn for a 16x16 box, stroke-centered at r=6.75. -->
+            <Path Stroke="{TemplateBinding Foreground}" StrokeThickness="2.5"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                  Data="M 8,1.25 A 6.75,6.75 0 0 1 14.75,8" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+              <BeginStoryboard>
+                <Storyboard>
+                  <DoubleAnimation Storyboard.TargetName="SpinTransform"
+                                   Storyboard.TargetProperty="Angle"
+                                   From="0" To="360" Duration="0:0:0.9"
+                                   RepeatBehavior="Forever" />
+                </Storyboard>
+              </BeginStoryboard>
+            </EventTrigger>
+          </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>
     </Setter>
@@ -157,6 +187,6 @@
 
   <!-- =============================================================== PAGE SHELL -->
   <Style x:Key="PageRoot" TargetType="StackPanel">
-    <Setter Property="Margin" Value="22,18,22,22" />
+    <Setter Property="Margin" Value="{StaticResource Pad.Page}" />
   </Style>
 </ResourceDictionary>

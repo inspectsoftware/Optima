@@ -8,8 +8,8 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <InvariantGlobalization>false</InvariantGlobalization>
     <NeutralLanguage>en</NeutralLanguage>
-    <Company>Optima</Company>
+    <Company>Aureum</Company>
     <Product>Optima</Product>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 </Project>

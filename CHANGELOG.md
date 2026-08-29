@@ -4,6 +4,31 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - Liquid glass redesign, themes, accents and the Aureum rebrand (v0.2.0)
+
+- Complete visual redesign: a liquid-glass interface with a deep blue-charcoal ground,
+  translucent layered surfaces, soft corners, and the new Aureum gold accent. The window
+  now uses the Windows acrylic backdrop where available, with a solid fallback.
+- Dark mode and Light mode: pick a theme on the Settings page under APPEARANCE. The
+  switch applies the moment you save, no restart needed, and both palettes keep the
+  4.5:1 WCAG AA contrast floor on the dimmest text.
+- Accent customization: six presets (Aureum Gold, Frost, Mint, Rose, Violet, Slate) plus
+  a custom hex field. Hover, pressed, glow and on-accent ink colors are derived
+  automatically, and the ink always stays readable on any accent you pick.
+- Rebrand: the app is now Optima by Aureum. The title bar carries the new wordmark and
+  byline, and a LICENSE file (all rights reserved, source visible) now ships at the
+  repository root.
+- Navigation regrouped into LAUNCH, MONITOR, CONFIGURE and SUPPORT sections with a glass
+  pill on the active row. Every page now has a shortcut: Alt+1 through Alt+0, plus Alt+D
+  for the developer page, which previously had none.
+- The status tags, meters and spinners were modernized: status values render as tinted
+  chips, the block-character meters became smooth accent tracks, and the loading spinner
+  is a rotating arc. Numbers still sit beside every meter, never replaced by it.
+- Fixed a layout overflow on the HOME page where long hardware names could push the
+  launch card and its PLAY button past the right edge of the window.
+- The in-game FPS overlay keeps its dark, high-contrast ground in both themes on purpose,
+  and picked up soft corners to match the new language.
+
 ## 2026-08-28 - Custom refresh rate fix and a real driver uninstall
 
 - Custom mode fix: applying a custom mode (for example 1920x1080 @ 240 Hz) no longer

@@ -4,7 +4,7 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="880" HorizontalAlignment="Left">
 
-      <TextBlock Text="UPDATE LOG" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Update log" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="{Binding BuildInfo}" Style="{StaticResource Text.PageSubtitle}" />
 
       <TextBlock Text="{Binding Status}" Style="{StaticResource Text.Label}" Margin="0,10,0,0"

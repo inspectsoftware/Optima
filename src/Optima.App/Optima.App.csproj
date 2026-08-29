@@ -37,6 +37,9 @@
     <!-- The bundled driver is MIT licensed; the license text must travel with the binaries. -->
     <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md"
           CopyToOutputDirectory="PreserveNewest" />
+    <!-- Optima's own license (all rights reserved, source visible) ships with every build. -->
+    <None Include="..\..\LICENSE" Link="LICENSE"
+          CopyToOutputDirectory="PreserveNewest" />
     <!-- The UPDATE LOG page renders this at runtime. -->
     <None Include="..\..\CHANGELOG.md" Link="CHANGELOG.md"
           CopyToOutputDirectory="PreserveNewest" />

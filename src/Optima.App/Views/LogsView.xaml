@@ -14,14 +14,14 @@
     </Grid.RowDefinitions>
 
     <StackPanel Margin="22,18,22,0">
-      <TextBlock Text="LOGS" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="structured application log · newest at the bottom · alt+f9 toggles the floating console"
+      <TextBlock Text="Logs" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Structured application log · newest at the bottom · Alt+F9 toggles the floating console"
                  Style="{StaticResource Text.PageSubtitle}" />
     </StackPanel>
 
     <!-- Filter line, styled as a command prompt -->
-    <Border Grid.Row="1" Background="{StaticResource Brush.Surface}"
-            BorderBrush="{StaticResource Brush.Hairline}" BorderThickness="0,1,0,1" Padding="22,7">
+    <Border Grid.Row="1" Background="{DynamicResource Brush.Surface}"
+            BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,1,0,1" Padding="22,7">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />
@@ -32,7 +32,7 @@
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <TextBlock Text="&gt;" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center"
+        <TextBlock Text="&gt;" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center"
                    FontSize="{StaticResource Type.Label}" Margin="0,0,10,0" />
         <TextBlock Grid.Column="1" Text="--level" Style="{StaticResource Text.Label}"
                    VerticalAlignment="Center" Margin="0,0,6,0" />
@@ -51,8 +51,8 @@
       </Grid>
     </Border>
 
-    <!-- Log surface: darker than the app ground so it reads as a device, not a page -->
-    <Border Grid.Row="2" Background="#FF050608">
+    <!-- Log surface: recessed from the app ground so it reads as a device, not a page -->
+    <Border Grid.Row="2" Background="{DynamicResource Brush.Deep}">
       <ListBox x:Name="LogList" ItemsSource="{Binding FilteredView}"
                Background="Transparent" BorderThickness="0" Padding="16,8"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -72,13 +72,13 @@
                 <ColumnDefinition />
               </Grid.ColumnDefinitions>
               <TextBlock Text="{Binding TimeText}" FontSize="{StaticResource Type.Micro}"
-                         Foreground="{StaticResource Brush.Hairline}" />
+                         Foreground="{DynamicResource Brush.Hairline}" />
               <TextBlock Grid.Column="1" Text="{Binding Level}" FontSize="{StaticResource Type.Micro}"
                          Foreground="{Binding Level, Converter={StaticResource LogLevelBrush}}" />
               <TextBlock Grid.Column="2" Text="{Binding Source}" FontSize="{StaticResource Type.Micro}"
-                         Foreground="{StaticResource Brush.TextMuted}" />
+                         Foreground="{DynamicResource Brush.TextMuted}" />
               <TextBlock Grid.Column="3" Text="{Binding Message}" FontSize="{StaticResource Type.Micro}"
-                         Foreground="{StaticResource Brush.Text}" TextWrapping="Wrap" TextTrimming="None" />
+                         Foreground="{DynamicResource Brush.Text}" TextWrapping="Wrap" TextTrimming="None" />
             </Grid>
           </DataTemplate>
         </ListBox.ItemTemplate>
@@ -86,13 +86,13 @@
     </Border>
 
     <!-- Status strip -->
-    <Border Grid.Row="3" Background="{StaticResource Brush.Surface}"
-            BorderBrush="{StaticResource Brush.Hairline}" BorderThickness="0,1,0,0" Padding="22,6">
+    <Border Grid.Row="3" Background="{DynamicResource Brush.Surface}"
+            BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,1,0,0" Padding="22,6">
       <Grid>
         <StackPanel Orientation="Horizontal">
           <TextBlock Text="{Binding LineCount, StringFormat='{}{0} lines'}" Style="{StaticResource Text.Micro}" />
           <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Text.Micro}"
-                     Foreground="{StaticResource Brush.Ok}" Margin="14,0,0,0" />
+                     Foreground="{DynamicResource Brush.Ok}" Margin="14,0,0,0" />
         </StackPanel>
         <CheckBox HorizontalAlignment="Right" IsChecked="{Binding TailEnabled}"
                   Content="TAIL" FontSize="{StaticResource Type.Micro}"

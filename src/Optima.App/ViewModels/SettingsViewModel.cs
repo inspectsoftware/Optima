@@ -2,10 +2,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
+using Optima.Core.Theming;
 
 namespace Optima.App.ViewModels;
 
-/// <summary>SETTINGS page (§21/§28/§29): app options, detection overrides, developer mode toggle.</summary>
+/// <summary>One selectable accent preset on the SETTINGS page.</summary>
+public sealed record AccentPreset(string Name, string Hex);
+
+/// <summary>SETTINGS page (§21/§28/§29): appearance, app options, detection overrides.</summary>
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly SettingsService _settings;
@@ -19,6 +23,23 @@ public sealed partial class SettingsViewModel : ObservableObject
     public IReadOnlyList<string> LogLevelOptions { get; } = ["Trace", "Debug", "Information", "Warning", "Error"];
     public IReadOnlyList<string> CornerOptions { get; } = ["TopLeft", "TopRight", "BottomLeft", "BottomRight"];
     public IReadOnlyList<double> OpacityOptions { get; } = [0.5, 0.65, 0.8, 1.0];
+    public IReadOnlyList<string> ThemeOptions { get; } = ["Dark", "Light"];
+
+    public IReadOnlyList<AccentPreset> AccentPresets { get; } =
+    [
+        new("Aureum Gold", "#E8B45A"),
+        new("Frost", "#6FB7E8"),
+        new("Mint", "#7FD6A4"),
+        new("Rose", "#E88A9E"),
+        new("Violet", "#A98BE8"),
+        new("Slate", "#C7CFDD"),
+    ];
+
+    [RelayCommand]
+    private void SelectAccent(AccentPreset preset) => AccentColor = preset.Hex;
+
+    [ObservableProperty] private string _theme = "Dark";
+    [ObservableProperty] private string _accentColor = AccentMath.DefaultAccentHex;
 
     [ObservableProperty] private string _provider = "Auto";
     [ObservableProperty] private bool _enableFrametimeCapture = true;
@@ -40,6 +61,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         var settings = await _settings.GetSettingsAsync(ct);
+        Theme = settings.Theme;
+        AccentColor = settings.AccentColor;
         Provider = settings.VirtualDisplayProvider;
         EnableFrametimeCapture = settings.EnableFrametimeCapture;
         LogLevel = settings.MinimumLogLevel;
@@ -62,8 +85,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task SaveAsync()
     {
+        var accentValid = AccentMath.TryParse(AccentColor) is not null;
+
         await _settings.UpdateSettingsAsync(s => s with
         {
+            Theme = Theme,
+            AccentColor = accentValid ? AccentColor.Trim() : s.AccentColor,
             VirtualDisplayProvider = Provider,
             EnableFrametimeCapture = EnableFrametimeCapture,
             MinimumLogLevel = LogLevel,
@@ -87,6 +114,14 @@ public sealed partial class SettingsViewModel : ObservableObject
         });
 
         App.LogLevelSwitch.MinimumLevel = LogsViewModel.ToSerilogLevel(LogLevel);
-        StatusMessage = "Settings saved.";
+        if (!accentValid)
+        {
+            AccentColor = (await _settings.GetSettingsAsync()).AccentColor;
+            StatusMessage = "Settings saved. Accent color was not a valid hex value, so the previous accent was kept.";
+        }
+        else
+        {
+            StatusMessage = "Settings saved.";
+        }
     }
 }

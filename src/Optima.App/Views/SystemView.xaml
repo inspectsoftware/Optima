@@ -4,8 +4,8 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="920" HorizontalAlignment="Left">
 
-      <TextBlock Text="SYSTEM" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="hardware inventory and virtualization state" Style="{StaticResource Text.PageSubtitle}" />
+      <TextBlock Text="System" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Hardware inventory and virtualization state" Style="{StaticResource Text.PageSubtitle}" />
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="HARDWARE">
         <HeaderedContentControl.Tag>

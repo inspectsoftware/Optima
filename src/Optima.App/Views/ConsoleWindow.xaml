@@ -6,15 +6,15 @@
         Width="960" Height="420" MinWidth="560" MinHeight="240"
         Topmost="True" ShowActivated="False" ShowInTaskbar="False"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource Brush.Background}"
+        Background="{DynamicResource Brush.Background}"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Ideal">
   <!--
     The floating console (global Alt+F9): the LOGS page in a topmost window, shown without
     stealing focus so it can sit over a borderless game while it keeps running.
   -->
-  <Border Background="{StaticResource Brush.Background}"
-          TextElement.Foreground="{StaticResource Brush.Text}"
+  <Border Background="{DynamicResource Brush.Background}"
+          TextElement.Foreground="{DynamicResource Brush.Text}"
           TextElement.FontFamily="{StaticResource Font.Mono}"
           TextElement.FontSize="{StaticResource Type.Body}">
     <views:LogsView />

@@ -5,15 +5,15 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1020" HorizontalAlignment="Left">
 
-      <TextBlock Text="SESSIONS" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="history and trends of every recorded session · fps over time · benchmark comparison"
+      <TextBlock Text="Sessions" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="History and trends of every recorded session · FPS over time · benchmark comparison"
                  Style="{StaticResource Text.PageSubtitle}" />
 
       <!-- Trends -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="TRENDS">
         <StackPanel>
           <TextBlock Text="{Binding TrendSparkline}" FontFamily="{StaticResource Font.Mono}"
-                     FontSize="{StaticResource Type.Title}" Foreground="{StaticResource Brush.Text}"
+                     FontSize="{StaticResource Type.Title}" Foreground="{DynamicResource Brush.Text}"
                      Visibility="{Binding HasTrend, Converter={StaticResource BoolToVis}}" />
           <TextBlock Text="{Binding TrendLegend}" Style="{StaticResource Text.Micro}" Margin="0,4,0,0" />
 
@@ -80,7 +80,7 @@
                     <TextBlock Grid.Column="6" Text="{Binding P99Text}" Style="{StaticResource Text.Cell}" />
                     <TextBlock Grid.Column="7" Text="{Binding NetworkText}" Style="{StaticResource Text.CellDim}" />
                     <TextBlock Grid.Column="8" Text="{Binding ConfigTag}" Style="{StaticResource Text.CellDim}"
-                               Foreground="{StaticResource Brush.Warn}" />
+                               Foreground="{DynamicResource Brush.Warn}" />
                   </Grid>
                 </Border>
               </DataTemplate>
@@ -111,7 +111,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <TextBlock Text="{Binding}" FontFamily="{StaticResource Font.Mono}"
-                           FontSize="{StaticResource Type.Body}" Foreground="{StaticResource Brush.Text}" />
+                           FontSize="{StaticResource Type.Body}" Foreground="{DynamicResource Brush.Text}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -141,7 +141,7 @@
           <StackPanel Visibility="{Binding Guided.PlanActive, Converter={StaticResource BoolToVis}}" Margin="0,12,0,0">
             <TextBlock Text="{Binding Guided.Progress}" Style="{StaticResource Text.Value}" />
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-              <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Content="START NEXT RUN"
+              <Button Style="{StaticResource PrimaryButton}" Padding="14,6" Content="Start next run"
                       Command="{Binding Guided.RunNextCommand}" IsEnabled="{Binding Guided.CanRunNext}" />
               <Button Style="{StaticResource GhostButton}" Content="cancel plan" Command="{Binding Guided.CancelPlanCommand}"
                       Margin="10,0,0,0" Padding="6,0" VerticalAlignment="Center" />
@@ -180,10 +180,10 @@
                        MaxWidth="720" HorizontalAlignment="Left">
               <TextBlock.Style>
                 <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Prose}">
-                  <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                  <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
                   <Style.Triggers>
                     <DataTrigger Binding="{Binding Guided.PerRunResult.IsStatisticallyMeaningful}" Value="True">
-                      <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                      <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
                     </DataTrigger>
                   </Style.Triggers>
                 </Style>
@@ -229,10 +229,10 @@
                        MaxWidth="720" HorizontalAlignment="Left">
               <TextBlock.Style>
                 <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Prose}">
-                  <Setter Property="Foreground" Value="{StaticResource Brush.TextMuted}" />
+                  <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
                   <Style.Triggers>
                     <DataTrigger Binding="{Binding Comparison.IsStatisticallyMeaningful}" Value="True">
-                      <Setter Property="Foreground" Value="{StaticResource Brush.Ok}" />
+                      <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
                     </DataTrigger>
                   </Style.Triggers>
                 </Style>
