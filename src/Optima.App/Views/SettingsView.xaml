@@ -104,7 +104,7 @@
           <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,5">
             <TextBox Text="{Binding DiscordApplicationId, UpdateSourceTrigger=PropertyChanged}" Width="240" HorizontalAlignment="Left" />
             <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" MaxWidth="560" HorizontalAlignment="Left" TextWrapping="Wrap"
-                       Text="One-time setup: create an application named Optima at discord.com/developers/applications, upload the Optima art as a Rich Presence asset named 'optima', then paste the Application ID here. Presence talks only to your local Discord client." />
+                       Text="Prefilled with Optima's own Discord application, so activity works out of the box. Change it only to use your own Discord application; clear it to keep presence off entirely. Presence talks only to your local Discord client." />
           </StackPanel>
         </Grid>
       </HeaderedContentControl>

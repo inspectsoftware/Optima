@@ -21,8 +21,12 @@ public sealed record AppSettings
     /// <summary>Show game activity on Discord (local IPC to the running Discord client).</summary>
     public bool DiscordPresenceEnabled { get; init; } = true;
 
-    /// <summary>Discord Application ID (registered by the user); empty keeps presence dormant.</summary>
-    public string DiscordApplicationId { get; init; } = string.Empty;
+    /// <summary>
+    /// Discord Application ID for game activity. Defaults to Optima's own registered
+    /// application, so presence works out of the box; override only to use a different
+    /// Discord application, or clear it to keep presence dormant.
+    /// </summary>
+    public string DiscordApplicationId { get; init; } = "1543421664904351794";
 
     /// <summary>Newest LIVE Critical Ops version seen on the official updates page; a change
     /// triggers the game-updated banner on HOME.</summary>

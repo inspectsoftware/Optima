@@ -64,8 +64,9 @@ under it, plain text, no em dashes.
   exactly one decided match, it lands in the new MATCHES list automatically; everything
   else can be added or corrected by hand, and every row stays editable.
 - Discord game activity: shows "Playing Critical Ops" with elapsed time while you play,
-  through your local Discord client only. One-time setup in Settings (create a free
-  Discord application, paste its ID); without it the feature stays dormant.
+  through your local Discord client only. Works out of the box through Optima's own
+  registered Discord application; Settings can point it at a different application id,
+  or clear the id to keep presence off entirely.
 - Crash capture: when the game ends and Google Play Games' own logs carry failure
   markers, the Watchdog saves a crash bundle (plain-text timeline plus the relevant
   log excerpt, with minidumps referenced by name only). The DIAGNOSTICS page lists
