@@ -22,6 +22,12 @@ public sealed record AppSettings
     public bool DiscordPresenceEnabled { get; init; } = true;
 
     /// <summary>
+    /// Also show presence while the launcher window is open with no game running.
+    /// The tray/background Watchdog never broadcasts: a hidden window counts as closed.
+    /// </summary>
+    public bool DiscordPresenceInLauncher { get; init; } = true;
+
+    /// <summary>
     /// Discord Application ID for game activity. Defaults to Optima's own registered
     /// application, so presence works out of the box; override only to use a different
     /// Discord application, or clear it to keep presence dormant.

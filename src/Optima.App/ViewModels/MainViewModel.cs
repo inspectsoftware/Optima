@@ -60,6 +60,7 @@ public sealed partial class MainViewModel : ObservableObject
         LogsViewModel logs,
         SettingsViewModel settingsPage,
         DeveloperViewModel developer,
+        NewsViewModel news,
         UpdateLogViewModel updateLog,
         LegalViewModel legal,
         StatusViewModel status,
@@ -85,6 +86,7 @@ public sealed partial class MainViewModel : ObservableObject
         Logs = logs;
         SettingsPage = settingsPage;
         Developer = developer;
+        News = news;
         UpdateLog = updateLog;
         Status = status;
         _recovery = recovery;
@@ -112,6 +114,7 @@ public sealed partial class MainViewModel : ObservableObject
     public LogsViewModel Logs { get; }
     public SettingsViewModel SettingsPage { get; }
     public DeveloperViewModel Developer { get; }
+    public NewsViewModel News { get; }
     public UpdateLogViewModel UpdateLog { get; }
     public StatusViewModel Status { get; }
 
@@ -141,9 +144,10 @@ public sealed partial class MainViewModel : ObservableObject
         new("08", "SETTINGS"),
         new("09", "DIAGNOSTICS", "SUPPORT"),
         new("10", "LOGS"),
-        new("11", "UPDATES"),
-        new("12", "LEGAL"),
-        new("13", "DEVELOPER"),
+        new("11", "NEWS"),
+        new("12", "UPDATES"),
+        new("13", "LEGAL"),
+        new("14", "DEVELOPER"),
     ];
 
     [RelayCommand]
@@ -169,6 +173,7 @@ public sealed partial class MainViewModel : ObservableObject
             "LOGS" => Logs,
             "SETTINGS" => SettingsPage,
             "DEVELOPER" => Developer,
+            "NEWS" => News,
             "UPDATES" => UpdateLog,
             _ => Home,
         };
@@ -204,6 +209,9 @@ public sealed partial class MainViewModel : ObservableObject
                     break;
                 case DeveloperViewModel dev:
                     await dev.RefreshAsync();
+                    break;
+                case NewsViewModel n:
+                    await n.InitializeAsync();
                     break;
                 case UpdateLogViewModel log:
                     await log.InitializeAsync();

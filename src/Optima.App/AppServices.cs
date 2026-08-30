@@ -137,6 +137,7 @@ public static class AppServices
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DeveloperViewModel>();
+        services.AddSingleton<NewsViewModel>();
         services.AddSingleton<UpdateLogViewModel>();
         services.AddSingleton<OverlayViewModel>();
     }

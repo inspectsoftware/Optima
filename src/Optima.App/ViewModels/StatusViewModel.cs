@@ -119,7 +119,11 @@ public sealed partial class StatusViewModel : ObservableObject
             if (virtualInfo is not null)
             {
                 var name = DisplayPresentation.CustomName(virtualInfo, overrides) ?? "virtual";
-                Set(Display, $"{virtualInfo.CurrentMode} on {name}", StatusKind.Good);
+                // Between sessions the driver parks the display on a bogus placeholder mode
+                // (999/9999 Hz); report that as idle rather than as a real mode.
+                Set(Display,
+                    virtualInfo.CurrentMode.IsValid ? $"{virtualInfo.CurrentMode} on {name}" : $"idle on {name}",
+                    StatusKind.Good);
             }
             else
             {

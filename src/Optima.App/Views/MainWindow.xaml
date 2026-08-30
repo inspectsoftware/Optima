@@ -35,6 +35,7 @@
     <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
     <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
     <KeyBinding Modifiers="Alt" Key="D0" Command="{Binding NavigateCommand}" CommandParameter="LOGS" />
+    <KeyBinding Modifiers="Alt" Key="N" Command="{Binding NavigateCommand}" CommandParameter="NEWS" />
     <KeyBinding Modifiers="Alt" Key="U" Command="{Binding NavigateCommand}" CommandParameter="UPDATES" />
     <KeyBinding Modifiers="Alt" Key="L" Command="{Binding NavigateCommand}" CommandParameter="LEGAL" />
     <KeyBinding Modifiers="Alt" Key="D" Command="{Binding NavigateCommand}" CommandParameter="DEVELOPER" />
@@ -53,6 +54,7 @@
     <DataTemplate DataType="{x:Type vm:LogsViewModel}"><views:LogsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:DeveloperViewModel}"><views:DeveloperView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:NewsViewModel}"><views:NewsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:UpdateLogViewModel}"><views:UpdateLogView /></DataTemplate>
   </Window.Resources>
 

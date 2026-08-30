@@ -42,6 +42,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _accentColor = AccentMath.DefaultAccentHex;
     [ObservableProperty] private string _playerIgn = string.Empty;
     [ObservableProperty] private bool _discordPresenceEnabled = true;
+    [ObservableProperty] private bool _discordPresenceInLauncher = true;
     [ObservableProperty] private string _discordApplicationId = string.Empty;
 
     [ObservableProperty] private string _provider = "Auto";
@@ -69,6 +70,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         AccentColor = settings.AccentColor;
         PlayerIgn = settings.PlayerIgn;
         DiscordPresenceEnabled = settings.DiscordPresenceEnabled;
+        DiscordPresenceInLauncher = settings.DiscordPresenceInLauncher;
         DiscordApplicationId = settings.DiscordApplicationId;
         Provider = settings.VirtualDisplayProvider;
         EnableFrametimeCapture = settings.EnableFrametimeCapture;
@@ -101,6 +103,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             AccentColor = accentValid ? AccentColor.Trim() : s.AccentColor,
             PlayerIgn = PlayerIgn.Trim(),
             DiscordPresenceEnabled = DiscordPresenceEnabled,
+            DiscordPresenceInLauncher = DiscordPresenceInLauncher,
             DiscordApplicationId = DiscordApplicationId.Trim(),
             VirtualDisplayProvider = Provider,
             EnableFrametimeCapture = EnableFrametimeCapture,

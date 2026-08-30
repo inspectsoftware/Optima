@@ -109,8 +109,11 @@ public partial class App : Application
         // The Watchdog's stats arm: public-profile deltas around each run (needs the
         // player's in-game name in Settings; without it, it never touches the network).
         _host.Services.GetRequiredService<Optima.Core.Stats.SessionStatsEnricher>().Start();
-        // Discord activity (dormant until an Application ID is configured).
-        _ = _host.Services.GetRequiredService<Services.DiscordPresenceService>().StartAsync();
+        // Discord activity (dormant until an Application ID is configured). The window is
+        // attached so "browsing the launcher" presence follows its visibility.
+        var discord = _host.Services.GetRequiredService<Services.DiscordPresenceService>();
+        discord.AttachLauncherWindow(window);
+        _ = discord.StartAsync();
 
         _ = mainViewModel.InitializeAsync();
     }

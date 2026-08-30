@@ -4,6 +4,20 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - News page, launcher presence on Discord, honest display status
+
+- Critical Ops news gets its own NEWS page in the sidebar (Alt+N) with a refresh button.
+  The UPDATES page keeps the launcher self-update and this changelog; the game-update
+  banner on HOME is unchanged.
+- Discord activity can now show while you sit in the launcher: "Optima Launcher /
+  Browsing the launcher" with time elapsed, only while the window is on screen
+  (minimized counts, hidden to the tray does not, autostart never broadcasts). A new
+  Settings toggle, on by default, controls the launcher part separately from game
+  activity; launching and in-game states still take priority.
+- The HOME status line no longer presents the virtual display driver's parked
+  999 Hz placeholder mode as if it were real; between sessions it now reads
+  "idle on <display>".
+
 ## 2026-08-30 - Fix-everything setup, repair actions, the Comp page and Legal (v0.5.0)
 
 - The first-run wizard now fixes things instead of just listing them: one consent runs

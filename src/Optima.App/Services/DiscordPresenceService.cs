@@ -1,3 +1,4 @@
+using System.Windows;
 using DiscordRPC;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
@@ -8,9 +9,10 @@ namespace Optima.App.Services;
 
 /// <summary>
 /// Discord Rich Presence, fed by the Watchdog's presence service. Local IPC to the user's
-/// running Discord client only: no bot, no server, no account access. Active only while
-/// the game is starting or running, and only when a Discord Application ID is configured
-/// and the toggle is on; everything degrades silently when Discord is not running.
+/// running Discord client only: no bot, no server, no account access. Active while the game
+/// is starting or running, and (behind its own toggle) while the launcher window is open;
+/// the tray/background Watchdog never broadcasts, so a hidden window counts as closed.
+/// Everything degrades silently when Discord is not running.
 /// Live ranked-vs-casual detail is intentionally absent this phase (no passive signal
 /// exists during a match); the session's mode lands in history via the stats delta.
 /// </summary>
@@ -20,8 +22,15 @@ public sealed class DiscordPresenceService : IDisposable
     private readonly SettingsService _settings;
     private readonly ILogger<DiscordPresenceService> _logger;
 
+    // Presence updates arrive from the Watchdog's background thread and from UI-thread
+    // window visibility changes; the gate keeps decision and RPC call together.
+    private readonly object _gate = new();
+
     private DiscordRpcClient? _client;
     private volatile bool _enabled;
+    private volatile bool _inLauncherEnabled;
+    private bool _launcherVisible;
+    private DateTimeOffset _launcherVisibleSince = DateTimeOffset.Now;
     private string _applicationId = "";
     private bool _subscribed;
 
@@ -47,9 +56,37 @@ public sealed class DiscordPresenceService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Watch the launcher window: menu presence shows only while the window is on screen
+    /// (minimized still counts; hidden to the tray does not).
+    /// </summary>
+    public void AttachLauncherWindow(Window window)
+    {
+        lock (_gate)
+        {
+            _launcherVisible = window.IsVisible;
+            _launcherVisibleSince = DateTimeOffset.Now;
+        }
+        window.IsVisibleChanged += (_, args) =>
+        {
+            lock (_gate)
+            {
+                var visible = args.NewValue is true;
+                if (visible && !_launcherVisible)
+                {
+                    _launcherVisibleSince = DateTimeOffset.Now;
+                }
+                _launcherVisible = visible;
+            }
+            UpdatePresence();
+        };
+        UpdatePresence();
+    }
+
     private void ApplySettings(AppSettings settings)
     {
         _enabled = settings.DiscordPresenceEnabled;
+        _inLauncherEnabled = settings.DiscordPresenceInLauncher;
         var newId = settings.DiscordApplicationId.Trim();
         if (!string.Equals(newId, _applicationId, StringComparison.Ordinal))
         {
@@ -63,49 +100,71 @@ public sealed class DiscordPresenceService : IDisposable
         else
         {
             // Re-assert current state under the new settings.
-            OnPresenceChanged(new PresenceChange(_presence.Current, _presence.Current, DateTimeOffset.Now));
+            UpdatePresence();
         }
     }
 
-    private void OnPresenceChanged(PresenceChange change)
+    private void OnPresenceChanged(PresenceChange change) => UpdatePresence();
+
+    private void UpdatePresence()
     {
         try
         {
-            if (!_enabled || !TryEnsureClient())
+            lock (_gate)
             {
-                return;
-            }
+                if (!_enabled || !TryEnsureClient())
+                {
+                    return;
+                }
 
-            switch (change.Current)
-            {
-                case GamePresence.InGame:
-                    var since = _presence.InGameSince ?? DateTimeOffset.Now;
-                    _client!.SetPresence(new RichPresence
-                    {
-                        Details = "Playing Critical Ops",
-                        State = "In game",
-                        Timestamps = new Timestamps(since.UtcDateTime),
-                        Assets = new Assets
+                switch (_presence.Current)
+                {
+                    case GamePresence.InGame:
+                        var since = _presence.InGameSince ?? DateTimeOffset.Now;
+                        _client!.SetPresence(new RichPresence
                         {
-                            LargeImageKey = "optima",
-                            LargeImageText = "Optima by Aureum",
-                        },
-                    });
-                    break;
-                case GamePresence.Starting:
-                    _client!.SetPresence(new RichPresence
-                    {
-                        Details = "Launching Critical Ops",
-                        Assets = new Assets
+                            Details = "Playing Critical Ops",
+                            State = "In game",
+                            Timestamps = new Timestamps(since.UtcDateTime),
+                            Assets = new Assets
+                            {
+                                LargeImageKey = "optima",
+                                LargeImageText = "Optima by Aureum",
+                            },
+                        });
+                        break;
+                    case GamePresence.Starting:
+                        _client!.SetPresence(new RichPresence
                         {
-                            LargeImageKey = "optima",
-                            LargeImageText = "Optima by Aureum",
-                        },
-                    });
-                    break;
-                default:
-                    _client!.ClearPresence();
-                    break;
+                            Details = "Launching Critical Ops",
+                            Assets = new Assets
+                            {
+                                LargeImageKey = "optima",
+                                LargeImageText = "Optima by Aureum",
+                            },
+                        });
+                        break;
+                    default:
+                        if (_inLauncherEnabled && _launcherVisible)
+                        {
+                            _client!.SetPresence(new RichPresence
+                            {
+                                Details = "Optima Launcher",
+                                State = "Browsing the launcher",
+                                Timestamps = new Timestamps(_launcherVisibleSince.UtcDateTime),
+                                Assets = new Assets
+                                {
+                                    LargeImageKey = "optima",
+                                    LargeImageText = "Optima by Aureum",
+                                },
+                            });
+                        }
+                        else
+                        {
+                            _client!.ClearPresence();
+                        }
+                        break;
+                }
             }
         }
         catch (Exception ex)

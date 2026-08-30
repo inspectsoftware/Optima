@@ -30,66 +30,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Critical Ops news -->
-      <HeaderedContentControl Style="{StaticResource Section}" Header="CRITICAL OPS NEWS">
-        <HeaderedContentControl.Tag>
-          <TextBox Text="{Binding NewsFilter, UpdateSourceTrigger=PropertyChanged}" Width="180"
-                   VerticalAlignment="Center" ToolTip="Filter the feed (e.g. controls, map, clan)" />
-        </HeaderedContentControl.Tag>
-        <StackPanel>
-          <TextBlock Text="{Binding NewsStatus}" Style="{StaticResource Text.Label}"
-                     Visibility="{Binding NewsStatus, Converter={StaticResource EmptyToCollapsed}}" />
-          <ItemsControl ItemsSource="{Binding News}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Border Style="{StaticResource GlassCard}" Margin="0,0,0,10">
-                  <StackPanel>
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Text="{Binding Title}" FontFamily="{StaticResource Font.Body}"
-                                 FontSize="{StaticResource Type.Title}" FontWeight="SemiBold"
-                                 Foreground="{DynamicResource Brush.Text}" />
-                      <TextBlock Grid.Column="1" Text="{Binding StatusTag}" Margin="10,0"
-                                 FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center">
-                        <TextBlock.Style>
-                          <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
-                            <Setter Property="FontSize" Value="{StaticResource Type.Micro}" />
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.Warn}" />
-                            <Style.Triggers>
-                              <DataTrigger Binding="{Binding IsLive}" Value="True">
-                                <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
-                              </DataTrigger>
-                            </Style.Triggers>
-                          </Style>
-                        </TextBlock.Style>
-                      </TextBlock>
-                      <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="full notes" Padding="6,0"
-                              Command="{Binding OpenNotesCommand}"
-                              ToolTip="Opens the official patch notes in your browser" />
-                    </Grid>
-                    <ItemsControl ItemsSource="{Binding Headlines}" Margin="0,8,0,0">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                          <StackPanel Orientation="Horizontal" Margin="0,1">
-                            <Border Width="4" Height="4" CornerRadius="2" Margin="1,0,9,0"
-                                    Background="{DynamicResource Brush.Accent}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding}" Style="{StaticResource Text.Label}" />
-                          </StackPanel>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </HeaderedContentControl>
-
       <!-- Optima changelog (the shipped CHANGELOG.md) -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="OPTIMA UPDATE LOG">
         <StackPanel>
