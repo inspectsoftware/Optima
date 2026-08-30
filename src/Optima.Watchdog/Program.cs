@@ -1,15 +1,15 @@
 using System.IO.Pipes;
 using Optima.Core.Ipc;
-using Optima.Elevated;
+using Optima.Watchdog;
 
-// Optima.Elevated is the only elevated part of the application (§20).
+// Optima.Watchdog is the only elevated part of the application (§20).
 // It connects back to the named pipe hosted by the non-elevated UI, then executes a small,
 // closed set of validated commands. It never shows UI and exits when the pipe closes.
 
 var pipeName = ParsePipeName(args);
 if (pipeName is null)
 {
-    Console.Error.WriteLine("Usage: Optima.Elevated --pipe <name>");
+    Console.Error.WriteLine("Usage: Optima.Watchdog --pipe <name>");
     return 2;
 }
 

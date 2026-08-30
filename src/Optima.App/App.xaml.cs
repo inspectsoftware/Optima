@@ -74,7 +74,13 @@ public partial class App : Application
         MainWindow = window;
         // The hidden console window must not keep the app alive after the main window closes.
         ShutdownMode = ShutdownMode.OnMainWindowClose;
-        window.Show();
+        // --tray (the start-with-Windows entry): the Watchdog starts in the tray;
+        // the window appears on demand via the tray menu.
+        var startInTray = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase));
+        if (!startInTray)
+        {
+            window.Show();
+        }
 
         _hotkeys = new GlobalHotkeys(window);
         _hotkeys.ConsoleRequested += ToggleConsole;
@@ -97,6 +103,14 @@ public partial class App : Application
             _tray!.ShowMainWindow();
             _ = mainViewModel.NavigateCommand.ExecuteAsync(page);
         };
+
+        // The Watchdog's crash arm: passive logcat correlation on game exits.
+        _host.Services.GetRequiredService<Optima.Core.Crashes.CrashSentinel>().Start();
+        // The Watchdog's stats arm: public-profile deltas around each run (needs the
+        // player's in-game name in Settings; without it, it never touches the network).
+        _host.Services.GetRequiredService<Optima.Core.Stats.SessionStatsEnricher>().Start();
+        // Discord activity (dormant until an Application ID is configured).
+        _ = _host.Services.GetRequiredService<Services.DiscordPresenceService>().StartAsync();
 
         _ = mainViewModel.InitializeAsync();
     }

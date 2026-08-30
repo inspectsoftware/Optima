@@ -84,9 +84,118 @@ public sealed class SqliteSessionStoreMigrationTests : IDisposable
         await using var connection = new SqliteConnection(
             new SqliteConnectionStringBuilder { DataSource = _paths.SessionsDatabase }.ToString());
         await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA user_version";
-        Assert.Equal(1L, (long)(await command.ExecuteScalarAsync())!);
+        await using (var version = connection.CreateCommand())
+        {
+            version.CommandText = "PRAGMA user_version";
+            Assert.Equal(2L, (long)(await version.ExecuteScalarAsync())!);
+        }
+        await using var tables = connection.CreateCommand();
+        tables.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='matches'";
+        Assert.Equal("matches", (string)(await tables.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task V1DatabaseGainsV2ColumnsAndKeepsRows()
+    {
+        // Simulate a database left by v0.2.x: base table + v1 columns, user_version 1.
+        CreateV0Database();
+        using (var connection = new SqliteConnection(
+                   new SqliteConnectionStringBuilder { DataSource = _paths.SessionsDatabase }.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                ALTER TABLE sessions ADD COLUMN tweak_ids TEXT NOT NULL DEFAULT '';
+                ALTER TABLE sessions ADD COLUMN profile_hash TEXT NOT NULL DEFAULT '';
+                ALTER TABLE sessions ADD COLUMN launch_kind TEXT NOT NULL DEFAULT 'play';
+                ALTER TABLE sessions ADD COLUMN avg_ping_ms REAL NULL;
+                ALTER TABLE sessions ADD COLUMN jitter_ms REAL NULL;
+                ALTER TABLE sessions ADD COLUMN packet_loss_pct REAL NULL;
+                PRAGMA user_version = 1;
+                """;
+            command.ExecuteNonQuery();
+            SqliteConnection.ClearAllPools();
+        }
+
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        var legacy = Assert.Single(await store.GetSessionsAsync());
+        Assert.Equal("Legacy", legacy.ProfileName);
+        Assert.Null(legacy.StatsDelta);
+        Assert.Null(legacy.GameVersion);
+        Assert.Empty(await store.GetMatchesAsync());
+    }
+
+    [Fact]
+    public async Task StatsDeltaAndMatchesRoundTrip()
+    {
+        var store = CreateStore();
+        var started = DateTimeOffset.Now;
+        var id = await store.SaveSessionAsync(MakeRecord("Ranked night") with
+        {
+            StartedAt = started,
+            StatsDelta = new Optima.Core.Stats.CopsProfileDelta(
+                12,
+                new Optima.Core.Stats.CopsModeStats(18, 11, 3, 1, 0),
+                Optima.Core.Stats.CopsModeStats.Zero,
+                Optima.Core.Stats.CopsModeStats.Zero),
+            GameVersion = "1.52.0",
+        });
+
+        var loaded = Assert.Single(await store.GetSessionsByIdsAsync([id]));
+        Assert.NotNull(loaded.StatsDelta);
+        Assert.Equal(12, loaded.StatsDelta!.Season);
+        Assert.Equal(18, loaded.StatsDelta.Ranked.Kills);
+        Assert.Equal("1.52.0", loaded.GameVersion);
+
+        var matchId = await store.SaveMatchAsync(new MatchRecord
+        {
+            SessionId = id,
+            StartedAt = started,
+            Mode = "ranked",
+            Result = "win",
+            Kills = 18,
+            Deaths = 11,
+            Assists = 3,
+            Source = "auto",
+        });
+        var match = Assert.Single(await store.GetMatchesAsync());
+        Assert.Equal(matchId, match.Id);
+        Assert.Equal("win", match.Result);
+        Assert.Equal(18, match.Kills);
+
+        await store.UpdateMatchAsync(match with { Result = "loss", Source = "edited" });
+        match = Assert.Single(await store.GetMatchesAsync());
+        Assert.Equal("loss", match.Result);
+        Assert.Equal("edited", match.Source);
+
+        await store.DeleteMatchAsync(match.Id);
+        Assert.Empty(await store.GetMatchesAsync());
+    }
+
+    [Fact]
+    public async Task AttachStatsDeltaTargetsTheNewestSessionInWindow()
+    {
+        var store = CreateStore();
+        var early = DateTimeOffset.Now.AddHours(-3);
+        await store.SaveSessionAsync(MakeRecord("Old") with { StartedAt = early });
+        var recent = DateTimeOffset.Now.AddMinutes(-10);
+        var target = await store.SaveSessionAsync(MakeRecord("Fresh") with { StartedAt = recent });
+
+        var delta = new Optima.Core.Stats.CopsProfileDelta(
+            12, new Optima.Core.Stats.CopsModeStats(5, 4, 1, 1, 0),
+            Optima.Core.Stats.CopsModeStats.Zero, Optima.Core.Stats.CopsModeStats.Zero);
+
+        var attached = await store.AttachStatsDeltaAsync(delta, recent.AddMinutes(-2));
+        Assert.Equal(target, attached);
+
+        var loaded = (await store.GetSessionsByIdsAsync([target])).Single();
+        Assert.Equal(5, loaded.StatsDelta!.Ranked.Kills);
+
+        // No session in the window: nothing is touched.
+        Assert.Null(await store.AttachStatsDeltaAsync(delta, DateTimeOffset.Now.AddMinutes(5)));
     }
 
     [Fact]

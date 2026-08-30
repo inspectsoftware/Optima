@@ -1,22 +1,24 @@
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
+using Optima.Core.Monitoring;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.Core.Launch;
 
 /// <summary>
-/// Watch mode (§5): a background poll that notices the game starting outside Optima and runs
-/// the orchestrator's attach path around it (full profile, monitoring, restore on exit).
-/// The decision logic lives in <see cref="GameWatchPolicy"/>; the orchestrator's session gate
-/// guarantees a watch session and a PLAY session can never double-apply. Frametime capture
-/// joins only when the elevated helper is already connected, so watch mode never causes a
-/// surprise UAC prompt.
+/// Watch mode (§5): notices the game starting outside Optima and runs the orchestrator's
+/// attach path around it (full profile, monitoring, restore on exit). Since the Watchdog
+/// rework it owns no poll loop of its own: it consumes the presence service's ticks, so
+/// there is exactly one process scan in the app and an attach can never block presence.
+/// The decision logic lives in <see cref="GameWatchPolicy"/>; the orchestrator's session
+/// gate guarantees a watch session and a PLAY session can never double-apply. Frametime
+/// capture joins only when the elevated helper is already connected, so watch mode never
+/// causes a surprise UAC prompt.
 /// </summary>
 public sealed class GameWatchService : IAsyncDisposable
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
-
+    private readonly GamePresenceService _presence;
     private readonly IProcessMonitor _processMonitor;
     private readonly LaunchOrchestrator _orchestrator;
     private readonly SettingsService _settings;
@@ -26,10 +28,11 @@ public sealed class GameWatchService : IAsyncDisposable
     private readonly GameWatchPolicy _policy = new();
 
     private CancellationTokenSource? _cts;
-    private Task? _loop;
+    private bool _subscribed;
     private volatile bool _watchEnabled;
 
     public GameWatchService(
+        GamePresenceService presence,
         IProcessMonitor processMonitor,
         LaunchOrchestrator orchestrator,
         SettingsService settings,
@@ -37,6 +40,7 @@ public sealed class GameWatchService : IAsyncDisposable
         IElevationBroker elevation,
         ILogger<GameWatchService> logger)
     {
+        _presence = presence;
         _processMonitor = processMonitor;
         _orchestrator = orchestrator;
         _settings = settings;
@@ -54,63 +58,64 @@ public sealed class GameWatchService : IAsyncDisposable
 
     public async Task StartAsync(CancellationToken ct = default)
     {
-        if (_loop is not null)
+        if (_subscribed)
         {
             return;
         }
         _watchEnabled = (await _settings.GetSettingsAsync(ct).ConfigureAwait(false)).EnableWatchMode;
         _cts = new CancellationTokenSource();
-        _loop = Task.Run(() => RunAsync(_cts.Token), CancellationToken.None);
-        _logger.LogInformation("Watch mode service started (enabled: {Enabled})", _watchEnabled);
+        _presence.Ticked += OnPresenceTick;
+        _subscribed = true;
+        _logger.LogInformation("Watch mode listening to presence ticks (enabled: {Enabled})", _watchEnabled);
     }
 
-    public async Task StopAsync()
+    public Task StopAsync()
     {
-        var loop = _loop;
-        if (loop is null)
+        if (_subscribed)
         {
-            return;
+            _presence.Ticked -= OnPresenceTick;
+            _subscribed = false;
         }
         _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+        return Task.CompletedTask;
+    }
+
+    private void OnPresenceTick(GameRuntimeState state)
+    {
         try
         {
-            await loop.ConfigureAwait(false);
+            var action = _policy.OnPoll(_watchEnabled, _orchestrator.IsSessionActive, state);
+            if (action != WatchAction.Attach)
+            {
+                return;
+            }
+
+            // The attach spans the whole game session; it must never block the presence
+            // loop, so it runs on its own task. The policy's attached flag plus the
+            // orchestrator gate prevent double entry.
+            var ct = _cts?.Token ?? CancellationToken.None;
+            _ = Task.Run(() => AttachSafeAsync(ct), CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Watch mode tick failed");
+        }
+    }
+
+    private async Task AttachSafeAsync(CancellationToken ct)
+    {
+        try
+        {
+            await AttachAsync(ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
         }
-        _cts?.Dispose();
-        _cts = null;
-        _loop = null;
-    }
-
-    private async Task RunAsync(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
+        catch (Exception ex)
         {
-            try
-            {
-                // Process enumeration only happens while the feature is on.
-                if (_watchEnabled)
-                {
-                    var state = await _processMonitor.GetGameStateAsync(ct).ConfigureAwait(false);
-                    var action = _policy.OnPoll(_watchEnabled, _orchestrator.IsSessionActive, state);
-                    if (action == WatchAction.Attach)
-                    {
-                        // Spans the whole game session; polling resumes after restore.
-                        await AttachAsync(ct).ConfigureAwait(false);
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Watch mode tick failed");
-            }
-            await Task.Delay(PollInterval, ct).ConfigureAwait(false);
+            _logger.LogWarning(ex, "Watch attach failed");
         }
     }
 

@@ -11,6 +11,18 @@ public sealed record AppSettings
 
     /// <summary>Accent color as #RRGGBB; the hover/pressed/glow family is derived from it.</summary>
     public string AccentColor { get; init; } = "#E8B45A";
+
+    /// <summary>
+    /// The player's in-game Critical Ops name, used ONLY to read their public profile from
+    /// Critical Force's public API for session stat deltas. Empty disables all API calls.
+    /// </summary>
+    public string PlayerIgn { get; init; } = string.Empty;
+
+    /// <summary>Show game activity on Discord (local IPC to the running Discord client).</summary>
+    public bool DiscordPresenceEnabled { get; init; } = true;
+
+    /// <summary>Discord Application ID (registered by the user); empty keeps presence dormant.</summary>
+    public string DiscordApplicationId { get; init; } = string.Empty;
     public bool DeveloperMode { get; init; }
     public string MinimumLogLevel { get; init; } = "Information";
 
@@ -36,6 +48,9 @@ public sealed record AppSettings
 
     /// <summary>Closing the main window hides Optima to the tray instead of exiting.</summary>
     public bool KeepInTrayOnClose { get; init; }
+
+    /// <summary>Start Optima (minimized to the tray) at Windows sign-in via an HKCU Run entry.</summary>
+    public bool StartWithWindows { get; init; }
 
     /// <summary>Show the in-game FPS overlay while a session runs (borderless / windowed game only).</summary>
     public bool OverlayEnabled { get; init; }

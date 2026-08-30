@@ -50,6 +50,13 @@ public sealed record SessionRecord
 
     /// <summary>Network quality aggregate; null when the session was not measured.</summary>
     public NetworkQualityStats? Network { get; init; }
+
+    /// <summary>Per-mode k/d/a/w/l gained during this session, from public-profile deltas;
+    /// null when the player name is not configured or the API was unreachable.</summary>
+    public Stats.CopsProfileDelta? StatsDelta { get; init; }
+
+    /// <summary>Critical Ops version at session time, once the update feed tracks it (v0.4).</summary>
+    public string? GameVersion { get; init; }
 }
 
 /// <summary>Per-run benchmark result: each completed run's average FPS is one observation (§14).</summary>

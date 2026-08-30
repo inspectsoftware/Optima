@@ -173,6 +173,10 @@ internal sealed class FakeMetrics : IPerformanceMetricsProvider
 internal sealed class FakeSessionStore : ISessionStore
 {
     public List<SessionRecord> Saved { get; } = [];
+    public List<MatchRecord> Matches { get; } = [];
+    public List<(Optima.Core.Stats.CopsProfileDelta Delta, DateTimeOffset WindowStart)> AttachedDeltas { get; } = [];
+    public long? AttachTargetId { get; set; } = 1;
+
     public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
     public Task<long> SaveSessionAsync(SessionRecord record, CancellationToken ct = default)
     {
@@ -185,6 +189,20 @@ internal sealed class FakeSessionStore : ISessionStore
         => Task.FromResult<IReadOnlyList<SessionRecord>>(Saved.Where(s => s.ProfileName == profileName).ToList());
     public Task<IReadOnlyList<SessionRecord>> GetSessionsByIdsAsync(IReadOnlyList<long> ids, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<SessionRecord>>(Saved.Where(s => ids.Contains(s.Id)).ToList());
+    public Task<long?> AttachStatsDeltaAsync(Optima.Core.Stats.CopsProfileDelta delta, DateTimeOffset windowStart, CancellationToken ct = default)
+    {
+        AttachedDeltas.Add((delta, windowStart));
+        return Task.FromResult(AttachTargetId);
+    }
+    public Task<long> SaveMatchAsync(MatchRecord match, CancellationToken ct = default)
+    {
+        Matches.Add(match);
+        return Task.FromResult((long)Matches.Count);
+    }
+    public Task UpdateMatchAsync(MatchRecord match, CancellationToken ct = default) => Task.CompletedTask;
+    public Task DeleteMatchAsync(long matchId, CancellationToken ct = default) => Task.CompletedTask;
+    public Task<IReadOnlyList<MatchRecord>> GetMatchesAsync(int limit = 100, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<MatchRecord>>(Matches);
 }
 
 internal sealed class FakeNetworkMonitor : INetworkQualityMonitor

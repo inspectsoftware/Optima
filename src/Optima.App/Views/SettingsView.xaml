@@ -67,6 +67,48 @@
         </Grid>
       </HeaderedContentControl>
 
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PLAYER">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210" />
+            <ColumnDefinition />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="in-game name" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <StackPanel Grid.Column="1" Margin="0,5">
+            <TextBox Text="{Binding PlayerIgn, UpdateSourceTrigger=PropertyChanged}" Width="240" HorizontalAlignment="Left" />
+            <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" MaxWidth="560" HorizontalAlignment="Left" TextWrapping="Wrap"
+                       Text="Your Critical Ops player name, used only to read your public profile from Critical Force's public API so sessions can record ranked kills, deaths and wins. Leave empty to disable all stat lookups." />
+          </StackPanel>
+        </Grid>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="DISCORD">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210" />
+            <ColumnDefinition />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition /><RowDefinition />
+          </Grid.RowDefinitions>
+
+          <TextBlock Text="game activity" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <CheckBox Grid.Column="1" IsChecked="{Binding DiscordPresenceEnabled}"
+                    VerticalAlignment="Center" Margin="0,5"
+                    Content="show Critical Ops activity on Discord while the game runs" />
+
+          <TextBlock Grid.Row="1" Text="application id" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,5">
+            <TextBox Text="{Binding DiscordApplicationId, UpdateSourceTrigger=PropertyChanged}" Width="240" HorizontalAlignment="Left" />
+            <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" MaxWidth="560" HorizontalAlignment="Left" TextWrapping="Wrap"
+                       Text="One-time setup: create an application named Optima at discord.com/developers/applications, upload the Optima art as a Rich Presence asset named 'optima', then paste the Application ID here. Presence talks only to your local Discord client." />
+          </StackPanel>
+        </Grid>
+      </HeaderedContentControl>
+
       <HeaderedContentControl Style="{StaticResource Section}" Header="GENERAL">
         <Grid>
           <Grid.ColumnDefinitions>
@@ -74,7 +116,7 @@
             <ColumnDefinition />
           </Grid.ColumnDefinitions>
           <Grid.RowDefinitions>
-            <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+            <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
           </Grid.RowDefinitions>
 
           <TextBlock Text="virtual display provider" Style="{StaticResource Text.Label}"
@@ -105,15 +147,21 @@
                     VerticalAlignment="Center" Margin="0,5"
                     Content="closing the window keeps Optima in the tray (quit via EXIT in the tray menu)" />
 
-          <TextBlock Grid.Row="5" Text="mock fps provider" Style="{StaticResource Text.Label}"
+          <TextBlock Grid.Row="5" Text="start with Windows" Style="{StaticResource Text.Label}"
                      VerticalAlignment="Center" Margin="0,5" />
-          <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding UseMockMetricsProvider}"
+          <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding StartWithWindows}"
+                    VerticalAlignment="Center" Margin="0,5"
+                    Content="launch the Optima Watchdog minimized to the tray at sign-in" />
+
+          <TextBlock Grid.Row="6" Text="mock fps provider" Style="{StaticResource Text.Label}"
+                     VerticalAlignment="Center" Margin="0,5" />
+          <CheckBox Grid.Row="6" Grid.Column="1" IsChecked="{Binding UseMockMetricsProvider}"
                     VerticalAlignment="Center" Margin="0,5"
                     Content="developer: synthetic fps data instead of the ETW trace (applies after restart)" />
         </Grid>
       </HeaderedContentControl>
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="OVERLAY AND WATCH MODE">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="OVERLAY AND WATCHDOG">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="210" />
@@ -151,7 +199,7 @@
                    HorizontalAlignment="Left" Margin="0,5"
                    ToolTip="pinged for link quality when no game endpoint answers ICMP" />
 
-          <TextBlock Grid.Row="5" Text="watch mode" Style="{StaticResource Text.Label}"
+          <TextBlock Grid.Row="5" Text="watchdog auto-attach" Style="{StaticResource Text.Label}"
                      VerticalAlignment="Center" Margin="0,5" />
           <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,5">
             <CheckBox IsChecked="{Binding EnableWatchMode}" VerticalAlignment="Center"

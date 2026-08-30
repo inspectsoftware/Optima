@@ -3,8 +3,10 @@ using Optima.App.ViewModels;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Detection;
+using Optima.Core.Crashes;
 using Optima.Core.Launch;
 using Optima.Core.Models;
+using Optima.Core.Monitoring;
 using Optima.Core.Recovery;
 using Optima.Driver;
 using Optima.Driver.Providers;
@@ -76,7 +78,18 @@ public static class AppServices
         services.AddSingleton<IGameLauncher, ShortcutLauncher>();
         services.AddSingleton<IGameLauncher, CustomCommandLauncher>();
         services.AddSingleton<LaunchOrchestrator>();
+        services.AddSingleton<GamePresenceService>();
         services.AddSingleton<GameWatchService>();
+        services.AddSingleton<GpgLogReader>();
+        services.AddSingleton<CrashSentinel>();
+        services.AddSingleton<Optima.Core.Stats.CopsApiClient>();
+        services.AddSingleton<Optima.App.Services.DiscordPresenceService>();
+        services.AddSingleton(sp => new Optima.Core.Stats.SessionStatsEnricher(
+            sp.GetRequiredService<GamePresenceService>(),
+            sp.GetRequiredService<SettingsService>(),
+            sp.GetRequiredService<ISessionStore>(),
+            (ign, ct) => sp.GetRequiredService<Optima.Core.Stats.CopsApiClient>().GetProfileByNameAsync(ign, ct),
+            sp.GetRequiredService<ILogger<Optima.Core.Stats.SessionStatsEnricher>>()));
 
         // ---- Monitoring (§12-14) ----
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();

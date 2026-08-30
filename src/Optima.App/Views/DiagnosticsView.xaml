@@ -76,6 +76,58 @@
                      Visibility="{Binding Summary, Converter={StaticResource EmptyToCollapsed}}" />
         </StackPanel>
       </HeaderedContentControl>
+
+      <!-- Crash bundles captured by the Watchdog on game exits with failure markers. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="CRASHES">
+        <HeaderedContentControl.Tag>
+          <StackPanel Orientation="Horizontal">
+            <Button Style="{StaticResource GhostButton}" Content="capture now" Padding="6,0"
+                    Command="{Binding CaptureCrashNowCommand}"
+                    ToolTip="Writes a bundle from the current platform logs even without a crash" />
+            <Button Style="{StaticResource GhostButton}" Content="open folder" Padding="6,0"
+                    Command="{Binding OpenCrashesFolderCommand}" />
+          </StackPanel>
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="720" HorizontalAlignment="Left" Margin="0,0,0,6"
+                     Text="When Critical Ops ends with failure markers in Google Play Games' own logs, the Watchdog saves a bundle here: a plain-text timeline plus the relevant log excerpt. Export makes a redacted zip that is safe to share with developers." />
+          <ItemsControl ItemsSource="{Binding Crashes}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="260" />
+                      <ColumnDefinition />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Name}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="1" Text="{Binding CapturedText}" Style="{StaticResource Text.CellDim}" />
+                    <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="export redacted zip" Padding="6,0"
+                            Command="{Binding DataContext.ExportCrashRedactedCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="no crash bundles captured" Margin="0,4,0,0">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Crashes.Count}" Value="0">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+          <TextBlock Text="{Binding CrashStatus}" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.Ok}" Margin="0,6,0,0"
+                     Visibility="{Binding CrashStatus, Converter={StaticResource EmptyToCollapsed}}" />
+        </StackPanel>
+      </HeaderedContentControl>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

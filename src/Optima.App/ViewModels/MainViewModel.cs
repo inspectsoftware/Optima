@@ -43,6 +43,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IPerformanceMonitor _monitor;
     private readonly ISessionStore _sessionStore;
     private readonly IProcessMonitor _processMonitor;
+    private readonly Core.Monitoring.GamePresenceService _presence;
     private readonly GameWatchService _gameWatch;
     private readonly ILogger<MainViewModel> _logger;
 
@@ -64,6 +65,7 @@ public sealed partial class MainViewModel : ObservableObject
         IPerformanceMonitor monitor,
         ISessionStore sessionStore,
         IProcessMonitor processMonitor,
+        Core.Monitoring.GamePresenceService presence,
         GameWatchService gameWatch,
         ILogger<MainViewModel> logger)
     {
@@ -84,6 +86,7 @@ public sealed partial class MainViewModel : ObservableObject
         _monitor = monitor;
         _sessionStore = sessionStore;
         _processMonitor = processMonitor;
+        _presence = presence;
         _gameWatch = gameWatch;
         _logger = logger;
         _currentPage = home;
@@ -239,6 +242,7 @@ public sealed partial class MainViewModel : ObservableObject
             await Home.InitializeAsync();
             await Play.InitializeAsync();
             await _monitor.StartAsync();
+            await _presence.StartAsync();
             await _gameWatch.StartAsync();
 
             // 5. Keep the "running" badge and game process ids current.

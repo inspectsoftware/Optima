@@ -23,7 +23,7 @@ $out = Join-Path $root $Output
 
 # A running instance locks the assemblies it loaded; publishing over them fails.
 $stopped = @()
-foreach ($name in @("Optima", "Optima.Elevated")) {
+foreach ($name in @("Optima", "Optima.Watchdog")) {
     foreach ($process in Get-Process -Name $name -ErrorAction SilentlyContinue) {
         Write-Host "stopping running $name (pid $($process.Id))"
         try {
@@ -54,9 +54,9 @@ if ((Test-Path $out) -and (Test-Path (Join-Path $out "Optima.exe"))) {
     }
 }
 
-Write-Host "publishing Optima.Elevated ($Configuration $Runtime)"
-dotnet publish (Join-Path $root "src\Optima.Elevated") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet
-if ($LASTEXITCODE -ne 0) { throw "publishing Optima.Elevated failed (exit $LASTEXITCODE)" }
+Write-Host "publishing Optima.Watchdog ($Configuration $Runtime)"
+dotnet publish (Join-Path $root "src\Optima.Watchdog") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet
+if ($LASTEXITCODE -ne 0) { throw "publishing Optima.Watchdog failed (exit $LASTEXITCODE)" }
 
 Write-Host "publishing Optima.App ($Configuration $Runtime)"
 dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet

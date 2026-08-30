@@ -4,7 +4,7 @@ using Optima.Core.Statistics;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Session;
 
-namespace Optima.Elevated;
+namespace Optima.Watchdog;
 
 /// <summary>
 /// External frametime capture (§12/§13): a real-time ETW session on the Microsoft-Windows-DXGI

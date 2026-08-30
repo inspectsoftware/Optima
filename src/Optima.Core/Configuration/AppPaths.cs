@@ -21,6 +21,7 @@ public sealed class AppPaths
         PendingSnapshotFile = Path.Combine(RecoveryDirectory, "pending-session.json");
         BackupsDirectory = Path.Combine(root, "backups");
         TweaksBackupFile = Path.Combine(BackupsDirectory, "tweaks-original-values.json");
+        CrashesDirectory = Path.Combine(root, "crashes");
     }
 
     public string Root { get; }
@@ -36,11 +37,15 @@ public sealed class AppPaths
     /// <summary>Original registry values captured before a Windows tweak is first applied.</summary>
     public string TweaksBackupFile { get; }
 
+    /// <summary>Crash report bundles captured by the Watchdog, one folder per incident.</summary>
+    public string CrashesDirectory { get; }
+
     public void EnsureCreated()
     {
         Directory.CreateDirectory(Root);
         Directory.CreateDirectory(LogsDirectory);
         Directory.CreateDirectory(RecoveryDirectory);
         Directory.CreateDirectory(BackupsDirectory);
+        Directory.CreateDirectory(CrashesDirectory);
     }
 }

@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Optima.Elevated;
+namespace Optima.Watchdog;
 
 /// <summary>
 /// Minimal append-only log for the elevated helper.
@@ -23,7 +23,7 @@ internal static class HelperLog
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "Optima", "logs");
             Directory.CreateDirectory(dir);
-            return Path.Combine(dir, $"optima-elevated-{DateTime.Now:yyyyMMdd}.log");
+            return Path.Combine(dir, $"optima-watchdog-{DateTime.Now:yyyyMMdd}.log");
         }
         catch (Exception)
         {

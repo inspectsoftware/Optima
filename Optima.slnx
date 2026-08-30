@@ -3,7 +3,7 @@
     <Project Path="src/Optima.App/Optima.App.csproj" />
     <Project Path="src/Optima.Core/Optima.Core.csproj" />
     <Project Path="src/Optima.Driver/Optima.Driver.csproj" />
-    <Project Path="src/Optima.Elevated/Optima.Elevated.csproj" />
+    <Project Path="src/Optima.Watchdog/Optima.Watchdog.csproj" />
     <Project Path="src/Optima.Monitoring/Optima.Monitoring.csproj" />
     <Project Path="src/Optima.Platform.Windows/Optima.Platform.Windows.csproj" />
   </Folder>

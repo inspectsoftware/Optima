@@ -67,7 +67,7 @@ public sealed class TrayService : IDisposable
         _menu = new ContextMenu();
         AddMenuItem("SHOW", ShowMainWindow);
         AddMenuItem("TERMINATE PROCESS", () => TerminateGameRequested?.Invoke());
-        _watchModeItem = AddMenuItem("WATCH MODE: OFF", () => _ = ToggleWatchModeAsync());
+        _watchModeItem = AddMenuItem("WATCHDOG: OFF", () => _ = ToggleWatchModeAsync());
         AddMenuItem("LOGS", () => NavigateRequested?.Invoke("LOGS"));
         AddMenuItem("PERFORMANCE", () => NavigateRequested?.Invoke("PERFORMANCE"));
         var separator = new Separator();
@@ -105,7 +105,7 @@ public sealed class TrayService : IDisposable
     private void UpdateWatchModeItem(bool enabled)
     {
         _watchModeEnabled = enabled;
-        _watchModeItem.Header = enabled ? "WATCH MODE: ON" : "WATCH MODE: OFF";
+        _watchModeItem.Header = enabled ? "WATCHDOG: ON" : "WATCHDOG: OFF";
     }
 
     private async Task ToggleWatchModeAsync()

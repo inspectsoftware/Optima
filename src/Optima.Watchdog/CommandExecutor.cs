@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using Optima.Core.Ipc;
 using Optima.Core.Models;
 
-namespace Optima.Elevated;
+namespace Optima.Watchdog;
 
 /// <summary>
 /// Executes the whitelisted elevated commands (§20). Every argument is validated before use:

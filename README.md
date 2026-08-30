@@ -126,7 +126,7 @@ in Cascadia Mono so numbers keep their alignment and their voice.
   are restored from a CCD topology snapshot (exact restore first, tolerant retry second) and an
   emergency-restore button lives on the Display page.
 - **Elevation**: the UI always runs non-elevated. A separate helper
-  (`Optima.Elevated.exe`) performs only whitelisted, argument-validated operations
+  (`Optima.Watchdog.exe`) performs only whitelisted, argument-validated operations
   (display device toggle, driver pipe write, ETW session, bcdedit read) over a private,
   ACL-restricted named pipe with length-prefixed JSON frames.
 - **Update log**: an in-app page that renders [CHANGELOG.md](CHANGELOG.md) (shipped next to
@@ -149,7 +149,7 @@ src/
                                     processes, probes, launchers, elevation broker
   Optima.Driver           virtual display providers (MttVdd, Mock) + settings editor
   Optima.Monitoring       hardware monitor, NVML, ETW metrics client, SQLite store
-  Optima.Elevated         the elevated helper (whitelisted commands, ETW host)
+  Optima.Watchdog         the elevated helper (whitelisted commands, ETW host)
   Optima.App              WPF UI (MVVM, CommunityToolkit.Mvvm, Serilog, DI)
 tests/
   Optima.Tests            xunit suite (statistics, detection, orchestrator, recovery,

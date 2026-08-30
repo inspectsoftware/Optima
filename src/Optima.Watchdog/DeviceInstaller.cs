@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Optima.Elevated;
+namespace Optima.Watchdog;
 
 /// <summary>
 /// Creates and removes root-enumerated device nodes via SetupAPI, the work `devcon install`

@@ -12,7 +12,7 @@ namespace Optima.Platform.Windows.Elevation;
 /// <summary>
 /// Client side of the elevated helper (§20). The non-elevated app hosts a named-pipe server
 /// with a current-user-only ACL and an unguessable name, launches
-/// Optima.Elevated.exe via the shell "runas" verb (one UAC prompt), and exchanges
+/// Optima.Watchdog.exe via the shell "runas" verb (one UAC prompt), and exchanges
 /// whitelisted, validated commands over length-prefixed JSON frames.
 /// </summary>
 public sealed class ElevationBrokerClient : IElevationBroker
@@ -74,7 +74,7 @@ public sealed class ElevationBrokerClient : IElevationBroker
                 PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
                 inBufferSize: 65536, outBufferSize: 65536, security);
 
-            var helperPath = Path.Combine(AppContext.BaseDirectory, "Optima.Elevated.exe");
+            var helperPath = Path.Combine(AppContext.BaseDirectory, "Optima.Watchdog.exe");
             if (!File.Exists(helperPath))
             {
                 _logger.LogError("Elevated helper not found at {Path}", helperPath);

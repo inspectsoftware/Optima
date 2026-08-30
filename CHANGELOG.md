@@ -4,6 +4,31 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - The Optima Watchdog: presence, Discord, ranked stats, crash capture (v0.3.0)
+
+- The Watchdog is now the app's always-on core: one lightweight presence loop watches
+  the game and feeds everything else, and the watch-attach feature consumes it instead
+  of running its own scan. The elevated helper was renamed to Optima.Watchdog and acts
+  as the Watchdog's admin arm; the tray and settings now speak Watchdog language.
+- Ranked session stats without touching the game: set your in-game name in Settings and
+  Optima reads your PUBLIC Critical Ops profile from Critical Force's own public API
+  before and after each run. The difference becomes the session's kills, deaths,
+  assists and win/loss record, shown in the session detail. When a session contains
+  exactly one decided match, it lands in the new MATCHES list automatically; everything
+  else can be added or corrected by hand, and every row stays editable.
+- Discord game activity: shows "Playing Critical Ops" with elapsed time while you play,
+  through your local Discord client only. One-time setup in Settings (create a free
+  Discord application, paste its ID); without it the feature stays dormant.
+- Crash capture: when the game ends and Google Play Games' own logs carry failure
+  markers, the Watchdog saves a crash bundle (plain-text timeline plus the relevant
+  log excerpt, with minidumps referenced by name only). The DIAGNOSTICS page lists
+  bundles and exports a redacted zip that is safe to share; a capture-now button
+  grabs the current platform logs on demand.
+- Start with Windows: an optional launcher-owned autostart entry starts the Watchdog
+  minimized to the tray at sign-in, and removes itself when you turn it off.
+- Session database schema v2: per-session stat deltas, game-version field and the new
+  matches table, with the previous database backed up before migration.
+
 ## 2026-08-30 - Liquid glass redesign, themes, accents and the Aureum rebrand (v0.2.0)
 
 - Complete visual redesign: a liquid-glass interface with a deep blue-charcoal ground,

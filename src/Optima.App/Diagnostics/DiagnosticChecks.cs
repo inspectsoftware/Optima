@@ -293,7 +293,7 @@ public sealed class AdminPermissionsCheck : IDiagnosticCheck
 
     public Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
-        var helperPath = Path.Combine(AppContext.BaseDirectory, "Optima.Elevated.exe");
+        var helperPath = Path.Combine(AppContext.BaseDirectory, "Optima.Watchdog.exe");
         var helperPresent = File.Exists(helperPath);
         var status = helperPresent ? DiagnosticStatus.Pass : DiagnosticStatus.Warning;
         var reason = _elevation.CurrentProcessIsElevated
@@ -306,7 +306,7 @@ public sealed class AdminPermissionsCheck : IDiagnosticCheck
             CheckName = Name,
             Status = status,
             Reason = reason,
-            RecommendedFix = helperPresent ? string.Empty : "Reinstall or rebuild the application so Optima.Elevated.exe sits next to the main executable.",
+            RecommendedFix = helperPresent ? string.Empty : "Reinstall or rebuild the application so Optima.Watchdog.exe sits next to the main executable.",
         });
     }
 }

@@ -40,12 +40,16 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private string _theme = "Dark";
     [ObservableProperty] private string _accentColor = AccentMath.DefaultAccentHex;
+    [ObservableProperty] private string _playerIgn = string.Empty;
+    [ObservableProperty] private bool _discordPresenceEnabled = true;
+    [ObservableProperty] private string _discordApplicationId = string.Empty;
 
     [ObservableProperty] private string _provider = "Auto";
     [ObservableProperty] private bool _enableFrametimeCapture = true;
     [ObservableProperty] private string _logLevel = "Information";
     [ObservableProperty] private bool _developerMode;
     [ObservableProperty] private bool _keepInTrayOnClose;
+    [ObservableProperty] private bool _startWithWindows;
     [ObservableProperty] private bool _overlayEnabled;
     [ObservableProperty] private string _overlayCorner = "TopRight";
     [ObservableProperty] private double _overlayOpacity = 0.8;
@@ -63,11 +67,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         var settings = await _settings.GetSettingsAsync(ct);
         Theme = settings.Theme;
         AccentColor = settings.AccentColor;
+        PlayerIgn = settings.PlayerIgn;
+        DiscordPresenceEnabled = settings.DiscordPresenceEnabled;
+        DiscordApplicationId = settings.DiscordApplicationId;
         Provider = settings.VirtualDisplayProvider;
         EnableFrametimeCapture = settings.EnableFrametimeCapture;
         LogLevel = settings.MinimumLogLevel;
         DeveloperMode = settings.DeveloperMode;
         KeepInTrayOnClose = settings.KeepInTrayOnClose;
+        StartWithWindows = settings.StartWithWindows;
         OverlayEnabled = settings.OverlayEnabled;
         OverlayCorner = settings.OverlayCorner;
         OverlayOpacity = settings.OverlayOpacity;
@@ -91,11 +99,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             Theme = Theme,
             AccentColor = accentValid ? AccentColor.Trim() : s.AccentColor,
+            PlayerIgn = PlayerIgn.Trim(),
+            DiscordPresenceEnabled = DiscordPresenceEnabled,
+            DiscordApplicationId = DiscordApplicationId.Trim(),
             VirtualDisplayProvider = Provider,
             EnableFrametimeCapture = EnableFrametimeCapture,
             MinimumLogLevel = LogLevel,
             DeveloperMode = DeveloperMode,
             KeepInTrayOnClose = KeepInTrayOnClose,
+            StartWithWindows = StartWithWindows,
             OverlayEnabled = OverlayEnabled,
             OverlayCorner = OverlayCorner,
             OverlayOpacity = OverlayOpacity,
@@ -113,6 +125,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             CustomLaunchCommand = string.IsNullOrWhiteSpace(CustomLaunchCommand) ? null : CustomLaunchCommand.Trim(),
         });
 
+        var autostartError = ApplyStartWithWindows();
+
         App.LogLevelSwitch.MinimumLevel = LogsViewModel.ToSerilogLevel(LogLevel);
         if (!accentValid)
         {
@@ -121,7 +135,36 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
         else
         {
-            StatusMessage = "Settings saved.";
+            StatusMessage = autostartError is null
+                ? "Settings saved."
+                : "Settings saved, but the start-with-Windows entry could not be updated: " + autostartError;
+        }
+    }
+
+    /// <summary>
+    /// Launcher-owned autostart: one HKCU Run value, written on enable, deleted on
+    /// disable, so nothing lingers when the user turns it off. Returns an error message
+    /// when the registry write failed, null on success.
+    /// </summary>
+    private string? ApplyStartWithWindows()
+    {
+        try
+        {
+            using var run = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+            if (StartWithWindows && Environment.ProcessPath is { } exe)
+            {
+                run.SetValue("Optima", $"\"{exe}\" --tray");
+            }
+            else
+            {
+                run.DeleteValue("Optima", throwOnMissingValue: false);
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
         }
     }
 }

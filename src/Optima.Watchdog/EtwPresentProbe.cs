@@ -1,7 +1,7 @@
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Session;
 
-namespace Optima.Elevated;
+namespace Optima.Watchdog;
 
 /// <summary>
 /// Short diagnostic trace (§12): listens to DXGI present events with NO process filter and

@@ -4,7 +4,7 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- The main UI never elevates; privileged work goes through Optima.Elevated.exe -->
+        <!-- The main UI never elevates; privileged work goes through Optima.Watchdog.exe -->
         <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>

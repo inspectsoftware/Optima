@@ -101,6 +101,88 @@
         </StackPanel>
       </HeaderedContentControl>
 
+      <!-- Matches: ranked history from profile deltas plus manual entries. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="MATCHES">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding MatchesSummary}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="760" HorizontalAlignment="Left" Margin="0,0,0,8"
+                     Text="Matches are recorded automatically from your public profile when a session contains exactly one decided match (set your in-game name in Settings). Anything else can be added or corrected by hand; every row stays editable." />
+
+          <ItemsControl ItemsSource="{Binding Matches}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="92" /><ColumnDefinition Width="92" /><ColumnDefinition Width="64" />
+                      <ColumnDefinition Width="96" /><ColumnDefinition Width="130" /><ColumnDefinition Width="86" />
+                      <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding StartedText}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="1" Text="{Binding ModeTag}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="2" Text="{Binding ResultText}" FontSize="{StaticResource Type.Label}"
+                               VerticalAlignment="Center">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Cell}">
+                          <Setter Property="Foreground" Value="{DynamicResource Brush.Fail}" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsWin}" Value="True">
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Grid.Column="3" Text="{Binding KdaText}" Style="{StaticResource Text.Cell}"
+                               ToolTip="kills / deaths / assists" />
+                    <TextBlock Grid.Column="4" Text="{Binding MapText}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="5" Text="{Binding SourceTag}" Style="{StaticResource Text.CellDim}"
+                               FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="6" Orientation="Horizontal" HorizontalAlignment="Right">
+                      <Button Style="{StaticResource GhostButton}" Content="edit" Padding="5,0"
+                              Command="{Binding DataContext.EditMatchCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                      <Button Style="{StaticResource GhostButton}" Content="delete" Padding="5,0"
+                              Command="{Binding DataContext.DeleteMatchCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="no matches recorded yet" Margin="0,4,0,0">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Matches.Count}" Value="0">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+
+          <!-- Manual add / edit form -->
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <ComboBox ItemsSource="{Binding MatchModeOptions}" SelectedItem="{Binding AddMode}" Width="104" />
+            <ComboBox ItemsSource="{Binding MatchResultOptions}" SelectedItem="{Binding AddResult}" Width="84" Margin="8,0,0,0" />
+            <TextBox Text="{Binding AddKills, UpdateSourceTrigger=PropertyChanged}" Width="46" Margin="8,0,0,0" ToolTip="kills" />
+            <TextBlock Text="/" Style="{StaticResource Text.Label}" Margin="4,0" VerticalAlignment="Center" />
+            <TextBox Text="{Binding AddDeaths, UpdateSourceTrigger=PropertyChanged}" Width="46" ToolTip="deaths" />
+            <TextBlock Text="/" Style="{StaticResource Text.Label}" Margin="4,0" VerticalAlignment="Center" />
+            <TextBox Text="{Binding AddAssists, UpdateSourceTrigger=PropertyChanged}" Width="46" ToolTip="assists" />
+            <TextBox Text="{Binding AddMap, UpdateSourceTrigger=PropertyChanged}" Width="120" Margin="8,0,0,0" ToolTip="map (optional)" />
+            <Button Style="{StaticResource SecondaryButton}" Content="{Binding MatchFormLabel}"
+                    Command="{Binding SaveMatchFormCommand}" Margin="10,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+      </HeaderedContentControl>
+
       <!-- Detail -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="DETAIL"
                               Visibility="{Binding SelectedRow, Converter={StaticResource NullToCollapsed}}">

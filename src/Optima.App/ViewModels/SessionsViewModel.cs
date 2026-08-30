@@ -10,6 +10,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
 
+/// <summary>One match history row with display strings.</summary>
+public sealed record MatchRowViewModel(MatchRecord Record)
+{
+    public string StartedText => Record.StartedAt.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture);
+    public string ModeTag => "[ " + Record.Mode.ToUpperInvariant() + " ]";
+    public string ResultText => Record.Result.ToUpperInvariant();
+    public bool IsWin => string.Equals(Record.Result, "win", StringComparison.OrdinalIgnoreCase);
+    public string KdaText => Record.Kills is null && Record.Deaths is null
+        ? "-"
+        : $"{Record.Kills?.ToString(CultureInfo.InvariantCulture) ?? "?"}/{Record.Deaths?.ToString(CultureInfo.InvariantCulture) ?? "?"}/{Record.Assists?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
+    public string MapText => Record.Map ?? string.Empty;
+    public string SourceTag => "[ " + Record.Source.ToUpperInvariant() + " ]";
+}
+
 /// <summary>One session history row with its display strings and config-change marker.</summary>
 public sealed record SessionRowViewModel(SessionRecord Record, bool ConfigChanged)
 {
@@ -86,6 +100,20 @@ public sealed partial class SessionsViewModel : ObservableObject
     [ObservableProperty] private LaunchProfile? _compareProfileB;
     [ObservableProperty] private BenchmarkComparison? _comparison;
 
+    // ---- Matches ----
+    public ObservableCollection<MatchRowViewModel> Matches { get; } = [];
+    public IReadOnlyList<string> MatchModeOptions { get; } = ["ranked", "casual", "custom"];
+    public IReadOnlyList<string> MatchResultOptions { get; } = ["win", "loss"];
+    [ObservableProperty] private string _matchesSummary = string.Empty;
+    [ObservableProperty] private string _addMode = "ranked";
+    [ObservableProperty] private string _addResult = "win";
+    [ObservableProperty] private string _addKills = string.Empty;
+    [ObservableProperty] private string _addDeaths = string.Empty;
+    [ObservableProperty] private string _addAssists = string.Empty;
+    [ObservableProperty] private string _addMap = string.Empty;
+    [ObservableProperty] private string _matchFormLabel = "add match";
+    private long? _editingMatchId;
+
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         try
@@ -120,7 +148,90 @@ public sealed partial class SessionsViewModel : ObservableObject
             Profiles.Add(profile);
         }
 
+        await LoadMatchesAsync(ct);
+
         SelectedRow ??= Rows.FirstOrDefault();
+    }
+
+    private async Task LoadMatchesAsync(CancellationToken ct = default)
+    {
+        Matches.Clear();
+        foreach (var match in await _sessions.GetMatchesAsync(50, ct))
+        {
+            Matches.Add(new MatchRowViewModel(match));
+        }
+
+        var ranked = Matches.Where(m => m.Record.Mode == "ranked").ToList();
+        MatchesSummary = ranked.Count == 0
+            ? string.Empty
+            : $"ranked {ranked.Count(m => m.IsWin)}W - {ranked.Count(m => !m.IsWin)}L over {ranked.Count} listed";
+    }
+
+    [RelayCommand]
+    private async Task SaveMatchFormAsync()
+    {
+        static long? ParseCount(string text)
+            => long.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) && v >= 0 ? v : null;
+
+        var record = new MatchRecord
+        {
+            Id = _editingMatchId ?? 0,
+            StartedAt = DateTimeOffset.Now,
+            Mode = AddMode,
+            Result = AddResult,
+            Kills = ParseCount(AddKills),
+            Deaths = ParseCount(AddDeaths),
+            Assists = ParseCount(AddAssists),
+            Map = string.IsNullOrWhiteSpace(AddMap) ? null : AddMap.Trim(),
+            Source = _editingMatchId is null ? "manual" : "edited",
+        };
+
+        if (_editingMatchId is { } id)
+        {
+            var original = Matches.FirstOrDefault(m => m.Record.Id == id)?.Record;
+            await _sessions.UpdateMatchAsync(record with
+            {
+                StartedAt = original?.StartedAt ?? record.StartedAt,
+                SessionId = original?.SessionId,
+            });
+        }
+        else
+        {
+            await _sessions.SaveMatchAsync(record);
+        }
+        ClearMatchForm();
+        await LoadMatchesAsync();
+    }
+
+    [RelayCommand]
+    private void EditMatch(MatchRowViewModel row)
+    {
+        _editingMatchId = row.Record.Id;
+        MatchFormLabel = "save edit";
+        AddMode = row.Record.Mode;
+        AddResult = row.Record.Result is "win" or "loss" ? row.Record.Result : "win";
+        AddKills = row.Record.Kills?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        AddDeaths = row.Record.Deaths?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        AddAssists = row.Record.Assists?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        AddMap = row.Record.Map ?? string.Empty;
+    }
+
+    [RelayCommand]
+    private async Task DeleteMatchAsync(MatchRowViewModel row)
+    {
+        await _sessions.DeleteMatchAsync(row.Record.Id);
+        if (_editingMatchId == row.Record.Id)
+        {
+            ClearMatchForm();
+        }
+        await LoadMatchesAsync();
+    }
+
+    private void ClearMatchForm()
+    {
+        _editingMatchId = null;
+        MatchFormLabel = "add match";
+        AddKills = AddDeaths = AddAssists = AddMap = string.Empty;
     }
 
     private void BuildTrend(IReadOnlyList<SessionTrendPoint> trend)
@@ -195,6 +306,26 @@ public sealed partial class SessionsViewModel : ObservableObject
         if (record.Network is { } network)
         {
             DetailRows.Add(new InfoRow("Network", value.NetworkText));
+        }
+        if (record.StatsDelta is { } delta)
+        {
+            AddModeDelta("Ranked (this session)", delta.Ranked);
+            AddModeDelta("Casual (this session)", delta.Casual);
+            AddModeDelta("Custom (this session)", delta.Custom);
+        }
+        if (record.GameVersion is { Length: > 0 } gameVersion)
+        {
+            DetailRows.Add(new InfoRow("Game version", gameVersion));
+        }
+
+        void AddModeDelta(string label, Optima.Core.Stats.CopsModeStats stats)
+        {
+            if (stats.IsZero)
+            {
+                return;
+            }
+            DetailRows.Add(new InfoRow(label,
+                $"{stats.Kills}/{stats.Deaths}/{stats.Assists} · {stats.Wins}W-{stats.Losses}L"));
         }
 
         DetailTweaks = record.TweakIds.Count > 0

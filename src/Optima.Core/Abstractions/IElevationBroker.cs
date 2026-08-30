@@ -3,7 +3,7 @@ using Optima.Core.Ipc;
 namespace Optima.Core.Abstractions;
 
 /// <summary>
-/// Client side of the elevated helper (§20). Starts Optima.Elevated.exe on demand
+/// Client side of the elevated helper (§20). Starts Optima.Watchdog.exe on demand
 /// (UAC prompt) and exchanges whitelisted commands over a private named pipe.
 /// </summary>
 public interface IElevationBroker : IAsyncDisposable

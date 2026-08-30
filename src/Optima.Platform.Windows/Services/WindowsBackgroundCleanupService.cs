@@ -15,7 +15,7 @@ public sealed class WindowsBackgroundCleanupService : IBackgroundCleanupService
     {
         "explorer", "dwm", "csrss", "winlogon", "services", "lsass", "svchost", "smss",
         "System", "Idle", "GooglePlayGamesServices", "crosvm", "client", "Bootstrapper",
-        "Optima", "Optima.Elevated",
+        "Optima", "Optima.Watchdog",
     };
 
     private readonly ILogger<WindowsBackgroundCleanupService> _logger;
