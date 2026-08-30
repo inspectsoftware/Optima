@@ -11,7 +11,7 @@
       <HeaderedContentControl Style="{StaticResource Section}" Header="WHAT OPTIMA IS">
         <StackPanel>
           <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="780" HorizontalAlignment="Left"
-                     Text="Optima is a Windows launcher and performance companion for Critical Ops running through Google Play Games on PC. Made by Aureum; all rights reserved under the Optima holder. Optima is an independent project: it is not affiliated with, endorsed by, or sponsored by Critical Force Oy or Google LLC. Critical Ops and Google Play Games are trademarks of their respective owners." />
+                     Text="Optima is a Windows launcher and performance companion for Critical Ops running through Google Play Games on PC. Made by Aureum at Inspect Software; all rights reserved under the Optima holder. Optima is an independent project: it is not affiliated with, endorsed by, or sponsored by Critical Force Oy or Google LLC. Critical Ops and Google Play Games are trademarks of their respective owners." />
         </StackPanel>
       </HeaderedContentControl>
 

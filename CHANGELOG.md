@@ -4,6 +4,12 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - Company attribution
+
+- Optima is made by Aureum at Inspect Software: the assembly Company metadata,
+  LICENSE copyright line, README and the LEGAL page now name Inspect Software as
+  the company. The "by Aureum" byline is unchanged.
+
 ## 2026-08-30 - Discord card buttons
 
 - The Discord activity card now carries two buttons for everyone who sees it:

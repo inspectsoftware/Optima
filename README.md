@@ -1,7 +1,7 @@
 # Optima
 
 A Windows bootstrapper and performance-management launcher for **Critical Ops** running through
-**Google Play Games for PC**. Made by Aureum; see [LICENSE](LICENSE).
+**Google Play Games for PC**. Made by Aureum at Inspect Software; see [LICENSE](LICENSE).
 
 Optima is a completely separate desktop application. It never injects into the game,
 never modifies game binaries or memory, and never touches game networking or authentication. It
