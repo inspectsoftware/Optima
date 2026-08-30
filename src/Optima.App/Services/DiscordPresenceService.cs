@@ -32,6 +32,14 @@ public sealed class DiscordPresenceService : IDisposable
     private const string LargeImageUrl =
         "https://raw.githubusercontent.com/inspectsoftware/Optima/master/src/Optima.App/Assets/optima-presence.png";
 
+    // Discord renders these to OTHER viewers of the card; the local user's own client
+    // does not show its own buttons as clickable, so absence on your own card is normal.
+    private static readonly Button[] PresenceButtons =
+    [
+        new Button { Label = "Join Discord", Url = "https://discord.gg/tktZe8fkmj" },
+        new Button { Label = "Private Beta", Url = "https://github.com/inspectsoftware/Optima/releases" },
+    ];
+
     private DiscordRpcClient? _client;
     private volatile bool _enabled;
     private volatile bool _inLauncherEnabled;
@@ -137,6 +145,7 @@ public sealed class DiscordPresenceService : IDisposable
                                 LargeImageKey = LargeImageUrl,
                                 LargeImageText = "Optima by Aureum",
                             },
+                            Buttons = PresenceButtons,
                         });
                         break;
                     case GamePresence.Starting:
@@ -148,6 +157,7 @@ public sealed class DiscordPresenceService : IDisposable
                                 LargeImageKey = LargeImageUrl,
                                 LargeImageText = "Optima by Aureum",
                             },
+                            Buttons = PresenceButtons,
                         });
                         break;
                     default:
@@ -163,6 +173,7 @@ public sealed class DiscordPresenceService : IDisposable
                                     LargeImageKey = LargeImageUrl,
                                     LargeImageText = "Optima by Aureum",
                                 },
+                                Buttons = PresenceButtons,
                             });
                         }
                         else

@@ -4,6 +4,13 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - Discord card buttons
+
+- The Discord activity card now carries two buttons for everyone who sees it:
+  "Join Discord" opens the community invite and "Private Beta" opens the GitHub
+  releases page. Note that Discord never shows your own buttons on your own
+  card; other people see them.
+
 ## 2026-08-30 - Launch card layout fix
 
 - The profile summary on HOME no longer runs under the PLAY button: the text
