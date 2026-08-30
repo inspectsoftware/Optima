@@ -37,10 +37,11 @@
     </Setter>
   </Style>
 
-  <!-- Raised glass card: the default vessel for grouped content in the glass language. -->
+  <!-- Raised glass card: the default vessel for grouped content in the glass language.
+       The specular border catches light on the top rim and falls away below. -->
   <Style x:Key="GlassCard" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Glass.Border}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Glass.Specular}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}" />
     <Setter Property="Padding" Value="16,14" />
@@ -82,7 +83,8 @@
     </Grid>
   </DataTemplate>
 
-  <!-- Same row, value rendered as a status-tinted chip. -->
+  <!-- Same row, value rendered as a status-tinted badge: square and monospace on
+       purpose, terminal output rather than a pill. -->
   <DataTemplate x:Key="StatusItemTemplate">
     <Grid Margin="0,3">
       <Grid.ColumnDefinitions>

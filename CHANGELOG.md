@@ -4,6 +4,24 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - The glass terminal (v0.6.0)
+
+- The dark theme is now a true black terminal behind real glass: neutral near-black
+  ground with no blue tint, the window sheet at 80 percent so the acrylic backdrop
+  genuinely bleeds through, brighter glass layers, and a specular rim on every card
+  that catches light at the top edge. The solid fallback for machines without the
+  backdrop is unchanged.
+- Everything structural is monospace now: titles, navigation, buttons, labels and
+  data all use Cascadia Mono. Long-form prose (news bodies, legal text) stays
+  humanist for reading comfort.
+- Split-radius shape language: glass chrome (window, cards, controls) keeps its soft
+  corners while terminal data goes hard-edged; the status readouts are square
+  badges instead of rounded pills.
+- The light theme follows as a faithful paper-terminal inversion: warm paper ground
+  with the same glass mechanics, black-alpha surfaces and a white specular rim.
+- The in-game overlay ground is plain black-alpha; the overlay never gains blur or
+  any effect that would cost frames over a running game.
+
 ## 2026-08-30 - News page, launcher presence on Discord, honest display status
 
 - Critical Ops news gets its own NEWS page in the sidebar (Alt+N) with a refresh button.

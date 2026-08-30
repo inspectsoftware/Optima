@@ -2,7 +2,9 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!--
-    Light palette: warm paper ground, black-alpha glass, darkened status hues.
+    Light palette: the paper terminal. A faithful inversion of the dark glass-terminal
+    language: warm paper ground with real acrylic bleed (85% instead of 95%),
+    black-alpha glass with a white specular rim, darkened status hues.
     Key set mirrors Palette.Dark.xaml exactly. Text steps clear WCAG AA against
     Color.Background (muted 4.7:1, secondary 6.9:1, primary 13.9:1). Accent as
     small TEXT is avoided by convention (buttons carry OnAccent on a fill); as a
@@ -11,7 +13,7 @@
 
   <!-- Ground and surfaces -->
   <Color x:Key="Color.Background">#FFF2F1EE</Color>
-  <Color x:Key="Color.WindowGround">#F2F2F1EE</Color>
+  <Color x:Key="Color.WindowGround">#D9F2F1EE</Color>
   <Color x:Key="Color.Surface">#FFFAF9F7</Color>
   <Color x:Key="Color.SurfaceRaised">#FFFFFFFF</Color>
   <Color x:Key="Color.SurfaceHover">#FFEDEBE6</Color>
@@ -62,6 +64,15 @@
   <SolidColorBrush x:Key="Brush.Glass.Surface3" Color="#1A000000" />
   <SolidColorBrush x:Key="Brush.Glass.Border" Color="#1F000000" />
   <SolidColorBrush x:Key="Brush.Glass.Highlight" Color="#66FFFFFF" />
+
+  <!-- Specular rim for glass cards: white light on the top edge, settling into the
+       black-alpha border. Per palette because GradientStops cannot resolve
+       DynamicResource; the wholesale palette swap keeps it theme-correct. -->
+  <LinearGradientBrush x:Key="Brush.Glass.Specular" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#B3FFFFFF" Offset="0" />
+    <GradientStop Color="#24000000" Offset="0.25" />
+    <GradientStop Color="#1F000000" Offset="1" />
+  </LinearGradientBrush>
 
   <!-- Accent companions (ThemeService rewrites these from the user's accent). -->
   <SolidColorBrush x:Key="Brush.AccentHover" Color="#FFC08A2B" />

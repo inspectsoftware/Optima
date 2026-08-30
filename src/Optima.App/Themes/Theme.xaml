@@ -9,10 +9,12 @@
     from the user's chosen color).
   -->
 
-  <!-- Type: data and metrics stay monospace; navigation and prose are humanist. -->
+  <!-- Type: mono-first. Everything structural (titles, nav, buttons, labels, data) is
+       monospace; the single exception is long-form prose (news bodies, legal text),
+       which stays humanist for reading comfort. -->
   <FontFamily x:Key="Font.Mono">Cascadia Mono, Consolas, Courier New</FontFamily>
   <FontFamily x:Key="Font.Prose">Segoe UI Variable Text, Segoe UI</FontFamily>
-  <FontFamily x:Key="Font.Body">Segoe UI Variable Text, Segoe UI</FontFamily>
+  <FontFamily x:Key="Font.Body">Cascadia Mono, Consolas, Courier New</FontFamily>
 
   <sys:Double x:Key="Type.Display">22</sys:Double>
   <sys:Double x:Key="Type.Title">15</sys:Double>
@@ -32,10 +34,12 @@
   <Thickness x:Key="Pad.Page">26,20,26,26</Thickness>
   <Thickness x:Key="Pad.Row">0,4,0,4</Thickness>
 
-  <!-- Shape: the glass language is soft. One token per tier. -->
+  <!-- Shape: split-radius. The glass chrome (windows, cards, controls) keeps soft
+       corners; terminal data (status chips, readouts) is hard-edged. Glass is the
+       vessel, the terminal is the content: curves on the vessel, edges on the content. -->
   <CornerRadius x:Key="Radius.Control">10</CornerRadius>
   <CornerRadius x:Key="Radius.Card">14</CornerRadius>
-  <CornerRadius x:Key="Radius.Chip">999</CornerRadius>
+  <CornerRadius x:Key="Radius.Chip">0</CornerRadius>
   <CornerRadius x:Key="Radius.Window">12</CornerRadius>
 
   <!--
@@ -43,7 +47,7 @@
     live gameplay, where a light glass pane would be unreadable, so it keeps the dark
     ground in both themes. That is why these live here and not in the palettes.
   -->
-  <SolidColorBrush x:Key="Brush.Overlay.Ground" Color="#CC0B0D12" />
+  <SolidColorBrush x:Key="Brush.Overlay.Ground" Color="#CC000000" />
   <SolidColorBrush x:Key="Brush.Overlay.Border" Color="#33FFFFFF" />
 
   <!--

@@ -2,29 +2,30 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!--
-    Dark palette (default). Liquid-glass language: a deep blue-charcoal ground,
-    translucent white-alpha surfaces that let the acrylic backdrop bleed through,
-    and one warm accent (Aureum gold by default; the user's accent replaces it at
-    runtime via ThemeService). Text steps keep the WCAG AA floor: muted 5.5:1,
-    secondary 8.7:1, primary 15:1 against Color.Background.
+    Dark palette (default). Glass-terminal language: a true neutral black ground with
+    real acrylic bleed (the window ground is 80% black, not 95%), translucent
+    white-alpha surfaces with a specular top rim, and one warm accent (Aureum gold by
+    default; the user's accent replaces it at runtime via ThemeService). No blue tint
+    anywhere: every gray is neutral. Text steps keep the WCAG AA floor: muted 6.4:1,
+    secondary 9.8:1, primary 16.9:1 against Color.Background.
     Every key here must exist in Palette.Light.xaml with a theme-appropriate value.
   -->
 
   <!-- Ground and surfaces -->
-  <Color x:Key="Color.Background">#FF0B0D12</Color>
-  <Color x:Key="Color.WindowGround">#F20B0D12</Color>
-  <Color x:Key="Color.Surface">#FF11141B</Color>
-  <Color x:Key="Color.SurfaceRaised">#FF171B24</Color>
-  <Color x:Key="Color.SurfaceHover">#FF1E2330</Color>
-  <Color x:Key="Color.Hairline">#FF232838</Color>
-  <Color x:Key="Color.HairlineStrong">#FF303850</Color>
+  <Color x:Key="Color.Background">#FF040404</Color>
+  <Color x:Key="Color.WindowGround">#CC000000</Color>
+  <Color x:Key="Color.Surface">#FF0E0E0E</Color>
+  <Color x:Key="Color.SurfaceRaised">#FF151515</Color>
+  <Color x:Key="Color.SurfaceHover">#FF1D1D1D</Color>
+  <Color x:Key="Color.Hairline">#FF262626</Color>
+  <Color x:Key="Color.HairlineStrong">#FF3A3A3A</Color>
   <!-- Recessed pane, darker than the ground: log surfaces, raw-data wells. -->
-  <Color x:Key="Color.Deep">#FF050608</Color>
+  <Color x:Key="Color.Deep">#FF000000</Color>
 
   <!-- Text -->
-  <Color x:Key="Color.TextMuted">#FF8089A0</Color>
-  <Color x:Key="Color.TextSecondary">#FFA6AEC2</Color>
-  <Color x:Key="Color.Text">#FFE2E6F0</Color>
+  <Color x:Key="Color.TextMuted">#FF8F8F8F</Color>
+  <Color x:Key="Color.TextSecondary">#FFB4B4B4</Color>
+  <Color x:Key="Color.Text">#FFEDEDED</Color>
 
   <!-- Accent (design-time default; ThemeService overrides from settings) -->
   <Color x:Key="Color.Accent">#FFE8B45A</Color>
@@ -57,12 +58,22 @@
   <SolidColorBrush x:Key="Brush.Fail" Color="{DynamicResource Color.Fail}" />
   <SolidColorBrush x:Key="Brush.Info" Color="{DynamicResource Color.Info}" />
 
-  <!-- Glass layers: white-alpha over the ground so backdrop light bleeds through. -->
-  <SolidColorBrush x:Key="Brush.Glass.Surface1" Color="#0DFFFFFF" />
-  <SolidColorBrush x:Key="Brush.Glass.Surface2" Color="#14FFFFFF" />
-  <SolidColorBrush x:Key="Brush.Glass.Surface3" Color="#1FFFFFFF" />
-  <SolidColorBrush x:Key="Brush.Glass.Border" Color="#26FFFFFF" />
-  <SolidColorBrush x:Key="Brush.Glass.Highlight" Color="#40FFFFFF" />
+  <!-- Glass layers: white-alpha over the ground so backdrop light bleeds through.
+       Stronger than v0.2.0 on purpose: over true black, timid alpha reads as flat. -->
+  <SolidColorBrush x:Key="Brush.Glass.Surface1" Color="#12FFFFFF" />
+  <SolidColorBrush x:Key="Brush.Glass.Surface2" Color="#1CFFFFFF" />
+  <SolidColorBrush x:Key="Brush.Glass.Surface3" Color="#26FFFFFF" />
+  <SolidColorBrush x:Key="Brush.Glass.Border" Color="#33FFFFFF" />
+  <SolidColorBrush x:Key="Brush.Glass.Highlight" Color="#59FFFFFF" />
+
+  <!-- Specular rim for glass cards: light catches the top edge and falls away.
+       Lives per palette because a GradientStop is a Freezable and cannot resolve
+       DynamicResource; the wholesale palette swap keeps it theme-correct. -->
+  <LinearGradientBrush x:Key="Brush.Glass.Specular" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#66FFFFFF" Offset="0" />
+    <GradientStop Color="#2BFFFFFF" Offset="0.25" />
+    <GradientStop Color="#1FFFFFFF" Offset="1" />
+  </LinearGradientBrush>
 
   <!-- Accent companions (ThemeService rewrites these from the user's accent). -->
   <SolidColorBrush x:Key="Brush.AccentHover" Color="#FFF0C475" />
@@ -84,7 +95,7 @@
     <DrawingBrush.Drawing>
       <GeometryDrawing>
         <GeometryDrawing.Brush>
-          <SolidColorBrush Color="#FF232838" />
+          <SolidColorBrush Color="#FF2E2E2E" />
         </GeometryDrawing.Brush>
         <GeometryDrawing.Geometry>
           <RectangleGeometry Rect="0,2,1.4,1.4" />

@@ -45,7 +45,8 @@
     checkbox and combo item text would be forced to this foreground instead of the
     control's own. App-wide text defaults are set as inheritable TextElement values on
     the window root instead; these keyed styles handle specific roles.
-    Headings are humanist (Font.Body); data and labels stay monospace.
+    Mono-first: headings, labels and data are all monospace (Font.Body is mono now);
+    only long-form prose (Text.Prose) stays humanist.
   -->
   <Style x:Key="Text.Base" TargetType="TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
