@@ -1,7 +1,9 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Optima.Core.Abstractions;
+using Optima.Core.Configuration;
 using Optima.Core.Models;
+using Optima.Core.News;
 
 namespace Optima.App.ViewModels;
 
@@ -10,17 +12,23 @@ public sealed partial class HomeViewModel : ObservableObject
 {
     private readonly ISystemInfoService _systemInfo;
     private readonly IPerformanceMonitor _monitor;
+    private readonly CopsNewsService _news;
+    private readonly SettingsService _settings;
 
     public HomeViewModel(
         StatusViewModel status,
         PlayViewModel play,
         ISystemInfoService systemInfo,
-        IPerformanceMonitor monitor)
+        IPerformanceMonitor monitor,
+        CopsNewsService news,
+        SettingsService settings)
     {
         Status = status;
         Play = play;
         _systemInfo = systemInfo;
         _monitor = monitor;
+        _news = news;
+        _settings = settings;
         _monitor.MetricsUpdated += OnMetrics;
     }
 
@@ -42,8 +50,14 @@ public sealed partial class HomeViewModel : ObservableObject
     [ObservableProperty] private double _gpuPercent;
     [ObservableProperty] private double _ramPercent;
 
+    /// <summary>The automatic game-update notice (Q5): a version change on the official
+    /// updates page, detected by Optima itself, with no curated feed involved.</summary>
+    [ObservableProperty] private string _gameUpdateBanner = string.Empty;
+
     public async Task InitializeAsync(CancellationToken ct = default)
     {
+        _ = Task.Run(() => CheckGameVersionAsync(ct), CancellationToken.None);
+
         var inventory = await _systemInfo.GetInventoryAsync(ct);
         var gpu = inventory.Gpus
             .Where(g => !g.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
@@ -53,6 +67,34 @@ public sealed partial class HomeViewModel : ObservableObject
         CpuText = inventory.CpuName;
         RamText = $"{inventory.TotalRamBytes / (1024.0 * 1024 * 1024):F0} GB";
         WindowsText = inventory.WindowsVersion;
+    }
+
+    private async Task CheckGameVersionAsync(CancellationToken ct)
+    {
+        try
+        {
+            var latest = CopsNewsParser.LatestLiveVersion(await _news.GetEntriesAsync(ct));
+            if (latest is null)
+            {
+                return;
+            }
+            var stored = (await _settings.GetSettingsAsync(ct)).LastKnownGameVersion;
+            if (stored.Length > 0 && !string.Equals(stored, latest, StringComparison.Ordinal))
+            {
+                var banner =
+                    $"Critical Ops updated to {latest}. Optima has not been validated against this " +
+                    "version yet; the overlay, tracking and saved profiles may need a re-check.";
+                Application.Current?.Dispatcher.BeginInvoke(() => GameUpdateBanner = banner);
+            }
+            if (!string.Equals(stored, latest, StringComparison.Ordinal))
+            {
+                await _settings.UpdateSettingsAsync(s => s with { LastKnownGameVersion = latest }, ct);
+            }
+        }
+        catch
+        {
+            // The banner is a bonus; a failed check must never disturb startup.
+        }
     }
 
     private void OnMetrics(object? sender, HardwareMetrics metrics)

@@ -84,6 +84,8 @@ public static class AppServices
         services.AddSingleton<CrashSentinel>();
         services.AddSingleton<Optima.Core.Stats.CopsApiClient>();
         services.AddSingleton<Optima.App.Services.DiscordPresenceService>();
+        services.AddSingleton<Optima.Core.News.CopsNewsService>();
+        services.AddSingleton<Optima.Core.Updates.LauncherUpdateService>();
         services.AddSingleton(sp => new Optima.Core.Stats.SessionStatsEnricher(
             sp.GetRequiredService<GamePresenceService>(),
             sp.GetRequiredService<SettingsService>(),

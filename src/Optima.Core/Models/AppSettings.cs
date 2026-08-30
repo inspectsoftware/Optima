@@ -23,6 +23,10 @@ public sealed record AppSettings
 
     /// <summary>Discord Application ID (registered by the user); empty keeps presence dormant.</summary>
     public string DiscordApplicationId { get; init; } = string.Empty;
+
+    /// <summary>Newest LIVE Critical Ops version seen on the official updates page; a change
+    /// triggers the game-updated banner on HOME.</summary>
+    public string LastKnownGameVersion { get; init; } = string.Empty;
     public bool DeveloperMode { get; init; }
     public string MinimumLogLevel { get; init; } = "Information";
 

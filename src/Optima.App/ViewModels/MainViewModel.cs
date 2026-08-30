@@ -131,7 +131,7 @@ public sealed partial class MainViewModel : ObservableObject
         new("07", "SETTINGS"),
         new("08", "DIAGNOSTICS", "SUPPORT"),
         new("09", "LOGS"),
-        new("10", "UPDATE LOG"),
+        new("10", "UPDATES"),
         new("11", "DEVELOPER"),
     ];
 
@@ -156,7 +156,7 @@ public sealed partial class MainViewModel : ObservableObject
             "LOGS" => Logs,
             "SETTINGS" => SettingsPage,
             "DEVELOPER" => Developer,
-            "UPDATE LOG" => UpdateLog,
+            "UPDATES" => UpdateLog,
             _ => Home,
         };
 

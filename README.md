@@ -235,3 +235,18 @@ No DLL injection, no game memory access, no binary/APK patching, no anti-cheat i
 no packet manipulation, no gameplay automation, no process/debugger hiding. FPS measurement is
 strictly external (ETW present events). Logs never contain tokens or credentials, and log export
 runs an additional redaction pass.
+
+Every outbound endpoint the app can contact, exhaustively:
+
+- ICMP ping to the game's own connection endpoints (or the configured reference host) for the
+  in-session network quality readout.
+- `default.prod.copsapi.criticalforce.fi` - Critical Force's PUBLIC profile API, read-only,
+  contacted only when an in-game name is configured in Settings (session stat deltas).
+- `criticalopsgame.com` - the official updates page, read for the news feed and the
+  game-updated banner; cached locally.
+- `api.github.com` and GitHub release downloads - the launcher's own update check and
+  packages.
+- Discord, via LOCAL named-pipe IPC only (game activity), never over the network.
+
+Crash bundles reference the platform's minidump names but never copy the dumps, and the
+redacted export scrubs user paths and machine names before anything leaves the machine.

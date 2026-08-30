@@ -4,6 +4,26 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - Update center: launcher self-update, Critical Ops news, game-update banner (v0.4.0)
+
+- The UPDATE LOG page grew into UPDATES: launcher self-update from the project's GitHub
+  releases (check, download and restart, one-click rollback to the kept previous build),
+  the official Critical Ops news feed, and the shipped changelog in one place.
+- Critical Ops news, straight from criticalopsgame.com/updates: every entry as a card
+  with its BETA/LIVE status and headline list, a keyword filter box, and a full-notes
+  button that opens the official page in your browser. The feed is cached so the page
+  still renders offline, and if the site changes shape the page says the feed is
+  unavailable instead of guessing.
+- Automatic game-update banner: Optima remembers the newest LIVE version from the
+  official page and, when it changes, HOME shows a notice that the game updated and
+  that the overlay, tracking and saved profiles may need a re-check. No hand-written
+  feed anywhere; the site itself is the source.
+- The updater treats the install folder as managed: applying an update mirrors the new
+  build over it and keeps the previous build for rollback. Update checks degrade to
+  "unavailable" while the repository has no public releases.
+- Every outbound endpoint the app can contact is now listed exhaustively in the README
+  security section.
+
 ## 2026-08-30 - The Optima Watchdog: presence, Discord, ranked stats, crash capture (v0.3.0)
 
 - The Watchdog is now the app's always-on core: one lightweight presence loop watches

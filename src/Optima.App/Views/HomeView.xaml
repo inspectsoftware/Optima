@@ -8,6 +8,13 @@
       <TextBlock Text="Critical Ops" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="Google Play Games · custom bootstrapper" Style="{StaticResource Text.PageSubtitle}" />
 
+      <!-- Automatic game-update notice: version change detected on the official updates page. -->
+      <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,0,0,16"
+              Visibility="{Binding GameUpdateBanner, Converter={StaticResource EmptyToCollapsed}}">
+        <TextBlock Text="{Binding GameUpdateBanner}" Style="{StaticResource Text.Prose}"
+                   Foreground="{DynamicResource Brush.Warn}" MaxWidth="860" HorizontalAlignment="Left" />
+      </Border>
+
       <!-- STATUS / SYSTEM side by side -->
       <Grid>
         <Grid.ColumnDefinitions>
