@@ -131,11 +131,11 @@
               <ColumnDefinition />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel VerticalAlignment="Center">
+            <StackPanel VerticalAlignment="Center" Margin="0,0,20,0">
               <TextBlock Text="{Binding Play.SelectedProfile.Name, FallbackValue='NO PROFILE'}"
                          FontSize="{StaticResource Type.Title}" Foreground="{DynamicResource Brush.Accent}" />
               <TextBlock Text="{Binding Play.SelectedProfileSummary}" Style="{StaticResource Text.Label}"
-                         Margin="0,4,0,0" />
+                         TextWrapping="Wrap" Margin="0,4,0,0" />
               <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
                           Visibility="{Binding Play.IsSessionActive, Converter={StaticResource BoolToVis}}">
                 <ctl:AsciiSpinner Cells="12" Margin="0,0,10,0" />
