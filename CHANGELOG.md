@@ -4,6 +4,11 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - Launch card layout fix
+
+- The profile summary on HOME no longer runs under the PLAY button: the text
+  column keeps 20px of separation and wraps onto a second line when needed.
+
 ## 2026-08-30 - Discord activity artwork
 
 - The Discord activity card now shows the Optima mark (gold on black, 512px)
