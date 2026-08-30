@@ -4,7 +4,7 @@
         xmlns:ctl="clr-namespace:Optima.App.Controls"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Welcome to Optima"
-        Width="660" Height="640" WindowStartupLocation="CenterOwner"
+        Width="700" Height="720" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Brush.Background}" ResizeMode="NoResize"
         UseLayoutRounding="True">
 
@@ -50,6 +50,53 @@
             </StackPanel>
           </HeaderedContentControl>
 
+          <!-- The one-consent fix-everything card (Q7) -->
+          <Border Style="{StaticResource Callout}" Margin="0,0,0,18"
+                  Visibility="{Binding ShowFixAll, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+              <TextBlock Text="{Binding FixSummary}" Style="{StaticResource Text.Prose}"
+                         MaxWidth="600" HorizontalAlignment="Left" />
+              <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Button Style="{StaticResource PrimaryButton}" Padding="18,8" FontSize="{StaticResource Type.Label}"
+                        Content="Fix everything" Command="{Binding FixEverythingCommand}"
+                        IsEnabled="{Binding Fixing, Converter={StaticResource InverseBool}}" />
+                <ctl:AsciiSpinner Cells="12" Margin="12,0,0,0"
+                                  Visibility="{Binding Fixing, Converter={StaticResource BoolToVis}}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <ItemsControl ItemsSource="{Binding FixLog}" Margin="0,0,0,10">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" Style="{StaticResource Text.Label}" Margin="0,2" TextWrapping="Wrap" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,0,0,18"
+                  Visibility="{Binding RestartNeeded, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+              <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="600" HorizontalAlignment="Left"
+                         Text="Windows needs one restart to finish enabling the virtualization features. Optima reopens this setup afterwards by itself." />
+              <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Button Style="{StaticResource SecondaryButton}" Content="Restart now" Command="{Binding RestartNowCommand}" />
+                <TextBlock Text="{Binding RestartStatus}" Style="{StaticResource Text.Micro}" Margin="12,0,0,0" VerticalAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- The firmware case is guided, never faked (no software can flip BIOS settings). -->
+          <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Fail}" Margin="0,0,0,18"
+                  Visibility="{Binding FirmwareGuideVisible, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+              <TextBlock Text="CPU virtualization is disabled in your BIOS/UEFI" Foreground="{DynamicResource Brush.Fail}"
+                         FontSize="{StaticResource Type.Label}" />
+              <TextBlock Style="{StaticResource Text.Prose}" Margin="0,6,0,0" MaxWidth="600" HorizontalAlignment="Left"
+                         Text="No software can change this setting; it takes one visit to your BIOS: restart the PC and tap the setup key while it boots (usually Del or F2, sometimes F10 or Esc), find the CPU or Advanced section, enable Intel VT-x or AMD SVM, then save and exit. Optima will pick it up from there." />
+            </StackPanel>
+          </Border>
+
           <HeaderedContentControl Style="{StaticResource Section}" Header="ENVIRONMENT CHECKS">
             <ItemsControl ItemsSource="{Binding Diagnostics.Results}">
               <ItemsControl.ItemTemplate>
@@ -72,8 +119,31 @@
             </ItemsControl>
           </HeaderedContentControl>
 
-          <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" MaxWidth="580" HorizontalAlignment="Left"
-                     Text="Default profiles are ready: Default, Balanced, Competitive 1080p240 and Competitive 1440p165. Everything here can be changed later from the Performance and Settings pages." />
+          <HeaderedContentControl Style="{StaticResource Section}" Header="MAKE IT YOURS">
+            <StackPanel>
+              <CheckBox IsChecked="{Binding StartWithWindows}" Margin="0,2"
+                        Content="start the Optima Watchdog with Windows (minimized to the tray)" />
+              <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="170" />
+                  <ColumnDefinition />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition /><RowDefinition />
+                </Grid.RowDefinitions>
+                <TextBlock Text="in-game name" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+                <TextBox Grid.Column="1" Text="{Binding PlayerIgn, UpdateSourceTrigger=PropertyChanged}" Width="220"
+                         HorizontalAlignment="Left" Margin="0,4"
+                         ToolTip="Optional: enables ranked session stats from your public profile" />
+                <TextBlock Grid.Row="1" Text="Discord app id" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DiscordApplicationId, UpdateSourceTrigger=PropertyChanged}" Width="220"
+                         HorizontalAlignment="Left" Margin="0,4"
+                         ToolTip="Optional: enables Discord game activity (see Settings for the how-to)" />
+              </Grid>
+              <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="580" HorizontalAlignment="Left" TextWrapping="Wrap"
+                         Text="Both fields are optional and can be set later in Settings. Default profiles are ready: Default, Balanced, Competitive 1080p240 and Competitive 1440p165." />
+            </StackPanel>
+          </HeaderedContentControl>
         </StackPanel>
       </ScrollViewer>
 

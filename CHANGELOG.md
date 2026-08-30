@@ -4,6 +4,33 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - Fix-everything setup, repair actions, the Comp page and Legal (v0.5.0)
+
+- The first-run wizard now fixes things instead of just listing them: one consent runs
+  every automatable fix (enabling the Windows hypervisor features through the
+  administrator helper, opening the official Google Play Games download page), a restart
+  is orchestrated when Windows asks for one and setup resumes by itself afterwards, and
+  the one thing software cannot do, the BIOS virtualization toggle, gets an honest
+  walkthrough instead of a fake button. The wizard ends with autostart (pre-checked),
+  player name and Discord id, and can be re-run any time from DIAGNOSTICS.
+- Repair, on the DIAGNOSTICS page: a Google Play Games heartbeat, a clean platform
+  restart, re-detection for moved installs with cached paths cleared, quick links to the
+  right Windows settings pages, one-click restore of Optima's own settings from the
+  automatic backups (kept on every save now), and a redacted support archive with logs,
+  diagnostics, the newest crash bundle and settings, scrubbed of user and machine names.
+- Comp, a new page for gear checks: an ad-hoc ping test with jitter and loss, a wifi
+  link readout, a raw-input mouse meter (polling rate, hardware counts and a DPI
+  calculator that Windows pointer settings cannot skew), a key timing widget, the display
+  scale, and live CPU/GPU temperatures streamed through the administrator helper via
+  LibreHardwareMonitor. Every readout states its honest measurement limits. The stress
+  test from the original wishlist stays deliberately unbuilt.
+- Legal, a new page: what Optima is (made by Aureum, all rights reserved under the
+  Optima holder), exactly how it stays outside the game, the exhaustive list of
+  everything it talks to, and the shipped LICENSE and third-party notices rendered
+  in-app. It promises behavior, never outcomes.
+- Navigation grew to thirteen rows with COMP and LEGAL in place, and every page kept a
+  keyboard shortcut.
+
 ## 2026-08-30 - Update center: launcher self-update, Critical Ops news, game-update banner (v0.4.0)
 
 - The UPDATE LOG page grew into UPDATES: launcher self-update from the project's GitHub

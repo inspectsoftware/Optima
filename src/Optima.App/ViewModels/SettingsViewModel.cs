@@ -141,30 +141,5 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// Launcher-owned autostart: one HKCU Run value, written on enable, deleted on
-    /// disable, so nothing lingers when the user turns it off. Returns an error message
-    /// when the registry write failed, null on success.
-    /// </summary>
-    private string? ApplyStartWithWindows()
-    {
-        try
-        {
-            using var run = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
-                @"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
-            if (StartWithWindows && Environment.ProcessPath is { } exe)
-            {
-                run.SetValue("Optima", $"\"{exe}\" --tray");
-            }
-            else
-            {
-                run.DeleteValue("Optima", throwOnMissingValue: false);
-            }
-            return null;
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
-    }
+    private string? ApplyStartWithWindows() => Services.AutostartService.Apply(StartWithWindows);
 }

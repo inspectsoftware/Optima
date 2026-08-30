@@ -22,8 +22,11 @@ public sealed partial class CommandExecutor : IAsyncDisposable
     [GeneratedRegex(@"^[A-Za-z0-9\\&_.{}\-]+$")]
     private static partial Regex SafeInstanceIdPattern();
 
+    private static readonly string[] AllowedWindowsFeatures = ["HypervisorPlatform", "VirtualMachinePlatform"];
+
     private readonly Func<IpcEvent, Task> _publishEvent;
     private EtwFrametimeCollector? _etw;
+    private HardwareStreamer? _hardware;
 
     public CommandExecutor(Func<IpcEvent, Task> publishEvent)
     {
@@ -352,6 +355,49 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 });
             }
 
+            case IpcCommand.StartHardwareStream:
+            {
+                if (_hardware is not null)
+                {
+                    return ok(null);
+                }
+                try
+                {
+                    _hardware = new HardwareStreamer(_publishEvent);
+                    return ok(null);
+                }
+                catch (Exception ex)
+                {
+                    return fail("Hardware monitoring could not start: " + ex.Message);
+                }
+            }
+
+            case IpcCommand.StopHardwareStream:
+                _hardware?.Dispose();
+                _hardware = null;
+                return ok(null);
+
+            case IpcCommand.EnableWindowsFeature:
+            {
+                if (!request.Args.TryGetValue("feature", out var feature)
+                    || !AllowedWindowsFeatures.Contains(feature, StringComparer.OrdinalIgnoreCase))
+                {
+                    return fail("The feature name is not on the allowed list.");
+                }
+                var (exitCode, output) = await RunProcessAsync(
+                    "dism.exe", $"/online /enable-feature /featurename:{feature} /norestart", ct);
+                // 3010 is DISM's "success, restart required".
+                if (exitCode is not (0 or 3010))
+                {
+                    return fail($"dism exited with {exitCode}: {Truncate(output)}");
+                }
+                return ok(new Dictionary<string, string>
+                {
+                    ["restartRequired"] = exitCode == 3010
+                        || output.Contains("restart", StringComparison.OrdinalIgnoreCase) ? "1" : "0",
+                });
+            }
+
             case IpcCommand.Shutdown:
                 return ok(null);
 
@@ -527,6 +573,8 @@ public sealed partial class CommandExecutor : IAsyncDisposable
     {
         _etw?.Dispose();
         _etw = null;
+        _hardware?.Dispose();
+        _hardware = null;
         return ValueTask.CompletedTask;
     }
 }

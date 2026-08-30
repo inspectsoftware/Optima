@@ -81,6 +81,25 @@ public sealed class GpgLogReader
         }
     }
 
+    /// <summary>Minutes since Google Play Games' Service.log was last written, or null when
+    /// it does not exist. A fresh write is the cheapest sign the platform is alive.</summary>
+    public double? ServiceLogAgeMinutes()
+    {
+        try
+        {
+            var path = Path.Combine(_logsDirectory, "Service.log");
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+            return (DateTime.UtcNow - File.GetLastWriteTimeUtc(path)).TotalMinutes;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Names and sizes of the platform's minidump files, newest first. The dumps
     /// themselves are never copied: they can contain process memory.</summary>
     public IReadOnlyList<string> ListMinidumpNames(int max = 10)

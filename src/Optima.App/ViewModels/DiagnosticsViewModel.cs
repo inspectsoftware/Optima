@@ -20,17 +20,29 @@ public sealed partial class DiagnosticsViewModel : ObservableObject
     private readonly IReadOnlyList<IDiagnosticCheck> _checks;
     private readonly CrashSentinel _crashSentinel;
     private readonly AppPaths _paths;
+    private readonly RepairService _repair;
+    private readonly SettingsService _settings;
+    private readonly FirstRunFixService _firstRunFix;
+    private readonly StatusViewModel _status;
     private readonly ILogger<DiagnosticsViewModel> _logger;
 
     public DiagnosticsViewModel(
         IEnumerable<IDiagnosticCheck> checks,
         CrashSentinel crashSentinel,
         AppPaths paths,
+        RepairService repair,
+        SettingsService settings,
+        FirstRunFixService firstRunFix,
+        StatusViewModel status,
         ILogger<DiagnosticsViewModel> logger)
     {
         _checks = checks.OrderBy(c => c.Order).ToList();
         _crashSentinel = crashSentinel;
         _paths = paths;
+        _repair = repair;
+        _settings = settings;
+        _firstRunFix = firstRunFix;
+        _status = status;
         _logger = logger;
         _crashSentinel.BundleWritten += _ =>
             System.Windows.Application.Current?.Dispatcher.Invoke(LoadCrashes);
@@ -43,14 +55,68 @@ public sealed partial class DiagnosticsViewModel : ObservableObject
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private string _summary = string.Empty;
     [ObservableProperty] private string _crashStatus = string.Empty;
+    [ObservableProperty] private string _heartbeatText = "not checked yet";
+    [ObservableProperty] private string _repairStatus = string.Empty;
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         LoadCrashes();
+        _ = RefreshHeartbeatAsync();
         if (Results.Count == 0)
         {
             await RunAllAsync(ct);
         }
+    }
+
+    // ---- Repair actions ----
+
+    [RelayCommand]
+    private async Task RefreshHeartbeatAsync()
+        => HeartbeatText = await _repair.HeartbeatAsync();
+
+    [RelayCommand]
+    private async Task RestartPlatformAsync()
+    {
+        RepairStatus = "restarting Google Play Games...";
+        RepairStatus = await _repair.RestartPlatformAsync();
+        await RefreshHeartbeatAsync();
+    }
+
+    [RelayCommand]
+    private async Task RedetectAsync()
+    {
+        RepairStatus = "re-detecting...";
+        RepairStatus = await _repair.RedetectAsync();
+    }
+
+    [RelayCommand]
+    private void OpenGraphicsSettings()
+        => RepairStatus = "graphics settings: " + RepairService.OpenSettingsPage("ms-settings:display-advancedgraphics");
+
+    [RelayCommand]
+    private void OpenAppsSettings()
+        => RepairStatus = "installed apps: " + RepairService.OpenSettingsPage("ms-settings:appsfeatures");
+
+    [RelayCommand]
+    private void RestoreSettingsBackups()
+        => RepairStatus = _repair.RestoreSettingsBackups();
+
+    [RelayCommand]
+    private void CreateSupportArchive()
+        => RepairStatus = _repair.CreateSupportArchive([.. Results]);
+
+    [RelayCommand]
+    private void RerunSetup()
+    {
+        var wizard = new Views.SetupWizardWindow
+        {
+            Owner = System.Windows.Application.Current.MainWindow,
+        };
+        var viewModel = new SetupWizardViewModel(_status, this, _settings, _firstRunFix);
+        wizard.DataContext = viewModel;
+        _ = viewModel.RunDetectionAsync();
+        viewModel.Completed += (_, _) => wizard.Close();
+        wizard.ShowDialog();
     }
 
     private void LoadCrashes()

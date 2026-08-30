@@ -30,11 +30,13 @@
     <KeyBinding Modifiers="Alt" Key="D3" Command="{Binding NavigateCommand}" CommandParameter="PERFORMANCE" />
     <KeyBinding Modifiers="Alt" Key="D4" Command="{Binding NavigateCommand}" CommandParameter="SESSIONS" />
     <KeyBinding Modifiers="Alt" Key="D5" Command="{Binding NavigateCommand}" CommandParameter="SYSTEM" />
-    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
-    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
-    <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
-    <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="LOGS" />
-    <KeyBinding Modifiers="Alt" Key="D0" Command="{Binding NavigateCommand}" CommandParameter="UPDATES" />
+    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="COMP" />
+    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
+    <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
+    <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
+    <KeyBinding Modifiers="Alt" Key="D0" Command="{Binding NavigateCommand}" CommandParameter="LOGS" />
+    <KeyBinding Modifiers="Alt" Key="U" Command="{Binding NavigateCommand}" CommandParameter="UPDATES" />
+    <KeyBinding Modifiers="Alt" Key="L" Command="{Binding NavigateCommand}" CommandParameter="LEGAL" />
     <KeyBinding Modifiers="Alt" Key="D" Command="{Binding NavigateCommand}" CommandParameter="DEVELOPER" />
   </Window.InputBindings>
 
@@ -45,6 +47,8 @@
     <DataTemplate DataType="{x:Type vm:SessionsViewModel}"><views:SessionsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:DisplayViewModel}"><views:DisplayView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SystemViewModel}"><views:SystemView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:CompViewModel}"><views:CompView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:LegalViewModel}"><views:LegalView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}"><views:DiagnosticsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:LogsViewModel}"><views:LogsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>

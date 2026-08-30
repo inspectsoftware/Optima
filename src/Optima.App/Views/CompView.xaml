@@ -1,0 +1,148 @@
+<UserControl x:Class="Optima.App.Views.CompView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="OnLoaded" Unloaded="OnUnloaded">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="900" HorizontalAlignment="Left">
+
+      <TextBlock Text="Comp" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="Gear checks for competitive play · every readout states its honest limits"
+                 Style="{StaticResource Text.PageSubtitle}" />
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="NETWORK">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBox Text="{Binding PingTarget, UpdateSourceTrigger=PropertyChanged}" Width="180"
+                     ToolTip="Host to ping (defaults to the reference host from Settings)" />
+            <Button Style="{StaticResource SecondaryButton}" Content="run ping test"
+                    Command="{Binding RunPingTestCommand}" Margin="10,0,0,0"
+                    IsEnabled="{Binding PingBusy, Converter={StaticResource InverseBool}}" />
+            <Button Style="{StaticResource SecondaryButton}" Content="wifi link"
+                    Command="{Binding RefreshWifiCommand}" Margin="8,0,0,0" />
+          </StackPanel>
+          <TextBlock Text="{Binding PingResult}" Style="{StaticResource Text.Value}" Margin="0,10,0,0"
+                     Visibility="{Binding PingResult, Converter={StaticResource EmptyToCollapsed}}" />
+          <TextBlock Text="{Binding WifiResult}" Style="{StaticResource Text.Value}" Margin="0,6,0,0" />
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="Ten pings, a quarter second apart. During a real session the SYSTEM page measures the game's own connection instead; this test is for the link in general." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="MOUSE">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <Button Style="{StaticResource SecondaryButton}"
+                    Command="{Binding ToggleMouseMeterCommand}">
+              <Button.Content>
+                <TextBlock>
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Text" Value="start meter" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding MouseMeterActive}" Value="True">
+                          <Setter Property="Text" Value="stop meter" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+              </Button.Content>
+            </Button>
+            <Button Style="{StaticResource GhostButton}" Content="reset counts"
+                    Command="{Binding ResetMouseCountsCommand}" Margin="8,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+
+          <Grid Margin="0,10,0,0" MaxWidth="560" HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition /><RowDefinition />
+            </Grid.RowDefinitions>
+            <TextBlock Text="polling rate" Style="{StaticResource Text.Label}" Margin="0,3" />
+            <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+            <TextBlock Grid.Column="2" Text="{Binding MousePollingRate}" Style="{StaticResource Text.Value}" Margin="0,3" />
+            <TextBlock Grid.Row="1" Text="hardware counts" Style="{StaticResource Text.Label}" Margin="0,3" />
+            <Rectangle Grid.Row="1" Grid.Column="1" Style="{StaticResource Leader}" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding MouseCounts}" Style="{StaticResource Text.Value}" Margin="0,3" />
+          </Grid>
+
+          <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="DPI check: move in one straight line, then distance moved" Style="{StaticResource Text.Label}"
+                       VerticalAlignment="Center" />
+            <TextBox Text="{Binding DpiDistance, UpdateSourceTrigger=PropertyChanged}" Width="52" Margin="8,0,4,0" />
+            <TextBlock Text="cm" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+            <Button Style="{StaticResource SecondaryButton}" Content="compute DPI"
+                    Command="{Binding ComputeDpiCommand}" Margin="10,0,0,0" />
+          </StackPanel>
+          <TextBlock Text="{Binding DpiResult}" Style="{StaticResource Text.Value}" Margin="0,6,0,0"
+                     Visibility="{Binding DpiResult, Converter={StaticResource EmptyToCollapsed}}" />
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="Raw input counts come straight from the device, unaffected by Windows pointer speed. The polling rate readout needs continuous motion to be meaningful." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="KEYBOARD AND DISPLAY">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="key timing" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+            <TextBox Text="{Binding KeyTestText, UpdateSourceTrigger=PropertyChanged}" Width="220" Margin="10,0,0,0"
+                     PreviewKeyDown="OnTestKeyDown" ToolTip="Type here; hold a key to see the repeat rate" />
+          </StackPanel>
+          <TextBlock Text="{Binding KeyIntervalResult}" Style="{StaticResource Text.Value}" Margin="0,8,0,0" />
+          <Grid Margin="0,10,0,0" MaxWidth="560" HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="display scale" Style="{StaticResource Text.Label}" Margin="0,3" />
+            <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+            <TextBlock Grid.Column="2" Text="{Binding DisplayScaleText}" Style="{StaticResource Text.Value}" Margin="0,3" />
+          </Grid>
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="Key timing is OS-visible timing between key-down events; the true switch latency underneath is below what any software can measure." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="THERMALS">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <Button Style="{StaticResource SecondaryButton}" Command="{Binding ToggleThermalsCommand}">
+              <Button.Content>
+                <TextBlock>
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Text" Value="start temperature stream (administrator)" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding ThermalsActive}" Value="True">
+                          <Setter Property="Text" Value="stop temperature stream" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+              </Button.Content>
+            </Button>
+          </StackPanel>
+          <TextBlock Text="{Binding ThermalStatus}" Style="{StaticResource Text.Micro}" Margin="0,8,0,0"
+                     Visibility="{Binding ThermalStatus, Converter={StaticResource EmptyToCollapsed}}" />
+          <Grid Margin="0,10,0,0" MaxWidth="560" HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition /><RowDefinition />
+            </Grid.RowDefinitions>
+            <TextBlock Text="CPU" Style="{StaticResource Text.Label}" Margin="0,3" />
+            <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+            <TextBlock Grid.Column="2" Text="{Binding CpuThermalText}" Style="{StaticResource Text.Value}" Margin="0,3" />
+            <TextBlock Grid.Row="1" Text="GPU" Style="{StaticResource Text.Label}" Margin="0,3" />
+            <Rectangle Grid.Row="1" Grid.Column="1" Style="{StaticResource Leader}" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding GpuThermalText}" Style="{StaticResource Text.Value}" Margin="0,3" />
+          </Grid>
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="Sensor access uses LibreHardwareMonitor inside Optima's administrator helper, which is why starting the stream can show one UAC prompt. Stopping the stream releases the sensors." />
+        </StackPanel>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

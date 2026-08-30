@@ -34,6 +34,12 @@ public enum IpcCommand
     EnsureVddSettings,
     /// <summary>Write the HKLM values of one catalog tweak (restricted to TweakCatalog paths).</summary>
     ApplyTweakValues,
+    /// <summary>Stream CPU/GPU temperature and load samples (LibreHardwareMonitor) as events.</summary>
+    StartHardwareStream,
+    StopHardwareStream,
+    /// <summary>Enable one whitelisted Windows optional feature via DISM (HypervisorPlatform,
+    /// VirtualMachinePlatform). Returns restartRequired; never restarts by itself.</summary>
+    EnableWindowsFeature,
     Shutdown,
 }
 

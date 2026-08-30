@@ -77,6 +77,49 @@
         </StackPanel>
       </HeaderedContentControl>
 
+      <!-- Repair: the actions that fix a broken environment without a reinstall. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="REPAIR">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="run setup wizard again" Padding="6,0"
+                  Command="{Binding RerunSetupCommand}" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <Grid Margin="0,0,0,8" MaxWidth="720" HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Google Play Games heartbeat" Style="{StaticResource Text.Label}" />
+            <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+              <TextBlock Text="{Binding HeartbeatText}" Style="{StaticResource Text.Value}" />
+              <Button Style="{StaticResource GhostButton}" Content="refresh" Padding="5,0" Margin="8,0,0,0"
+                      Command="{Binding RefreshHeartbeatCommand}" />
+            </StackPanel>
+          </Grid>
+          <WrapPanel>
+            <Button Style="{StaticResource SecondaryButton}" Content="restart Google Play Games cleanly"
+                    Command="{Binding RestartPlatformCommand}" Margin="0,0,8,8"
+                    ToolTip="Stops the platform's own processes in order and relaunches it" />
+            <Button Style="{StaticResource SecondaryButton}" Content="re-detect installation"
+                    Command="{Binding RedetectCommand}" Margin="0,0,8,8"
+                    ToolTip="Clears the cached paths and searches again (for moved installs)" />
+            <Button Style="{StaticResource SecondaryButton}" Content="graphics settings"
+                    Command="{Binding OpenGraphicsSettingsCommand}" Margin="0,0,8,8" />
+            <Button Style="{StaticResource SecondaryButton}" Content="installed apps"
+                    Command="{Binding OpenAppsSettingsCommand}" Margin="0,0,8,8" />
+            <Button Style="{StaticResource SecondaryButton}" Content="restore settings backups"
+                    Command="{Binding RestoreSettingsBackupsCommand}" Margin="0,0,8,8"
+                    ToolTip="Puts back the previous saved generation of Optima's own settings files" />
+            <Button Style="{StaticResource SecondaryButton}" Content="create support archive"
+                    Command="{Binding CreateSupportArchiveCommand}" Margin="0,0,8,8"
+                    ToolTip="Redacted zip: logs, diagnostics, newest crash bundle, settings" />
+          </WrapPanel>
+          <TextBlock Text="{Binding RepairStatus}" Style="{StaticResource Text.Value}"
+                     Foreground="{DynamicResource Brush.Ok}" Margin="0,4,0,0" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
+                     Visibility="{Binding RepairStatus, Converter={StaticResource EmptyToCollapsed}}" />
+        </StackPanel>
+      </HeaderedContentControl>
+
       <!-- Crash bundles captured by the Watchdog on game exits with failure markers. -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="CRASHES">
         <HeaderedContentControl.Tag>

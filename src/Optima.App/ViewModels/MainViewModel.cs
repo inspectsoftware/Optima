@@ -45,6 +45,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IProcessMonitor _processMonitor;
     private readonly Core.Monitoring.GamePresenceService _presence;
     private readonly GameWatchService _gameWatch;
+    private readonly Services.FirstRunFixService _firstRunFix;
     private readonly ILogger<MainViewModel> _logger;
 
     public MainViewModel(
@@ -54,11 +55,13 @@ public sealed partial class MainViewModel : ObservableObject
         SessionsViewModel sessions,
         DisplayViewModel display,
         SystemViewModel system,
+        CompViewModel comp,
         DiagnosticsViewModel diagnostics,
         LogsViewModel logs,
         SettingsViewModel settingsPage,
         DeveloperViewModel developer,
         UpdateLogViewModel updateLog,
+        LegalViewModel legal,
         StatusViewModel status,
         IRecoveryService recovery,
         SettingsService settings,
@@ -67,6 +70,7 @@ public sealed partial class MainViewModel : ObservableObject
         IProcessMonitor processMonitor,
         Core.Monitoring.GamePresenceService presence,
         GameWatchService gameWatch,
+        Services.FirstRunFixService firstRunFix,
         ILogger<MainViewModel> logger)
     {
         Home = home;
@@ -75,6 +79,8 @@ public sealed partial class MainViewModel : ObservableObject
         Sessions = sessions;
         Display = display;
         System = system;
+        Comp = comp;
+        Legal = legal;
         Diagnostics = diagnostics;
         Logs = logs;
         SettingsPage = settingsPage;
@@ -88,6 +94,7 @@ public sealed partial class MainViewModel : ObservableObject
         _processMonitor = processMonitor;
         _presence = presence;
         _gameWatch = gameWatch;
+        _firstRunFix = firstRunFix;
         _logger = logger;
         _currentPage = home;
         _settings.SettingsChanged += (_, s) => DeveloperModeVisible = s.DeveloperMode;
@@ -99,6 +106,8 @@ public sealed partial class MainViewModel : ObservableObject
     public SessionsViewModel Sessions { get; }
     public DisplayViewModel Display { get; }
     public SystemViewModel System { get; }
+    public CompViewModel Comp { get; }
+    public LegalViewModel Legal { get; }
     public DiagnosticsViewModel Diagnostics { get; }
     public LogsViewModel Logs { get; }
     public SettingsViewModel SettingsPage { get; }
@@ -127,12 +136,14 @@ public sealed partial class MainViewModel : ObservableObject
         new("03", "PERFORMANCE", "MONITOR"),
         new("04", "SESSIONS"),
         new("05", "SYSTEM"),
-        new("06", "DISPLAY", "CONFIGURE"),
-        new("07", "SETTINGS"),
-        new("08", "DIAGNOSTICS", "SUPPORT"),
-        new("09", "LOGS"),
-        new("10", "UPDATES"),
-        new("11", "DEVELOPER"),
+        new("06", "COMP"),
+        new("07", "DISPLAY", "CONFIGURE"),
+        new("08", "SETTINGS"),
+        new("09", "DIAGNOSTICS", "SUPPORT"),
+        new("10", "LOGS"),
+        new("11", "UPDATES"),
+        new("12", "LEGAL"),
+        new("13", "DEVELOPER"),
     ];
 
     [RelayCommand]
@@ -152,6 +163,8 @@ public sealed partial class MainViewModel : ObservableObject
             "SESSIONS" => Sessions,
             "DISPLAY" => Display,
             "SYSTEM" => System,
+            "COMP" => Comp,
+            "LEGAL" => Legal,
             "DIAGNOSTICS" => Diagnostics,
             "LOGS" => Logs,
             "SETTINGS" => SettingsPage,
@@ -176,6 +189,12 @@ public sealed partial class MainViewModel : ObservableObject
                     break;
                 case SystemViewModel s:
                     await s.InitializeAsync();
+                    break;
+                case CompViewModel c:
+                    await c.InitializeAsync();
+                    break;
+                case LegalViewModel l:
+                    await l.InitializeAsync();
                     break;
                 case DiagnosticsViewModel diag:
                     await diag.InitializeAsync();
@@ -230,7 +249,7 @@ public sealed partial class MainViewModel : ObservableObject
             if (!settings.FirstRunCompleted)
             {
                 var wizard = new SetupWizardWindow { Owner = Application.Current.MainWindow };
-                var wizardViewModel = new SetupWizardViewModel(Status, Diagnostics, _settings);
+                var wizardViewModel = new SetupWizardViewModel(Status, Diagnostics, _settings, _firstRunFix);
                 wizard.DataContext = wizardViewModel;
                 _ = wizardViewModel.RunDetectionAsync();
                 wizard.ShowDialog();

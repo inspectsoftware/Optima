@@ -86,6 +86,8 @@ public static class AppServices
         services.AddSingleton<Optima.App.Services.DiscordPresenceService>();
         services.AddSingleton<Optima.Core.News.CopsNewsService>();
         services.AddSingleton<Optima.Core.Updates.LauncherUpdateService>();
+        services.AddSingleton<Optima.App.Services.FirstRunFixService>();
+        services.AddSingleton<Optima.App.Services.RepairService>();
         services.AddSingleton(sp => new Optima.Core.Stats.SessionStatsEnricher(
             sp.GetRequiredService<GamePresenceService>(),
             sp.GetRequiredService<SettingsService>(),
@@ -96,6 +98,7 @@ public static class AppServices
         // ---- Monitoring (§12-14) ----
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();
         services.AddSingleton<EtwMetricsProviderClient>();
+        services.AddSingleton<HardwareStreamClient>();
         services.AddSingleton(_ => new MockMetricsProvider());
         // Developer setting: swap the ETW provider for the deterministic mock (restart applies it).
         services.AddSingleton<IPerformanceMetricsProvider>(sp =>
@@ -128,6 +131,8 @@ public static class AppServices
         services.AddSingleton<GuidedBenchmarkViewModel>();
         services.AddSingleton<DisplayViewModel>();
         services.AddSingleton<SystemViewModel>();
+        services.AddSingleton<CompViewModel>();
+        services.AddSingleton<LegalViewModel>();
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<LogsViewModel>();
         services.AddSingleton<SettingsViewModel>();

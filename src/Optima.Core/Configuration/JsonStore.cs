@@ -61,7 +61,9 @@ public sealed class JsonStore
 
             if (File.Exists(path))
             {
-                File.Replace(tmp, path, destinationBackupFileName: null);
+                // The previous version becomes .bak in the same swap: a free last-known-good
+                // generation that the repair action can restore.
+                File.Replace(tmp, path, destinationBackupFileName: path + ".bak");
             }
             else
             {

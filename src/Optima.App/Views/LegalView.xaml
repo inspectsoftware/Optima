@@ -1,0 +1,72 @@
+<UserControl x:Class="Optima.App.Views.LegalView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="860" HorizontalAlignment="Left">
+
+      <TextBlock Text="Legal" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="What Optima is, how it stays outside the game, and the licenses it ships with"
+                 Style="{StaticResource Text.PageSubtitle}" />
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="WHAT OPTIMA IS">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="780" HorizontalAlignment="Left"
+                     Text="Optima is a Windows launcher and performance companion for Critical Ops running through Google Play Games on PC. Made by Aureum; all rights reserved under the Optima holder. Optima is an independent project: it is not affiliated with, endorsed by, or sponsored by Critical Force Oy or Google LLC. Critical Ops and Google Play Games are trademarks of their respective owners." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="HOW OPTIMA STAYS OUTSIDE THE GAME">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="780" HorizontalAlignment="Left" Margin="0,0,0,8"
+                     Text="Optima never interferes with the game or with Google Play Games: it does not inject code, does not read or write another process's memory, does not modify game files, does not touch game networking or accounts, and does not automate gameplay. Everything it knows, it knows by observing from the outside:" />
+          <ItemsControl>
+            <ItemsControl.Items>
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· the Windows process list and window titles, to notice when the game runs" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· Windows performance events (ETW), the same public counters other monitoring tools use, for FPS" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· Google Play Games' own log files on this PC, read-only, for crash correlation" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· Critical Force's public profile API, only when you enter your player name yourself" />
+            </ItemsControl.Items>
+          </ItemsControl>
+          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="780" HorizontalAlignment="Left" Margin="0,10,0,0"
+                     Text="What Optima changes, it changes on YOUR system, openly, and puts back: display configuration, power plans, process scheduling, and the Windows tweaks you toggle yourself (originals are captured before the first change). One honest limit: no third-party tool can make promises about another company's decisions, so Optima does not promise anything about account standing. Its design goal is simpler: give the game no reason to notice Optima exists." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="EVERYTHING OPTIMA TALKS TO">
+        <StackPanel>
+          <ItemsControl>
+            <ItemsControl.Items>
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· ping to the game's own connection (network quality readout during sessions)" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· default.prod.copsapi.criticalforce.fi (public profile stats, only with your player name set)" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· criticalopsgame.com (the official updates page, for the news feed)" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· api.github.com and GitHub downloads (Optima's own updates)" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· your local Discord client over a named pipe (game activity), never over the network" />
+            </ItemsControl.Items>
+          </ItemsControl>
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="760" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="That list is exhaustive. Data Optima stores lives under %LOCALAPPDATA%\Optima; exported logs and crash archives pass a redaction step that removes user names and machine names first." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="LICENSE">
+        <Border Background="{DynamicResource Brush.Deep}" BorderBrush="{DynamicResource Brush.Hairline}"
+                BorderThickness="1" CornerRadius="{StaticResource Radius.Control}" Padding="12">
+          <TextBox Text="{Binding LicenseText, Mode=OneWay}" IsReadOnly="True"
+                   FontSize="{StaticResource Type.Micro}" TextWrapping="Wrap"
+                   MaxHeight="260" VerticalScrollBarVisibility="Auto" BorderThickness="0"
+                   Background="Transparent" />
+        </Border>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="THIRD-PARTY NOTICES">
+        <Border Background="{DynamicResource Brush.Deep}" BorderBrush="{DynamicResource Brush.Hairline}"
+                BorderThickness="1" CornerRadius="{StaticResource Radius.Control}" Padding="12">
+          <TextBox Text="{Binding ThirdPartyText, Mode=OneWay}" IsReadOnly="True"
+                   FontSize="{StaticResource Type.Micro}" TextWrapping="Wrap"
+                   MaxHeight="260" VerticalScrollBarVisibility="Auto" BorderThickness="0"
+                   Background="Transparent" />
+        </Border>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
