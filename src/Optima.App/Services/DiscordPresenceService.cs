@@ -26,6 +26,12 @@ public sealed class DiscordPresenceService : IDisposable
     // window visibility changes; the gate keeps decision and RPC call together.
     private readonly object _gate = new();
 
+    // Served straight from the public repo: Discord's media proxy fetches URLs given as
+    // image keys, so no art asset upload in the Discord application is needed. Stable on
+    // master; keep in step with src/Optima.App/Assets/optima-presence.png.
+    private const string LargeImageUrl =
+        "https://raw.githubusercontent.com/inspectsoftware/Optima/master/src/Optima.App/Assets/optima-presence.png";
+
     private DiscordRpcClient? _client;
     private volatile bool _enabled;
     private volatile bool _inLauncherEnabled;
@@ -128,7 +134,7 @@ public sealed class DiscordPresenceService : IDisposable
                             Timestamps = new Timestamps(since.UtcDateTime),
                             Assets = new Assets
                             {
-                                LargeImageKey = "optima",
+                                LargeImageKey = LargeImageUrl,
                                 LargeImageText = "Optima by Aureum",
                             },
                         });
@@ -139,7 +145,7 @@ public sealed class DiscordPresenceService : IDisposable
                             Details = "Launching Critical Ops",
                             Assets = new Assets
                             {
-                                LargeImageKey = "optima",
+                                LargeImageKey = LargeImageUrl,
                                 LargeImageText = "Optima by Aureum",
                             },
                         });
@@ -154,7 +160,7 @@ public sealed class DiscordPresenceService : IDisposable
                                 Timestamps = new Timestamps(_launcherVisibleSince.UtcDateTime),
                                 Assets = new Assets
                                 {
-                                    LargeImageKey = "optima",
+                                    LargeImageKey = LargeImageUrl,
                                     LargeImageText = "Optima by Aureum",
                                 },
                             });

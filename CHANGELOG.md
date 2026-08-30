@@ -4,6 +4,12 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-08-30 - Discord activity artwork
+
+- The Discord activity card now shows the Optima mark (gold on black, 512px)
+  instead of the blank placeholder. The image is served from the public repo,
+  so it works without uploading art assets to the Discord application.
+
 ## 2026-08-30 - The glass terminal (v0.6.0)
 
 - The dark theme is now a true black terminal behind real glass: neutral near-black
