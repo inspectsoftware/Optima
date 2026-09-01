@@ -4,6 +4,14 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-09-02 - Glass redesign, phase 2: HUD direction chosen, hi-fi screens
+
+- Direction C (HUD: glass strips and rails, chamfered geometry, Space Grotesk) was
+  chosen. The design canvas now carries hi-fi screens for Home, Play (the session
+  page), Performance and Settings, plus a system sheet with tokens, the glass recipe,
+  every control state and the motion table that phase 3 builds from. The phase 1
+  directions moved to a second canvas page. Still no change to the shipped UI.
+
 ## 2026-09-02 - Glass redesign, phase 1: directions and the renderer prototype
 
 - v0.7.0 liquid-glass redesign starts on its own branch. Three design directions

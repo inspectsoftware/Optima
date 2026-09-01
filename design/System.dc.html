@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <style>
+    body { margin: 0; background: #050505; }
+    a { color: #E8B45A; } a:hover { color: #F3C97A; }
+    .root { font-family: "Space Grotesk", "Segoe UI Variable Text", "Segoe UI", sans-serif; color: #EDEDED; }
+    .mono { font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace; }
+    .strip { position: relative; background: rgba(255,255,255,0.04); backdrop-filter: blur(22px) saturate(130%); -webkit-backdrop-filter: blur(22px) saturate(130%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.6), 0 18px 40px rgba(0,0,0,0.5);
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+    .strip::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,90,70,0.6), #E8B45A 40%, rgba(90,150,255,0.6)); }
+    .h { font-size: 11px; color: #8F8F8F; letter-spacing: 0.12em; text-transform: uppercase; }
+    .label { font-size: 11px; color: #8F8F8F; letter-spacing: 0.08em; text-transform: uppercase; }
+    .t { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 14px; font-size: 12px; align-items: baseline; }
+    .t .k { color: #8F8F8F; } .t .v { color: #EDEDED; }
+    .sw { display: flex; flex-direction: column; gap: 6px; }
+    .sw div:first-child { height: 34px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); }
+    .badge { font-size: 10.5px; padding: 2px 7px; color: #82C097; background: rgba(130,192,151,0.12); border-left: 2px solid #82C097; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+    .badge.warn { color: #D9B36A; background: rgba(217,179,106,0.12); border-left-color: #D9B36A; }
+    .badge.fail { color: #E08A8A; background: rgba(224,138,138,0.12); border-left-color: #E08A8A; }
+    .badge.info { color: #8FA8CC; background: rgba(143,168,204,0.12); border-left-color: #8FA8CC; }
+    .badge.dim { color: #8F8F8F; background: rgba(255,255,255,0.04); border-left-color: #3A3A3A; }
+    .btn { height: 36px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+    .btn.primary { background: linear-gradient(180deg, #F0C066, #D9A345); color: #16130B; font-weight: 600; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5); }
+    .btn.secondary { background: rgba(255,255,255,0.05); color: #EDEDED; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.5); }
+    .btn.danger { background: rgba(224,138,138,0.10); color: #E08A8A; box-shadow: inset 0 1px 0 rgba(224,138,138,0.35); }
+    .btn.disabled { background: transparent; color: #6E6E6E; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+    .ghost { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #8F8F8F; }
+    .toggle { width: 40px; height: 22px; background: rgba(255,255,255,0.06); position: relative; flex: 0 0 auto; clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px); }
+    .toggle.on { background: rgba(232,180,90,0.18); }
+    .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; bottom: 3px; width: 16px; background: #5A5A5A; }
+    .toggle.on::after { left: auto; right: 3px; background: #E8B45A; }
+    .check { width: 16px; height: 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); background: rgba(0,0,0,0.35); display: inline-flex; align-items: center; justify-content: center; }
+    .check.on { background: #E8B45A; }
+    .check svg { width: 12px; height: 12px; stroke: #16130B; fill: none; stroke-width: 2.5; }
+    .field { height: 32px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(0,0,0,0.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); font-size: 12.5px; color: #EDEDED; }
+    .chev { width: 14px; height: 14px; stroke: #6E6E6E; fill: none; stroke-width: 2; }
+    .chip { padding: 6px 12px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #B4B4B4; background: rgba(255,255,255,0.04); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); white-space: nowrap; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+    .chip.on { color: #16130B; background: #E8B45A; font-weight: 600; box-shadow: none; }
+    .track { height: 6px; background: rgba(255,255,255,0.06); position: relative; width: 220px; }
+    .track::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 62%; background: repeating-linear-gradient(90deg, #E8B45A 0 6px, rgba(232,180,90,0.35) 6px 8px); }
+    .busy { height: 6px; background: rgba(255,255,255,0.06); position: relative; width: 220px; overflow: hidden; }
+    .busy::after { content: ""; position: absolute; left: 30%; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, rgba(232,180,90,0), #E8B45A, rgba(232,180,90,0)); }
+    .tile { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; background: rgba(0,0,0,0.30); box-shadow: inset 0 1px 0 rgba(255,255,255,0.07); border-left: 2px solid rgba(232,180,90,0.5); width: 110px; }
+    .num { font-size: 26px; line-height: 1; }
+    .ico { display: flex; gap: 14px; align-items: center; }
+    .ico svg { width: 20px; height: 20px; stroke: #EDEDED; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+    .menu { display: flex; flex-direction: column; background: #0B0B0B; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 14px 30px rgba(0,0,0,0.6); width: 200px; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); padding: 6px 0; }
+    .menu span { padding: 8px 14px; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #B4B4B4; }
+    .menu span.on { color: #EDEDED; background: linear-gradient(90deg, rgba(232,180,90,0.16), rgba(232,180,90,0)); box-shadow: inset 2px 0 0 #E8B45A; }
+    .menu .sep { height: 1px; background: rgba(255,255,255,0.08); padding: 0; margin: 6px 0; }
+    .mt { display: grid; grid-template-columns: 150px 90px 110px minmax(0, 1fr); gap: 6px 14px; font-size: 12px; align-items: baseline; }
+    .mt .k { color: #8F8F8F; } .mt .v { color: #EDEDED; }
+  </style>
+</helmet>
+<div class="root" style="width: 1280px; height: 1180px; box-sizing: border-box; padding: 24px; background: #050505; display: flex; flex-direction: column; gap: 16px;">
+  <div style="display: flex; align-items: baseline; justify-content: space-between;">
+    <div style="font-size: 24px; font-weight: 600;">System sheet · HUD</div>
+    <div class="mono" style="font-size: 11.5px; color: #8F8F8F; letter-spacing: 0.06em;">TOKENS · GLASS · COMPONENTS · MOTION · FOR PHASE 3</div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start;">
+    <!-- Color -->
+    <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 16px 22px;">
+      <span class="h">Color</span>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+        <div class="sw"><div style="background: #050505;"></div><span class="mono" style="font-size: 10.5px; color: #8F8F8F;">ground 050505</span></div>
+        <div class="sw"><div style="background: #0E0E0E;"></div><span class="mono" style="font-size: 10.5px; color: #8F8F8F;">surface 0E0E0E</span></div>
+        <div class="sw"><div style="background: #262626;"></div><span class="mono" style="font-size: 10.5px; color: #8F8F8F;">hairline 262626</span></div>
+        <div class="sw"><div style="background: #EDEDED;"></div><span class="mono" style="font-size: 10.5px; color: #8F8F8F;">text EDEDED</span></div>
+        <div class="sw"><div style="background: #E8B45A;"></div><span class="mono" style="font-size: 10.5px; color: #8F8F8F;">accent E8B45A</span></div>
+        <div class="sw"><div style="background: #82C097;"></div><span class="mono" style="font-size: 10.5px; color: #8F8F8F;">ok 82C097</span></div>
+        <div class="sw"><div style="background: #D9B36A;"></div><span class="mono" style="font-size: 10.5px; color: #8F8F8F;">warn D9B36A</span></div>
+        <div class="sw"><div style="background: #E08A8A;"></div><span class="mono" style="font-size: 10.5px; color: #8F8F8F;">fail E08A8A</span></div>
+      </div>
+      <div class="t">
+        <span class="k">info</span><span class="v mono">8FA8CC · also the A/B second series</span>
+        <span class="k">text muted</span><span class="v mono">8F8F8F (labels) · 6E6E6E (dim)</span>
+        <span class="k">chroma edge</span><span class="v mono">FF5A46 @ .6 · 5A96FF @ .6</span>
+      </div>
+    </div>
+
+    <!-- Type and space -->
+    <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 16px 22px;">
+      <span class="h">Type and space</span>
+      <div style="font-size: 30px; font-weight: 600; line-height: 1.05; letter-spacing: -0.01em;">Display 30 / 600</div>
+      <div style="font-size: 20px; font-weight: 600;">Title 20 / 600</div>
+      <div style="font-size: 13px;">Body 13 / 400 · Space Grotesk</div>
+      <div class="label">Label 11 / caps / +0.08em</div>
+      <div class="mono" style="font-size: 12px;">Data 12 · mono · Cascadia Mono in-app</div>
+      <div class="t" style="margin-top: 4px;">
+        <span class="k">space</span><span class="v mono">4 · 8 · 12 · 16 · 24</span>
+        <span class="k">chamfer</span><span class="v mono">strip 10 · button 8 · chip 6 · toggle 5</span>
+        <span class="k">radius</span><span class="v mono">none (chamfers replace radii)</span>
+        <span class="k">hit target</span><span class="v mono">36 min (controls) · 44 (PLAY)</span>
+        <span class="k">display face</span><span class="v mono">Space Grotesk (OFL) embedded</span>
+      </div>
+    </div>
+
+    <!-- Glass recipe -->
+    <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 16px 22px;">
+      <span class="h">Glass recipe (strip)</span>
+      <div class="t">
+        <span class="k">fill</span><span class="v mono">white @ .04 over blurred backdrop</span>
+        <span class="k">blur</span><span class="v mono">22 (shader, half-res)</span>
+        <span class="k">refraction</span><span class="v mono">edge 20 · strength 10 · chroma .35</span>
+        <span class="k">top specular</span><span class="v mono">1 px white @ .22 + pointer light</span>
+        <span class="k">bottom</span><span class="v mono">1 px black @ .6</span>
+        <span class="k">leading edge</span><span class="v mono">2 px red → gold → blue</span>
+        <span class="k">shadow</span><span class="v mono">0 18 40 black @ .5</span>
+        <span class="k">shape</span><span class="v mono">chamfer 10 top-left and bottom-right</span>
+        <span class="k">depth</span><span class="v mono">ground → content → strip → floating (2 max)</span>
+        <span class="k">text on glass</span><span class="v mono">scrim black @ .30 under running text</span>
+        <span class="k">shader todo</span><span class="v mono">chamfer SDF (rounded today)</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start;">
+    <!-- Components 1 -->
+    <div class="strip" style="display: flex; flex-direction: column; gap: 14px; padding: 14px 18px 16px 22px;">
+      <span class="h">Controls</span>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;"><span class="btn primary">Primary</span><span class="btn secondary">Secondary</span><span class="btn danger">Terminate</span><span class="btn disabled">Disabled</span></div>
+      <div style="display: flex; gap: 16px; align-items: center;"><span class="ghost">Ghost action</span><span class="ghost" style="color: #E8B45A;">Ghost hover</span></div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;"><span class="badge">Ready</span><span class="badge warn">Attention</span><span class="badge fail">Failed</span><span class="badge info">Admin</span><span class="badge dim">Nothing</span></div>
+      <div style="display: flex; gap: 14px; align-items: center;"><span class="toggle on"></span><span class="toggle"></span><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span class="check"></span></div>
+      <div style="display: flex; gap: 8px;"><span class="chip on">Selected</span><span class="chip">Chip</span></div>
+      <div style="display: flex; gap: 8px;"><div class="field" style="width: 160px;"><span>Combo</span><svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div><div class="field mono" style="width: 120px;">1920</div><div class="field" style="width: 120px;"><span style="color: #6E6E6E;">empty</span></div></div>
+    </div>
+
+    <!-- Components 2 -->
+    <div class="strip" style="display: flex; flex-direction: column; gap: 14px; padding: 14px 18px 16px 22px;">
+      <span class="h">Progress, data, icons</span>
+      <div style="display: flex; flex-direction: column; gap: 8px;"><span class="label">Determinate</span><div class="track"></div><span class="label">Busy (light sweep)</span><div class="busy"></div></div>
+      <div style="display: flex; gap: 8px;"><div class="tile"><span class="label">FPS</span><span class="num mono">238</span></div><div class="tile" style="border-left-color: #8FA8CC;"><span class="label">Run B</span><span class="num mono">231</span></div></div>
+      <svg viewBox="0 0 320 50" style="width: 320px; height: 50px; display: block;">
+        <path d="M0 40 L40 34 L80 36 L120 22 L160 26 L200 16 L240 20 L280 10 L320 12" fill="none" stroke="#E8B45A" stroke-width="1.75"></path>
+        <path d="M0 44 L40 40 L80 42 L120 30 L160 34 L200 26 L240 30 L280 22 L320 24" fill="none" stroke="#8FA8CC" stroke-width="1.5"></path>
+      </svg>
+      <div class="ico">
+        <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>
+        <svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"></path></svg>
+        <svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        <svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"></rect><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"></path></svg>
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>
+        <svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"></path><path d="M12 10v4M12 17h.01"></path></svg>
+        <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h10M4 19h13"></path></svg>
+        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"></rect><path d="M4 10h16M8 6V4M16 6V4"></path></svg>
+      </div>
+      <span class="label">Lucide 20/24 · 1.75 stroke · custom: virtual display, watchdog, session, chamfer mark</span>
+    </div>
+
+    <!-- Floating glass -->
+    <div class="strip" style="display: flex; flex-direction: column; gap: 14px; padding: 14px 18px 16px 22px;">
+      <span class="h">Floating glass and tray</span>
+      <div class="strip" style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: rgba(255,255,255,0.06);">
+        <span style="font-size: 14px; font-weight: 600;">Driver still installed</span>
+        <span style="font-size: 12px; color: #B4B4B4; line-height: 1.4;">It stays active after Optima closes.</span>
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;"><span class="ghost" style="align-self: center;">Cancel</span><span class="btn secondary" style="height: 30px; font-size: 11px; padding: 0 12px;">Uninstall</span><span class="btn primary" style="height: 30px; font-size: 11px; padding: 0 12px;">Keep driver</span></div>
+      </div>
+      <div style="display: flex; gap: 16px; align-items: flex-start;">
+        <div class="menu"><span class="on">Show</span><span>Terminate process</span><span>Watchdog: on</span><span>Logs</span><span>Performance</span><span class="sep"></span><span>Exit</span></div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <span class="label">Tooltip</span>
+          <div style="background: #0B0B0B; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 20px rgba(0,0,0,0.6); padding: 6px 10px; font-size: 11.5px; color: #B4B4B4; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);">Ctrl+Alt+K works anywhere</div>
+          <span class="label" style="margin-top: 6px;">Tray menu: solid, glass cues only</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Motion -->
+  <div class="strip" style="display: flex; flex-direction: column; gap: 10px; padding: 14px 18px 16px 22px;">
+    <span class="h">Motion (all off under the Windows animation switch)</span>
+    <div class="mt">
+      <span class="k">what</span><span class="k">duration</span><span class="k">easing</span><span class="k">notes</span>
+      <span class="v">Page transition</span><span class="v mono">220 ms</span><span class="v mono">ease-out cubic</span><span class="v">content crossfades with an 8 px rise; strips stagger 40 ms top to bottom; shell stays fixed</span>
+      <span class="v">Pointer light</span><span class="v mono">follow</span><span class="v mono">none</span><span class="v">specular on strip top edges, the shader's Light input; freezes when not foreground</span>
+      <span class="v">Ambient drift</span><span class="v mono">10 s cycle</span><span class="v mono">sine in-out</span><span class="v">band and cool body drift at 30 fps; three states: rest, session (warmer, higher), attention (red wash 600 ms)</span>
+      <span class="v">Launch choreography</span><span class="v mono">700 ms</span><span class="v mono">ease-in-out</span><span class="v">PLAY fills as a progress track while steps tick in the launch rail; window snaps toward the tray icon and dissolves; reverse on return</span>
+      <span class="v">Row expand</span><span class="v mono">180 ms</span><span class="v mono">ease-out</span><span class="v">disclosure opens; chevron rotates; a 240 ms gold sweep along the leading edge on toggle</span>
+      <span class="v">Terminate</span><span class="v mono">600 ms hold</span><span class="v mono">linear</span><span class="v">hold to confirm, the button fills red left to right, release early cancels</span>
+      <span class="v">Numbers</span><span class="v mono">120 ms</span><span class="v mono">ease-out</span><span class="v">live tiles crossfade digits in place, never count up</span>
+      <span class="v">Wizard</span><span class="v mono">3 beats</span><span class="v mono">ease-out</span><span class="v">full-shell sequence: detect, fix everything, ready; each beat rises 12 px over 320 ms</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

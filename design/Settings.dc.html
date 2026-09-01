@@ -1,0 +1,176 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <style>
+    body { margin: 0; background: #050505; }
+    a { color: #E8B45A; } a:hover { color: #F3C97A; }
+    .root { font-family: "Space Grotesk", "Segoe UI Variable Text", "Segoe UI", sans-serif; color: #EDEDED; }
+    .mono { font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace; }
+    .strip { position: relative; background: rgba(255,255,255,0.04); backdrop-filter: blur(22px) saturate(130%); -webkit-backdrop-filter: blur(22px) saturate(130%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.6), 0 18px 40px rgba(0,0,0,0.5);
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+    .strip::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,90,70,0.6), #E8B45A 40%, rgba(90,150,255,0.6)); }
+    .label { font-size: 11px; color: #8F8F8F; letter-spacing: 0.08em; text-transform: uppercase; }
+    .nav { display: flex; align-items: center; gap: 12px; padding: 8px 12px; color: #B4B4B4; font-size: 13px; border-left: 2px solid transparent; }
+    .nav.active { background: linear-gradient(90deg, rgba(232,180,90,0.16), rgba(232,180,90,0)); color: #EDEDED; border-left-color: #E8B45A; }
+    .nav svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+    .group { font-size: 10px; color: #6E6E6E; letter-spacing: 0.18em; text-transform: uppercase; padding: 12px 14px 5px; }
+    .form { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 10px 16px; align-items: center; }
+    .hint { font-size: 12px; color: #8F8F8F; line-height: 1.45; }
+    .field { height: 32px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(0,0,0,0.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); font-size: 12.5px; color: #EDEDED; }
+    .chev { width: 14px; height: 14px; stroke: #6E6E6E; fill: none; stroke-width: 2; flex: 0 0 auto; }
+    .check { width: 16px; height: 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); background: rgba(0,0,0,0.35); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    .check.on { background: #E8B45A; }
+    .check svg { width: 12px; height: 12px; stroke: #16130B; fill: none; stroke-width: 2.5; }
+    .opt { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+    .seg { display: inline-flex; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); }
+    .seg span { padding: 7px 14px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #B4B4B4; }
+    .seg span.on { background: #E8B45A; color: #16130B; font-weight: 600; }
+    .sw { width: 22px; height: 22px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15); }
+    .sw.on { outline: 2px solid #EDEDED; outline-offset: 2px; }
+    .slider { position: relative; height: 4px; width: 260px; background: rgba(255,255,255,0.08); }
+    .slider::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 85%; background: #E8B45A; }
+    .slider::after { content: ""; position: absolute; left: calc(85% - 6px); top: -5px; width: 12px; height: 14px; background: #EDEDED; }
+    .btn { height: 36px; padding: 0 18px; display: inline-flex; align-items: center; gap: 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+    .btn.primary { background: linear-gradient(180deg, #F0C066, #D9A345); color: #16130B; font-weight: 600; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5); }
+    .cap { display: flex; align-items: center; gap: 14px; color: #8F8F8F; }
+    .cap svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; }
+  </style>
+</helmet>
+<div class="root" style="position: relative; width: 1280px; height: 1180px; overflow: hidden; background: #050505;">
+  <div style="position: absolute; left: -200px; top: 200px; width: 1700px; height: 260px; transform: rotate(-14deg); background: linear-gradient(90deg, rgba(232,180,90,0), rgba(232,180,90,0.18) 40%, rgba(232,180,90,0.24) 55%, rgba(232,180,90,0)); filter: blur(40px);"></div>
+  <div style="position: absolute; right: -200px; bottom: -200px; width: 700px; height: 500px; border-radius: 50%; background: radial-gradient(closest-side, rgba(143,168,204,0.14), rgba(143,168,204,0));"></div>
+  <div style="position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%);"></div>
+
+  <div style="position: absolute; inset: 0; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; padding: 12px;">
+    <div class="strip" style="display: flex; flex-direction: column; padding: 14px 6px 10px;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 4px 12px 12px;">
+        <div style="width: 20px; height: 20px; border: 4.5px solid #E8B45A; box-sizing: border-box;"></div>
+        <div style="font-size: 15px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;">Optima</div>
+      </div>
+      <div class="group">Play</div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg><span>Home</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"></path></svg><span>Play</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span>Performance</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span>Sessions</span></div>
+      <div class="group">Tune</div>
+      <div class="nav"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"></rect><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"></path></svg><span>System</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg><span>Comp</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg><span>Display</span></div>
+      <div class="group">Support</div>
+      <div class="nav active"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg><span>Settings</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"></path><path d="M12 10v4M12 17h.01"></path></svg><span>Diagnostics</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h10M4 19h13"></path></svg><span>Logs</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8M8 13h5"></path></svg><span>News</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M4 18h16"></path></svg><span>Updates</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 7l7-4 7 4M3 12h4l-2-5zM17 12h4l-2-5z"></path></svg><span>Legal</span></div>
+      <div style="flex: 1 1 auto;"></div>
+      <div class="mono" style="font-size: 10.5px; color: #6E6E6E; padding: 8px 14px;">v0.7.0</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 26px; padding: 0 6px;">
+        <div class="mono" style="display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: #8F8F8F; letter-spacing: 0.06em;"><span>SETTINGS</span></div>
+        <div class="cap">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14"></path></svg>
+          <svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"></rect></svg>
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 6px;">
+        <div style="font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.05;">Settings</div>
+        <div class="mono" style="font-size: 11.5px; color: #8F8F8F; letter-spacing: 0.06em;">%LOCALAPPDATA%\OPTIMA</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start;">
+        <!-- Appearance -->
+        <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 16px 24px;">
+          <span class="label">Appearance</span>
+          <div class="form">
+            <span class="label">Theme</span><div class="seg"><span class="on">Dark</span><span>Chrome</span><span>System</span></div>
+            <span class="label">Accent</span><div style="display: flex; gap: 10px;"><span class="sw on" style="background: #E8B45A;"></span><span class="sw" style="background: #8FA8CC;"></span><span class="sw" style="background: #82C097;"></span><span class="sw" style="background: #E08A8A;"></span><span class="sw" style="background: #EDEDED;"></span></div>
+            <span class="label">Motion</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>follow the Windows animation setting</span></div>
+          </div>
+          <span class="hint">Theme and accent apply the moment you save. Motion follows Windows by default; untick to keep Optima's motion on regardless.</span>
+        </div>
+
+        <!-- Player -->
+        <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 16px 24px;">
+          <span class="label">Player</span>
+          <div class="form">
+            <span class="label">In-game name</span><div class="field mono">Aur3um</div>
+          </div>
+          <span class="hint">Used only to read your public profile from Critical Force's public API so sessions can record ranked kills, deaths and wins. Leave empty to disable all stat lookups.</span>
+        </div>
+
+        <!-- Discord -->
+        <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 16px 24px;">
+          <span class="label">Discord</span>
+          <div class="form">
+            <span class="label">Game activity</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>show Critical Ops activity while the game runs</span></div>
+            <span class="label">Launcher activity</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>also show presence while browsing the launcher</span></div>
+            <span class="label">Application id</span><div class="field mono">1543421664904351794</div>
+          </div>
+          <span class="hint">Prefilled with Optima's own Discord application. Presence talks only to your local Discord client.</span>
+        </div>
+
+        <!-- General -->
+        <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 16px 24px;">
+          <span class="label">General</span>
+          <div class="form">
+            <span class="label">Virtual display provider</span><div class="field" style="width: 220px;"><span>Auto</span><svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>
+            <span class="label">Frametime capture</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>collect FPS via event tracing (elevated helper)</span></div>
+            <span class="label">Minimum log level</span><div class="field" style="width: 220px;"><span>Information</span><svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>
+            <span class="label">Developer mode</span><div class="opt"><span class="check"></span><span>show the Developer page (Alt+D)</span></div>
+            <span class="label">Keep in tray</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>closing the window keeps Optima in the tray</span></div>
+            <span class="label">Start with Windows</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>launch the Watchdog minimized to the tray at sign-in</span></div>
+          </div>
+        </div>
+
+        <!-- Overlay and Watchdog -->
+        <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 16px 24px;">
+          <span class="label">Overlay and Watchdog</span>
+          <div class="form">
+            <span class="label">FPS overlay</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>show FPS over the game (Alt+F10 toggles)</span></div>
+            <span class="label">Overlay corner</span><div class="field" style="width: 220px;"><span>Top right</span><svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></div>
+            <span class="label">Overlay opacity</span><div style="display: flex; align-items: center; gap: 12px;"><div class="slider"></div><span class="mono" style="font-size: 12px; color: #B4B4B4;">85%</span></div>
+            <span class="label">Network line</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>show ping, jitter, loss below the FPS readout</span></div>
+            <span class="label">Reference host</span><div class="field mono" style="width: 220px;">1.1.1.1</div>
+            <span class="label">Watchdog auto-attach</span><div class="opt"><span class="check on"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></span><span>apply the profile when the game starts outside Optima</span></div>
+          </div>
+          <span class="hint">Auto-attach applies the full profile including the virtual display, so the screen can visibly reconfigure when the game is detected. Everything is restored when the game exits.</span>
+        </div>
+
+        <!-- Path overrides -->
+        <div class="strip" style="display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 16px 24px;">
+          <span class="label">Path overrides</span>
+          <span class="hint">Leave empty for automatic detection. Fallbacks for unusual installations, so a Google Play Games update can be accommodated without a new build.</span>
+          <div class="form">
+            <span class="label">Play Games folder</span><div class="field"><span style="color: #6E6E6E;">auto</span></div>
+            <span class="label">VDD settings xml</span><div class="field"><span style="color: #6E6E6E;">auto</span></div>
+            <span class="label">Custom launch command</span><div class="field"><span style="color: #6E6E6E;">none</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save bar: appears only when something changed -->
+      <div class="strip" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 20px 12px 24px; margin-top: auto;">
+        <span class="mono" style="font-size: 11.5px; color: #D9B36A;">2 unsaved changes</span>
+        <span class="btn primary">Save settings</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
