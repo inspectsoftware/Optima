@@ -56,7 +56,9 @@ in Cascadia Mono so numbers keep their alignment and their voice.
   no Device Manager and no `devcon`. Optima stages the package with `pnputil`, creates the
   **root-enumerated device node** via SetupAPI (the step that package staging alone does not
   do, and the usual reason a manual install is needed), and writes a default `vdd_settings.xml`
-  without overwriting an existing one. Uninstall reverses it. See [drivers/README.md](drivers/README.md).
+  without overwriting an existing one. Uninstall reverses it. Because the driver stays active
+  in Windows on its own, closing Optima completely while it is installed asks whether to keep
+  it or remove it on the way out. See [drivers/README.md](drivers/README.md).
 - **Optima Virtualization** (virtual display control): provider abstraction with a full
   implementation for the bundled IddCx virtual display driver: non-destructive `vdd_settings.xml`
   editing with automatic backup, `RELOAD_DRIVER` over the driver's control pipe, device

@@ -20,6 +20,7 @@ public partial class App : Application
     private IHost? _host;
     private GlobalHotkeys? _hotkeys;
     private TrayService? _tray;
+    private AppShutdown? _shutdown;
     private ConsoleWindow? _console;
     private OverlayController? _overlay;
     private ThemeService? _theme;
@@ -94,7 +95,11 @@ public partial class App : Application
             _host.Services.GetRequiredService<INetworkQualityMonitor>());
         _hotkeys.OverlayRequested += () => _overlay!.Toggle();
 
-        _tray = new TrayService(window, _host.Services.GetRequiredService<SettingsService>());
+        // Every deliberate exit (window close, tray EXIT) goes through here, so the user is
+        // warned that the virtual display driver stays installed and can remove it on the way out.
+        _shutdown = new AppShutdown(window, _host.Services.GetRequiredService<IDriverInstaller>());
+
+        _tray = new TrayService(window, _host.Services.GetRequiredService<SettingsService>(), _shutdown);
         _tray.AttachOrchestrator(_host.Services.GetRequiredService<LaunchOrchestrator>());
         // Same route as Ctrl+Alt+K, so the result text lands in the UI either way.
         _tray.TerminateGameRequested += KillGameFromHotkey;
@@ -149,7 +154,15 @@ public partial class App : Application
             "Any temporary system changes have been rolled back. Details were written to the log folder.",
             "Optima", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
-        Shutdown(1);
+        // A crash exit skips the driver question.
+        if (_shutdown is not null)
+        {
+            _shutdown.ShutdownNow(1);
+        }
+        else
+        {
+            Shutdown(1);
+        }
     }
 
     private void TryEmergencyRestore()
@@ -178,6 +191,7 @@ public partial class App : Application
         _hotkeys?.Dispose();
         _overlay?.Dispose();
         _tray?.Dispose();
+        _shutdown?.Dispose();
         _theme?.Dispose();
         try
         {

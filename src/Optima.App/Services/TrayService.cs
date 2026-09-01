@@ -41,12 +41,12 @@ public sealed class TrayService : IDisposable
     private readonly ContextMenu _menu;
     private readonly TrayVisibilityPolicy _policy = new();
     private readonly SettingsService _settings;
+    private readonly AppShutdown _shutdown;
     private readonly MenuItem _watchModeItem;
     private HwndSource? _source;
     private LaunchOrchestrator? _orchestrator;
     private bool _keepInTrayOnClose;
     private bool _watchModeEnabled;
-    private bool _exiting;
 
     /// <summary>Tray "Terminate Process": kill the game, same route as the kill buttons.</summary>
     public event Action? TerminateGameRequested;
@@ -54,10 +54,11 @@ public sealed class TrayService : IDisposable
     /// <summary>Tray "Logs"/"Performance": show the window and open the given page.</summary>
     public event Action<string>? NavigateRequested;
 
-    public TrayService(Window window, SettingsService settings)
+    public TrayService(Window window, SettingsService settings, AppShutdown shutdown)
     {
         _window = window;
         _settings = settings;
+        _shutdown = shutdown;
         _handle = new WindowInteropHelper(window).EnsureHandle();
         _source = HwndSource.FromHwnd(_handle);
         _source?.AddHook(OnWindowMessage);
@@ -73,7 +74,7 @@ public sealed class TrayService : IDisposable
         var separator = new Separator();
         separator.SetResourceReference(FrameworkElement.StyleProperty, typeof(Separator));
         _menu.Items.Add(separator);
-        AddMenuItem("EXIT", ExitApplication);
+        AddMenuItem("EXIT", _shutdown.RequestExit);
 
         _window.Closing += OnWindowClosing;
         _settings.SettingsChanged += OnSettingsChanged;
@@ -120,21 +121,26 @@ public sealed class TrayService : IDisposable
         }
     }
 
-    /// <summary>With "keep in tray" enabled, closing the window hides it; EXIT in the tray menu quits.</summary>
+    /// <summary>
+    /// The window's close button never quits on its own. With "keep in tray" enabled it hides
+    /// the window; otherwise the close is handed to <see cref="AppShutdown"/>, which asks about
+    /// the installed driver first and then shuts the application down.
+    /// </summary>
     private void OnWindowClosing(object? sender, CancelEventArgs e)
     {
-        if (_exiting || !_keepInTrayOnClose)
+        if (_shutdown.IsShuttingDown)
         {
             return;
         }
         e.Cancel = true;
-        _window.Hide();
-    }
-
-    private void ExitApplication()
-    {
-        _exiting = true;
-        Application.Current.Shutdown();
+        if (_keepInTrayOnClose)
+        {
+            _window.Hide();
+        }
+        else
+        {
+            _shutdown.RequestExit();
+        }
     }
 
     /// <summary>Hide the window while the game runs; bring it back when the session ends.</summary>

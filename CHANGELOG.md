@@ -4,6 +4,17 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-09-02 - Driver reminder when Optima closes
+
+- Closing Optima completely (the window's close button without "keep in tray", or EXIT in
+  the tray menu) now warns that the virtual display driver is still installed and stays
+  active in Windows. The pop-up offers "Keep driver", "Uninstall driver" (one
+  administrator prompt, then Optima closes) or "Cancel" to stay in the app. Nothing is
+  asked when the driver is not installed.
+- If the removal fails (for example a declined administrator prompt), Optima says so and
+  stays open instead of quietly leaving the driver behind.
+- Hiding to the tray, crashes and Windows logoff never show the question.
+
 ## 2026-08-30 - Company attribution
 
 - Optima is made by Aureum at Inspect Software: the assembly Company metadata,
