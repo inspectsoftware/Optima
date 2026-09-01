@@ -119,7 +119,7 @@ public sealed partial class GuidedBenchmarkViewModel : ObservableObject
             {
                 _plan.Abort();
                 FinishPlanUi();
-                Status = $"[ FAIL ] {drift.Message}";
+                Status = $"FAIL · {drift.Message}";
                 return;
             }
 
@@ -142,11 +142,11 @@ public sealed partial class GuidedBenchmarkViewModel : ObservableObject
             RunLog.Add(outcome switch
             {
                 BenchmarkRunOutcome.Accepted =>
-                    $"[ OK ] run {runNumber} · {profileName} · {result.Session!.Stats.AverageFps:F0} fps avg",
+                    $"OK · run {runNumber} · {profileName} · {result.Session!.Stats.AverageFps:F0} fps avg",
                 BenchmarkRunOutcome.Retry =>
-                    $"[ RETRY ] run {runNumber} · {profileName} · {(result.Success ? "no fps data captured" : result.Error?.Title ?? "failed")} · re-queued",
+                    $"RETRY · run {runNumber} · {profileName} · {(result.Success ? "no fps data captured" : result.Error?.Title ?? "failed")} · re-queued",
                 _ =>
-                    $"[ FAIL ] run {runNumber} · {profileName} · too many failed attempts",
+                    $"FAIL · run {runNumber} · {profileName} · too many failed attempts",
             });
 
             if (_cancelRequested && _plan.State != BenchmarkPlanState.Completed)

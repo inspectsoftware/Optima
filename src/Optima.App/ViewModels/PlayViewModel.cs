@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -10,9 +11,73 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
 
-/// <summary>PLAY page: profile choice, the big button, live pipeline progress, session result (§3/§5/§32).</summary>
+/// <summary>State of one row in the launch step list.</summary>
+public enum StepState
+{
+    Todo,
+    Live,
+    Done,
+    Failed,
+}
+
+/// <summary>One launch step shown on the session page.</summary>
+public sealed partial class LaunchStep : ObservableObject
+{
+    public LaunchStep(string title, string detail)
+    {
+        Title = title;
+        _detail = detail;
+        _defaultDetail = detail;
+    }
+
+    private readonly string _defaultDetail;
+
+    public string Title { get; }
+
+    [ObservableProperty]
+    private string _detail;
+
+    [ObservableProperty]
+    private StepState _state;
+
+    public void Reset()
+    {
+        State = StepState.Todo;
+        Detail = _defaultDetail;
+    }
+}
+
+/// <summary>A profile as a selectable chip on the launch surface.</summary>
+public sealed partial class ProfileChip : ObservableObject
+{
+    public ProfileChip(LaunchProfile profile)
+    {
+        Profile = profile;
+    }
+
+    public LaunchProfile Profile { get; }
+
+    public string Name => Profile.Name;
+
+    [ObservableProperty]
+    private bool _isSelected;
+}
+
+/// <summary>
+/// The launch surface (Home) and the session page (Play): profile choice, the PLAY button,
+/// live pipeline progress as a step list, session result (§3/§5/§32).
+/// </summary>
 public sealed partial class PlayViewModel : ObservableObject
 {
+    private static readonly LaunchPhase[] StepPhases =
+    [
+        LaunchPhase.Validating,
+        LaunchPhase.ApplyingPerformanceProfile,
+        LaunchPhase.ConfiguringDisplay,
+        LaunchPhase.StartingPlatform,
+        LaunchPhase.Restoring,
+    ];
+
     private readonly LaunchOrchestrator _orchestrator;
     private readonly ProfileService _profiles;
     private readonly SettingsService _settings;
@@ -39,7 +104,20 @@ public sealed partial class PlayViewModel : ObservableObject
         _orchestrator.ProgressChanged += OnProgress;
     }
 
-    public System.Collections.ObjectModel.ObservableCollection<LaunchProfile> Profiles { get; } = [];
+    public ObservableCollection<LaunchProfile> Profiles { get; } = [];
+
+    /// <summary>The same profiles as chips, with the selected one marked.</summary>
+    public ObservableCollection<ProfileChip> ProfileChips { get; } = [];
+
+    /// <summary>The launch pipeline as rows; the session page ticks them off as phases complete.</summary>
+    public ObservableCollection<LaunchStep> Steps { get; } =
+    [
+        new("Launcher resolved", "checking the install"),
+        new("Profile applied", "power plan, priority, throttling"),
+        new("Virtual display", "as the profile says"),
+        new("Game running", "waiting for the game window"),
+        new("Restore on exit", "pending"),
+    ];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedProfileSummary))]
@@ -54,12 +132,15 @@ public sealed partial class PlayViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SessionTag))]
+    [NotifyPropertyChangedFor(nameof(ElapsedText))]
     private TimeSpan _sessionElapsed;
 
-    /// <summary>Title-bar state tag, visible from every page.</summary>
+    /// <summary>Caption state tag, visible from every page.</summary>
     public string SessionTag => IsSessionActive
-        ? $"[ RUNNING {SessionElapsed:mm\\:ss} ]"
-        : "[ IDLE ]";
+        ? $"RUNNING {SessionElapsed:mm\\:ss}"
+        : "IDLE";
+
+    public string ElapsedText => $"{SessionElapsed:hh\\:mm\\:ss}";
 
     [ObservableProperty]
     private string _phaseText = string.Empty;
@@ -67,26 +148,32 @@ public sealed partial class PlayViewModel : ObservableObject
     [ObservableProperty]
     private LaunchPhase _phase = LaunchPhase.Idle;
 
+    /// <summary>0..1 progress of the launch pipeline, for the PLAY capsule and the session track.</summary>
+    [ObservableProperty]
+    private double _sessionProgress;
+
     [ObservableProperty]
     private SessionRecord? _lastSession;
 
     [ObservableProperty]
     private UserFriendlyError? _lastError;
 
-    public string PlayButtonText => IsSessionActive ? "CRITICAL OPS RUNNING" : "PLAY CRITICAL OPS";
+    public string PlayButtonText => IsSessionActive ? "Running" : "Play Critical Ops";
 
     public string SelectedProfileSummary => SelectedProfile is null
         ? string.Empty
         : SelectedProfile.Display.VirtualDisplay
-            ? $"{SelectedProfile.Display.Mode} virtual display · {SelectedProfile.Performance.PowerPlan} power plan"
-            : $"Physical display · {SelectedProfile.Performance.PowerPlan} power plan";
+            ? $"{SelectedProfile.Display.Mode} virtual display · {SelectedProfile.Performance.PowerPlan} power plan · restored on exit"
+            : $"Physical display · {SelectedProfile.Performance.PowerPlan} power plan · restored on exit";
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         Profiles.Clear();
+        ProfileChips.Clear();
         foreach (var profile in await _profiles.GetProfilesAsync(ct))
         {
             Profiles.Add(profile);
+            ProfileChips.Add(new ProfileChip(profile));
         }
 
         var settings = await _settings.GetSettingsAsync(ct);
@@ -96,9 +183,22 @@ public sealed partial class PlayViewModel : ObservableObject
 
     partial void OnSelectedProfileChanged(LaunchProfile? value)
     {
+        foreach (var chip in ProfileChips)
+        {
+            chip.IsSelected = value is not null && string.Equals(chip.Profile.Name, value.Name, StringComparison.OrdinalIgnoreCase);
+        }
         if (value is not null)
         {
             _ = _settings.UpdateSettingsAsync(s => s with { SelectedProfileName = value.Name });
+        }
+    }
+
+    [RelayCommand]
+    private void SelectProfile(ProfileChip? chip)
+    {
+        if (chip is not null && !IsSessionActive)
+        {
+            SelectedProfile = chip.Profile;
         }
     }
 
@@ -113,6 +213,7 @@ public sealed partial class PlayViewModel : ObservableObject
         LastError = null;
         LastSession = null;
         IsSessionActive = true;
+        ResetSteps();
         _sessionCts = new CancellationTokenSource();
         var profile = SelectedProfile;
 
@@ -131,10 +232,12 @@ public sealed partial class PlayViewModel : ObservableObject
             if (result.Success)
             {
                 LastSession = result.Session;
+                MarkAllDone();
             }
             else if (result.Error is { Code: not "CANCELLED" })
             {
                 LastError = result.Error;
+                MarkLiveFailed();
             }
         }
         catch (Exception ex)
@@ -147,6 +250,7 @@ public sealed partial class PlayViewModel : ObservableObject
                 Explanation = "Details were written to the log.",
                 DeveloperDetails = ex.ToString(),
             };
+            MarkLiveFailed();
         }
         finally
         {
@@ -195,6 +299,86 @@ public sealed partial class PlayViewModel : ObservableObject
         {
             Phase = progress.Phase;
             PhaseText = progress.Message;
+            ApplyPhase(progress.Phase, progress.Message);
         });
+    }
+
+    // ---- step list --------------------------------------------------------------------
+
+    private void ResetSteps()
+    {
+        foreach (var step in Steps)
+        {
+            step.Reset();
+        }
+        SessionProgress = 0;
+    }
+
+    private void ApplyPhase(LaunchPhase phase, string message)
+    {
+        switch (phase)
+        {
+            case LaunchPhase.Idle:
+                return;
+            case LaunchPhase.Completed:
+                MarkAllDone();
+                return;
+            case LaunchPhase.Failed:
+                MarkLiveFailed();
+                return;
+        }
+
+        var index = phase switch
+        {
+            LaunchPhase.Validating => 0,
+            LaunchPhase.ApplyingPerformanceProfile => 1,
+            LaunchPhase.ConfiguringDisplay => 2,
+            LaunchPhase.StartingPlatform or LaunchPhase.WaitingForGame or LaunchPhase.Monitoring => 3,
+            LaunchPhase.Restoring => 4,
+            _ => -1,
+        };
+        if (index < 0)
+        {
+            return;
+        }
+        for (var i = 0; i < Steps.Count; i++)
+        {
+            if (i < index)
+            {
+                Steps[i].State = StepState.Done;
+            }
+            else if (i == index)
+            {
+                Steps[i].State = StepState.Live;
+                Steps[i].Detail = phase == LaunchPhase.Monitoring ? "running" : message;
+            }
+        }
+        SessionProgress = phase switch
+        {
+            LaunchPhase.Validating => 0.12,
+            LaunchPhase.ApplyingPerformanceProfile => 0.32,
+            LaunchPhase.ConfiguringDisplay => 0.52,
+            LaunchPhase.StartingPlatform => 0.7,
+            LaunchPhase.WaitingForGame => 0.82,
+            LaunchPhase.Monitoring => 0.9,
+            LaunchPhase.Restoring => 0.96,
+            _ => SessionProgress,
+        };
+    }
+
+    private void MarkAllDone()
+    {
+        foreach (var step in Steps)
+        {
+            step.State = StepState.Done;
+        }
+        Steps[^1].Detail = "everything restored";
+        SessionProgress = 1;
+    }
+
+    private void MarkLiveFailed()
+    {
+        var live = Steps.FirstOrDefault(s => s.State == StepState.Live) ?? Steps[0];
+        live.State = StepState.Failed;
     }
 }

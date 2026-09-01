@@ -32,13 +32,13 @@
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <TextBlock Text="&gt;" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center"
+        <TextBlock Text="" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center"
                    FontSize="{StaticResource Type.Label}" Margin="0,0,10,0" />
-        <TextBlock Grid.Column="1" Text="--level" Style="{StaticResource Text.Label}"
+        <TextBlock Grid.Column="1" Text="level" Style="{StaticResource Text.Label}"
                    VerticalAlignment="Center" Margin="0,0,6,0" />
         <ComboBox Grid.Column="2" ItemsSource="{Binding LevelOptions}" SelectedItem="{Binding SelectedLevel}"
                   Width="104" VerticalAlignment="Center" />
-        <TextBlock Grid.Column="3" Text="--grep" Style="{StaticResource Text.Label}"
+        <TextBlock Grid.Column="3" Text="filter" Style="{StaticResource Text.Label}"
                    VerticalAlignment="Center" Margin="14,0,6,0" />
         <TextBox Grid.Column="4" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                  VerticalAlignment="Center" MaxWidth="360" HorizontalAlignment="Left" MinWidth="200" />

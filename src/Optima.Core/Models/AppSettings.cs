@@ -63,6 +63,12 @@ public sealed record AppSettings
     /// <summary>Closing the main window hides Optima to the tray instead of exiting.</summary>
     public bool KeepInTrayOnClose { get; init; }
 
+    /// <summary>Motion follows the Windows "animation effects" switch; false keeps Optima moving regardless.</summary>
+    public bool FollowWindowsMotion { get; init; } = true;
+
+    /// <summary>The navigation rail is collapsed to icons.</summary>
+    public bool RailCollapsed { get; init; }
+
     /// <summary>Start Optima (minimized to the tray) at Windows sign-in via an HKCU Run entry.</summary>
     public bool StartWithWindows { get; init; }
 

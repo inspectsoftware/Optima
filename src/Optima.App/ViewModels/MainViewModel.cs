@@ -13,17 +13,25 @@ namespace Optima.App.ViewModels;
 /// <summary>One sidebar row. <see cref="Key"/> doubles as the navigation command parameter.</summary>
 public sealed partial class NavItem : ObservableObject
 {
-    public NavItem(string index, string key, string? sectionHeader = null)
+    public NavItem(string index, string key, string? sectionHeader = null, string? iconKey = null)
     {
         Index = index;
         Key = key;
         SectionHeader = sectionHeader ?? "";
+        IconKey = iconKey ?? (key.Length > 1 ? key[0] + key[1..].ToLowerInvariant() : key);
+        Label = key.Length > 1 ? key[0] + key[1..].ToLowerInvariant() : key;
     }
 
-    /// <summary>Row number shown left of the label; also the Alt+N shortcut it answers to.</summary>
+    /// <summary>Row number; also the Alt+N shortcut it answers to.</summary>
     public string Index { get; }
 
     public string Key { get; }
+
+    /// <summary>Display name of the row.</summary>
+    public string Label { get; }
+
+    /// <summary>Icon resource suffix (Themes/Icons.xaml "Icon.&lt;key&gt;").</summary>
+    public string IconKey { get; }
 
     /// <summary>Group label rendered above this row when it opens a new sidebar section.</summary>
     public string SectionHeader { get; }
@@ -126,7 +134,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Path-style label for the current page, shown in the title bar.</summary>
     [ObservableProperty]
-    private string _breadcrumb = "~/home";
+    private string _breadcrumb = "HOME";
 
     /// <summary>
     /// Sidebar rows. Data-driven rather than hand-written elements so the active marker
@@ -134,15 +142,15 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<NavItem> NavItems { get; } =
     [
-        new("01", "HOME", "LAUNCH") { IsActive = true },
+        new("01", "HOME", "PLAY") { IsActive = true },
         new("02", "PLAY"),
-        new("03", "PERFORMANCE", "MONITOR"),
+        new("03", "PERFORMANCE"),
         new("04", "SESSIONS"),
-        new("05", "SYSTEM"),
+        new("05", "SYSTEM", "TUNE"),
         new("06", "COMP"),
-        new("07", "DISPLAY", "CONFIGURE"),
-        new("08", "SETTINGS"),
-        new("09", "DIAGNOSTICS", "SUPPORT"),
+        new("07", "DISPLAY"),
+        new("08", "SETTINGS", "SUPPORT"),
+        new("09", "DIAGNOSTICS"),
         new("10", "LOGS"),
         new("11", "NEWS"),
         new("12", "UPDATES"),
@@ -150,10 +158,29 @@ public sealed partial class MainViewModel : ObservableObject
         new("14", "DEVELOPER"),
     ];
 
+    /// <summary>The rail shows icons only; persisted in settings.</summary>
+    [ObservableProperty]
+    private bool _railCollapsed;
+
+    [RelayCommand]
+    private async Task ToggleRailAsync()
+    {
+        RailCollapsed = !RailCollapsed;
+        try
+        {
+            var collapsed = RailCollapsed;
+            await _settings.UpdateSettingsAsync(s => s with { RailCollapsed = collapsed });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not persist the rail state");
+        }
+    }
+
     [RelayCommand]
     private async Task NavigateAsync(string page)
     {
-        Breadcrumb = "~/" + page.ToLowerInvariant();
+        Breadcrumb = page.ToUpperInvariant();
         foreach (var item in NavItems)
         {
             item.IsActive = string.Equals(item.Key, page, StringComparison.OrdinalIgnoreCase);
@@ -232,13 +259,14 @@ public sealed partial class MainViewModel : ObservableObject
             var pending = await _recovery.GetPendingAsync();
             if (pending is not null)
             {
-                var restore = MessageBox.Show(
+                var restore = GlassDialog.Confirm(
+                    Application.Current.MainWindow,
+                    "Restore previous system settings?",
                     "Optima did not shut down cleanly last time and some system settings " +
-                    "may still be modified (display, power plan, process tuning).\n\n" +
-                    "Restore the previous system settings now?",
-                    "Restore previous system settings",
-                    MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (restore == MessageBoxResult.Yes)
+                    "may still be modified (display, power plan, process tuning). " +
+                    "Restoring puts the previous values back now.",
+                    "Keep as is", "Restore");
+                if (restore)
                 {
                     await _recovery.RestoreAsync(pending);
                 }
@@ -251,6 +279,7 @@ public sealed partial class MainViewModel : ObservableObject
             // 2. Settings-driven state.
             var settings = await _settings.GetSettingsAsync();
             DeveloperModeVisible = settings.DeveloperMode;
+            RailCollapsed = settings.RailCollapsed;
             App.LogLevelSwitch.MinimumLevel = LogsViewModel.ToSerilogLevel(settings.MinimumLogLevel);
 
             // 3. First-run wizard (§23).

@@ -1,0 +1,45 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!--
+    Stroke icons on a 24 px grid, drawn with round caps and joins at 1.75 px by the Icon
+    control. Shapes follow Lucide (ISC license, see THIRD-PARTY-NOTICES.md); the last
+    group are Optima's own glyphs in the same style.
+  -->
+
+  <!-- Navigation -->
+  <Geometry x:Key="Icon.Home">M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z</Geometry>
+  <Geometry x:Key="Icon.Play">M7 4v16l13-8z</Geometry>
+  <Geometry x:Key="Icon.Performance">M3 12h4l3-8 4 16 3-8h4</Geometry>
+  <Geometry x:Key="Icon.Sessions">M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7v5l3 2</Geometry>
+  <Geometry x:Key="Icon.System">M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3</Geometry>
+  <Geometry x:Key="Icon.Comp">M4 20V10M10 20V4M16 20v-7M22 20H2</Geometry>
+  <Geometry x:Key="Icon.Display">M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M8 20h8M12 16v4</Geometry>
+  <Geometry x:Key="Icon.Settings">M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1</Geometry>
+  <Geometry x:Key="Icon.Diagnostics">M12 3l9 16H3z M12 10v4M12 17h.01</Geometry>
+  <Geometry x:Key="Icon.Logs">M4 5h16M4 12h10M4 19h13</Geometry>
+  <Geometry x:Key="Icon.News">M4 4h16v16H4z M8 9h8M8 13h5</Geometry>
+  <Geometry x:Key="Icon.Updates">M12 4v10M8 10l4 4 4-4M4 18h16</Geometry>
+  <Geometry x:Key="Icon.Legal">M12 3v18M5 7l7-4 7 4M3 12h4l-2-5z M17 12h4l-2-5z</Geometry>
+  <Geometry x:Key="Icon.Developer">M8 6l-6 6 6 6M16 6l6 6-6 6</Geometry>
+
+  <!-- Chrome and controls -->
+  <Geometry x:Key="Icon.Check">M5 12l5 5 9-10</Geometry>
+  <Geometry x:Key="Icon.ChevronDown">M6 9l6 6 6-6</Geometry>
+  <Geometry x:Key="Icon.ChevronRight">M9 6l6 6-6 6</Geometry>
+  <Geometry x:Key="Icon.Close">M6 6l12 12M18 6L6 18</Geometry>
+  <Geometry x:Key="Icon.Minimize">M5 12h14</Geometry>
+  <Geometry x:Key="Icon.Maximize">M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z</Geometry>
+  <Geometry x:Key="Icon.Restore">M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2 M6 8h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z</Geometry>
+  <Geometry x:Key="Icon.Refresh">M21 12a9 9 0 1 1-2.6-6.4 M21 4v5h-5</Geometry>
+  <Geometry x:Key="Icon.Kill">M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M9 9l6 6M15 9l-6 6</Geometry>
+  <Geometry x:Key="Icon.Rail">M4 6h16M4 12h10M4 18h16</Geometry>
+  <Geometry x:Key="Icon.Dot">M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z</Geometry>
+  <Geometry x:Key="Icon.Circle">M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z</Geometry>
+
+  <!-- Optima's own -->
+  <Geometry x:Key="Icon.Optima">M5 5h14v14H5z M9 9h6v6H9z</Geometry>
+  <Geometry x:Key="Icon.Watchdog">M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z</Geometry>
+  <Geometry x:Key="Icon.VirtualDisplay">M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M8 20h8M12 16v4 M8 8h8M8 12h5</Geometry>
+  <Geometry x:Key="Icon.Session">M4 6h16M4 12h16M4 18h9 M17 16l2 2 4-4</Geometry>
+</ResourceDictionary>

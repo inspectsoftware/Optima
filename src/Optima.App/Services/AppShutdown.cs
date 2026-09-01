@@ -112,17 +112,11 @@ public sealed class AppShutdown : IDisposable
         var detail = result.Error is { } error
             ? $"{error.Title}\n{error.SuggestedFixes.FirstOrDefault()}".TrimEnd()
             : "The elevated helper did not report a reason.";
-        var text = "The virtual display driver could not be removed, so Optima stays open.\n\n" +
-                   detail + "\n\n" +
-                   "Try again from the Display page, or close Optima and choose \"Keep driver\".";
-        if (_window.IsVisible)
-        {
-            MessageBox.Show(_window, text, "Optima", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-        else
-        {
-            MessageBox.Show(text, "Optima", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
+        GlassDialog.Notice(
+            _window,
+            "The driver could not be removed, so Optima stays open",
+            detail + " Try again from the Display page, or close Optima and choose \"Keep driver\".",
+            DialogTone.Warning);
         return false;
     }
 

@@ -16,7 +16,7 @@ public sealed partial class NewsEntryViewModel : ObservableObject
     public CopsNewsEntry Entry { get; }
 
     public string Title => Entry.Version.Length > 0 ? $"{Entry.Name} · {Entry.Version}" : Entry.Name;
-    public string StatusTag => "[ " + Entry.Status + " ]";
+    public string StatusTag => Entry.Status.ToUpperInvariant();
     public bool IsLive => Entry.IsLive;
     public IReadOnlyList<string> Headlines => Entry.Headlines;
 

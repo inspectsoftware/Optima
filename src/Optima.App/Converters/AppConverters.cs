@@ -81,11 +81,11 @@ public sealed class DiagnosticStatusToTagConverter : IValueConverter
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         => value switch
         {
-            DiagnosticStatus.Pass => "[ OK ]",
-            DiagnosticStatus.Warning => "[WARN]",
-            DiagnosticStatus.Fail => "[FAIL]",
-            DiagnosticStatus.Skipped => "[SKIP]",
-            _ => "[ ?? ]",
+            DiagnosticStatus.Pass => "OK",
+            DiagnosticStatus.Warning => "WARN",
+            DiagnosticStatus.Fail => "FAIL",
+            DiagnosticStatus.Skipped => "SKIP",
+            _ => "??",
         };
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

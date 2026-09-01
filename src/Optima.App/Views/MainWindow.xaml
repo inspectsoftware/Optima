@@ -7,20 +7,20 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Optima"
         Icon="/Assets/optima.ico"
-        Width="1240" Height="800" MinWidth="980" MinHeight="640"
+        Width="1280" Height="820" MinWidth="980" MinHeight="640"
         WindowStartupLocation="CenterScreen"
         Background="Transparent"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Ideal">
 
   <!--
-    Custom caption, but WindowChrome keeps snap layouts, Aero Snap and resize native.
-    GlassFrameThickness -1 turns the whole client area into a DWM sheet so the system
-    acrylic backdrop (applied in code-behind) can show through the translucent ground;
-    when the backdrop is unavailable the code-behind swaps the ground to a solid brush.
+    Frameless: the caption is dissolved into the shell (drag anywhere along the top,
+    buttons float in the content column); WindowChrome keeps snap layouts, Aero Snap and
+    resize native, DWM rounds the corners (code-behind). GlassFrameThickness -1 keeps the
+    acrylic halo at the window edge; the in-app ambient field is what the glass refracts.
   -->
   <shell:WindowChrome.WindowChrome>
-    <shell:WindowChrome CaptionHeight="36" ResizeBorderThickness="6"
+    <shell:WindowChrome CaptionHeight="40" ResizeBorderThickness="6"
                         CornerRadius="0" GlassFrameThickness="-1" UseAeroCaptionButtons="False" />
   </shell:WindowChrome.WindowChrome>
 
@@ -39,6 +39,7 @@
     <KeyBinding Modifiers="Alt" Key="U" Command="{Binding NavigateCommand}" CommandParameter="UPDATES" />
     <KeyBinding Modifiers="Alt" Key="L" Command="{Binding NavigateCommand}" CommandParameter="LEGAL" />
     <KeyBinding Modifiers="Alt" Key="D" Command="{Binding NavigateCommand}" CommandParameter="DEVELOPER" />
+    <KeyBinding Modifiers="Alt" Key="B" Command="{Binding ToggleRailCommand}" />
   </Window.InputBindings>
 
   <Window.Resources>
@@ -61,117 +62,156 @@
   <!--
     Border compensates for the overhang WindowChrome leaves when maximized.
     The TextElement.* values here are the app-wide text defaults: they inherit down the
-    tree (including into ContentPresenter-generated text) without overriding any control
-    that sets its own, which an implicit TextBlock style would have done.
+    tree without overriding any control that sets its own.
   -->
   <Border x:Name="RootBorder" Background="{DynamicResource Brush.WindowGround}"
           TextElement.Foreground="{DynamicResource Brush.Text}"
-          TextElement.FontFamily="{StaticResource Font.Mono}"
+          TextElement.FontFamily="{StaticResource Font.Body}"
           TextElement.FontSize="{StaticResource Type.Body}">
     <Grid>
-      <Grid.RowDefinitions>
-        <RowDefinition Height="36" />
-        <RowDefinition />
-      </Grid.RowDefinitions>
+      <!-- Ground: the ambient field every glass strip refracts (drifts), then the HUD grid,
+           which is static and therefore kept out of the drifting layer. -->
+      <ctl:AmbientField x:Name="Ambient" DrawGrid="False" />
+      <Rectangle Fill="{DynamicResource Brush.Grid}" IsHitTestVisible="False">
+        <Rectangle.OpacityMask>
+          <RadialGradientBrush Center="0.5,0.4" GradientOrigin="0.5,0.4" RadiusX="0.75" RadiusY="0.75">
+            <GradientStop Color="#FF000000" Offset="0" />
+            <GradientStop Color="#00000000" Offset="1" />
+          </RadialGradientBrush>
+        </Rectangle.OpacityMask>
+      </Rectangle>
 
-      <ctl:TitleBar x:Name="Caption" Grid.Row="0"
-                    Breadcrumb="{Binding Breadcrumb}"
-                    SessionTag="{Binding Play.SessionTag}" />
-
-      <Grid Grid.Row="1">
+      <Grid Margin="12" ctl:GlassPanel.Backdrop="{Binding ElementName=Ambient}">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="204" />
+          <ColumnDefinition x:Name="RailColumn" Width="200" />
+          <ColumnDefinition Width="12" />
           <ColumnDefinition />
         </Grid.ColumnDefinitions>
 
-        <!-- Sidebar: a glass rail over the backdrop. -->
-        <Border Background="{DynamicResource Brush.Glass.Surface1}"
-                BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,0,1,0">
-          <DockPanel>
-            <!-- Footer: live game state -->
-            <StackPanel DockPanel.Dock="Bottom" Margin="16,0,16,14">
-              <Rectangle Height="1" Fill="{DynamicResource Brush.Hairline}" Margin="0,0,0,10" />
-              <StackPanel Orientation="Horizontal">
-                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="1,1,7,0">
-                  <Ellipse.Style>
-                    <Style TargetType="Ellipse">
-                      <Setter Property="Fill" Value="{DynamicResource Brush.TextMuted}" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
-                          <Setter Property="Fill" Value="{DynamicResource Brush.Ok}" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </Ellipse.Style>
-                </Ellipse>
-                <TextBlock FontFamily="{StaticResource Font.Mono}" FontSize="{StaticResource Type.Micro}">
-                  <TextBlock.Style>
-                    <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
-                      <Setter Property="Text" Value="NOT RUNNING" />
-                      <Setter Property="FontSize" Value="{StaticResource Type.Micro}" />
-                      <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
-                          <Setter Property="Text" Value="RUNNING" />
-                          <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </TextBlock.Style>
-                </TextBlock>
-              </StackPanel>
-              <TextBlock Text="critical ops" Style="{StaticResource Text.Micro}"
-                         Foreground="{DynamicResource Brush.TextMuted}" Opacity="0.55" Margin="15,2,0,0" />
-            </StackPanel>
+        <!-- Rail: one glass strip with the grouped navigation. -->
+        <ctl:GlassPanel x:Name="Rail" Chamfer="{StaticResource Chamfer.Strip}" Padding="6,12,6,10"
+                        Tint="{DynamicResource Color.Glass.Tint}"
+                        TopLine="{DynamicResource Brush.Strip.Top}"
+                        BottomLine="{DynamicResource Brush.Strip.Bottom}"
+                        LeadingEdge="{DynamicResource Brush.Strip.Edge}">
+          <ctl:GlassPanel.Child>
+            <DockPanel>
+              <!-- Brand -->
+              <Grid DockPanel.Dock="Top" Margin="10,2,6,10" Height="26">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition />
+                </Grid.ColumnDefinitions>
+                <Border Width="18" Height="18" BorderThickness="4.5" BorderBrush="{DynamicResource Brush.Accent}"
+                        VerticalAlignment="Center" Margin="1,0,0,0" />
+                <TextBlock Grid.Column="1" Text="Optima" FontSize="15" FontWeight="SemiBold"
+                           VerticalAlignment="Center" Margin="11,0,0,0"
+                           Visibility="{Binding RailCollapsed, Converter={StaticResource InverseBoolToVis}}" />
+              </Grid>
 
-            <!-- Navigation, bound to NavItems so the active marker tracks every route.
-                 A row whose SectionHeader is set opens a new labelled group. -->
-            <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,10,0,0">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <StackPanel>
-                    <TextBlock Text="{Binding SectionHeader}" Style="{StaticResource Text.SectionHeader}"
-                               Margin="22,12,0,5" Opacity="0.8"
-                               Visibility="{Binding SectionHeader, Converter={StaticResource EmptyToCollapsed}}" />
-                    <Button Style="{StaticResource NavButton}"
-                            Content="{Binding Key}" Tag="{Binding Index}"
-                            HorizontalAlignment="Stretch"
-                            Command="{Binding DataContext.NavigateCommand,
-                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                            CommandParameter="{Binding Key}">
-                      <Button.Visibility>
-                        <!-- Only the DEVELOPER row is conditional; the rest are always shown. -->
-                        <MultiBinding Converter="{StaticResource NavItemVisibility}">
-                          <Binding Path="Key" />
-                          <Binding Path="DataContext.DeveloperModeVisible"
-                                   RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
-                        </MultiBinding>
-                      </Button.Visibility>
-                    </Button>
-                  </StackPanel>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </DockPanel>
-        </Border>
+              <!-- Footer: live game state and the collapse toggle -->
+              <Grid DockPanel.Dock="Bottom" Margin="6,8,2,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                  <Rectangle Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,8,0">
+                    <Rectangle.Style>
+                      <Style TargetType="Rectangle">
+                        <Setter Property="Fill" Value="{DynamicResource Brush.TextMuted}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
+                            <Setter Property="Fill" Value="{DynamicResource Brush.Ok}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Rectangle.Style>
+                  </Rectangle>
+                  <TextBlock Visibility="{Binding RailCollapsed, Converter={StaticResource InverseBoolToVis}}">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
+                        <Setter Property="Text" Value="idle" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Status.GameIsRunning}" Value="True">
+                            <Setter Property="Text" Value="game running" />
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </StackPanel>
+                <Button Grid.Column="1" Style="{StaticResource GhostButton}" Command="{Binding ToggleRailCommand}"
+                        ToolTip="Collapse or expand the rail (Alt+B)" Padding="6,4">
+                  <ctl:Icon Symbol="{StaticResource Icon.Rail}" Size="15" Foreground="{DynamicResource Brush.TextMuted}" />
+                </Button>
+              </Grid>
 
-        <!-- Page host, with a short cross-fade on navigation -->
-        <ContentControl Grid.Column="1" Content="{Binding CurrentPage, NotifyOnTargetUpdated=True}">
-          <ContentControl.Style>
-            <Style TargetType="ContentControl">
-              <Style.Triggers>
-                <EventTrigger RoutedEvent="Binding.TargetUpdated">
-                  <BeginStoryboard>
-                    <Storyboard>
-                      <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                       From="0" To="1" Duration="0:0:0.16" />
-                    </Storyboard>
-                  </BeginStoryboard>
-                </EventTrigger>
-              </Style.Triggers>
-            </Style>
-          </ContentControl.Style>
-        </ContentControl>
+              <!-- Navigation, bound to NavItems so the active marker tracks every route.
+                   A row whose SectionHeader is set opens a new labelled group. -->
+              <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,2,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel>
+                      <TextBlock Text="{Binding SectionHeader}" Margin="12,10,0,4" Opacity="0.7">
+                        <TextBlock.Style>
+                          <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding SectionHeader}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                              </DataTrigger>
+                              <DataTrigger Binding="{Binding DataContext.RailCollapsed, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </TextBlock.Style>
+                      </TextBlock>
+                      <Button Style="{StaticResource NavButton}"
+                              Content="{Binding Label}" Tag="{Binding IconKey}"
+                              HorizontalAlignment="Stretch"
+                              Command="{Binding DataContext.NavigateCommand,
+                                        RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                              CommandParameter="{Binding Key}">
+                        <Button.Visibility>
+                          <!-- Only the DEVELOPER row is conditional; the rest are always shown. -->
+                          <MultiBinding Converter="{StaticResource NavItemVisibility}">
+                            <Binding Path="Key" />
+                            <Binding Path="DataContext.DeveloperModeVisible"
+                                     RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                          </MultiBinding>
+                        </Button.Visibility>
+                      </Button>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DockPanel>
+          </ctl:GlassPanel.Child>
+        </ctl:GlassPanel>
+
+        <!-- Content column: caption row dissolved into the shell, then the page. -->
+        <Grid Grid.Column="2">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="28" />
+            <RowDefinition />
+          </Grid.RowDefinitions>
+
+          <ctl:TitleBar x:Name="Caption" Grid.Row="0"
+                        Breadcrumb="{Binding Breadcrumb}"
+                        SessionTag="{Binding Play.SessionTag}" />
+
+          <!-- Page host; the transition (crossfade with a rise) runs from code-behind so
+               it can honor the motion switch. -->
+          <ContentControl x:Name="PageHost" Grid.Row="1" Margin="0,4,0,0"
+                          Content="{Binding CurrentPage, NotifyOnTargetUpdated=True}"
+                          Binding.TargetUpdated="OnPageChanged">
+            <ContentControl.RenderTransform>
+              <TranslateTransform x:Name="PageShift" />
+            </ContentControl.RenderTransform>
+          </ContentControl>
+        </Grid>
       </Grid>
     </Grid>
   </Border>

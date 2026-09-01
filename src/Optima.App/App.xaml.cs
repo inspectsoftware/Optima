@@ -68,7 +68,11 @@ public partial class App : Application
         var settingsService = _host.Services.GetRequiredService<SettingsService>();
         _theme = new ThemeService(settingsService);
         // Theme must be on the wall before the first window paints.
-        _theme.Initialize(settingsService.GetSettingsAsync().GetAwaiter().GetResult());
+        var initialSettings = settingsService.GetSettingsAsync().GetAwaiter().GetResult();
+        _theme.Initialize(initialSettings);
+        // Motion follows the Windows animation switch unless the user opted out.
+        Motion.SetFollowWindows(initialSettings.FollowWindowsMotion);
+        settingsService.SettingsChanged += (_, s) => Dispatcher.BeginInvoke(() => Motion.SetFollowWindows(s.FollowWindowsMotion));
 
         var mainViewModel = _host.Services.GetRequiredService<MainViewModel>();
         var window = new MainWindow { DataContext = mainViewModel };
@@ -105,7 +109,16 @@ public partial class App : Application
         _shutdown = new AppShutdown(window, _host.Services.GetRequiredService<IDriverInstaller>());
 
         _tray = new TrayService(window, _host.Services.GetRequiredService<SettingsService>(), _shutdown);
-        _tray.AttachOrchestrator(_host.Services.GetRequiredService<LaunchOrchestrator>());
+        var orchestrator = _host.Services.GetRequiredService<LaunchOrchestrator>();
+        _tray.AttachOrchestrator(orchestrator);
+        // The ambient field carries the launch state: rest, session running, attention.
+        orchestrator.ProgressChanged += (_, progress) => Dispatcher.BeginInvoke(() =>
+            window.AmbientLayer.State = progress.Phase switch
+            {
+                LaunchPhase.Failed => Controls.AmbientState.Attention,
+                LaunchPhase.Idle or LaunchPhase.Completed => Controls.AmbientState.Rest,
+                _ => Controls.AmbientState.Session,
+            });
         // Same route as Ctrl+Alt+K, so the result text lands in the UI either way.
         _tray.TerminateGameRequested += KillGameFromHotkey;
         _tray.NavigateRequested += page =>

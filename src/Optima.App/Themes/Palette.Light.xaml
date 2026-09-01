@@ -74,6 +74,48 @@
     <GradientStop Color="#1F000000" Offset="1" />
   </LinearGradientBrush>
 
+  <!-- HUD glass keys (v0.7). The light "chrome" design is deferred; these are inversions. -->
+  <Color x:Key="Color.ChromaRed">#FFD94A38</Color>
+  <Color x:Key="Color.ChromaBlue">#FF3F78D6</Color>
+  <Color x:Key="Color.Glass.Tint">#26FFFFFF</Color>
+  <SolidColorBrush x:Key="Brush.ChromaRed" Color="{DynamicResource Color.ChromaRed}" />
+  <SolidColorBrush x:Key="Brush.ChromaBlue" Color="{DynamicResource Color.ChromaBlue}" />
+  <SolidColorBrush x:Key="Brush.Strip.Top" Color="#B3FFFFFF" />
+  <SolidColorBrush x:Key="Brush.Strip.Bottom" Color="#33000000" />
+  <LinearGradientBrush x:Key="Brush.Strip.Edge" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#99D94A38" Offset="0" />
+    <GradientStop Color="#FFB07B1E" Offset="0.4" />
+    <GradientStop Color="#993F78D6" Offset="1" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="Brush.Nav.Active" StartPoint="0,0" EndPoint="1,0">
+    <GradientStop Color="#29B07B1E" Offset="0" />
+    <GradientStop Color="#00B07B1E" Offset="1" />
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="Brush.Field" Color="#14000000" />
+  <SolidColorBrush x:Key="Brush.Field.Outline" Color="#22000000" />
+  <SolidColorBrush x:Key="Brush.Tile" Color="#0F000000" />
+  <SolidColorBrush x:Key="Brush.Scrim" Color="#26FFFFFF" />
+  <DrawingBrush x:Key="Brush.Grid" TileMode="Tile"
+                Viewport="0,0,48,48" ViewportUnits="Absolute"
+                Viewbox="0,0,48,48" ViewboxUnits="Absolute" Stretch="None">
+    <DrawingBrush.Drawing>
+      <DrawingGroup>
+        <GeometryDrawing Brush="#0C000000"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,48,1" /></GeometryDrawing.Geometry></GeometryDrawing>
+        <GeometryDrawing Brush="#0C000000"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,1,48" /></GeometryDrawing.Geometry></GeometryDrawing>
+      </DrawingGroup>
+    </DrawingBrush.Drawing>
+  </DrawingBrush>
+  <DrawingBrush x:Key="Brush.TrackFill" TileMode="Tile"
+                Viewport="0,0,8,4" ViewportUnits="Absolute"
+                Viewbox="0,0,8,4" ViewboxUnits="Absolute" Stretch="None">
+    <DrawingBrush.Drawing>
+      <DrawingGroup>
+        <GeometryDrawing Brush="#FFB07B1E"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,6,4" /></GeometryDrawing.Geometry></GeometryDrawing>
+        <GeometryDrawing Brush="#59B07B1E"><GeometryDrawing.Geometry><RectangleGeometry Rect="6,0,2,4" /></GeometryDrawing.Geometry></GeometryDrawing>
+      </DrawingGroup>
+    </DrawingBrush.Drawing>
+  </DrawingBrush>
+
   <!-- Accent companions (ThemeService rewrites these from the user's accent). -->
   <SolidColorBrush x:Key="Brush.AccentHover" Color="#FFC08A2B" />
   <SolidColorBrush x:Key="Brush.AccentPressed" Color="#FF986A19" />

@@ -1,12 +1,13 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace Optima.App.Controls;
 
 /// <summary>
-/// Custom window caption used by both windows. The host supplies the breadcrumb and the
-/// session tag; drag/double-click-maximize come from <see cref="System.Windows.Shell.WindowChrome"/>,
-/// so native snap and resize behavior is preserved.
+/// Caption row used by the shell and the secondary windows. The host supplies the
+/// breadcrumb and the session tag; drag and double-click-maximize come from
+/// <see cref="System.Windows.Shell.WindowChrome"/>, so native snap and resize survive.
 /// </summary>
 public partial class TitleBar : UserControl
 {
@@ -79,12 +80,8 @@ public partial class TitleBar : UserControl
     /// <summary>Keeps the glyph honest when the state changes by any route (snap, double-click, Win+Up).</summary>
     public void SyncMaximizeGlyph()
     {
-        if (Host is not { } window)
-        {
-            return;
-        }
-        var maximized = window.WindowState == WindowState.Maximized;
-        MaximizeButton.Content = maximized ? "▣" : "□";
+        var maximized = Host?.WindowState == WindowState.Maximized;
+        MaximizeGlyph.Symbol = TryFindResource(maximized ? "Icon.Restore" : "Icon.Maximize") as Geometry;
         MaximizeButton.ToolTip = maximized ? "Restore" : "Maximize";
     }
 }

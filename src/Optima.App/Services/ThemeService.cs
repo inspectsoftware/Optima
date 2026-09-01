@@ -13,7 +13,6 @@ namespace Optima.App.Services;
 /// </summary>
 public sealed class ThemeService : IDisposable
 {
-    private const string PaletteMarker = "/Themes/Palette.";
     private readonly SettingsService _settings;
     private string _appliedTheme = "";
     private string _appliedAccent = "";
@@ -30,6 +29,9 @@ public sealed class ThemeService : IDisposable
 
     /// <summary>The last applied theme name, for late subscribers.</summary>
     public static string CurrentTheme { get; private set; } = "Dark";
+
+    /// <summary>The live accent, for code that draws with it (the ambient field).</summary>
+    public static Color CurrentAccent { get; private set; } = Color.FromRgb(0xE8, 0xB4, 0x5A);
 
     /// <summary>Synchronous startup apply, before the main window shows (avoids a theme flash).</summary>
     public void Initialize(AppSettings settings) => Apply(settings);
@@ -112,6 +114,46 @@ public sealed class ThemeService : IDisposable
         SetBrush(app, "Brush.AccentHover", family.Hover);
         SetBrush(app, "Brush.AccentPressed", family.Pressed);
         SetBrush(app, "Brush.AccentGlow", family.Glow);
+
+        var baseColor = ToColor(family.Base);
+        CurrentAccent = baseColor;
+
+        // Accent-derived composites that are Freezables (gradients, drawings) and so cannot
+        // follow the accent through DynamicResource on their own.
+        var red = app.TryFindResource("Color.ChromaRed") is Color r ? r : Color.FromRgb(0xFF, 0x5A, 0x46);
+        var blue = app.TryFindResource("Color.ChromaBlue") is Color b ? b : Color.FromRgb(0x5A, 0x96, 0xFF);
+        var edge = new LinearGradientBrush(
+        [
+            new GradientStop(Color.FromArgb(0x99, red.R, red.G, red.B), 0),
+            new GradientStop(baseColor, 0.4),
+            new GradientStop(Color.FromArgb(0x99, blue.R, blue.G, blue.B), 1),
+        ], new Point(0, 0), new Point(0, 1));
+        edge.Freeze();
+        app.Resources["Brush.Strip.Edge"] = edge;
+
+        var active = new LinearGradientBrush(
+        [
+            new GradientStop(Color.FromArgb(0x29, baseColor.R, baseColor.G, baseColor.B), 0),
+            new GradientStop(Color.FromArgb(0x00, baseColor.R, baseColor.G, baseColor.B), 1),
+        ], new Point(0, 0), new Point(1, 0));
+        active.Freeze();
+        app.Resources["Brush.Nav.Active"] = active;
+
+        var dim = Color.FromArgb(0x59, baseColor.R, baseColor.G, baseColor.B);
+        var group = new DrawingGroup();
+        group.Children.Add(new GeometryDrawing(new SolidColorBrush(baseColor), null, new RectangleGeometry(new Rect(0, 0, 6, 4))));
+        group.Children.Add(new GeometryDrawing(new SolidColorBrush(dim), null, new RectangleGeometry(new Rect(6, 0, 2, 4))));
+        var track = new DrawingBrush(group)
+        {
+            TileMode = TileMode.Tile,
+            Viewport = new Rect(0, 0, 8, 4),
+            ViewportUnits = BrushMappingMode.Absolute,
+            Viewbox = new Rect(0, 0, 8, 4),
+            ViewboxUnits = BrushMappingMode.Absolute,
+            Stretch = Stretch.None,
+        };
+        track.Freeze();
+        app.Resources["Brush.TrackFill"] = track;
     }
 
     private static void SetColorAndBrush(Application app, string colorKey, string brushKey, uint argb)

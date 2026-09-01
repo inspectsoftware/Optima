@@ -55,9 +55,21 @@ public sealed class GlassEffect : ShaderEffect
         nameof(Tint), typeof(Color), typeof(GlassEffect),
         new UIPropertyMetadata(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF), PixelShaderConstantCallback(8)));
 
+    public static readonly DependencyProperty ChamferProperty = DependencyProperty.Register(
+        nameof(Chamfer), typeof(double), typeof(GlassEffect),
+        new UIPropertyMetadata(0.0, PixelShaderConstantCallback(9)));
+
+    /// <summary>Chamfer size in DIPs; greater than zero selects the HUD shape over the rounded one.</summary>
+    public double Chamfer
+    {
+        get => (double)GetValue(ChamferProperty);
+        set => SetValue(ChamferProperty, value);
+    }
+
     public GlassEffect()
     {
         PixelShader = Shader;
+        UpdateShaderValue(ChamferProperty);
         UpdateShaderValue(InputProperty);
         UpdateShaderValue(SizeProperty);
         UpdateShaderValue(InsetProperty);

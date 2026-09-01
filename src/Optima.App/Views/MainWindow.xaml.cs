@@ -1,12 +1,21 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media.Animation;
+using Optima.App.Controls;
 using Optima.App.Services;
+using Optima.App.ViewModels;
 
 namespace Optima.App.Views;
 
 public partial class MainWindow : Window
 {
+    private const double RailWidth = 200;
+    private const double RailCollapsedWidth = 56;
+
     private bool _backdropActive;
 
     public MainWindow()
@@ -19,13 +28,87 @@ public partial class MainWindow : Window
         };
         SourceInitialized += (_, _) => ApplyWindowDressing(ThemeService.CurrentTheme);
         ThemeService.ThemeApplied += ApplyWindowDressing;
-        Closed += (_, _) => ThemeService.ThemeApplied -= ApplyWindowDressing;
+        Closed += (_, _) =>
+        {
+            ThemeService.ThemeApplied -= ApplyWindowDressing;
+            Motion.Changed -= OnMotionChanged;
+        };
+
+        // The pointer is the light source for every glass strip.
+        MouseMove += OnPointerMoved;
+        MouseLeave += (_, _) => GlassPanel.ClearLights();
+        Activated += (_, _) => Motion.SetForeground(true);
+        Deactivated += (_, _) => Motion.SetForeground(false);
+        Motion.Changed += OnMotionChanged;
+
+        DataContextChanged += (_, args) =>
+        {
+            if (args.OldValue is INotifyPropertyChanged old)
+            {
+                old.PropertyChanged -= OnViewModelPropertyChanged;
+            }
+            if (args.NewValue is INotifyPropertyChanged next)
+            {
+                next.PropertyChanged += OnViewModelPropertyChanged;
+            }
+            if (args.NewValue is MainViewModel vm)
+            {
+                ApplyRail(vm.RailCollapsed);
+            }
+        };
+    }
+
+    /// <summary>The shell's mood layer, driven by the launch state from App.</summary>
+    public AmbientField AmbientLayer => Ambient;
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.RailCollapsed) && sender is MainViewModel vm)
+        {
+            ApplyRail(vm.RailCollapsed);
+        }
+    }
+
+    private void ApplyRail(bool collapsed)
+    {
+        RailColumn.Width = new GridLength(collapsed ? RailCollapsedWidth : RailWidth);
+    }
+
+    private void OnPointerMoved(object sender, MouseEventArgs e)
+    {
+        if (Motion.Enabled)
+        {
+            GlassPanel.NotifyPointer(this, e.GetPosition(this));
+        }
+    }
+
+    private void OnMotionChanged()
+    {
+        if (!Motion.Enabled)
+        {
+            Dispatcher.BeginInvoke(GlassPanel.ClearLights);
+        }
+    }
+
+    /// <summary>Page transition: crossfade with an 8 px rise, instant under reduced motion.</summary>
+    private void OnPageChanged(object sender, DataTransferEventArgs e)
+    {
+        if (!Motion.Enabled)
+        {
+            PageHost.Opacity = 1;
+            PageShift.Y = 0;
+            return;
+        }
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var duration = TimeSpan.FromMilliseconds(220);
+        PageHost.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
+        PageShift.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, new DoubleAnimation(8, 0, duration) { EasingFunction = ease });
     }
 
     /// <summary>
-    /// Asks DWM for the acrylic system backdrop and the theme-matched caption. When the
-    /// backdrop is unavailable (older Windows), the translucent window ground would sit
-    /// on nothing, so it falls back to the solid background brush.
+    /// Asks DWM for rounded corners, the acrylic backdrop at the window edge and the
+    /// theme-matched caption. When the backdrop is unavailable (older Windows), the
+    /// translucent window ground would sit on nothing, so it falls back to the solid brush.
     /// </summary>
     private void ApplyWindowDressing(string theme)
     {
@@ -41,19 +124,25 @@ public partial class MainWindow : Window
             return;
         }
 
+        Ambient.Accent = ThemeService.CurrentAccent;
+
         var dark = !string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         _ = DwmSetWindowAttribute(handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+
+        var corner = DWMWCP_ROUND;
+        _ = DwmSetWindowAttribute(handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
 
         var backdrop = DWMSBT_TRANSIENTWINDOW;
         _backdropActive = DwmSetWindowAttribute(handle, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int)) == 0;
 
-        // Translucent ground over acrylic; solid ground when there is nothing behind it.
         RootBorder.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty,
             _backdropActive ? "Brush.WindowGround" : "Brush.Background");
     }
 
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+    private const int DWMWCP_ROUND = 2;
     private const int DWMSBT_TRANSIENTWINDOW = 3;
 
     [DllImport("dwmapi.dll")]
@@ -82,7 +171,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Physical pixels → DIPs, since Padding is expressed in DIPs.
         var source = PresentationSource.FromVisual(this);
         var scaleX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
         var scaleY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;

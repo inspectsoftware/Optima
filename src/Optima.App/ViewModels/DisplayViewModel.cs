@@ -300,13 +300,13 @@ public sealed partial class DisplayViewModel : ObservableObject
     [RelayCommand]
     private Task UninstallDriverAsync() => GuardedAsync(async ct =>
     {
-        var confirm = MessageBox.Show(
-            "Remove the virtual display driver from Windows?\n\n" +
+        var confirm = Views.GlassDialog.Confirm(
+            System.Windows.Application.Current.MainWindow,
+            "Remove the virtual display driver?",
             "The virtual display disappears immediately, and the Optima Virtualization " +
-            "features stop working until the driver is installed again.",
-            "Remove virtual display driver",
-            MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (confirm != MessageBoxResult.Yes)
+            "features stop working until the driver is installed again. One administrator prompt follows.",
+            "Cancel", "Remove driver", Views.DialogTone.Danger);
+        if (!confirm)
         {
             return;
         }

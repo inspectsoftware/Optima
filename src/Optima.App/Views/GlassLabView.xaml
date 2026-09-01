@@ -83,7 +83,7 @@
 
       <Canvas x:Name="Overlay">
         <ctl:GlassPanel x:Name="Panel" Canvas.Left="120" Canvas.Top="90" Width="440" Height="250"
-                        BackdropSource="{Binding ElementName=Plane}" CornerRadius="22" BlurRadius="36"
+                        ctl:GlassPanel.Backdrop="{Binding ElementName=Plane}" Chamfer="0" CornerRadius="22" BlurRadius="36" Downsample="2"
                         Cursor="SizeAll"
                         MouseLeftButtonDown="OnPanelDown" MouseMove="OnPanelMove" MouseLeftButtonUp="OnPanelUp">
           <ctl:GlassPanel.Child>

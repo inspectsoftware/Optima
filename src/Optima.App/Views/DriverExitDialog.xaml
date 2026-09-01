@@ -7,56 +7,56 @@
         Width="560" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
         Background="{DynamicResource Brush.Background}" UseLayoutRounding="True">
 
-  <!-- Same chrome as the main window, so the dialog cannot end up with a light title bar. -->
   <shell:WindowChrome.WindowChrome>
-    <shell:WindowChrome CaptionHeight="36" ResizeBorderThickness="0"
+    <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="0"
                         CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
   </shell:WindowChrome.WindowChrome>
 
   <Border Background="{DynamicResource Brush.Background}"
           TextElement.Foreground="{DynamicResource Brush.Text}"
-          TextElement.FontFamily="{StaticResource Font.Mono}"
+          TextElement.FontFamily="{StaticResource Font.Body}"
           TextElement.FontSize="{StaticResource Type.Body}">
     <Grid>
-      <Grid.RowDefinitions>
-        <RowDefinition Height="36" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-      </Grid.RowDefinitions>
+      <ctl:AmbientField x:Name="Ambient" />
+      <Grid Margin="12" ctl:GlassPanel.Backdrop="{Binding ElementName=Ambient}">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="28" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ctl:TitleBar Grid.Row="0" ShowMinimize="False" ShowMaximize="False" Breadcrumb="OPTIMA · ATTENTION" />
 
-      <ctl:TitleBar Grid.Row="0" ShowMinimize="False" ShowMaximize="False" />
-
-      <StackPanel Grid.Row="1" Margin="24,20,24,20">
-        <StackPanel Orientation="Horizontal">
-          <TextBlock Text="[WARN]" Foreground="{DynamicResource Brush.Warn}"
-                     FontSize="{StaticResource Type.Label}" VerticalAlignment="Center" Margin="0,0,10,0" />
-          <TextBlock Text="Driver still installed" Style="{StaticResource Text.PageTitle}" />
-        </StackPanel>
-        <TextBlock Text="the virtual display driver stays active after Optima closes"
-                   Style="{StaticResource Text.PageSubtitle}" />
-        <TextBlock Style="{StaticResource Text.Prose}" Margin="0,8,0,0"
-                   Text="Closing Optima does not remove the virtual display driver. It remains installed in Windows and keeps advertising its virtual display until it is uninstalled." />
-        <TextBlock Style="{StaticResource Text.Prose}" Margin="0,10,0,0"
-                   Text="Keep it if you plan to use Optima Virtualization again. Uninstalling takes one administrator prompt and can be undone at any time from the Display page." />
-      </StackPanel>
-
-      <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,1,0,0"
-              Background="{DynamicResource Brush.Surface}" Padding="24,14">
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <Button Grid.Column="0" Style="{StaticResource GhostButton}" Content="Cancel"
-                  IsCancel="True" Click="OnCancel" Padding="12,9" />
-          <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Uninstall driver"
-                  Click="OnUninstall" Padding="18,9" Margin="0,0,10,0" />
-          <Button Grid.Column="3" Style="{StaticResource PrimaryButton}" Content="Keep driver"
-                  IsDefault="True" Click="OnKeep" Padding="18,9" FontSize="{StaticResource Type.Label}" />
-        </Grid>
-      </Border>
+        <ctl:GlassPanel Grid.Row="1" Chamfer="{StaticResource Chamfer.Strip}" Padding="20,16,20,16"
+                        Tint="{DynamicResource Color.Glass.Tint}"
+                        TopLine="{DynamicResource Brush.Strip.Top}"
+                        BottomLine="{DynamicResource Brush.Strip.Bottom}"
+                        LeadingEdge="{DynamicResource Brush.Warn}">
+          <ctl:GlassPanel.Child>
+            <StackPanel>
+              <TextBlock Text="Driver still installed" FontSize="{StaticResource Type.Title}" FontWeight="SemiBold" />
+              <TextBlock Text="the virtual display driver stays active after Optima closes"
+                         Style="{StaticResource Text.PageSubtitle}" Margin="0,4,0,10" />
+              <TextBlock Style="{StaticResource Text.Prose}"
+                         Text="Closing Optima does not remove the virtual display driver. It remains installed in Windows and keeps advertising its virtual display until it is uninstalled." />
+              <TextBlock Style="{StaticResource Text.Prose}" Margin="0,8,0,0"
+                         Text="Keep it if you plan to use Optima Virtualization again. Uninstalling takes one administrator prompt and can be undone at any time from the Display page." />
+              <Grid Margin="0,18,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Style="{StaticResource GhostButton}" Content="Cancel"
+                        IsCancel="True" Click="OnCancel" Padding="10,8" />
+                <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Uninstall driver"
+                        Click="OnUninstall" Padding="18,8" Margin="0,0,10,0" />
+                <Button Grid.Column="3" Style="{StaticResource PrimaryButton}" Content="Keep driver"
+                        IsDefault="True" Click="OnKeep" Padding="18,8" />
+              </Grid>
+            </StackPanel>
+          </ctl:GlassPanel.Child>
+        </ctl:GlassPanel>
+      </Grid>
     </Grid>
   </Border>
 </Window>

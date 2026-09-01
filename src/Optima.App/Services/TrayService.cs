@@ -164,6 +164,7 @@ public sealed class TrayService : IDisposable
             _window.WindowState = WindowState.Normal;
         }
         _window.Activate();
+        PlayReturn();
     }
 
     private void OnLaunchProgress(object? sender, LaunchProgress progress)
@@ -174,13 +175,67 @@ public sealed class TrayService : IDisposable
             switch (_policy.OnPhase(progress.Phase))
             {
                 case TrayWindowAction.Hide:
-                    _window.Hide();
+                    HideToTray();
                     break;
                 case TrayWindowAction.Restore:
                     RestoreWindow();
                     break;
             }
         });
+    }
+
+    // ---- launch choreography ----------------------------------------------------------
+    // The window slips toward the tray corner and dissolves when the game is confirmed
+    // running; the reverse plays when the session ends. Instant under reduced motion.
+
+    private static readonly TimeSpan Slip = TimeSpan.FromMilliseconds(500);
+
+    private void HideToTray()
+    {
+        if (_window.Content is not FrameworkElement content || !Motion.Enabled)
+        {
+            _window.Hide();
+            return;
+        }
+        var scale = new System.Windows.Media.ScaleTransform(1, 1);
+        content.RenderTransformOrigin = new Point(1, 1);
+        content.RenderTransform = scale;
+        var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseIn };
+        var shrink = new System.Windows.Media.Animation.DoubleAnimation(1, 0.85, Slip) { EasingFunction = ease };
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(1, 0, Slip) { EasingFunction = ease };
+        fade.Completed += (_, _) =>
+        {
+            _window.Hide();
+            content.BeginAnimation(UIElement.OpacityProperty, null);
+            content.Opacity = 1;
+            content.RenderTransform = null;
+        };
+        scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, shrink);
+        scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, shrink);
+        content.BeginAnimation(UIElement.OpacityProperty, fade);
+    }
+
+    private void PlayReturn()
+    {
+        if (_window.Content is not FrameworkElement content || !Motion.Enabled)
+        {
+            return;
+        }
+        var scale = new System.Windows.Media.ScaleTransform(0.85, 0.85);
+        content.RenderTransformOrigin = new Point(1, 1);
+        content.RenderTransform = scale;
+        var ease = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+        var grow = new System.Windows.Media.Animation.DoubleAnimation(0.85, 1, Slip) { EasingFunction = ease };
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1, Slip) { EasingFunction = ease };
+        fade.Completed += (_, _) =>
+        {
+            content.BeginAnimation(UIElement.OpacityProperty, null);
+            content.Opacity = 1;
+            content.RenderTransform = null;
+        };
+        scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, grow);
+        scale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, grow);
+        content.BeginAnimation(UIElement.OpacityProperty, fade);
     }
 
     private MenuItem AddMenuItem(string header, Action action)

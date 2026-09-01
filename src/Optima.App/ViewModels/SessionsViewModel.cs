@@ -14,14 +14,14 @@ namespace Optima.App.ViewModels;
 public sealed record MatchRowViewModel(MatchRecord Record)
 {
     public string StartedText => Record.StartedAt.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture);
-    public string ModeTag => "[ " + Record.Mode.ToUpperInvariant() + " ]";
+    public string ModeTag => Record.Mode.ToUpperInvariant();
     public string ResultText => Record.Result.ToUpperInvariant();
     public bool IsWin => string.Equals(Record.Result, "win", StringComparison.OrdinalIgnoreCase);
     public string KdaText => Record.Kills is null && Record.Deaths is null
         ? "-"
         : $"{Record.Kills?.ToString(CultureInfo.InvariantCulture) ?? "?"}/{Record.Deaths?.ToString(CultureInfo.InvariantCulture) ?? "?"}/{Record.Assists?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
     public string MapText => Record.Map ?? string.Empty;
-    public string SourceTag => "[ " + Record.Source.ToUpperInvariant() + " ]";
+    public string SourceTag => Record.Source.ToUpperInvariant();
 }
 
 /// <summary>One session history row with its display strings and config-change marker.</summary>
@@ -31,9 +31,9 @@ public sealed record SessionRowViewModel(SessionRecord Record, bool ConfigChange
     public string ProfileName => Record.ProfileName;
     public string KindTag => Record.LaunchKind switch
     {
-        LaunchKind.Watch => "[ WATCH ]",
-        LaunchKind.Benchmark => "[ BENCH ]",
-        _ => "[ PLAY ]",
+        LaunchKind.Watch => "WATCH",
+        LaunchKind.Benchmark => "BENCH",
+        _ => "PLAY",
     };
     public string DurationText => Record.Duration.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
     public string AvgFpsText => Record.Stats.HasData ? Record.Stats.AverageFps.ToString("F0", CultureInfo.InvariantCulture) : "-";
@@ -42,7 +42,7 @@ public sealed record SessionRowViewModel(SessionRecord Record, bool ConfigChange
     public string NetworkText => Record.Network is { } n
         ? $"{n.AveragePingMs:F0} ms · {n.JitterMs:F1} jit · {n.PacketLossPct:F1}%"
         : string.Empty;
-    public string ConfigTag => ConfigChanged ? "[ CFG ]" : string.Empty;
+    public string ConfigTag => ConfigChanged ? "CFG" : string.Empty;
 }
 
 /// <summary>Per-profile average FPS bar in the TRENDS section.</summary>
@@ -85,6 +85,8 @@ public sealed partial class SessionsViewModel : ObservableObject
 
     // ---- Trends ----
     [ObservableProperty] private string _trendSparkline = string.Empty;
+    /// <summary>Average fps per session, oldest to newest, for the vector sparkline.</summary>
+    [ObservableProperty] private IReadOnlyList<double> _trendValues = [];
     [ObservableProperty] private string _trendLegend = "no completed sessions with fps data yet";
     [ObservableProperty] private bool _hasTrend;
 
@@ -92,6 +94,8 @@ public sealed partial class SessionsViewModel : ObservableObject
     [ObservableProperty] private SessionRowViewModel? _selectedRow;
     public ObservableCollection<InfoRow> DetailRows { get; } = [];
     public ObservableCollection<string> DetailSparklineLines { get; } = [];
+    /// <summary>The stored per-second fps series of the selected session.</summary>
+    [ObservableProperty] private IReadOnlyList<double> _detailValues = [];
     [ObservableProperty] private string _detailTweaks = string.Empty;
     [ObservableProperty] private string _detailSparklineLegend = string.Empty;
 
@@ -241,11 +245,13 @@ public sealed partial class SessionsViewModel : ObservableObject
         if (!HasTrend)
         {
             TrendSparkline = string.Empty;
+            TrendValues = [];
             TrendLegend = "no completed sessions with fps data yet";
             return;
         }
 
         TrendSparkline = AsciiSparkline.Render(values, TrendLength * 2);
+        TrendValues = values;
         var changes = trend.Count(p => p.ConfigChanged);
         TrendLegend =
             $"avg fps · last {values.Count} sessions · oldest to newest · " +
@@ -278,6 +284,7 @@ public sealed partial class SessionsViewModel : ObservableObject
     {
         DetailRows.Clear();
         DetailSparklineLines.Clear();
+        DetailValues = [];
         DetailTweaks = string.Empty;
         DetailSparklineLegend = string.Empty;
         if (value is null)
@@ -334,10 +341,7 @@ public sealed partial class SessionsViewModel : ObservableObject
 
         if (record.FpsSamples.Count > 1)
         {
-            foreach (var line in AsciiSparkline.RenderWrapped(record.FpsSamples, DetailWrapWidth))
-            {
-                DetailSparklineLines.Add(line);
-            }
+            DetailValues = record.FpsSamples.Select(s => (double)s).ToList();
             DetailSparklineLegend =
                 $"fps per second · {record.FpsSamples.Count} samples · " +
                 $"{record.FpsSamples.Min():F0} min · {record.FpsSamples.Average():F0} avg · {record.FpsSamples.Max():F0} max";

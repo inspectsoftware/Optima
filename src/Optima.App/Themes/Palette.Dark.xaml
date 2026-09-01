@@ -2,24 +2,21 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!--
-    Dark palette (default). Glass-terminal language: a true neutral black ground with
-    real acrylic bleed (the window ground is 80% black, not 95%), translucent
-    white-alpha surfaces with a specular top rim, and one warm accent (Aureum gold by
-    default; the user's accent replaces it at runtime via ThemeService). No blue tint
-    anywhere: every gray is neutral. Text steps keep the WCAG AA floor: muted 6.4:1,
-    secondary 9.8:1, primary 16.9:1 against Color.Background.
+    Dark palette (default). HUD glass language: a true neutral black ground carrying the
+    in-app ambient field, glass strips that refract it, one warm accent (Aureum gold by
+    default; the user's accent replaces it at runtime via ThemeService) and a red/blue
+    chroma split on leading edges. Text steps keep the WCAG AA floor against the ground.
     Every key here must exist in Palette.Light.xaml with a theme-appropriate value.
   -->
 
   <!-- Ground and surfaces -->
-  <Color x:Key="Color.Background">#FF040404</Color>
-  <Color x:Key="Color.WindowGround">#CC000000</Color>
+  <Color x:Key="Color.Background">#FF050505</Color>
+  <Color x:Key="Color.WindowGround">#F2050505</Color>
   <Color x:Key="Color.Surface">#FF0E0E0E</Color>
-  <Color x:Key="Color.SurfaceRaised">#FF151515</Color>
+  <Color x:Key="Color.SurfaceRaised">#FF141414</Color>
   <Color x:Key="Color.SurfaceHover">#FF1D1D1D</Color>
   <Color x:Key="Color.Hairline">#FF262626</Color>
   <Color x:Key="Color.HairlineStrong">#FF3A3A3A</Color>
-  <!-- Recessed pane, darker than the ground: log surfaces, raw-data wells. -->
   <Color x:Key="Color.Deep">#FF000000</Color>
 
   <!-- Text -->
@@ -36,6 +33,13 @@
   <Color x:Key="Color.Warn">#FFD9B36A</Color>
   <Color x:Key="Color.Fail">#FFE08A8A</Color>
   <Color x:Key="Color.Info">#FF8FA8CC</Color>
+
+  <!-- Chroma split on leading edges and PLAY -->
+  <Color x:Key="Color.ChromaRed">#FFFF5A46</Color>
+  <Color x:Key="Color.ChromaBlue">#FF5A96FF</Color>
+
+  <!-- Glass tint the shader mixes over the refracted backdrop (alpha = strength). -->
+  <Color x:Key="Color.Glass.Tint">#0CFFFFFF</Color>
 
   <!-- Brushes -->
   <SolidColorBrush x:Key="Brush.Background" Color="{DynamicResource Color.Background}" />
@@ -57,18 +61,62 @@
   <SolidColorBrush x:Key="Brush.Warn" Color="{DynamicResource Color.Warn}" />
   <SolidColorBrush x:Key="Brush.Fail" Color="{DynamicResource Color.Fail}" />
   <SolidColorBrush x:Key="Brush.Info" Color="{DynamicResource Color.Info}" />
+  <SolidColorBrush x:Key="Brush.ChromaRed" Color="{DynamicResource Color.ChromaRed}" />
+  <SolidColorBrush x:Key="Brush.ChromaBlue" Color="{DynamicResource Color.ChromaBlue}" />
 
-  <!-- Glass layers: white-alpha over the ground so backdrop light bleeds through.
-       Stronger than v0.2.0 on purpose: over true black, timid alpha reads as flat. -->
-  <SolidColorBrush x:Key="Brush.Glass.Surface1" Color="#12FFFFFF" />
-  <SolidColorBrush x:Key="Brush.Glass.Surface2" Color="#1CFFFFFF" />
+  <!-- Glass layers: white-alpha over the ground; the shader adds refraction and light. -->
+  <SolidColorBrush x:Key="Brush.Glass.Surface1" Color="#0FFFFFFF" />
+  <SolidColorBrush x:Key="Brush.Glass.Surface2" Color="#1AFFFFFF" />
   <SolidColorBrush x:Key="Brush.Glass.Surface3" Color="#26FFFFFF" />
-  <SolidColorBrush x:Key="Brush.Glass.Border" Color="#33FFFFFF" />
+  <SolidColorBrush x:Key="Brush.Glass.Border" Color="#2BFFFFFF" />
   <SolidColorBrush x:Key="Brush.Glass.Highlight" Color="#59FFFFFF" />
 
-  <!-- Specular rim for glass cards: light catches the top edge and falls away.
-       Lives per palette because a GradientStop is a Freezable and cannot resolve
-       DynamicResource; the wholesale palette swap keeps it theme-correct. -->
+  <!-- Strip rim lines: light catches the top edge, the bottom edge falls into shadow. -->
+  <SolidColorBrush x:Key="Brush.Strip.Top" Color="#38FFFFFF" />
+  <SolidColorBrush x:Key="Brush.Strip.Bottom" Color="#99000000" />
+  <!-- Leading edge: red to accent to blue (ThemeService rebuilds it from the live accent). -->
+  <LinearGradientBrush x:Key="Brush.Strip.Edge" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#99FF5A46" Offset="0" />
+    <GradientStop Color="#FFE8B45A" Offset="0.4" />
+    <GradientStop Color="#995A96FF" Offset="1" />
+  </LinearGradientBrush>
+  <!-- Active nav row: accent bleeding in from the leading edge. -->
+  <LinearGradientBrush x:Key="Brush.Nav.Active" StartPoint="0,0" EndPoint="1,0">
+    <GradientStop Color="#29E8B45A" Offset="0" />
+    <GradientStop Color="#00E8B45A" Offset="1" />
+  </LinearGradientBrush>
+
+  <!-- Recessed surfaces inside glass: fields, tiles, tracks. -->
+  <SolidColorBrush x:Key="Brush.Field" Color="#59000000" />
+  <SolidColorBrush x:Key="Brush.Field.Outline" Color="#1AFFFFFF" />
+  <SolidColorBrush x:Key="Brush.Tile" Color="#4D000000" />
+  <SolidColorBrush x:Key="Brush.Scrim" Color="#4D000000" />
+
+  <!-- HUD progress fill: 6 px of accent, 2 px dim (ThemeService rebuilds from the accent). -->
+  <DrawingBrush x:Key="Brush.TrackFill" TileMode="Tile"
+                Viewport="0,0,8,4" ViewportUnits="Absolute"
+                Viewbox="0,0,8,4" ViewboxUnits="Absolute" Stretch="None">
+    <DrawingBrush.Drawing>
+      <DrawingGroup>
+        <GeometryDrawing Brush="#FFE8B45A"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,6,4" /></GeometryDrawing.Geometry></GeometryDrawing>
+        <GeometryDrawing Brush="#59E8B45A"><GeometryDrawing.Geometry><RectangleGeometry Rect="6,0,2,4" /></GeometryDrawing.Geometry></GeometryDrawing>
+      </DrawingGroup>
+    </DrawingBrush.Drawing>
+  </DrawingBrush>
+
+  <!-- HUD grid behind the shell: 48 px cells, one pixel lines. -->
+  <DrawingBrush x:Key="Brush.Grid" TileMode="Tile"
+                Viewport="0,0,48,48" ViewportUnits="Absolute"
+                Viewbox="0,0,48,48" ViewboxUnits="Absolute" Stretch="None">
+    <DrawingBrush.Drawing>
+      <DrawingGroup>
+        <GeometryDrawing Brush="#09FFFFFF"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,48,1" /></GeometryDrawing.Geometry></GeometryDrawing>
+        <GeometryDrawing Brush="#09FFFFFF"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,1,48" /></GeometryDrawing.Geometry></GeometryDrawing>
+      </DrawingGroup>
+    </DrawingBrush.Drawing>
+  </DrawingBrush>
+
+  <!-- Specular rim for the few remaining rounded glass cards. -->
   <LinearGradientBrush x:Key="Brush.Glass.Specular" StartPoint="0,0" EndPoint="0,1">
     <GradientStop Color="#66FFFFFF" Offset="0" />
     <GradientStop Color="#2BFFFFFF" Offset="0.25" />
@@ -86,7 +134,7 @@
   <SolidColorBrush x:Key="Brush.Warning" Color="{DynamicResource Color.Warn}" />
   <SolidColorBrush x:Key="Brush.Error" Color="{DynamicResource Color.Fail}" />
 
-  <!-- Dot-leader lives per palette because a Freezable cannot resolve DynamicResource. -->
+  <!-- Dot leader (retired from the layouts; kept so nothing fails to resolve). -->
   <DrawingBrush x:Key="Brush.DotLeader"
                 TileMode="Tile"
                 Viewport="0,0,5,5" ViewportUnits="Absolute"

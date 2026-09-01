@@ -40,7 +40,7 @@
               <DataTemplate>
                 <HeaderedContentControl Style="{StaticResource Section}" Header="{Binding Title}">
                   <HeaderedContentControl.Tag>
-                    <TextBlock Text="{Binding Date, StringFormat=[ {0} ]}" Style="{StaticResource Text.Micro}"
+                    <TextBlock Text="{Binding Date}" Style="{StaticResource Text.Micro}"
                                VerticalAlignment="Center" />
                   </HeaderedContentControl.Tag>
                   <ItemsControl ItemsSource="{Binding Changes}">

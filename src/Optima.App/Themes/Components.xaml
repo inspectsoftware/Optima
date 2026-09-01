@@ -3,111 +3,114 @@
                     xmlns:ctl="clr-namespace:Optima.App.Controls">
 
   <!--
-    App-level composites built on the tokens and control templates. These exist so the
-    same visual idea is expressed once: previously the label/value row had six separate
-    hand-rolled implementations with seven different hardcoded column widths.
+    App-level composites built on the tokens and control templates. The Section is the
+    strip: every grouped block on every page is a glass strip refracting the ambient
+    field, so restyling it here restyles the whole app.
   -->
 
   <!-- ================================================================= SECTION -->
   <!--
-    A borderless section: an all-caps header, a hairline rule running to the right
-    edge, an optional action slot (bind to Tag), then the body.
+    A glass strip: header label, an optional action slot (bind to Tag), then the body.
+    Chamfered, with the chroma leading edge and the specular top line.
   -->
   <Style x:Key="Section" TargetType="HeaderedContentControl">
-    <Setter Property="Margin" Value="0,0,0,20" />
+    <Setter Property="Margin" Value="{StaticResource Pad.Section}" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="HeaderedContentControl">
-          <StackPanel>
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <TextBlock Text="{TemplateBinding Header}" Style="{StaticResource Text.SectionHeader}" />
-              <Rectangle Grid.Column="1" Height="1" Margin="10,0,10,0" VerticalAlignment="Center"
-                         Fill="{DynamicResource Brush.Hairline}" />
-              <ContentPresenter Grid.Column="2" Content="{TemplateBinding Tag}" VerticalAlignment="Center" />
-            </Grid>
-            <ContentPresenter Margin="0,10,0,0" />
-          </StackPanel>
+          <ctl:GlassPanel Chamfer="{StaticResource Chamfer.Strip}" Padding="18,12,16,14"
+                          Tint="{DynamicResource Color.Glass.Tint}"
+                          TopLine="{DynamicResource Brush.Strip.Top}"
+                          BottomLine="{DynamicResource Brush.Strip.Bottom}"
+                          LeadingEdge="{DynamicResource Brush.Strip.Edge}">
+            <ctl:GlassPanel.Child>
+              <StackPanel>
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{TemplateBinding Header}" Style="{StaticResource Text.SectionHeader}" />
+                  <ContentPresenter Grid.Column="2" Content="{TemplateBinding Tag}" VerticalAlignment="Center" />
+                </Grid>
+                <ContentPresenter Margin="0,10,0,0" />
+              </StackPanel>
+            </ctl:GlassPanel.Child>
+          </ctl:GlassPanel>
         </ControlTemplate>
       </Setter.Value>
     </Setter>
   </Style>
 
-  <!-- Raised glass card: the default vessel for grouped content in the glass language.
-       The specular border catches light on the top rim and falls away below. -->
+  <!-- A recessed tile inside a strip: darker, top specular. -->
   <Style x:Key="GlassCard" TargetType="Border">
-    <Setter Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Glass.Specular}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{StaticResource Radius.Card}" />
-    <Setter Property="Padding" Value="16,14" />
+    <Setter Property="Background" Value="{DynamicResource Brush.Tile}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Strip.Top}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="14,12" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
   </Style>
 
-  <!-- A framed variant for callouts that genuinely need an edge (warnings, errors). -->
-  <Style x:Key="Callout" TargetType="Border" BasedOn="{StaticResource GlassCard}">
-    <Setter Property="Background" Value="{DynamicResource Brush.Glass.Surface2}" />
+  <!-- A framed variant for callouts that genuinely need an edge (warnings, errors):
+       set BorderBrush to the status color; it becomes the leading edge. -->
+  <Style x:Key="Callout" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource Brush.Tile}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+    <Setter Property="BorderThickness" Value="2,0,0,0" />
     <Setter Property="Padding" Value="14,12" />
+    <Setter Property="SnapsToDevicePixels" Value="True" />
+  </Style>
+
+  <!-- Stat tile: label over a monospace number. -->
+  <Style x:Key="Tile" TargetType="Border" BasedOn="{StaticResource GlassCard}">
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+    <Setter Property="BorderThickness" Value="2,0,0,0" />
+    <Setter Property="Padding" Value="12,9,12,10" />
+    <Setter Property="Margin" Value="0,0,8,0" />
   </Style>
 
   <!-- =============================================================== DOT LEADER -->
-  <!--
-    The connector between a label and its value. A tiled DrawingBrush rather than
-    repeated "·" glyphs: it fills any width exactly and never wraps or clips.
-  -->
+  <!-- Retired: label and value now sit on the same row with the value right-aligned.
+       Kept as a style so existing rows keep their layout, drawing nothing. -->
   <Style x:Key="Leader" TargetType="Rectangle">
-    <Setter Property="Fill" Value="{DynamicResource Brush.DotLeader}" />
-    <Setter Property="Height" Value="5" />
-    <Setter Property="VerticalAlignment" Value="Bottom" />
-    <Setter Property="Margin" Value="8,0,8,3" />
-    <Setter Property="SnapsToDevicePixels" Value="True" />
+    <Setter Property="Height" Value="0" />
+    <Setter Property="Fill" Value="{x:Null}" />
+    <Setter Property="Margin" Value="8,0" />
   </Style>
 
   <!-- ============================================================ LABEL / VALUE -->
-  <!-- Binds to InfoRow (Label, Value). The single row implementation for the app. -->
   <DataTemplate x:Key="InfoRowTemplate">
-    <Grid Margin="0,3">
+    <Grid Margin="0,4">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="*" MinWidth="16" />
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
-      <TextBlock Text="{Binding Label}" Style="{StaticResource Text.Label}" />
-      <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+      <TextBlock Text="{Binding Label}" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
       <TextBlock Grid.Column="2" Text="{Binding Value}" Style="{StaticResource Text.Value}"
-                 TextTrimming="CharacterEllipsis" />
+                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
     </Grid>
   </DataTemplate>
 
-  <!-- Same row, value rendered as a status-tinted badge: square and monospace on
-       purpose, terminal output rather than a pill. -->
+  <!-- Same row, value rendered as a status badge with a leading edge in its status color. -->
   <DataTemplate x:Key="StatusItemTemplate">
-    <Grid Margin="0,3">
+    <Grid Margin="0,4">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="*" MinWidth="16" />
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
-      <TextBlock Text="{Binding Label}" Style="{StaticResource Text.Label}" />
-      <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
-      <Border Grid.Column="2" CornerRadius="{StaticResource Radius.Chip}"
-              BorderThickness="1" Padding="9,2,9,3" VerticalAlignment="Center"
-              Background="{DynamicResource Brush.Glass.Surface1}"
+      <TextBlock Text="{Binding Label}" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+      <Border Grid.Column="2" Style="{StaticResource Badge}"
               BorderBrush="{Binding Kind, Converter={StaticResource StatusKindBrush}}">
-        <TextBlock Text="{Binding Value}"
-                   FontFamily="{StaticResource Font.Mono}"
-                   FontSize="{StaticResource Type.Micro}"
+        <TextBlock Text="{Binding Value}" Style="{StaticResource Text.Badge}"
                    Foreground="{Binding Kind, Converter={StaticResource StatusKindBrush}}" />
       </Border>
     </Grid>
   </DataTemplate>
 
   <!-- ================================================================== TABLES -->
-  <!-- Shared row chrome for the ItemsControl tables (processes, monitors, sessions). -->
   <Style x:Key="TableRow" TargetType="Border">
     <Setter Property="BorderBrush" Value="{DynamicResource Brush.Hairline}" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
@@ -115,13 +118,13 @@
     <Setter Property="SnapsToDevicePixels" Value="True" />
   </Style>
 
-  <Style x:Key="Text.TableHeader" TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
-    <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+  <Style x:Key="Text.TableHeader" TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
     <Setter Property="Margin" Value="0,0,0,4" />
   </Style>
 
   <Style x:Key="Text.Cell" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
-    <Setter Property="FontSize" Value="{StaticResource Type.Label}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Mono}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Value}" />
     <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
@@ -133,12 +136,11 @@
   <!-- ================================================================== METERS -->
   <!--
     AsciiBar / AsciiSpinner keep their historical class names and API (Value, Maximum,
-    Cells; the block-text properties are still produced but unused), so no view or
-    view-model changes. Only the templates changed: the bar is now a smooth accent
-    track, the spinner a rotating arc animated purely in XAML.
+    Cells), so no view or view-model changes. The bar is a recessed HUD track; the spinner
+    is an indeterminate light sweep along a short track.
   -->
   <Style TargetType="ctl:AsciiBar">
-    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TrackFill}" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="MinWidth" Value="90" />
     <Setter Property="Template">
@@ -155,29 +157,25 @@
 
   <Style TargetType="ctl:AsciiSpinner">
     <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
-    <Setter Property="Width" Value="16" />
-    <Setter Property="Height" Value="16" />
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="4" />
+    <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ctl:AsciiSpinner">
-          <Grid RenderTransformOrigin="0.5,0.5">
-            <Grid.RenderTransform>
-              <RotateTransform x:Name="SpinTransform" />
-            </Grid.RenderTransform>
-            <Ellipse Stroke="{DynamicResource Brush.Glass.Border}" StrokeThickness="2.5" />
-            <!-- Quarter arc drawn for a 16x16 box, stroke-centered at r=6.75. -->
-            <Path Stroke="{TemplateBinding Foreground}" StrokeThickness="2.5"
-                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                  Data="M 8,1.25 A 6.75,6.75 0 0 1 14.75,8" />
-          </Grid>
+          <Border Background="{DynamicResource Brush.Glass.Surface2}" ClipToBounds="True">
+            <Rectangle Width="18" HorizontalAlignment="Left" Fill="{TemplateBinding Foreground}">
+              <Rectangle.RenderTransform>
+                <TranslateTransform x:Name="Sweep" X="-18" />
+              </Rectangle.RenderTransform>
+            </Rectangle>
+          </Border>
           <ControlTemplate.Triggers>
             <EventTrigger RoutedEvent="Loaded">
               <BeginStoryboard>
                 <Storyboard>
-                  <DoubleAnimation Storyboard.TargetName="SpinTransform"
-                                   Storyboard.TargetProperty="Angle"
-                                   From="0" To="360" Duration="0:0:0.9"
-                                   RepeatBehavior="Forever" />
+                  <DoubleAnimation Storyboard.TargetName="Sweep" Storyboard.TargetProperty="X"
+                                   From="-18" To="44" Duration="0:0:1.1" RepeatBehavior="Forever" />
                 </Storyboard>
               </BeginStoryboard>
             </EventTrigger>

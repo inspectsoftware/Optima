@@ -4,14 +4,23 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
-## 2026-09-02 - 0.7.0 preview: liquid glass redesign, design and renderer
+## 2026-09-02 - 0.7.0 preview 2: the liquid glass redesign
 
-- New in-app glass renderer: a pixel shader blurs and refracts the content beneath a
-  panel, with a chromatic fringe and a pointer-following highlight, over a drifting
-  ambient field. Try it in the Glass lab on the Developer page or with "--glass-lab".
-- Design canvas with the chosen HUD direction: hi-fi Home, Play, Performance and
-  Settings plus the system sheet the rebuild follows. The shipped pages are unchanged
-  until the next build.
+- Every page is rebuilt in the HUD glass language: chamfered glass strips that refract
+  a drifting ambient field, a specular top edge and a chroma leading edge, a grouped
+  navigation rail with icons (collapses to icons with Alt+B), the caption dissolved into
+  the shell, and rounded window corners. Terminal artifacts (dot leaders, ASCII bars,
+  bracket tags, block sparklines) are gone; status words are badges, sparklines are
+  vector, buttons and fields are chamfered.
+- Home is the launch surface (profile chips and Play), Play is the session page with the
+  launch steps ticking off, elapsed time and the terminate control. Performance folds
+  the per-setting disclosure into the profile editor. Settings is two columns.
+- Motion: pages crossfade with a rise, the pointer lights the glass, the ambient field
+  drifts and shifts warmer while a game runs, and the window slips toward the tray when
+  the game is confirmed running (reverse on return). All of it follows the Windows
+  "animation effects" switch by default; Settings > Appearance > motion opts out.
+- Dialogs (restore prompt, driver removal, driver-on-exit) and the first-run setup share
+  the same glass. The Glass lab stays on the Developer page.
 
 ## 2026-09-02 - Driver reminder when Optima closes
 

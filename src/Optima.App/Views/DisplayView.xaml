@@ -19,21 +19,32 @@
               <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{Binding ProviderName}" FontSize="{StaticResource Type.Title}"
                            Foreground="{DynamicResource Brush.Text}" />
-                <TextBlock Margin="12,0,0,0" VerticalAlignment="Center"
-                           FontSize="{StaticResource Type.Label}">
-                  <TextBlock.Style>
-                    <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
-                      <Setter Property="Text" Value="[ OFF ]" />
-                      <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+                <Border Margin="12,0,0,0" VerticalAlignment="Center">
+                  <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource Badge}">
+                      <Setter Property="BorderBrush" Value="{DynamicResource Brush.TextMuted}" />
                       <Style.Triggers>
                         <DataTrigger Binding="{Binding VirtualDisplayActive}" Value="True">
-                          <Setter Property="Text" Value="[ ACTIVE ]" />
-                          <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                          <Setter Property="BorderBrush" Value="{DynamicResource Brush.Ok}" />
                         </DataTrigger>
                       </Style.Triggers>
                     </Style>
-                  </TextBlock.Style>
-                </TextBlock>
+                  </Border.Style>
+                  <TextBlock>
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Badge}">
+                        <Setter Property="Text" Value="OFF" />
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding VirtualDisplayActive}" Value="True">
+                            <Setter Property="Text" Value="ACTIVE" />
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </Border>
               </StackPanel>
               <TextBlock Text="{Binding ProviderCapabilities}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0" />
               <TextBlock Text="{Binding VirtualDisplayModeText, StringFormat='mode · {0}'}"
@@ -74,11 +85,11 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="custom" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Width="70" />
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-              <TextBox Text="{Binding CustomWidth}" Width="64" />
-              <TextBlock Text="x" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
-              <TextBox Text="{Binding CustomHeight}" Width="64" />
-              <TextBlock Text="@" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
-              <TextBox Text="{Binding CustomRefreshRate}" Width="52" />
+              <TextBox Text="{Binding CustomWidth}" Width="76" />
+              <TextBlock Text="x" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding CustomHeight}" Width="76" />
+              <TextBlock Text="@" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
+              <TextBox Text="{Binding CustomRefreshRate}" Width="64" />
               <TextBlock Text="Hz" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
               <Button Style="{StaticResource SecondaryButton}" Content="apply"
                       Command="{Binding ApplyCustomModeCommand}" Margin="10,0,0,0" />
@@ -97,7 +108,7 @@
                      Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToCollapsed}}" />
 
           <!-- No driver device: offer to install the bundled package rather than dead-ending. -->
-          <Border Style="{StaticResource Callout}" Margin="0,12,0,0"
+          <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,12,0,0"
                   Visibility="{Binding DriverMissing, Converter={StaticResource BoolToVis}}">
             <Grid>
               <Grid.ColumnDefinitions>
@@ -105,8 +116,7 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="[WARN] no virtual display device"
-                           Foreground="{DynamicResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
+                <TextBlock Text="No virtual display device" Foreground="{DynamicResource Brush.Warn}" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding DriverBannerText}" Style="{StaticResource Text.Prose}"
                            Margin="0,4,0,0" MaxWidth="620" HorizontalAlignment="Left" />
                 <TextBlock Text="{Binding DriverPackageText}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0"
@@ -143,8 +153,8 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="[WARN] display configuration changed this session"
-                           Foreground="{DynamicResource Brush.Warn}" FontSize="{StaticResource Type.Label}" />
+                <TextBlock Text="Display configuration changed this session"
+                           Foreground="{DynamicResource Brush.Warn}" FontWeight="SemiBold" />
                 <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" MaxWidth="560"
                            HorizontalAlignment="Left"
                            Text="If anything looks wrong, this puts the previous layout back immediately." />
@@ -210,14 +220,14 @@
                   </TextBox>
 
                   <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" Style="{StaticResource Text.Cell}" />
-                  <TextBlock Grid.Column="3" FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center">
+                  <TextBlock Grid.Column="3" VerticalAlignment="Center">
                     <TextBlock.Style>
-                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
-                        <Setter Property="Text" Value="[ ---- ]" />
+                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Badge}">
+                        <Setter Property="Text" Value="" />
                         <Setter Property="Foreground" Value="{DynamicResource Brush.Hairline}" />
                         <Style.Triggers>
                           <DataTrigger Binding="{Binding IsPrimary}" Value="True">
-                            <Setter Property="Text" Value="[ PRIMARY ]" />
+                            <Setter Property="Text" Value="PRIMARY" />
                             <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
                           </DataTrigger>
                           <MultiDataTrigger>
@@ -225,11 +235,11 @@
                               <Condition Binding="{Binding IsActive}" Value="True" />
                               <Condition Binding="{Binding IsPrimary}" Value="False" />
                             </MultiDataTrigger.Conditions>
-                            <Setter Property="Text" Value="[ ACTIVE ]" />
+                            <Setter Property="Text" Value="ACTIVE" />
                             <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
                           </MultiDataTrigger>
                           <DataTrigger Binding="{Binding IsHidden}" Value="True">
-                            <Setter Property="Text" Value="[ HIDDEN ]" />
+                            <Setter Property="Text" Value="HIDDEN" />
                             <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
                           </DataTrigger>
                         </Style.Triggers>

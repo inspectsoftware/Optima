@@ -36,9 +36,11 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="{Binding Status, Converter={StaticResource DiagStatusTag}}"
-                               Foreground="{Binding Status, Converter={StaticResource DiagStatusBrush}}"
-                               FontSize="{StaticResource Type.Label}" />
+                    <Border Style="{StaticResource Badge}" MinWidth="52"
+                            BorderBrush="{Binding Status, Converter={StaticResource DiagStatusBrush}}">
+                      <TextBlock Text="{Binding Status, Converter={StaticResource DiagStatusTag}}" Style="{StaticResource Text.Badge}"
+                                 Foreground="{Binding Status, Converter={StaticResource DiagStatusBrush}}" HorizontalAlignment="Center" />
+                    </Border>
                     <TextBlock Grid.Column="1" Text="{Binding CheckName}" Style="{StaticResource Text.Value}"
                                Margin="10,0,0,0" />
                     <Rectangle Grid.Column="2" Style="{StaticResource Leader}" />
@@ -49,13 +51,12 @@
                   </Grid>
 
                   <!-- Fix, shown only where there is a problem to fix -->
-                  <StackPanel Orientation="Horizontal" Margin="0,3,0,2"
-                              Visibility="{Binding Status, Converter={StaticResource DiagStatusIsProblem}}">
-                    <TextBlock Text="&#x2514;" Foreground="{DynamicResource Brush.Hairline}"
-                               Margin="6,0,8,0" VerticalAlignment="Top" />
+                  <Border BorderBrush="{DynamicResource Brush.Warn}" BorderThickness="2,0,0,0" Padding="10,2" Margin="0,4,0,2"
+                          HorizontalAlignment="Left"
+                          Visibility="{Binding Status, Converter={StaticResource DiagStatusIsProblem}}">
                     <TextBlock Text="{Binding RecommendedFix}" Style="{StaticResource Text.Prose}"
                                Foreground="{DynamicResource Brush.Warn}" MaxWidth="720" />
-                  </StackPanel>
+                  </Border>
 
                   <Expander Header="details" Margin="24,0,0,4"
                             Visibility="{Binding Details, Converter={StaticResource EmptyToCollapsed}}">
@@ -68,9 +69,9 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <!-- Cursor block while checks are still arriving -->
-          <TextBlock Text="&#x258C;" Foreground="{DynamicResource Brush.TextMuted}" Margin="0,4,0,0"
-                     Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}" />
+          <!-- Sweep while checks are still arriving -->
+          <ctl:AsciiSpinner Cells="10" HorizontalAlignment="Left" Margin="0,6,0,0"
+                            Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}" />
 
           <TextBlock Text="{Binding Summary}" Style="{StaticResource Text.Value}" Margin="0,12,0,0"
                      Visibility="{Binding Summary, Converter={StaticResource EmptyToCollapsed}}" />

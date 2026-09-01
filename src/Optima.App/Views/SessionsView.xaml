@@ -12,9 +12,8 @@
       <!-- Trends -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="TRENDS">
         <StackPanel>
-          <TextBlock Text="{Binding TrendSparkline}" FontFamily="{StaticResource Font.Mono}"
-                     FontSize="{StaticResource Type.Title}" Foreground="{DynamicResource Brush.Text}"
-                     Visibility="{Binding HasTrend, Converter={StaticResource BoolToVis}}" />
+          <ctl:Sparkline Values="{Binding TrendValues}" Stroke="{DynamicResource Brush.Accent}" Height="64"
+                         Visibility="{Binding HasTrend, Converter={StaticResource BoolToVis}}" />
           <TextBlock Text="{Binding TrendLegend}" Style="{StaticResource Text.Micro}" Margin="0,4,0,0" />
 
           <ItemsControl ItemsSource="{Binding ProfileTrends}" Margin="0,12,0,0">
@@ -189,14 +188,8 @@
         <StackPanel>
           <ItemsControl ItemsSource="{Binding DetailRows}" ItemTemplate="{StaticResource InfoRowTemplate}" MaxWidth="560" HorizontalAlignment="Left" />
           <TextBlock Text="{Binding DetailTweaks}" Style="{StaticResource Text.Micro}" Margin="0,8,0,0" />
-          <ItemsControl ItemsSource="{Binding DetailSparklineLines}" Margin="0,12,0,0">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <TextBlock Text="{Binding}" FontFamily="{StaticResource Font.Mono}"
-                           FontSize="{StaticResource Type.Body}" Foreground="{DynamicResource Brush.Text}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <ctl:Sparkline Values="{Binding DetailValues}" Stroke="{DynamicResource Brush.Accent}" Height="96" Margin="0,12,0,0"
+                         Visibility="{Binding DetailSparklineLegend, Converter={StaticResource EmptyToCollapsed}}" />
           <TextBlock Text="{Binding DetailSparklineLegend}" Style="{StaticResource Text.Micro}" Margin="0,4,0,0" />
         </StackPanel>
       </HeaderedContentControl>

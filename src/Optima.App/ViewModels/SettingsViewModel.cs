@@ -50,6 +50,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _logLevel = "Information";
     [ObservableProperty] private bool _developerMode;
     [ObservableProperty] private bool _keepInTrayOnClose;
+    [ObservableProperty] private bool _followWindowsMotion = true;
     [ObservableProperty] private bool _startWithWindows;
     [ObservableProperty] private bool _overlayEnabled;
     [ObservableProperty] private string _overlayCorner = "TopRight";
@@ -77,6 +78,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         LogLevel = settings.MinimumLogLevel;
         DeveloperMode = settings.DeveloperMode;
         KeepInTrayOnClose = settings.KeepInTrayOnClose;
+        FollowWindowsMotion = settings.FollowWindowsMotion;
         StartWithWindows = settings.StartWithWindows;
         OverlayEnabled = settings.OverlayEnabled;
         OverlayCorner = settings.OverlayCorner;
@@ -110,6 +112,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             MinimumLogLevel = LogLevel,
             DeveloperMode = DeveloperMode,
             KeepInTrayOnClose = KeepInTrayOnClose,
+            FollowWindowsMotion = FollowWindowsMotion,
             StartWithWindows = StartWithWindows,
             OverlayEnabled = OverlayEnabled,
             OverlayCorner = OverlayCorner,
