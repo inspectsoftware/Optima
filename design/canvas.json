@@ -6,7 +6,7 @@
   "artboards": [
     { "file": "Main.dc.html", "title": "Home", "page": "page-1", "x": 0, "y": 0, "w": 1280, "h": 800 },
     { "file": "Play.dc.html", "title": "Play · session", "page": "page-1", "x": 1400, "y": 0, "w": 1280, "h": 800 },
-    { "file": "Performance.dc.html", "title": "Performance", "page": "page-1", "x": 0, "y": 960, "w": 1280, "h": 1000 },
+    { "file": "Performance.dc.html", "title": "Performance", "page": "page-1", "x": 0, "y": 960, "w": 1280, "h": 1060 },
     { "file": "Settings.dc.html", "title": "Settings", "page": "page-1", "x": 1400, "y": 960, "w": 1280, "h": 1180 },
     { "file": "System.dc.html", "title": "System sheet", "page": "page-1", "x": 2800, "y": 0, "w": 1280, "h": 1180 },
     { "file": "DirectionA.dc.html", "title": "A · Obsidian", "page": "page-2", "x": 0, "y": 0, "w": 1280, "h": 800 },
