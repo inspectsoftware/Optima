@@ -4,6 +4,18 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-09-02 - Glass redesign, phase 1: directions and the renderer prototype
+
+- v0.7.0 liquid-glass redesign starts on its own branch. Three design directions
+  (Obsidian, Prism, HUD) live on the design canvas with a shared component strip;
+  nothing in the shipped UI changes yet.
+- Glass lab on the Developer page (also opens standalone with the "--glass-lab"
+  switch): the new in-app glass renderer, a pixel shader that blurs and refracts the
+  content beneath a panel with a chromatic fringe and a pointer-following highlight,
+  over a drifting ambient field, with sliders for every input and a frame-rate readout.
+  Drift and the light freeze when the window is not foreground and when Windows
+  animation effects are off.
+
 ## 2026-09-02 - Driver reminder when Optima closes
 
 - Closing Optima completely (the window's close button without "keep in tray", or EXIT in

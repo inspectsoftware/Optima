@@ -1,0 +1,15 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "A · Obsidian", "x": 0, "y": 0, "w": 1280, "h": 800 },
+    { "file": "DirectionB.dc.html", "title": "B · Prism", "x": 1400, "y": 0, "w": 1280, "h": 800 },
+    { "file": "DirectionC.dc.html", "title": "C · HUD", "x": 2800, "y": 0, "w": 1280, "h": 800 },
+    { "file": "Components.dc.html", "title": "Component strip · A | B | C", "x": 0, "y": 960, "w": 1280, "h": 560 }
+  ],
+  "annotations": [
+    { "id": "motion-a", "x": 0, "y": -200, "w": 420, "text": "A · Obsidian · motion: slow.\nAmbient gold drifts on a ~12 s cycle. Pointer light rides the slab rims. PLAY press: the slab thickens (blur 40 to 56, rim brightens), steps reveal, then the window sinks toward the tray over 700 ms.\nTradeoff: heaviest blur = highest GPU cost; darkest ground leaves the least contrast headroom for muted text." },
+    { "id": "motion-b", "x": 1400, "y": -200, "w": 420, "text": "B · Prism · motion: lively.\nDrift on a ~8 s cycle with two colored bodies passing each other. Chroma fringes shift with pointer angle (the aberration follows the light). PLAY press: the sheet lifts 4 px and the fringes flare, then the window folds to the tray.\nTradeoff: the most color on screen and the easiest to overdo; thin glass shows ambient noise through text, so every text block needs its scrim." },
+    { "id": "motion-c", "x": 2800, "y": -200, "w": 420, "text": "C · HUD · motion: fast, mechanical.\nStrips slide in from the rail side with a 160 ms stagger. PLAY press: the capsule fills as a progress track while steps tick in the strip; window snaps to the tray in 500 ms.\nTradeoff: density reads as tool, not premium; angular geometry fights the round refraction the shader does best." },
+    { "id": "read-me", "x": 1400, "y": 960, "w": 520, "text": "How to read this canvas.\nThree Home screens, one per direction, same content and same palette (black, gold #E8B45A, status colors). What differs: glass thickness, type, geometry, chroma intensity, tempo. The strip below A shows the same eight components in all three treatments.\nMono text uses JetBrains Mono here as a stand-in for the app's Cascadia Mono. Everything is static; motion is described in the notes and proven in the app prototype (Glass lab)." }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -8,3 +8,6 @@ artifacts/
 TestResults/
 publish/
 *.binlog
+
+# Seeded design canvas (regenerated from design/*.dc.html by the design skill)
+design/optima-liquid-glass.html

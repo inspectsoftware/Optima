@@ -10,6 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets\optima.ico" />
+    <!-- Compiled pixel shader for the glass layer (source: Effects\Glass.hlsl, built with fxc). -->
+    <Resource Include="Effects\Glass.ps" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

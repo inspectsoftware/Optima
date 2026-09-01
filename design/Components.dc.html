@@ -1,0 +1,102 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;family=Sora:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <style>
+    body { margin: 0; background: #080808; }
+    a { color: #E8B45A; } a:hover { color: #F3C97A; }
+    .mono { font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace; }
+    .col { display: flex; flex-direction: column; gap: 18px; padding: 22px; color: #EDEDED; position: relative; overflow: hidden; }
+    .row { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+    .cap { font-size: 10.5px; color: #6E6E6E; letter-spacing: 0.14em; text-transform: uppercase; width: 92px; flex: 0 0 auto; }
+    /* A Obsidian */
+    .a { font-family: "Instrument Sans", "Segoe UI", sans-serif; background: #040404; }
+    .a .glass { position: relative; border-radius: 18px; background: rgba(255,255,255,0.035); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.20), inset 0 -1px 0 rgba(0,0,0,0.70), inset 1px 0 0 rgba(255,90,70,0.07), inset -1px 0 0 rgba(90,150,255,0.07), 0 20px 50px rgba(0,0,0,0.6); }
+    .a .primary { height: 44px; padding: 0 22px; border-radius: 13px; display: inline-flex; align-items: center; background: linear-gradient(180deg, #F0C066, #D9A345); color: #16130B; font-weight: 600; font-size: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -2px 0 rgba(0,0,0,0.25), 0 10px 30px rgba(232,180,90,0.30); }
+    .a .secondary { height: 44px; padding: 0 20px; border-radius: 13px; display: inline-flex; align-items: center; font-size: 14px; color: #EDEDED; }
+    .a .badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(130,192,151,0.35); color: #82C097; background: rgba(130,192,151,0.10); }
+    .a .badge.warn { border-color: rgba(217,179,106,0.4); color: #D9B36A; background: rgba(217,179,106,0.10); }
+    .a .toggle { width: 46px; height: 26px; border-radius: 999px; background: linear-gradient(180deg, #F0C066, #D9A345); position: relative; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5); }
+    .a .toggle::after { content: ""; position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; background: #16130B; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+    .a .track { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.06); box-shadow: inset 0 1px 2px rgba(0,0,0,0.6); flex: 1 1 auto; position: relative; }
+    .a .track::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 62%; border-radius: inherit; background: linear-gradient(90deg, #D9A345, #F0C066); box-shadow: 0 0 16px rgba(232,180,90,0.5); }
+    .a .nav { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; color: #EDEDED; font-size: 13.5px; background: rgba(232,180,90,0.10); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12); width: 180px; }
+    /* B Prism */
+    .b { font-family: "Sora", "Segoe UI", sans-serif; background: #121214; }
+    .b .glass { position: relative; border-radius: 12px; background: rgba(255,255,255,0.03); backdrop-filter: blur(14px) saturate(160%); -webkit-backdrop-filter: blur(14px) saturate(160%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), inset 1.5px 0 0 rgba(255,80,80,0.22), inset -1.5px 0 0 rgba(90,150,255,0.22), 0 12px 30px rgba(0,0,0,0.35); }
+    .b .primary { height: 44px; padding: 0 22px; border-radius: 11px; display: inline-flex; align-items: center; background: linear-gradient(180deg, #F0C066, #DDAA4C); color: #16130B; font-weight: 600; font-size: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), -3px 0 0 rgba(255,80,80,0.35), 3px 0 0 rgba(90,150,255,0.35), 0 10px 30px rgba(232,180,90,0.25); }
+    .b .secondary { height: 44px; padding: 0 20px; border-radius: 11px; display: inline-flex; align-items: center; font-size: 14px; color: #EDEDED; }
+    .b .badge { font-size: 11px; padding: 2px 8px; border-radius: 7px; color: #82C097; background: rgba(130,192,151,0.14); }
+    .b .badge.warn { color: #D9B36A; background: rgba(217,179,106,0.14); }
+    .b .toggle { width: 46px; height: 26px; border-radius: 8px; background: rgba(232,180,90,0.25); position: relative; box-shadow: inset 1.5px 0 0 rgba(255,80,80,0.4), inset -1.5px 0 0 rgba(90,150,255,0.4); }
+    .b .toggle::after { content: ""; position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 6px; background: #E8B45A; }
+    .b .track { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); flex: 1 1 auto; position: relative; }
+    .b .track::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 62%; border-radius: inherit; background: linear-gradient(90deg, rgba(255,120,120,0.9), #E8B45A 30%, #E8B45A 70%, rgba(120,170,255,0.9)); }
+    .b .nav { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 9px; color: #EDEDED; font-size: 13px; background: rgba(255,255,255,0.07); box-shadow: inset 1.5px 0 0 rgba(255,80,80,0.5), inset -1.5px 0 0 rgba(90,150,255,0.5); width: 180px; }
+    /* C HUD */
+    .c { font-family: "Space Grotesk", "Segoe UI", sans-serif; background: #050505; }
+    .c .glass { position: relative; border-radius: 6px; background: rgba(255,255,255,0.04); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.6), 0 14px 30px rgba(0,0,0,0.5);
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+    .c .primary { height: 44px; padding: 0 22px; display: inline-flex; align-items: center; background: linear-gradient(180deg, #F0C066, #D9A345); color: #16130B; font-weight: 600; font-size: 13px; letter-spacing: 0.10em; text-transform: uppercase; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+    .c .secondary { height: 44px; padding: 0 20px; display: inline-flex; align-items: center; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: #EDEDED; }
+    .c .badge { font-size: 10.5px; padding: 2px 7px; color: #82C097; background: rgba(130,192,151,0.12); border-left: 2px solid #82C097; letter-spacing: 0.06em; text-transform: uppercase; }
+    .c .badge.warn { color: #D9B36A; background: rgba(217,179,106,0.12); border-left-color: #D9B36A; }
+    .c .toggle { width: 46px; height: 24px; background: rgba(255,255,255,0.06); position: relative; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+    .c .toggle::after { content: ""; position: absolute; top: 3px; right: 3px; bottom: 3px; width: 20px; background: #E8B45A; }
+    .c .track { height: 6px; background: rgba(255,255,255,0.06); flex: 1 1 auto; position: relative; }
+    .c .track::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 62%; background: repeating-linear-gradient(90deg, #E8B45A 0 6px, rgba(232,180,90,0.35) 6px 8px); }
+    .c .nav { display: flex; align-items: center; gap: 12px; padding: 8px 12px; color: #EDEDED; font-size: 13px; background: linear-gradient(90deg, rgba(232,180,90,0.16), rgba(232,180,90,0)); border-left: 2px solid #E8B45A; width: 180px; }
+    .nav svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+</helmet>
+<div style="width: 1280px; height: 560px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; background: #080808;">
+  <!-- A -->
+  <div class="col a">
+    <div style="position: absolute; left: -120px; top: -160px; width: 520px; height: 460px; border-radius: 50%; background: radial-gradient(closest-side, rgba(232,180,90,0.40), rgba(232,180,90,0)); pointer-events: none;"></div>
+    <div style="font-size: 12px; color: #8F8F8F; letter-spacing: 0.12em; text-transform: uppercase;">A · Obsidian · Instrument Sans</div>
+    <div class="row"><span class="cap">Buttons</span><span class="primary">Apply profile</span><span class="glass secondary">Reset</span></div>
+    <div class="row"><span class="cap">Badges</span><span class="badge">Ready</span><span class="badge warn">Attention</span></div>
+    <div class="row"><span class="cap">Toggle</span><span class="toggle"></span><span style="font-size: 13px; color: #B4B4B4;">Watchdog</span></div>
+    <div class="row"><span class="cap">Progress</span><span class="track"></span><span class="mono" style="font-size: 12px; color: #8F8F8F;">62%</span></div>
+    <div class="row"><span class="cap">Nav</span><span class="nav"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span>Performance</span></span></div>
+    <div class="row"><span class="cap">Tile</span><div class="glass" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; width: 120px;"><span style="font-size: 12px; color: #8F8F8F;">FPS</span><span class="mono" style="font-size: 24px; line-height: 1;">238</span></div></div>
+    <div class="row" style="align-items: flex-start;"><span class="cap" style="padding-top: 12px;">Dialog</span><div class="glass" style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; width: 250px;"><span style="font-size: 14px; font-weight: 600;">Driver still installed</span><span style="font-size: 12px; color: #B4B4B4; line-height: 1.4;">It stays active after Optima closes.</span><div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;"><span class="glass secondary" style="height: 32px; font-size: 12px; padding: 0 12px;">Uninstall</span><span class="primary" style="height: 32px; font-size: 12px; padding: 0 12px;">Keep driver</span></div></div></div>
+  </div>
+  <!-- B -->
+  <div class="col b">
+    <div style="position: absolute; left: 40px; top: -180px; width: 520px; height: 420px; border-radius: 50%; background: radial-gradient(closest-side, rgba(232,180,90,0.28), rgba(232,180,90,0)); pointer-events: none;"></div>
+    <div style="position: absolute; left: -160px; bottom: -200px; width: 520px; height: 420px; border-radius: 50%; background: radial-gradient(closest-side, rgba(120,150,230,0.22), rgba(120,150,230,0)); pointer-events: none;"></div>
+    <div style="font-size: 12px; color: #9A9A9A; letter-spacing: 0.12em; text-transform: uppercase;">B · Prism · Sora</div>
+    <div class="row"><span class="cap">Buttons</span><span class="primary">Apply profile</span><span class="glass secondary">Reset</span></div>
+    <div class="row"><span class="cap">Badges</span><span class="badge">Ready</span><span class="badge warn">Attention</span></div>
+    <div class="row"><span class="cap">Toggle</span><span class="toggle"></span><span style="font-size: 13px; color: #B4B4B4;">Watchdog</span></div>
+    <div class="row"><span class="cap">Progress</span><span class="track"></span><span class="mono" style="font-size: 12px; color: #9A9A9A;">62%</span></div>
+    <div class="row"><span class="cap">Nav</span><span class="nav"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span>Performance</span></span></div>
+    <div class="row"><span class="cap">Tile</span><div class="glass" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; width: 120px;"><span style="font-size: 12px; color: #9A9A9A;">FPS</span><span class="mono" style="font-size: 24px; line-height: 1;">238</span></div></div>
+    <div class="row" style="align-items: flex-start;"><span class="cap" style="padding-top: 12px;">Dialog</span><div class="glass" style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; width: 250px;"><span style="font-size: 14px; font-weight: 600;">Driver still installed</span><span style="font-size: 12px; color: #B4B4B4; line-height: 1.4;">It stays active after Optima closes.</span><div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;"><span class="glass secondary" style="height: 32px; font-size: 12px; padding: 0 12px;">Uninstall</span><span class="primary" style="height: 32px; font-size: 12px; padding: 0 12px;">Keep driver</span></div></div></div>
+  </div>
+  <!-- C -->
+  <div class="col c">
+    <div style="position: absolute; left: -100px; top: 140px; width: 700px; height: 160px; transform: rotate(-14deg); background: linear-gradient(90deg, rgba(232,180,90,0), rgba(232,180,90,0.26) 50%, rgba(232,180,90,0)); filter: blur(30px); pointer-events: none;"></div>
+    <div style="font-size: 12px; color: #8F8F8F; letter-spacing: 0.12em; text-transform: uppercase;">C · HUD · Space Grotesk</div>
+    <div class="row"><span class="cap">Buttons</span><span class="primary">Apply profile</span><span class="glass secondary">Reset</span></div>
+    <div class="row"><span class="cap">Badges</span><span class="badge">Ready</span><span class="badge warn">Attention</span></div>
+    <div class="row"><span class="cap">Toggle</span><span class="toggle"></span><span style="font-size: 13px; color: #B4B4B4;">Watchdog</span></div>
+    <div class="row"><span class="cap">Progress</span><span class="track"></span><span class="mono" style="font-size: 12px; color: #8F8F8F;">62%</span></div>
+    <div class="row"><span class="cap">Nav</span><span class="nav"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg><span>Performance</span></span></div>
+    <div class="row"><span class="cap">Tile</span><div class="glass" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; width: 120px; border-left: 2px solid rgba(232,180,90,0.5);"><span style="font-size: 11px; color: #8F8F8F; letter-spacing: 0.08em; text-transform: uppercase;">FPS</span><span class="mono" style="font-size: 24px; line-height: 1;">238</span></div></div>
+    <div class="row" style="align-items: flex-start;"><span class="cap" style="padding-top: 12px;">Dialog</span><div class="glass" style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; width: 250px;"><span style="font-size: 14px; font-weight: 600;">Driver still installed</span><span style="font-size: 12px; color: #B4B4B4; line-height: 1.4;">It stays active after Optima closes.</span><div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;"><span class="glass secondary" style="height: 32px; font-size: 11px; padding: 0 12px;">Uninstall</span><span class="primary" style="height: 32px; font-size: 11px; padding: 0 12px;">Keep driver</span></div></div></div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

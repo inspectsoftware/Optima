@@ -1,12 +1,18 @@
 <UserControl x:Class="Optima.App.Views.DeveloperView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:v="clr-namespace:Optima.App.Views">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="980" HorizontalAlignment="Left">
 
       <TextBlock Text="Developer" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="Raw detection data · first place to look after a Google Play Games update"
                  Style="{StaticResource Text.PageSubtitle}" />
+
+      <!-- Glass renderer prototype for the v0.7 redesign (also opens standalone with the glass-lab switch). -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="GLASS LAB">
+        <v:GlassLabView Height="520" />
+      </HeaderedContentControl>
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="TRACKED PROCESSES">
         <HeaderedContentControl.Tag>

@@ -82,6 +82,11 @@ public partial class App : Application
         {
             window.Show();
         }
+        // --glass-lab: the v0.7 glass renderer prototype in its own window, for measurement.
+        if (e.Args.Any(a => string.Equals(a, "--glass-lab", StringComparison.OrdinalIgnoreCase)))
+        {
+            new GlassLabWindow().Show();
+        }
 
         _hotkeys = new GlobalHotkeys(window);
         _hotkeys.ConsoleRequested += ToggleConsole;
