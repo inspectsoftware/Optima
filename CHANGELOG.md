@@ -10,6 +10,8 @@ under it, plain text, no em dashes.
   preset names no longer carry the old byline.
 - README rewritten as a short feature summary.
 - Source comments trimmed to the ones that explain a constraint or a non-obvious decision.
+- The main window's caption buttons are gone. Double-click the caption or Win+Up to
+  maximize, Win+Down to minimize, Alt+F4 or the tray's EXIT to close.
 
 ## 2026-09-03 - Optima 0.7.0: liquid glass, lighter beside the game
 
