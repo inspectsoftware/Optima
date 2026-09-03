@@ -2,6 +2,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace Optima.App.Controls;
 
@@ -82,25 +83,16 @@ public sealed class AsciiBar : Control
 }
 
 /// <summary>Indeterminate counterpart to AsciiBar: a lit block travels along a fixed-width track.</summary>
+/// <summary>Indeterminate counterpart to AsciiBar: a lit block sweeps along a fixed-width track.</summary>
 public sealed class AsciiSpinner : Control
 {
-    private const char Filled = '▓';
-    private const char Empty = '░';
-
-    private readonly System.Windows.Threading.DispatcherTimer _timer;
-    private int _position;
-    private int _direction = 1;
+    private const double SweepStart = -18;
+    private const double SweepEnd = 44;
 
     public static readonly DependencyProperty CellsProperty = DependencyProperty.Register(
         nameof(Cells), typeof(int), typeof(AsciiSpinner), new PropertyMetadata(14));
 
-    public static readonly DependencyProperty HeadProperty = DependencyProperty.Register(
-        nameof(Head), typeof(int), typeof(AsciiSpinner), new PropertyMetadata(3));
-
-    private static readonly DependencyPropertyKey TextPropertyKey = DependencyProperty.RegisterReadOnly(
-        nameof(Text), typeof(string), typeof(AsciiSpinner), new PropertyMetadata(string.Empty));
-
-    public static readonly DependencyProperty TextProperty = TextPropertyKey.DependencyProperty;
+    private TranslateTransform? _sweep;
 
     public int Cells
     {
@@ -108,62 +100,38 @@ public sealed class AsciiSpinner : Control
         set => SetValue(CellsProperty, value);
     }
 
-    public int Head
-    {
-        get => (int)GetValue(HeadProperty);
-        set => SetValue(HeadProperty, value);
-    }
-
-    public string Text => (string)GetValue(TextProperty);
-
     public AsciiSpinner()
     {
-        _timer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(90),
-        };
-        _timer.Tick += (_, _) => Advance();
-
-        // Only animate while actually on screen; an off-screen page must not keep a timer alive.
-        IsVisibleChanged += (_, e) =>
-        {
-            if ((bool)e.NewValue)
-            {
-                _timer.Start();
-            }
-            else
-            {
-                _timer.Stop();
-            }
-        };
-        Unloaded += (_, _) => _timer.Stop();
-        Render();
+        IsVisibleChanged += (_, e) => SetRunning((bool)e.NewValue);
+        Unloaded += (_, _) => SetRunning(false);
     }
 
-    private void Advance()
+    // The sweep is started from code rather than a template EventTrigger on Loaded: a
+    // spinner that is collapsed when its page loads has no template tree yet, so a
+    // storyboard targeting a template name throws and takes the whole app down.
+    public override void OnApplyTemplate()
     {
-        var cells = Math.Clamp(Cells, 4, 200);
-        var head = Math.Clamp(Head, 1, cells);
-        _position += _direction;
-        if (_position + head >= cells || _position <= 0)
-        {
-            _direction = -_direction;
-            _position = Math.Clamp(_position, 0, cells - head);
-        }
-        Render();
+        base.OnApplyTemplate();
+        _sweep = (GetTemplateChild("SweepBar") as UIElement)?.RenderTransform as TranslateTransform;
+        SetRunning(IsVisible);
     }
 
-    private void Render()
+    private void SetRunning(bool running)
     {
-        var cells = Math.Clamp(Cells, 4, 200);
-        var head = Math.Clamp(Head, 1, cells);
-        var start = Math.Clamp(_position, 0, cells - head);
-
-        var builder = new StringBuilder(cells);
-        for (var i = 0; i < cells; i++)
+        if (_sweep is null)
         {
-            builder.Append(i >= start && i < start + head ? Filled : Empty);
+            return;
         }
-        SetValue(TextPropertyKey, builder.ToString());
+        if (running)
+        {
+            _sweep.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(SweepStart, SweepEnd, TimeSpan.FromSeconds(1.1))
+            {
+                RepeatBehavior = RepeatBehavior.Forever,
+            });
+        }
+        else
+        {
+            _sweep.BeginAnimation(TranslateTransform.XProperty, null);
+        }
     }
 }

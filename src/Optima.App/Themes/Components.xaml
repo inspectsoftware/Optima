@@ -136,22 +136,12 @@
       <Setter.Value>
         <ControlTemplate TargetType="ctl:AsciiSpinner">
           <Border Background="{DynamicResource Brush.Glass.Surface2}" ClipToBounds="True">
-            <Rectangle Width="18" HorizontalAlignment="Left" Fill="{TemplateBinding Foreground}">
+            <Rectangle x:Name="SweepBar" Width="18" HorizontalAlignment="Left" Fill="{TemplateBinding Foreground}">
               <Rectangle.RenderTransform>
-                <TranslateTransform x:Name="Sweep" X="-18" />
+                <TranslateTransform X="-18" />
               </Rectangle.RenderTransform>
             </Rectangle>
           </Border>
-          <ControlTemplate.Triggers>
-            <EventTrigger RoutedEvent="Loaded">
-              <BeginStoryboard>
-                <Storyboard>
-                  <DoubleAnimation Storyboard.TargetName="Sweep" Storyboard.TargetProperty="X"
-                                   From="-18" To="44" Duration="0:0:1.1" RepeatBehavior="Forever" />
-                </Storyboard>
-              </BeginStoryboard>
-            </EventTrigger>
-          </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>
     </Setter>

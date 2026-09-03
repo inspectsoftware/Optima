@@ -4,6 +4,12 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-09-03 - 0.7.1: first-run crash fix
+
+- 0.7.0 crashed on start for anyone whose first-run setup was still pending ("Optima hit
+  an unexpected error and will close", twice). The busy indicator's animation was wired
+  to a template name that does not exist yet while the indicator is hidden. Fixed.
+
 ## 2026-09-03 - Attribution and housekeeping
 
 - Optima is made by Inspect Software. The Legal page, the Discord card and the accent
