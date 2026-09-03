@@ -21,6 +21,9 @@ public sealed class EtwFrametimeCollector : IDisposable
     // Present_Start (42) and PresentMultiplaneOverlay_Start (55) mark a frame presentation.
     private static readonly int[] PresentStartEventIds = [42, 55];
 
+    // MAX_EVENT_FILTER_PID_COUNT: ETW rejects a process id filter with more entries.
+    private const int MaxFilteredPids = 8;
+
     private readonly HashSet<int> _candidatePids;
     private readonly int _intervalMs;
     private readonly Func<IpcEvent, Task> _publish;
@@ -46,7 +49,18 @@ public sealed class EtwFrametimeCollector : IDisposable
         {
             StopOnDispose = true,
         };
-        _session.EnableProvider(DxgiProvider, TraceEventLevel.Informational);
+        // Kernel-side filters: only the two present events, and (when the candidate list fits
+        // ETW's eight-pid limit) only from the candidate processes. Without them every DXGI
+        // event of every process on the machine lands in the session buffers, and the game
+        // itself pays the per-event cost of emitting the ones the callback then discards.
+        var options = new TraceEventProviderOptions { EventIDsToEnable = [.. PresentStartEventIds] };
+        if (_candidatePids.Count <= MaxFilteredPids)
+        {
+            options.ProcessIDFilter = [.. _candidatePids];
+        }
+        _session.EnableProvider(DxgiProvider, TraceEventLevel.Informational, ulong.MaxValue, options);
+        HelperLog.Write("ETW present trace enabled, pid filter: "
+            + (options.ProcessIDFilter is null ? "none (too many candidates)" : string.Join(',', options.ProcessIDFilter)));
 
         _session.Source.Dynamic.All += OnEvent;
         _session.Source.AllEvents += OnAnyEvent;

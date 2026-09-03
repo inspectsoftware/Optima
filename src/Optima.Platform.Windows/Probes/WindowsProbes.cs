@@ -81,20 +81,6 @@ public sealed class WindowsFileSystemProbe : IFileSystemProbe
 
 public sealed class WindowsProcessProbe : IProcessProbe
 {
-    public IReadOnlyList<(int Id, string Name)> GetProcesses()
-    {
-        var result = new List<(int, string)>();
-        foreach (var process in Process.GetProcesses())
-        {
-            try
-            {
-                result.Add((process.Id, process.ProcessName));
-            }
-            finally
-            {
-                process.Dispose();
-            }
-        }
-        return result;
-    }
+    // Detection runs on every environment refresh; the snapshot keeps that a sub-millisecond scan.
+    public IReadOnlyList<(int Id, string Name)> GetProcesses() => NativeMethods.ProcessSnapshot.GetRunning();
 }

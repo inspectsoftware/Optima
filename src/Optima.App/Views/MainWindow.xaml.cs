@@ -39,6 +39,14 @@ public partial class MainWindow : Window
         MouseLeave += (_, _) => GlassPanel.ClearLights();
         Activated += (_, _) => Motion.SetForeground(true);
         Deactivated += (_, _) => Motion.SetForeground(false);
+        // Hidden to the tray: nothing to light or drift, whatever the activation state says.
+        IsVisibleChanged += (_, _) =>
+        {
+            if (!IsVisible)
+            {
+                Motion.SetForeground(false);
+            }
+        };
         Motion.Changed += OnMotionChanged;
 
         DataContextChanged += (_, args) =>

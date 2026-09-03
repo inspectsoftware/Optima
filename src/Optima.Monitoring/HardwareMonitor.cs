@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Win32.SafeHandles;
 using Optima.Core.Abstractions;
 using Optima.Core.Models;
 using Optima.Monitoring.Nvidia;
@@ -8,9 +9,12 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Monitoring;
 
 /// <summary>
-/// Live dashboard feed (§12): one sample per second. CPU comes from GetSystemTimes deltas,
-/// RAM from GlobalMemoryStatusEx, GPU from NVML when present (RTX systems) with Windows
-/// "GPU Engine" performance counters as fallback, and per-process usage for the game PIDs.
+/// Live dashboard feed (§12): one sample per second while someone can see it. CPU comes from
+/// GetSystemTimes deltas, RAM from GlobalMemoryStatusEx, GPU from NVML when present (RTX
+/// systems) with one "GPU Engine" category read as the fallback, and per-process usage for
+/// the game pids through kept handles. Start and stop are cheap and repeatable: the app
+/// pauses the loop whenever the window is hidden or minimized, so a game on screen never
+/// pays for tiles nobody is looking at.
 /// </summary>
 public sealed class HardwareMonitor : IPerformanceMonitor
 {
@@ -18,16 +22,19 @@ public sealed class HardwareMonitor : IPerformanceMonitor
 
     private readonly ILogger<HardwareMonitor> _logger;
     private readonly object _stateLock = new();
+    private readonly SemaphoreSlim _lifecycle = new(1, 1);
 
     private NvmlGpuReader? _nvml;
-    private PerformanceCounter[]? _gpuEngineCounters;
+    private GpuEngineCounters? _gpuEngines;
+    private bool _gpuEnginesUnavailable;
     private PerformanceCounter? _cpuPerformanceCounter;
+    private bool _countersInitialized;
     private double _cpuBaseMhz;
     private CancellationTokenSource? _cts;
     private Task? _loop;
 
     private long _prevIdle, _prevKernel, _prevUser;
-    private IReadOnlyList<int> _gameProcessIds = [];
+    private readonly Dictionary<int, SafeProcessHandle> _gameProcesses = [];
     private readonly Dictionary<int, TimeSpan> _prevProcessCpu = [];
     private DateTimeOffset _prevProcessSample = DateTimeOffset.MinValue;
 
@@ -44,21 +51,90 @@ public sealed class HardwareMonitor : IPerformanceMonitor
     {
         lock (_stateLock)
         {
-            _gameProcessIds = processIds;
-            _prevProcessCpu.Clear();
+            foreach (var pid in _gameProcesses.Keys.Where(pid => !processIds.Contains(pid)).ToList())
+            {
+                _gameProcesses[pid].Dispose();
+                _gameProcesses.Remove(pid);
+                _prevProcessCpu.Remove(pid);
+            }
+            foreach (var pid in processIds)
+            {
+                if (!_gameProcesses.ContainsKey(pid) && ProcessQuery.Open(pid) is { } handle)
+                {
+                    _gameProcesses[pid] = handle;
+                }
+            }
         }
     }
 
-    public Task StartAsync(CancellationToken ct = default)
+    public async Task StartAsync(CancellationToken ct = default)
     {
-        if (_loop is not null)
+        await _lifecycle.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            return Task.CompletedTask;
+            if (_loop is not null)
+            {
+                return;
+            }
+
+            InitializeCountersOnce();
+            ProcessNative.GetSystemTimes(out _prevIdle, out _prevKernel, out _prevUser);
+            lock (_stateLock)
+            {
+                _prevProcessCpu.Clear();
+                _prevProcessSample = DateTimeOffset.MinValue;
+            }
+
+            _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+            _loop = Task.Run(() => SampleLoopAsync(token), CancellationToken.None);
+            _logger.LogInformation("Hardware monitor sampling (NVML available: {Nvml})", _nvml?.IsAvailable ?? false);
         }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    public async Task StopAsync()
+    {
+        await _lifecycle.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var loop = _loop;
+            if (loop is null)
+            {
+                return;
+            }
+            _cts?.Cancel();
+            try
+            {
+                await loop.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            _cts?.Dispose();
+            _cts = null;
+            _loop = null;
+            _logger.LogDebug("Hardware monitor paused");
+        }
+        finally
+        {
+            _lifecycle.Release();
+        }
+    }
+
+    /// <summary>Counter handles survive pause/resume; opening them is the expensive part.</summary>
+    private void InitializeCountersOnce()
+    {
+        if (_countersInitialized)
+        {
+            return;
+        }
+        _countersInitialized = true;
 
         _nvml = new NvmlGpuReader();
-        _logger.LogInformation("Hardware monitor starting (NVML available: {Nvml})", _nvml.IsAvailable);
-
         try
         {
             _cpuPerformanceCounter = new PerformanceCounter("Processor Information", "% Processor Performance", "_Total", readOnly: true);
@@ -69,31 +145,7 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             _logger.LogDebug(ex, "CPU performance counter unavailable");
             _cpuPerformanceCounter = null;
         }
-
         _cpuBaseMhz = ReadCpuBaseMhz();
-        ProcessNative.GetSystemTimes(out _prevIdle, out _prevKernel, out _prevUser);
-
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _loop = Task.Run(() => SampleLoopAsync(_cts.Token), CancellationToken.None);
-        return Task.CompletedTask;
-    }
-
-    public async Task StopAsync()
-    {
-        _cts?.Cancel();
-        if (_loop is not null)
-        {
-            try
-            {
-                await _loop.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
-        _loop = null;
-        _cts?.Dispose();
-        _cts = null;
     }
 
     private async Task SampleLoopAsync(CancellationToken ct)
@@ -154,7 +206,7 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         }
         else
         {
-            gpuUtil = SampleGpuEngineCounters();
+            gpuUtil = SampleGpuEngines();
         }
 
         // ---- Game processes ----
@@ -177,31 +229,28 @@ public sealed class HardwareMonitor : IPerformanceMonitor
 
     private (double CpuPercent, ulong RamBytes) SampleGameProcesses()
     {
-        IReadOnlyList<int> pids;
         lock (_stateLock)
         {
-            pids = _gameProcessIds;
-        }
-        if (pids.Count == 0)
-        {
-            return (0, 0);
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var elapsed = _prevProcessSample == DateTimeOffset.MinValue ? Interval : now - _prevProcessSample;
-        _prevProcessSample = now;
-
-        double cpuPercent = 0;
-        ulong ramBytes = 0;
-        foreach (var pid in pids)
-        {
-            try
+            if (_gameProcesses.Count == 0)
             {
-                using var process = Process.GetProcessById(pid);
-                ramBytes += (ulong)process.WorkingSet64;
+                return (0, 0);
+            }
 
-                var cpuNow = process.TotalProcessorTime;
-                lock (_stateLock)
+            var now = DateTimeOffset.UtcNow;
+            var elapsed = _prevProcessSample == DateTimeOffset.MinValue ? Interval : now - _prevProcessSample;
+            _prevProcessSample = now;
+
+            double cpuPercent = 0;
+            ulong ramBytes = 0;
+            foreach (var (pid, handle) in _gameProcesses)
+            {
+                // A process that exited keeps answering with its final numbers until the next
+                // pid refresh drops it; a stale handle that stops answering is simply skipped.
+                if (ProcessQuery.GetWorkingSetBytes(handle) is { } workingSet)
+                {
+                    ramBytes += workingSet;
+                }
+                if (ProcessQuery.GetTotalProcessorTime(handle) is { } cpuNow)
                 {
                     if (_prevProcessCpu.TryGetValue(pid, out var cpuPrev) && elapsed > TimeSpan.Zero)
                     {
@@ -211,52 +260,26 @@ public sealed class HardwareMonitor : IPerformanceMonitor
                     _prevProcessCpu[pid] = cpuNow;
                 }
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
-            {
-                // Process exited or access denied, so skip it this tick.
-            }
+            return (Math.Clamp(cpuPercent, 0, 100), ramBytes);
         }
-        return (Math.Clamp(cpuPercent, 0, 100), ramBytes);
     }
 
-    /// <summary>Fallback GPU utilization: sum of 3D-engine "GPU Engine" counters (documented PDH).</summary>
-    private double SampleGpuEngineCounters()
+    /// <summary>Fallback GPU utilization (documented PDH "GPU Engine" counters, one category read per tick).</summary>
+    private double SampleGpuEngines()
     {
+        if (_gpuEnginesUnavailable)
+        {
+            return 0;
+        }
         try
         {
-            if (_gpuEngineCounters is null)
-            {
-                var category = new PerformanceCounterCategory("GPU Engine");
-                _gpuEngineCounters = category.GetInstanceNames()
-                    .Where(name => name.EndsWith("engtype_3D", StringComparison.OrdinalIgnoreCase))
-                    .Select(name => new PerformanceCounter("GPU Engine", "Utilization Percentage", name, readOnly: true))
-                    .ToArray();
-                foreach (var counter in _gpuEngineCounters)
-                {
-                    _ = counter.NextValue(); // warm-up
-                }
-                return 0;
-            }
-
-            double sum = 0;
-            foreach (var counter in _gpuEngineCounters)
-            {
-                try
-                {
-                    sum += counter.NextValue();
-                }
-                catch (InvalidOperationException)
-                {
-                    // Instance disappeared (process exited), so rebuild next tick.
-                    DisposeGpuCounters();
-                    return 0;
-                }
-            }
-            return Math.Clamp(sum, 0, 100);
+            _gpuEngines ??= new GpuEngineCounters();
+            return _gpuEngines.Sample();
         }
-        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
-            _logger.LogDebug(ex, "GPU Engine counters unavailable");
+            _logger.LogDebug(ex, "GPU Engine counters unavailable; GPU utilization stays at 0");
+            _gpuEnginesUnavailable = true;
             return 0;
         }
     }
@@ -278,22 +301,17 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         return 0;
     }
 
-    private void DisposeGpuCounters()
-    {
-        if (_gpuEngineCounters is not null)
-        {
-            foreach (var counter in _gpuEngineCounters)
-            {
-                counter.Dispose();
-            }
-            _gpuEngineCounters = null;
-        }
-    }
-
     public async ValueTask DisposeAsync()
     {
         await StopAsync().ConfigureAwait(false);
-        DisposeGpuCounters();
+        lock (_stateLock)
+        {
+            foreach (var handle in _gameProcesses.Values)
+            {
+                handle.Dispose();
+            }
+            _gameProcesses.Clear();
+        }
         _cpuPerformanceCounter?.Dispose();
         _nvml?.Dispose();
     }

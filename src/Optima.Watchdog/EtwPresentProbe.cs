@@ -25,7 +25,10 @@ public static class EtwPresentProbe
         {
             StopOnDispose = true,
         };
-        session.EnableProvider(DxgiProvider, TraceEventLevel.Informational);
+        // No process filter on purpose (that is the question the probe answers), but only the
+        // present events: everything else the DXGI provider emits would be dropped anyway.
+        session.EnableProvider(DxgiProvider, TraceEventLevel.Informational, ulong.MaxValue,
+            new TraceEventProviderOptions { EventIDsToEnable = [.. PresentStartEventIds] });
 
         session.Source.Dynamic.All += OnManifestEvent;
         session.Source.AllEvents += OnAnyEvent;

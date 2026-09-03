@@ -86,6 +86,12 @@ public partial class App : Application
         {
             window.Show();
         }
+        else
+        {
+            // Never activated, so the window would otherwise count as foreground and keep
+            // the ambient drift ticking on a window nobody can see.
+            Motion.SetForeground(false);
+        }
         // --glass-lab: the v0.7 glass renderer prototype in its own window, for measurement.
         if (e.Args.Any(a => string.Equals(a, "--glass-lab", StringComparison.OrdinalIgnoreCase)))
         {
@@ -138,7 +144,58 @@ public partial class App : Application
         discord.AttachLauncherWindow(window);
         _ = discord.StartAsync();
 
+        // The dashboard tiles are the only reader of the hardware monitor, so it samples only
+        // while the window can be seen. Hidden to the tray or minimized, it pauses, and with
+        // it the per-second counter, NVML and per-process traffic beside a running game.
+        var hardware = _host.Services.GetRequiredService<IPerformanceMonitor>();
+        void SyncHardwareMonitor()
+        {
+            var wanted = window.IsVisible && window.WindowState != WindowState.Minimized;
+            _ = RunQuietlyAsync(wanted ? hardware.StartAsync() : hardware.StopAsync(), "Hardware monitor toggle");
+        }
+        window.IsVisibleChanged += (_, _) => SyncHardwareMonitor();
+        window.StateChanged += (_, _) => SyncHardwareMonitor();
+        SyncHardwareMonitor();
+
+        // Game first: while the game is on screen, Optima's own process runs below normal
+        // priority so none of its background work competes with the emulator for CPU time.
+        var presence = _host.Services.GetRequiredService<Optima.Core.Monitoring.GamePresenceService>();
+        presence.PresenceChanged += change =>
+            SetOwnPriority(gameOnScreen: change.Current == Optima.Core.Monitoring.GamePresence.InGame);
+
         _ = mainViewModel.InitializeAsync();
+    }
+
+    private static async Task RunQuietlyAsync(Task task, string what)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "{What} failed", what);
+        }
+    }
+
+    private static void SetOwnPriority(bool gameOnScreen)
+    {
+        try
+        {
+            using var self = System.Diagnostics.Process.GetCurrentProcess();
+            var target = gameOnScreen
+                ? System.Diagnostics.ProcessPriorityClass.BelowNormal
+                : System.Diagnostics.ProcessPriorityClass.Normal;
+            if (self.PriorityClass != target)
+            {
+                self.PriorityClass = target;
+                Log.Information("Optima process priority set to {Priority}", target);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Could not change the Optima process priority");
+        }
     }
 
     /// <summary>Global Alt+F9: floating log console over whatever is on screen, without stealing focus.</summary>

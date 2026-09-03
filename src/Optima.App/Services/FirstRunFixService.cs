@@ -96,6 +96,8 @@ public sealed class FirstRunFixService
                     _logger.LogInformation("EnableWindowsFeature {Feature}: {Ok} {Error}",
                         feature, response.Success, response.Error);
                 }
+                // The feature state is cached for the life of the process; it just changed.
+                _systemInfo.InvalidateCache();
             }
         }
 

@@ -4,34 +4,19 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
-## 2026-09-02 - 0.7.0 preview 2: the liquid glass redesign
+## 2026-09-03 - Optima 0.7.0: liquid glass, lighter beside the game
 
-- Every page is rebuilt in the HUD glass language: chamfered glass strips that refract
-  a drifting ambient field, a specular top edge and a chroma leading edge, a grouped
-  navigation rail with icons (collapses to icons with Alt+B), the caption dissolved into
-  the shell, and rounded window corners. Terminal artifacts (dot leaders, ASCII bars,
-  bracket tags, block sparklines) are gone; status words are badges, sparklines are
-  vector, buttons and fields are chamfered.
-- Home is the launch surface (profile chips and Play), Play is the session page with the
-  launch steps ticking off, elapsed time and the terminate control. Performance folds
-  the per-setting disclosure into the profile editor. Settings is two columns.
-- Motion: pages crossfade with a rise, the pointer lights the glass, the ambient field
-  drifts and shifts warmer while a game runs, and the window slips toward the tray when
-  the game is confirmed running (reverse on return). All of it follows the Windows
-  "animation effects" switch by default; Settings > Appearance > motion opts out.
-- Dialogs (restore prompt, driver removal, driver-on-exit) and the first-run setup share
-  the same glass. The Glass lab stays on the Developer page.
-
-## 2026-09-02 - Driver reminder when Optima closes
-
-- Closing Optima completely (the window's close button without "keep in tray", or EXIT in
-  the tray menu) now warns that the virtual display driver is still installed and stays
-  active in Windows. The pop-up offers "Keep driver", "Uninstall driver" (one
-  administrator prompt, then Optima closes) or "Cancel" to stay in the app. Nothing is
-  asked when the driver is not installed.
-- If the removal fails (for example a declined administrator prompt), Optima says so and
-  stays open instead of quietly leaving the driver behind.
-- Hiding to the tray, crashes and Windows logoff never show the question.
+- New liquid glass design on every page: chamfered glass over a drifting ambient field,
+  an icon rail (Alt+B collapses it), rounded window corners, glass dialogs and setup.
+  Motion follows the Windows animation switch; Settings > Appearance opts out.
+- Home launches, Play runs the session (steps, elapsed time, terminate), Performance
+  edits profiles with every setting explained in place.
+- Far less background load while you play: the status tick no longer runs WMI queries
+  and full detection every ten seconds, process scans are cheap snapshots, the hardware
+  monitor pauses while the window is hidden, and the frametime trace only listens to the
+  game's own present events.
+- Optima drops to below-normal priority while the game is on screen.
+- Closing Optima completely asks whether to keep or uninstall the virtual display driver.
 
 ## 2026-08-30 - Company attribution
 

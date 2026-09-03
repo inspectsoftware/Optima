@@ -1,8 +1,10 @@
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
+using Optima.Core.Monitoring;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
@@ -32,7 +34,13 @@ public sealed partial class StatusItem : ObservableObject
     private StatusKind _kind = StatusKind.Unknown;
 }
 
-/// <summary>Shared environment status shown on HOME and in the sidebar footer (§3).</summary>
+/// <summary>
+/// Shared environment status shown on HOME and in the sidebar footer (§3). Two refresh
+/// paths on purpose: <see cref="RefreshAsync"/> is the full environment check (detection,
+/// WMI, driver state) for startup, the refresh button and after a change on the Display
+/// page; <see cref="RefreshLiveAsync"/> is the cheap tick for the things that actually
+/// move while the app sits beside a game (running badge, display readout).
+/// </summary>
 public sealed partial class StatusViewModel : ObservableObject
 {
     private readonly IGameDetector _detector;
@@ -40,8 +48,10 @@ public sealed partial class StatusViewModel : ObservableObject
     private readonly IDriverInstaller _driverInstaller;
     private readonly ISystemInfoService _systemInfo;
     private readonly IProcessMonitor _processMonitor;
+    private readonly GamePresenceService _presence;
     private readonly SettingsService _settings;
     private readonly ILogger<StatusViewModel> _logger;
+    private DriverState? _lastDriverState;
 
     public StatusViewModel(
         IGameDetector detector,
@@ -49,6 +59,7 @@ public sealed partial class StatusViewModel : ObservableObject
         IDriverInstaller driverInstaller,
         ISystemInfoService systemInfo,
         IProcessMonitor processMonitor,
+        GamePresenceService presence,
         SettingsService settings,
         ILogger<StatusViewModel> logger)
     {
@@ -57,8 +68,14 @@ public sealed partial class StatusViewModel : ObservableObject
         _driverInstaller = driverInstaller;
         _systemInfo = systemInfo;
         _processMonitor = processMonitor;
+        _presence = presence;
         _settings = settings;
         _logger = logger;
+
+        // The Watchdog already scans for the game every couple of seconds; the badge follows
+        // its edges instead of running a scan of its own.
+        _presence.PresenceChanged += _ => Application.Current?.Dispatcher.BeginInvoke(
+            () => GameIsRunning = _presence.Current == GamePresence.InGame);
     }
 
     public StatusItem GooglePlayGames { get; } = new("Google Play Games");
@@ -73,6 +90,7 @@ public sealed partial class StatusViewModel : ObservableObject
     public InstalledGame? DetectedGame { get; private set; }
     public GooglePlayGamesInstallation? DetectedPlatform { get; private set; }
 
+    /// <summary>The full environment check. Not for a timer: it costs WMI and PnP queries.</summary>
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken ct = default)
     {
@@ -91,18 +109,8 @@ public sealed partial class StatusViewModel : ObservableObject
 
             // Device presence is the authority. A leftover settings file from a driver that
             // has since been uninstalled would otherwise report READY with no device at all.
-            var driverState = await _driverInstaller.GetStateAsync(ct);
-            if (driverState != DriverState.Installed)
-            {
-                Set(VirtualDisplay,
-                    driverState == DriverState.NotInstalledPackageAvailable ? "NOT INSTALLED" : "NO DRIVER",
-                    StatusKind.Warning);
-            }
-            else
-            {
-                var vddActive = await _virtualDisplay.IsDisplayActiveAsync(ct);
-                Set(VirtualDisplay, vddActive ? "ACTIVE" : "READY", StatusKind.Good);
-            }
+            _lastDriverState = await _driverInstaller.GetStateAsync(ct);
+            await RefreshVirtualDisplayAsync(ct);
 
             var virtualization = await _systemInfo.GetVirtualizationStateAsync(ct);
             var virtOk = virtualization.HypervisorPresent == true || virtualization.FirmwareVirtualizationEnabled == true;
@@ -110,30 +118,7 @@ public sealed partial class StatusViewModel : ObservableObject
                 virtOk ? "ENABLED" : "DISABLED",
                 virtOk ? StatusKind.Good : StatusKind.Bad);
 
-            // Not a status word but a measurement, so it keeps its natural casing.
-            // The readout answers "which display drives the FPS cap": the virtual display
-            // whenever it is attached (that is where the game renders during an uncapped
-            // session), otherwise the physical primary.
-            var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
-            var virtualInfo = await _virtualDisplay.GetDisplayInfoAsync(ct);
-            if (virtualInfo is not null)
-            {
-                var name = DisplayPresentation.CustomName(virtualInfo, overrides) ?? "virtual";
-                // Between sessions the driver parks the display on a bogus placeholder mode
-                // (999/9999 Hz); report that as idle rather than as a real mode.
-                Set(Display,
-                    virtualInfo.CurrentMode.IsValid ? $"{virtualInfo.CurrentMode} on {name}" : $"idle on {name}",
-                    StatusKind.Good);
-            }
-            else
-            {
-                var displays = (await _systemInfo.GetInventoryAsync(ct)).Displays;
-                var primary = displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault(d => d.IsActive);
-                var name = primary is null ? null : DisplayPresentation.CustomName(primary, overrides) ?? "primary";
-                Set(Display,
-                    primary is null ? "UNKNOWN" : $"{primary.CurrentMode} on {name}",
-                    primary is null ? StatusKind.Warning : StatusKind.Good);
-            }
+            await RefreshDisplayReadoutAsync(ct);
 
             GameIsRunning = await _processMonitor.GetGameStateAsync(ct) == GameRuntimeState.Running;
         }
@@ -143,6 +128,69 @@ public sealed partial class StatusViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Status refresh failed");
+        }
+    }
+
+    /// <summary>The periodic tick: only what moves at runtime, nothing that needs WMI.</summary>
+    public async Task RefreshLiveAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await RefreshVirtualDisplayAsync(ct);
+            await RefreshDisplayReadoutAsync(ct);
+            GameIsRunning = _presence.Current == GamePresence.InGame;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Live status refresh failed");
+        }
+    }
+
+    private async Task RefreshVirtualDisplayAsync(CancellationToken ct)
+    {
+        var driverState = _lastDriverState ?? await _driverInstaller.GetStateAsync(ct);
+        _lastDriverState = driverState;
+        if (driverState != DriverState.Installed)
+        {
+            Set(VirtualDisplay,
+                driverState == DriverState.NotInstalledPackageAvailable ? "NOT INSTALLED" : "NO DRIVER",
+                StatusKind.Warning);
+        }
+        else
+        {
+            var vddActive = await _virtualDisplay.IsDisplayActiveAsync(ct);
+            Set(VirtualDisplay, vddActive ? "ACTIVE" : "READY", StatusKind.Good);
+        }
+    }
+
+    private async Task RefreshDisplayReadoutAsync(CancellationToken ct)
+    {
+        // Not a status word but a measurement, so it keeps its natural casing.
+        // The readout answers "which display drives the FPS cap": the virtual display
+        // whenever it is attached (that is where the game renders during an uncapped
+        // session), otherwise the physical primary.
+        var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
+        var virtualInfo = await _virtualDisplay.GetDisplayInfoAsync(ct);
+        if (virtualInfo is not null)
+        {
+            var name = DisplayPresentation.CustomName(virtualInfo, overrides) ?? "virtual";
+            // Between sessions the driver parks the display on a bogus placeholder mode
+            // (999/9999 Hz); report that as idle rather than as a real mode.
+            Set(Display,
+                virtualInfo.CurrentMode.IsValid ? $"{virtualInfo.CurrentMode} on {name}" : $"idle on {name}",
+                StatusKind.Good);
+        }
+        else
+        {
+            var displays = (await _systemInfo.GetInventoryAsync(ct)).Displays;
+            var primary = displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault(d => d.IsActive);
+            var name = primary is null ? null : DisplayPresentation.CustomName(primary, overrides) ?? "primary";
+            Set(Display,
+                primary is null ? "UNKNOWN" : $"{primary.CurrentMode} on {name}",
+                primary is null ? StatusKind.Warning : StatusKind.Good);
         }
     }
 

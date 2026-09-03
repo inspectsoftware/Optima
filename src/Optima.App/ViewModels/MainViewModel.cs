@@ -297,11 +297,11 @@ public sealed partial class MainViewModel : ObservableObject
             await Status.RefreshAsync();
             await Home.InitializeAsync();
             await Play.InitializeAsync();
-            await _monitor.StartAsync();
+            // The hardware monitor is started and paused by App with the window's visibility.
             await _presence.StartAsync();
             await _gameWatch.StartAsync();
 
-            // 5. Keep the "running" badge and game process ids current.
+            // 5. Keep the game process ids and the live status readouts current.
             _ = Task.Run(BackgroundStatusLoopAsync);
         }
         catch (Exception ex)
@@ -310,19 +310,35 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// The ten-second tick. Deliberately cheap: it used to re-run the whole environment
+    /// check (WMI, PnP, platform detection, two process scans) every time, which showed up
+    /// as periodic hitches in the game. Now it feeds the hardware monitor the game pids only
+    /// while the Watchdog says the game stack is up, and refreshes just the live readouts.
+    /// </summary>
     private async Task BackgroundStatusLoopAsync()
     {
+        var hadGamePids = false;
         while (Application.Current is not null)
         {
             try
             {
-                var tracked = await _processMonitor.GetTrackedProcessesAsync();
-                _monitor.SetGameProcessIds(tracked
-                    .Where(p => p.Kind is TrackedProcessKind.Emulator or TrackedProcessKind.GameWindow)
-                    .Select(p => p.ProcessId)
-                    .ToList());
+                if (_presence.Current != Core.Monitoring.GamePresence.NotRunning)
+                {
+                    var tracked = await _processMonitor.GetTrackedProcessesAsync();
+                    _monitor.SetGameProcessIds(tracked
+                        .Where(p => p.Kind is TrackedProcessKind.Emulator or TrackedProcessKind.GameWindow)
+                        .Select(p => p.ProcessId)
+                        .ToList());
+                    hadGamePids = true;
+                }
+                else if (hadGamePids)
+                {
+                    _monitor.SetGameProcessIds([]);
+                    hadGamePids = false;
+                }
 
-                await Application.Current.Dispatcher.InvokeAsync(async () => await Status.RefreshAsync());
+                await Application.Current.Dispatcher.InvokeAsync(() => Status.RefreshLiveAsync()).Task.Unwrap();
             }
             catch (Exception ex)
             {

@@ -13,6 +13,7 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
     private readonly IDisplayService _displayService;
     private readonly ILogger<WindowsSystemInfoService> _logger;
     private SystemInventory? _cached;
+    private Task<VirtualizationState>? _virtualization;
 
     public WindowsSystemInfoService(IDisplayService displayService, ILogger<WindowsSystemInfoService> logger)
     {
@@ -36,6 +37,22 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
     }
 
     public Task<VirtualizationState> GetVirtualizationStateAsync(CancellationToken ct = default)
+    {
+        // Five WMI queries (three of them against Win32_OptionalFeature, the slow one) answer a
+        // question that only changes across a reboot, and the status bar used to ask it every
+        // ten seconds, game or no game. One query per launch; InvalidateCache after a feature
+        // enable so diagnostics see the new state without a restart of Optima.
+        var pending = _virtualization;
+        if (pending is null || pending.IsFaulted || pending.IsCanceled)
+        {
+            pending = _virtualization = QueryVirtualizationStateAsync();
+        }
+        return pending.WaitAsync(ct);
+    }
+
+    public void InvalidateCache() => _virtualization = null;
+
+    private Task<VirtualizationState> QueryVirtualizationStateAsync()
         => Task.Run(() =>
         {
             bool? firmware = null;
@@ -74,7 +91,7 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
                 VirtualMachinePlatformEnabled = GetOptionalFeatureEnabled("VirtualMachinePlatform"),
                 WindowsHypervisorPlatformEnabled = GetOptionalFeatureEnabled("HypervisorPlatform"),
             };
-        }, ct);
+        });
 
     private SystemInventory BuildInventory()
     {

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Optima.Core.Abstractions;
 using Optima.Core.Detection;
@@ -12,6 +11,9 @@ namespace Optima.Platform.Windows.Services;
 /// Watches Google Play Games / emulator / game processes by polling (§9). Process names come
 /// from configurable detection rules, never hardcoded (§29). "Game running" means a visible
 /// top-level window whose title matches the configured pattern while the emulator process lives.
+/// Every scan is a Toolhelp snapshot plus one window enumeration (see <see cref="ProcessSnapshot"/>),
+/// because the Watchdog's presence loop, the session exit wait and the status tick all run
+/// these while the game is on screen.
 /// </summary>
 public sealed class WindowsProcessMonitor : IProcessMonitor
 {
@@ -37,39 +39,32 @@ public sealed class WindowsProcessMonitor : IProcessMonitor
                 .ToDictionary(g => g.Key, g => g.First().Title);
 
             var tracked = new List<TrackedProcess>();
-            foreach (var process in Process.GetProcesses())
+            foreach (var (id, name) in ProcessSnapshot.GetRunning())
             {
-                try
+                var kind = Classify(name, windowsByPid.GetValueOrDefault(id), rules);
+                if (kind == TrackedProcessKind.Other)
                 {
-                    var kind = Classify(process.ProcessName, windowsByPid.GetValueOrDefault(process.Id), rules);
-                    if (kind == TrackedProcessKind.Other)
-                    {
-                        continue;
-                    }
-
-                    DateTimeOffset? started = null;
-                    try
-                    {
-                        started = process.StartTime;
-                    }
-                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
-                    {
-                        // Access denied / exited, so start time stays unknown.
-                    }
-
-                    tracked.Add(new TrackedProcess
-                    {
-                        ProcessId = process.Id,
-                        Name = process.ProcessName,
-                        MainWindowTitle = windowsByPid.GetValueOrDefault(process.Id, string.Empty),
-                        Kind = kind,
-                        StartedAt = started,
-                    });
+                    continue;
                 }
-                finally
+
+                // Start time needs a handle; access denied / already exited leaves it unknown.
+                DateTimeOffset? started = null;
+                using (var handle = ProcessQuery.Open(id))
                 {
-                    process.Dispose();
+                    if (handle is not null)
+                    {
+                        started = ProcessQuery.GetStartTime(handle);
+                    }
                 }
+
+                tracked.Add(new TrackedProcess
+                {
+                    ProcessId = id,
+                    Name = name,
+                    MainWindowTitle = windowsByPid.GetValueOrDefault(id, string.Empty),
+                    Kind = kind,
+                    StartedAt = started,
+                });
             }
             return tracked;
         }, ct).ConfigureAwait(false);
@@ -161,18 +156,11 @@ public sealed class WindowsProcessMonitor : IProcessMonitor
 
     private static int? FirstProcessMatching(IReadOnlyList<string> patterns)
     {
-        foreach (var process in Process.GetProcesses())
+        foreach (var (id, name) in ProcessSnapshot.GetRunning())
         {
-            try
+            if (GameDetectionEngine.MatchesAny(name, patterns))
             {
-                if (GameDetectionEngine.MatchesAny(process.ProcessName, patterns))
-                {
-                    return process.Id;
-                }
-            }
-            finally
-            {
-                process.Dispose();
+                return id;
             }
         }
         return null;
