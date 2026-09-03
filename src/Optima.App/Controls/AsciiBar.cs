@@ -112,13 +112,19 @@ public sealed class AsciiSpinner : Control
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
-        _sweep = (GetTemplateChild("SweepBar") as UIElement)?.RenderTransform as TranslateTransform;
+        // The transform is created here, not in the template: WPF freezes unnamed template
+        // freezables, and a frozen transform cannot be animated.
+        _sweep = new TranslateTransform(SweepStart, 0);
+        if (GetTemplateChild("SweepBar") is UIElement bar)
+        {
+            bar.RenderTransform = _sweep;
+        }
         SetRunning(IsVisible);
     }
 
     private void SetRunning(bool running)
     {
-        if (_sweep is null)
+        if (_sweep is null || _sweep.IsFrozen)
         {
             return;
         }

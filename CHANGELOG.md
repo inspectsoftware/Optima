@@ -4,6 +4,13 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-09-03 - 0.7.2: the busy indicator, fixed for real
+
+- 0.7.1 still closed with the same error box as soon as a page with a busy indicator
+  opened (Diagnostics, Display, the first-run setup): the replacement animation ran into
+  a transform WPF had frozen. The indicator now builds its own transform. Verified on
+  those pages and on a forced first run.
+
 ## 2026-09-03 - 0.7.1: first-run crash fix
 
 - 0.7.0 crashed on start for anyone whose first-run setup was still pending ("Optima hit

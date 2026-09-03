@@ -136,11 +136,7 @@
       <Setter.Value>
         <ControlTemplate TargetType="ctl:AsciiSpinner">
           <Border Background="{DynamicResource Brush.Glass.Surface2}" ClipToBounds="True">
-            <Rectangle x:Name="SweepBar" Width="18" HorizontalAlignment="Left" Fill="{TemplateBinding Foreground}">
-              <Rectangle.RenderTransform>
-                <TranslateTransform X="-18" />
-              </Rectangle.RenderTransform>
-            </Rectangle>
+            <Rectangle x:Name="SweepBar" Width="18" HorizontalAlignment="Left" Fill="{TemplateBinding Foreground}" />
           </Border>
         </ControlTemplate>
       </Setter.Value>
