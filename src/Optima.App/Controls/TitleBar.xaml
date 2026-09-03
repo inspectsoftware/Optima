@@ -34,8 +34,7 @@
               Visibility="{Binding ShowMaximize, ElementName=Root, Converter={StaticResource BoolToVis}}">
         <ctl:Icon x:Name="MaximizeGlyph" Symbol="{StaticResource Icon.Maximize}" Size="13" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
       </Button>
-      <Button Style="{StaticResource CaptionButton.Close}" Click="OnClose" ToolTip="Close"
-              Visibility="{Binding ShowClose, ElementName=Root, Converter={StaticResource BoolToVis}}">
+      <Button Style="{StaticResource CaptionButton.Close}" Click="OnClose" ToolTip="Close">
         <ctl:Icon Symbol="{StaticResource Icon.Close}" Size="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
       </Button>
     </StackPanel>

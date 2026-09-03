@@ -178,7 +178,6 @@
           </Grid.RowDefinitions>
 
           <ctl:TitleBar x:Name="Caption" Grid.Row="0"
-                        ShowMinimize="False" ShowMaximize="False" ShowClose="False"
                         Breadcrumb="{Binding Breadcrumb}"
                         SessionTag="{Binding Play.SessionTag}" />
 

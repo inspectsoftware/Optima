@@ -19,9 +19,6 @@ public partial class TitleBar : UserControl
     public static readonly DependencyProperty ShowMaximizeProperty = DependencyProperty.Register(
         nameof(ShowMaximize), typeof(bool), typeof(TitleBar), new PropertyMetadata(true));
 
-    public static readonly DependencyProperty ShowCloseProperty = DependencyProperty.Register(
-        nameof(ShowClose), typeof(bool), typeof(TitleBar), new PropertyMetadata(true));
-
     public string Breadcrumb
     {
         get => (string)GetValue(BreadcrumbProperty);
@@ -44,12 +41,6 @@ public partial class TitleBar : UserControl
     {
         get => (bool)GetValue(ShowMaximizeProperty);
         set => SetValue(ShowMaximizeProperty, value);
-    }
-
-    public bool ShowClose
-    {
-        get => (bool)GetValue(ShowCloseProperty);
-        set => SetValue(ShowCloseProperty, value);
     }
 
     public TitleBar()
