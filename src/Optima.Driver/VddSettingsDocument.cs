@@ -4,9 +4,8 @@ using Optima.Core.Models;
 namespace Optima.Driver;
 
 /// <summary>
-/// Reads and edits the Virtual Display Driver settings XML (vdd_settings.xml) non-destructively:
-/// existing nodes, comments and options are preserved; we only add resolutions / refresh rates
-/// that a requested mode needs. Pure XML in/out, unit-testable without the driver.
+/// Reads and edits the Virtual Display Driver settings XML (vdd_settings.xml) non-destructively: existing nodes,
+/// comments and options are preserved; we only add resolutions / refresh rates that a requested mode needs.
 /// </summary>
 public sealed class VddSettingsDocument
 {
@@ -43,7 +42,6 @@ public sealed class VddSettingsDocument
         GetOrAdd(gpu, "friendlyname").Value = name;
     }
 
-    /// <summary>Global refresh rates, replicated by the driver across all resolutions.</summary>
     public IReadOnlyList<int> GlobalRefreshRates
         => Root.Element("global")?.Elements("g_refresh_rate")
             .Select(e => int.TryParse(e.Value, out var r) ? r : 0)
@@ -59,10 +57,6 @@ public sealed class VddSettingsDocument
             .Where(r => r.Width > 0 && r.Height > 0)
             .ToList() ?? [];
 
-    /// <summary>
-    /// Every mode the driver will advertise: each listed resolution × (its own refresh rate + all
-    /// global refresh rates). Bogus placeholder rates (e.g. 999 or 9999) are filtered by IsValid.
-    /// </summary>
     public IReadOnlyList<DisplayMode> GetAdvertisedModes()
     {
         var modes = new HashSet<DisplayMode>();
@@ -86,7 +80,6 @@ public sealed class VddSettingsDocument
         return modes.OrderByDescending(m => m.Width).ThenByDescending(m => m.RefreshRate).ToList();
     }
 
-    /// <summary>Ensures the driver will advertise the given mode. Returns true when the XML changed.</summary>
     public bool EnsureMode(DisplayMode mode)
     {
         if (!mode.IsValid)
@@ -109,8 +102,6 @@ public sealed class VddSettingsDocument
 
         if (!GetAdvertisedModes().Contains(mode))
         {
-            // Resolution exists but not at this refresh rate, so add a global refresh rate,
-            // which the driver replicates to every resolution.
             var global = GetOrAdd(Root, "global");
             global.Add(new XElement("g_refresh_rate", mode.RefreshRate));
             changed = true;

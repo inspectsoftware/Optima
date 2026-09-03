@@ -2,14 +2,7 @@ using System.Globalization;
 
 namespace Optima.Watchdog;
 
-/// <summary>
-/// Minimal append-only log for the elevated helper.
-///
-/// The helper runs as a separate elevated process with no console and no UI, so without
-/// this every failure inside it is invisible: the caller only ever sees a success flag
-/// and a one-line message. Deliberately dependency-free, because the helper should stay
-/// small and must not drag a logging framework into an elevated process.
-/// </summary>
+/// <summary>Minimal append-only log for the elevated helper.</summary>
 internal static class HelperLog
 {
     private static readonly object Gate = new();

@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="clr-namespace:Optima.App.Controls">
   <UserControl.Resources>
-    <!-- Status as a cell: label above a badge. -->
     <DataTemplate x:Key="StatusCell">
       <StackPanel Margin="0,0,12,0">
         <TextBlock Text="{Binding Label}" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
@@ -18,7 +17,6 @@
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1040" HorizontalAlignment="Left">
-
       <Grid Margin="0,0,0,14">
         <Grid.ColumnDefinitions>
           <ColumnDefinition />
@@ -29,14 +27,12 @@
                    Margin="0,0,4,0" VerticalAlignment="Bottom" />
       </Grid>
 
-      <!-- Automatic game-update notice: version change detected on the official updates page. -->
       <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,0,0,12"
               Visibility="{Binding GameUpdateBanner, Converter={StaticResource EmptyToCollapsed}}">
         <TextBlock Text="{Binding GameUpdateBanner}" Style="{StaticResource Text.Prose}"
                    Foreground="{DynamicResource Brush.Warn}" MaxWidth="860" HorizontalAlignment="Left" />
       </Border>
 
-      <!-- Status strip: one row, five cells -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="STATUS">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="refresh"
@@ -58,7 +54,6 @@
         </Grid>
       </HeaderedContentControl>
 
-      <!-- System strip -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="SYSTEM">
         <UniformGrid Columns="4">
           <StackPanel Margin="0,0,12,0">
@@ -80,7 +75,6 @@
         </UniformGrid>
       </HeaderedContentControl>
 
-      <!-- Live meters as tiles -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="PERFORMANCE">
         <HeaderedContentControl.Tag>
           <TextBlock Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}" />
@@ -110,7 +104,6 @@
         </UniformGrid>
       </HeaderedContentControl>
 
-      <!-- Launch rail: the single launch surface. Profile chips, summary, PLAY. -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="LAUNCH">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="kill game · Ctrl+Alt+K" Padding="6,0"
@@ -156,7 +149,6 @@
                          Visibility="{Binding Play.KillStatusText, Converter={StaticResource EmptyToCollapsed}}" />
             </StackPanel>
 
-            <!-- PLAY, which becomes a progress capsule while the pipeline runs. -->
             <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="260">
               <Button Style="{StaticResource PrimaryButton}" MinHeight="52" FontSize="{StaticResource Type.Title}"
                       Content="{Binding Play.PlayButtonText}" Command="{Binding Play.PlayCommand}" />

@@ -5,9 +5,8 @@ using Optima.Core.Ipc;
 namespace Optima.Watchdog;
 
 /// <summary>
-/// CPU/GPU temperature and load sampling via LibreHardwareMonitor, which needs the
-/// elevated side because its sensor access uses a kernel driver. One sample every two
-/// seconds is pushed as a "hardwareSample" event while a stream is active.
+/// CPU/GPU temperature and load sampling via LibreHardwareMonitor, which needs the elevated side because its sensor
+/// access uses a kernel driver.
 /// </summary>
 public sealed class HardwareStreamer : IDisposable
 {
@@ -54,8 +53,6 @@ public sealed class HardwareStreamer : IDisposable
                     }
                     switch (sensor.SensorType)
                     {
-                        // CPUs report many temperature sensors; package/Tctl is the honest headline,
-                        // and the maximum is a sane fallback when no package sensor exists.
                         case SensorType.Temperature when isCpu:
                             if (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase)
                                 || sensor.Name.Contains("Tctl", StringComparison.OrdinalIgnoreCase))

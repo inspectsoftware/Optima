@@ -10,7 +10,6 @@ public sealed record DisplayProfile
     public int Height { get; init; } = 1080;
     public int RefreshRate { get; init; } = 60;
 
-    /// <summary>When true the virtual display is made the primary display for the session.</summary>
     public bool MakePrimary { get; init; }
 
     [JsonIgnore]
@@ -19,7 +18,6 @@ public sealed record DisplayProfile
 
 public enum PowerPlanKind
 {
-    /// <summary>Leave the active power plan untouched.</summary>
     Unchanged,
     Balanced,
     HighPerformance,
@@ -34,21 +32,17 @@ public enum ProcessPriorityLevel
     High,
 }
 
-/// <summary>Performance portion of a launch profile. Every field is opt-in and reversible.</summary>
+/// <summary>Performance portion of a launch profile.</summary>
 public sealed record PerformanceProfile
 {
     public PowerPlanKind PowerPlan { get; init; } = PowerPlanKind.Unchanged;
 
-    /// <summary>Priority applied to the game / emulator processes.</summary>
     public ProcessPriorityLevel Priority { get; init; } = ProcessPriorityLevel.Unchanged;
 
-    /// <summary>Disable Windows power throttling (EcoQoS) for game processes.</summary>
     public bool DisablePowerThrottling { get; init; }
 
-    /// <summary>Optional CPU affinity mask for the emulator process. 0 = unchanged.</summary>
     public ulong CpuAffinityMask { get; init; }
 
-    /// <summary>Names of processes the user opted-in to close before launch (background cleanup, §10).</summary>
     public IReadOnlyList<string> CleanupProcessNames { get; init; } = [];
 }
 

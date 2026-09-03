@@ -5,8 +5,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Core.Configuration;
 
 /// <summary>
-/// Crash-safe JSON persistence: writes go to a temp file, then replace the target atomically,
-/// so a crash mid-write never corrupts settings or recovery snapshots.
+/// Crash-safe JSON persistence: writes go to a temp file, then replace the target atomically, so a crash mid-write
+/// never corrupts settings or recovery snapshots.
 /// </summary>
 public sealed class JsonStore
 {
@@ -61,8 +61,6 @@ public sealed class JsonStore
 
             if (File.Exists(path))
             {
-                // The previous version becomes .bak in the same swap: a free last-known-good
-                // generation that the repair action can restore.
                 File.Replace(tmp, path, destinationBackupFileName: path + ".bak");
             }
             else

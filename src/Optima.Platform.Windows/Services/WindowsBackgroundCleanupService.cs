@@ -4,11 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Platform.Windows.Services;
 
-/// <summary>
-/// Closes only processes the user explicitly listed in their profile (§10). Asks nicely first
-/// (CloseMainWindow), terminates only if the process ignores the request. Critical system and
-/// Google Play Games processes are refused even if listed.
-/// </summary>
+/// <summary>Closes only processes the user explicitly listed in their profile (§10).</summary>
 public sealed class WindowsBackgroundCleanupService : IBackgroundCleanupService
 {
     private static readonly HashSet<string> NeverTouch = new(StringComparer.OrdinalIgnoreCase)

@@ -10,11 +10,8 @@ public enum BenchmarkPlanState
 
 public enum BenchmarkRunOutcome
 {
-    /// <summary>The run counted; the plan advanced.</summary>
     Accepted,
-    /// <summary>The run produced no usable data and was re-queued for the same profile.</summary>
     Retry,
-    /// <summary>Too many failed attempts; the plan gave up.</summary>
     Aborted,
 }
 
@@ -23,13 +20,7 @@ public sealed record BenchmarkDrift(bool HasDrift, string Message)
     public static readonly BenchmarkDrift None = new(false, string.Empty);
 }
 
-/// <summary>
-/// The guided benchmark state machine (§14), pure and UI-free. Runs alternate A,B,A,B so
-/// time-of-day effects hit both profiles equally. A run only counts when the session
-/// succeeded AND captured frames; failed runs re-queue (bounded). The configuration is
-/// snapshotted at start, and any drift (tweaks toggled, a profile edited) aborts the plan:
-/// a comparison across mixed configurations answers no question.
-/// </summary>
+/// <summary>The guided benchmark state machine (§14), pure and UI-free.</summary>
 public sealed class GuidedBenchmarkPlan
 {
     private const int ExtraAttemptAllowance = 4;
@@ -66,7 +57,6 @@ public sealed class GuidedBenchmarkPlan
     public IReadOnlyList<long> AcceptedSessionIdsA => _acceptedA;
     public IReadOnlyList<long> AcceptedSessionIdsB => _acceptedB;
 
-    /// <summary>The profile of the next run; null once the plan is finished.</summary>
     public string? NextProfileName
         => State is BenchmarkPlanState.Completed or BenchmarkPlanState.Aborted ? null : _runOrder[CompletedRuns];
 
@@ -78,7 +68,6 @@ public sealed class GuidedBenchmarkPlan
         _ => $"run {CompletedRuns + 1} of {TotalRuns} · next: {NextProfileName}",
     };
 
-    /// <summary>Captures the configuration every run must keep.</summary>
     public void SetBaseline(IReadOnlyList<string> enabledTweakIds, string profileHashA, string profileHashB)
     {
         _baselineTweakIds = [.. enabledTweakIds];
@@ -86,7 +75,6 @@ public sealed class GuidedBenchmarkPlan
         _baselineHashB = profileHashB;
     }
 
-    /// <summary>Checked before every run; drifted configuration refuses the run and aborts.</summary>
     public BenchmarkDrift CheckDrift(IReadOnlyList<string> enabledTweakIds, string profileHashA, string profileHashB)
     {
         if (!_baselineTweakIds.SequenceEqual(enabledTweakIds, StringComparer.Ordinal))

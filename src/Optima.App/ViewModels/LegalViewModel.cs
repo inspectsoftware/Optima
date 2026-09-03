@@ -4,10 +4,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace Optima.App.ViewModels;
 
 /// <summary>
-/// LEGAL page: who makes Optima, exactly how it stays outside the game, everything it
-/// reads and writes, and the license texts that ship with every build. The page states
-/// facts about the code's behavior; it deliberately makes no promises about third-party
-/// services or account standing.
+/// LEGAL page: who makes Optima, exactly how it stays outside the game, everything it reads and writes, and the license
+/// texts that ship with every build.
 /// </summary>
 public sealed partial class LegalViewModel : ObservableObject
 {

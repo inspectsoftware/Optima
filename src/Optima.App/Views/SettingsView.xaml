@@ -2,7 +2,6 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <UserControl.Resources>
-    <!-- Label column for every settings row. -->
     <Style x:Key="RowLabel" TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Margin" Value="0,6,12,6" />
@@ -11,7 +10,6 @@
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1100" HorizontalAlignment="Left">
-
       <TextBlock Text="Settings" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="%LOCALAPPDATA%\Optima" Style="{StaticResource Text.PageSubtitle}" />
 
@@ -22,7 +20,6 @@
           <ColumnDefinition />
         </Grid.ColumnDefinitions>
 
-        <!-- Left column -->
         <StackPanel>
           <HeaderedContentControl Style="{StaticResource Section}" Header="APPEARANCE">
             <Grid>
@@ -158,7 +155,6 @@
           </HeaderedContentControl>
         </StackPanel>
 
-        <!-- Right column -->
         <StackPanel Grid.Column="2">
           <HeaderedContentControl Style="{StaticResource Section}" Header="PLAYER">
             <Grid>
@@ -244,7 +240,6 @@
         </StackPanel>
       </Grid>
 
-      <!-- Save bar -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="SAVE">
         <Grid>
           <Grid.ColumnDefinitions>

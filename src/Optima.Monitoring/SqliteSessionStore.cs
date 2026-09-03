@@ -12,7 +12,6 @@ namespace Optima.Monitoring;
 /// <summary>Session history in SQLite (%LOCALAPPDATA%\Optima\sessions.db, §13/§21).</summary>
 public sealed class SqliteSessionStore : ISessionStore
 {
-    /// <summary>Current schema version stored in PRAGMA user_version.</summary>
     private const int SchemaVersion = 2;
 
     private readonly string _databasePath;
@@ -73,7 +72,6 @@ public sealed class SqliteSessionStore : ISessionStore
             return;
         }
 
-        // One-way change: keep a copy of the pre-migration database as cheap insurance.
         TryBackupDatabase();
 
         if (version < 1)
@@ -290,7 +288,7 @@ public sealed class SqliteSessionStore : ISessionStore
             AveragePingMs = reader.GetDouble(pingOrdinal),
             JitterMs = reader.GetDouble(reader.GetOrdinal("jitter_ms")),
             PacketLossPct = reader.GetDouble(reader.GetOrdinal("packet_loss_pct")),
-            SampleCount = 1, // presence marker; per-sample counts are not persisted
+            SampleCount = 1,
         };
     }
 

@@ -6,12 +6,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Core.Crashes;
 
 /// <summary>
-/// The Watchdog's crash arm: on every game exit it reads the platform's own logcat tail
-/// and, only when a real failure marker is present, writes a crash bundle under
-/// %LOCALAPPDATA%\Optima\crashes. Bundles hold a plain-text timeline, the relevant logcat
-/// excerpt, and the NAMES of the platform's minidumps (never the dumps themselves, which
-/// can contain process memory). Everything here is passive reading; the honest promise is
-/// a correlated picture of the crash, not a root-cause verdict.
+/// The Watchdog's crash arm: on every game exit it reads the platform's own logcat tail and, only when a real failure
+/// marker is present, writes a crash bundle under %LOCALAPPDATA%\Optima\crashes.
 /// </summary>
 public sealed class CrashSentinel : IDisposable
 {
@@ -36,7 +32,6 @@ public sealed class CrashSentinel : IDisposable
         _logger = logger;
     }
 
-    /// <summary>Raised with the bundle folder after a capture, for UI refresh.</summary>
     public event Action<string>? BundleWritten;
 
     public void Start()
@@ -51,7 +46,6 @@ public sealed class CrashSentinel : IDisposable
     private void OnGameExited(GameExit exit)
         => _ = Task.Run(() => CaptureAsync(exit, manual: false, CancellationToken.None));
 
-    /// <summary>User-triggered capture: always writes a bundle, crash markers or not.</summary>
     public Task<string?> CaptureManualAsync(CancellationToken ct = default)
         => CaptureAsync(exit: null, manual: true, ct);
 

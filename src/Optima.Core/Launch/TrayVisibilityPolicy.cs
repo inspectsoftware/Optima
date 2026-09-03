@@ -7,12 +7,7 @@ public enum TrayWindowAction
     Restore,
 }
 
-/// <summary>
-/// Decides when the main window should hide to the tray during a game session and
-/// when it should come back. Hides once the game is actually running (Monitoring),
-/// so early launch failures stay visible; restores on session end only if the hide
-/// was automatic and the user has not already brought the window back themselves.
-/// </summary>
+/// <summary>Decides when the main window should hide to the tray during a game session and when it should come back.</summary>
 public sealed class TrayVisibilityPolicy
 {
     private bool _autoHidden;
@@ -32,6 +27,5 @@ public sealed class TrayVisibilityPolicy
         return TrayWindowAction.None;
     }
 
-    /// <summary>The user restored the window themselves; session end must not steal focus.</summary>
     public void OnManualShow() => _autoHidden = false;
 }

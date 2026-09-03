@@ -7,10 +7,7 @@ using Optima.Core.Ipc;
 
 namespace Optima.App.ViewModels;
 
-/// <summary>
-/// DEVELOPER page (§28): raw detected processes, resolved paths, driver capabilities and
-/// helper status. The first place to look after a Google Play Games update changes behavior.
-/// </summary>
+/// <summary>DEVELOPER page (§28): raw detected processes, resolved paths, driver capabilities and helper status.</summary>
 public sealed partial class DeveloperViewModel : ObservableObject
 {
     private readonly IProcessMonitor _processMonitor;
@@ -98,11 +95,6 @@ public sealed partial class DeveloperViewModel : ObservableObject
         HelperStatus = response.Success ? "Connected (ping ok)" : $"Error: {response.Error}";
     }
 
-    /// <summary>
-    /// Runs a 10 second unfiltered DXGI present trace in the helper and lists which processes
-    /// actually present frames. The one diagnostic that explains a silent FPS capture: the
-    /// presenter is not always the emulator process the orchestrator picked.
-    /// </summary>
     [RelayCommand]
     private async Task RunEtwProbeAsync()
     {

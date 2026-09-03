@@ -6,9 +6,9 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Core.Recovery;
 
 /// <summary>
-/// Implements the crash-recovery contract (§18/§19): the snapshot is persisted before any
-/// mutation, updated as the session progresses, and restored best-effort: every restore step
-/// runs even if an earlier one fails, and failures are logged rather than thrown.
+/// Implements the crash-recovery contract (§18/§19): the snapshot is persisted before any mutation, updated as the
+/// session progresses, and restored best-effort: every restore step runs even if an earlier one fails, and failures are
+/// logged rather than thrown.
 /// </summary>
 public sealed class RecoveryService : IRecoveryService
 {
@@ -80,8 +80,6 @@ public sealed class RecoveryService : IRecoveryService
 
         if (snapshot.VirtualDisplayEnabledByUs || snapshot.VirtualDisplayConfigured)
         {
-            // The provider undoes everything it did: driver settings file, device state,
-            // including after a crash (it keeps its own on-disk pending marker).
             await Attempt("virtual display", () => _virtualDisplay.RestoreOriginalStateAsync(ct)).ConfigureAwait(false);
         }
 

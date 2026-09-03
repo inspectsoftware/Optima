@@ -2,11 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Optima.Monitoring.Nvidia;
 
-/// <summary>
-/// Minimal binding to NVIDIA's documented NVML management library (nvml.dll ships with the
-/// GeForce driver). Used only for reading temperature / clocks / utilization, never for
-/// modifying driver state (§11). All calls degrade gracefully when the library is missing.
-/// </summary>
+/// <summary>Minimal binding to NVIDIA's documented NVML management library (nvml.dll ships with the GeForce driver).</summary>
 internal static class NvmlInterop
 {
     private const string Dll = "nvml.dll";
@@ -14,8 +10,8 @@ internal static class NvmlInterop
     [StructLayout(LayoutKind.Sequential)]
     internal struct NvmlUtilization
     {
-        public uint Gpu;    // percent
-        public uint Memory; // percent
+        public uint Gpu;
+        public uint Memory;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -50,8 +46,8 @@ internal static class NvmlInterop
     [DllImport(Dll, EntryPoint = "nvmlDeviceGetMemoryInfo")]
     internal static extern int GetMemoryInfo(IntPtr device, out NvmlMemory memory);
 
-    internal const int SensorGpu = 0;   // NVML_TEMPERATURE_GPU
-    internal const int ClockGraphics = 0; // NVML_CLOCK_GRAPHICS
+    internal const int SensorGpu = 0;
+    internal const int ClockGraphics = 0;
 }
 
 /// <summary>Safe wrapper that answers "n/a" (nulls) whenever NVML is unavailable.</summary>
@@ -112,7 +108,6 @@ public sealed class NvmlGpuReader : IDisposable
             }
             catch (Exception)
             {
-                // Driver unloaded underneath us, nothing to do.
             }
         }
     }

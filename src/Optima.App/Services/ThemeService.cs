@@ -7,9 +7,8 @@ using Optima.Core.Theming;
 namespace Optima.App.Services;
 
 /// <summary>
-/// Applies the theme palette (Dark/Light) and the user's accent family to
-/// Application.Current.Resources at startup and live on every settings save.
-/// All markup consumes these via DynamicResource, so a swap repaints in place.
+/// Applies the theme palette (Dark/Light) and the user's accent family to Application.Current.Resources at startup and
+/// live on every settings save.
 /// </summary>
 public sealed class ThemeService : IDisposable
 {
@@ -23,17 +22,12 @@ public sealed class ThemeService : IDisposable
         _settings.SettingsChanged += OnSettingsChanged;
     }
 
-    /// <summary>Raised after a palette/accent apply; carries "Dark" or "Light". The shell
-    /// listens to keep DWM window attributes (dark caption, backdrop fallback) in step.</summary>
     public static event Action<string>? ThemeApplied;
 
-    /// <summary>The last applied theme name, for late subscribers.</summary>
     public static string CurrentTheme { get; private set; } = "Dark";
 
-    /// <summary>The live accent, for code that draws with it (the ambient field).</summary>
     public static Color CurrentAccent { get; private set; } = Color.FromRgb(0xE8, 0xB4, 0x5A);
 
-    /// <summary>Synchronous startup apply, before the main window shows (avoids a theme flash).</summary>
     public void Initialize(AppSettings settings) => Apply(settings);
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
@@ -101,8 +95,6 @@ public sealed class ThemeService : IDisposable
     {
         var accent = AccentMath.TryParse(accentHex) ?? AccentMath.TryParse(AccentMath.DefaultAccentHex)!.Value;
 
-        // On paper the default gold is too bright; deepen any overly light accent so
-        // hairlines and fills keep definition against the light ground.
         if (theme == "Light" && AccentMath.Luminance(accent) > 0.55)
         {
             accent = AccentMath.Darken(accent, 0.25);
@@ -118,8 +110,6 @@ public sealed class ThemeService : IDisposable
         var baseColor = ToColor(family.Base);
         CurrentAccent = baseColor;
 
-        // Accent-derived composites that are Freezables (gradients, drawings) and so cannot
-        // follow the accent through DynamicResource on their own.
         var red = app.TryFindResource("Color.ChromaRed") is Color r ? r : Color.FromRgb(0xFF, 0x5A, 0x46);
         var blue = app.TryFindResource("Color.ChromaBlue") is Color b ? b : Color.FromRgb(0x5A, 0x96, 0xFF);
         var edge = new LinearGradientBrush(

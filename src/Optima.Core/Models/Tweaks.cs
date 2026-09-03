@@ -23,12 +23,10 @@ public enum TweakStatus
 {
     Disabled,
     Enabled,
-    /// <summary>Some of the tweak's values match the enabled state and some do not
-    /// (usually another tweaker got there first). Enabling normalizes it.</summary>
     Mixed,
 }
 
-/// <summary>One registry value a tweak sets. All data is string-encoded (DWORDs as unsigned decimal).</summary>
+/// <summary>One registry value a tweak sets.</summary>
 public sealed record TweakValue
 {
     public required TweakHive Hive { get; init; }
@@ -37,15 +35,10 @@ public sealed record TweakValue
     public required TweakValueKind Kind { get; init; }
     public required string EnabledData { get; init; }
 
-    /// <summary>Windows default restored on disable when no original was captured. Null = delete the value.</summary>
     public string? DefaultData { get; init; }
 }
 
-/// <summary>
-/// A single Windows tweak: what it writes, and the §8-style disclosure (what it changes,
-/// benefit, downside) that the UI must show. The catalog below is the closed set the
-/// elevated helper will write; nothing outside it can be applied.
-/// </summary>
+/// <summary>A single Windows tweak: what it writes, and the §8-style disclosure (what it changes, benefit, downside) that the UI must show.</summary>
 public sealed record TweakDefinition
 {
     public required string Id { get; init; }
@@ -61,15 +54,9 @@ public sealed record TweakDefinition
     public bool RequiresElevation => Values.Any(v => v.Hive == TweakHive.LocalMachine);
 }
 
-/// <summary>
-/// The curated Windows tweak catalog. These are the widely published gaming tweaks the major
-/// tweaking utilities apply (registry keys and values are public knowledge; the texts here are
-/// Optima's own). Every tweak is individually reversible: originals are captured before the
-/// first write, and disable restores them (or the documented Windows default).
-/// </summary>
+/// <summary>The curated Windows tweak catalog.</summary>
 public static class TweakCatalog
 {
-    /// <summary>Stable identity of one value inside a tweak, used in backups and over IPC.</summary>
     public static string ValueKey(TweakValue value) => $"{value.KeyPath}::{value.ValueName}";
 
     public static TweakDefinition? Find(string id)
@@ -77,7 +64,6 @@ public static class TweakCatalog
 
     public static IReadOnlyList<TweakDefinition> All { get; } =
     [
-        // ---------------------------------------------------------------- capture
         new()
         {
             Id = "game-dvr-off",
@@ -110,7 +96,6 @@ public static class TweakCatalog
             ],
         },
 
-        // ------------------------------------------------------------- scheduling
         new()
         {
             Id = "game-mode-on",
@@ -185,7 +170,6 @@ public static class TweakCatalog
             ],
         },
 
-        // -------------------------------------------------------------------- gpu
         new()
         {
             Id = "hags-on",
@@ -202,7 +186,6 @@ public static class TweakCatalog
             ],
         },
 
-        // ---------------------------------------------------------------- network
         new()
         {
             Id = "network-throttling-off",
@@ -219,7 +202,6 @@ public static class TweakCatalog
             ],
         },
 
-        // ------------------------------------------------------------------ input
         new()
         {
             Id = "mouse-accel-off",
@@ -251,7 +233,6 @@ public static class TweakCatalog
             ],
         },
 
-        // ------------------------------------------------------------------ shell
         new()
         {
             Id = "menu-show-delay-off",

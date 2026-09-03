@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="920" HorizontalAlignment="Left">
-
       <TextBlock Text="System" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="Hardware inventory and virtualization state" Style="{StaticResource Text.PageSubtitle}" />
 

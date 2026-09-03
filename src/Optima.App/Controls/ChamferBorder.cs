@@ -4,12 +4,7 @@ using System.Windows.Media;
 
 namespace Optima.App.Controls;
 
-/// <summary>
-/// The HUD vessel: a rectangle with its top-left and bottom-right corners cut at 45 degrees.
-/// Draws a fill, an optional 1 px outline, a specular line along the top edge, a dark line
-/// along the bottom edge and a 2 px leading edge on the left, then clips its child to the
-/// same shape. Replaces rounded Borders everywhere the HUD language applies.
-/// </summary>
+/// <summary>The HUD vessel: a rectangle with its top-left and bottom-right corners cut at 45 degrees.</summary>
 public class ChamferBorder : Decorator
 {
     public static readonly DependencyProperty BackgroundProperty = DependencyProperty.Register(
@@ -63,7 +58,6 @@ public class ChamferBorder : Decorator
         SnapsToDevicePixels = true;
     }
 
-    /// <summary>The chamfered outline for a given size, shared by the fill, the clip and the lines.</summary>
     public static Geometry BuildGeometry(Size size, double chamfer)
     {
         var w = Math.Max(0, size.Width);
@@ -113,7 +107,6 @@ public class ChamferBorder : Decorator
         return arrangeSize;
     }
 
-    /// <summary>Clip in the child's coordinate space (offset by the padding).</summary>
     private Geometry BuildChildClip(Size size, Thickness pad)
     {
         var shape = BuildGeometry(size, Chamfer).Clone();

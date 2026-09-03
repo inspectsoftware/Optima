@@ -5,15 +5,11 @@ using System.Windows.Media;
 
 namespace Optima.App.Controls;
 
-/// <summary>
-/// A bounded meter drawn as block characters: <c>████████░░░░░░░░</c>.
-/// Numbers are always shown beside one of these, never replaced by it: the bar gives
-/// shape at a glance, the number is what actually gets read.
-/// </summary>
+/// <summary>A bounded meter drawn as block characters: ████████░░░░░░░░.</summary>
 public sealed class AsciiBar : Control
 {
-    private const char Filled = '█'; // █
-    private const char Empty = '░';  // ░
+    private const char Filled = '█';
+    private const char Empty = '░';
 
     public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
         nameof(Value), typeof(double), typeof(AsciiBar),
@@ -30,13 +26,11 @@ public sealed class AsciiBar : Control
     private static readonly DependencyPropertyKey TextPropertyKey = DependencyProperty.RegisterReadOnly(
         nameof(Text), typeof(string), typeof(AsciiBar), new PropertyMetadata(string.Empty));
 
-    /// <summary>The rendered block string; the control template binds to this.</summary>
     public static readonly DependencyProperty TextProperty = TextPropertyKey.DependencyProperty;
 
     private static readonly DependencyPropertyKey FilledTextPropertyKey = DependencyProperty.RegisterReadOnly(
         nameof(FilledText), typeof(string), typeof(AsciiBar), new PropertyMetadata(string.Empty));
 
-    /// <summary>Just the filled run, so it can be tinted separately from the track.</summary>
     public static readonly DependencyProperty FilledTextProperty = FilledTextPropertyKey.DependencyProperty;
 
     private static readonly DependencyPropertyKey EmptyTextPropertyKey = DependencyProperty.RegisterReadOnly(
@@ -56,7 +50,6 @@ public sealed class AsciiBar : Control
         set => SetValue(MaximumProperty, value);
     }
 
-    /// <summary>Number of block cells in the bar.</summary>
     public int Cells
     {
         get => (int)GetValue(CellsProperty);
@@ -88,15 +81,11 @@ public sealed class AsciiBar : Control
     }
 }
 
-/// <summary>
-/// Indeterminate counterpart to <see cref="AsciiBar"/>: a lit block travels along a
-/// fixed-width track. Replaces the stock WPF indeterminate ProgressBar, whose animation
-/// is baked into the Aero template and cannot be restyled.
-/// </summary>
+/// <summary>Indeterminate counterpart to AsciiBar: a lit block travels along a fixed-width track.</summary>
 public sealed class AsciiSpinner : Control
 {
-    private const char Filled = '▓'; // ▓
-    private const char Empty = '░';  // ░
+    private const char Filled = '▓';
+    private const char Empty = '░';
 
     private readonly System.Windows.Threading.DispatcherTimer _timer;
     private int _position;
@@ -119,7 +108,6 @@ public sealed class AsciiSpinner : Control
         set => SetValue(CellsProperty, value);
     }
 
-    /// <summary>Width of the travelling lit run.</summary>
     public int Head
     {
         get => (int)GetValue(HeadProperty);

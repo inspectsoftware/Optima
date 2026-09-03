@@ -9,15 +9,11 @@ public interface IDisplayService
 
     Task<IReadOnlyList<DisplayMode>> GetSupportedModesAsync(string deviceName, CancellationToken ct = default);
 
-    /// <summary>Applies a mode to one display. Throws <see cref="OptimaException"/> with a friendly error on failure.</summary>
     Task ApplyModeAsync(string deviceName, DisplayMode mode, CancellationToken ct = default);
 
-    /// <summary>Makes the given display the primary display (temporary; topology restore reverts it).</summary>
     Task MakePrimaryAsync(string deviceName, CancellationToken ct = default);
 
-    /// <summary>Serializes the full current display topology (positions, modes, primary) to an opaque string.</summary>
     Task<string> CaptureTopologyAsync(CancellationToken ct = default);
 
-    /// <summary>Restores a topology captured earlier. Safe to call repeatedly.</summary>
     Task RestoreTopologyAsync(string topology, CancellationToken ct = default);
 }

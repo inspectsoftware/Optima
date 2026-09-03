@@ -12,13 +12,6 @@
         Background="Transparent"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Ideal">
-
-  <!--
-    Frameless: the caption is dissolved into the shell (drag anywhere along the top,
-    buttons float in the content column); WindowChrome keeps snap layouts, Aero Snap and
-    resize native, DWM rounds the corners (code-behind). GlassFrameThickness -1 keeps the
-    acrylic halo at the window edge; the in-app ambient field is what the glass refracts.
-  -->
   <shell:WindowChrome.WindowChrome>
     <shell:WindowChrome CaptionHeight="40" ResizeBorderThickness="6"
                         CornerRadius="0" GlassFrameThickness="-1" UseAeroCaptionButtons="False" />
@@ -59,18 +52,11 @@
     <DataTemplate DataType="{x:Type vm:UpdateLogViewModel}"><views:UpdateLogView /></DataTemplate>
   </Window.Resources>
 
-  <!--
-    Border compensates for the overhang WindowChrome leaves when maximized.
-    The TextElement.* values here are the app-wide text defaults: they inherit down the
-    tree without overriding any control that sets its own.
-  -->
   <Border x:Name="RootBorder" Background="{DynamicResource Brush.WindowGround}"
           TextElement.Foreground="{DynamicResource Brush.Text}"
           TextElement.FontFamily="{StaticResource Font.Body}"
           TextElement.FontSize="{StaticResource Type.Body}">
     <Grid>
-      <!-- Ground: the ambient field every glass strip refracts (drifts), then the HUD grid,
-           which is static and therefore kept out of the drifting layer. -->
       <ctl:AmbientField x:Name="Ambient" DrawGrid="False" />
       <Rectangle Fill="{DynamicResource Brush.Grid}" IsHitTestVisible="False">
         <Rectangle.OpacityMask>
@@ -88,7 +74,6 @@
           <ColumnDefinition />
         </Grid.ColumnDefinitions>
 
-        <!-- Rail: one glass strip with the grouped navigation. -->
         <ctl:GlassPanel x:Name="Rail" Chamfer="{StaticResource Chamfer.Strip}" Padding="6,12,6,10"
                         Tint="{DynamicResource Color.Glass.Tint}"
                         TopLine="{DynamicResource Brush.Strip.Top}"
@@ -96,7 +81,6 @@
                         LeadingEdge="{DynamicResource Brush.Strip.Edge}">
           <ctl:GlassPanel.Child>
             <DockPanel>
-              <!-- Brand -->
               <Grid DockPanel.Dock="Top" Margin="10,2,6,10" Height="26">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto" />
@@ -109,7 +93,6 @@
                            Visibility="{Binding RailCollapsed, Converter={StaticResource InverseBoolToVis}}" />
               </Grid>
 
-              <!-- Footer: live game state and the collapse toggle -->
               <Grid DockPanel.Dock="Bottom" Margin="6,8,2,0">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition />
@@ -148,8 +131,6 @@
                 </Button>
               </Grid>
 
-              <!-- Navigation, bound to NavItems so the active marker tracks every route.
-                   A row whose SectionHeader is set opens a new labelled group. -->
               <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,2,0,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
@@ -175,7 +156,6 @@
                                         RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                               CommandParameter="{Binding Key}">
                         <Button.Visibility>
-                          <!-- Only the DEVELOPER row is conditional; the rest are always shown. -->
                           <MultiBinding Converter="{StaticResource NavItemVisibility}">
                             <Binding Path="Key" />
                             <Binding Path="DataContext.DeveloperModeVisible"
@@ -191,7 +171,6 @@
           </ctl:GlassPanel.Child>
         </ctl:GlassPanel>
 
-        <!-- Content column: caption row dissolved into the shell, then the page. -->
         <Grid Grid.Column="2">
           <Grid.RowDefinitions>
             <RowDefinition Height="28" />
@@ -202,8 +181,6 @@
                         Breadcrumb="{Binding Breadcrumb}"
                         SessionTag="{Binding Play.SessionTag}" />
 
-          <!-- Page host; the transition (crossfade with a rise) runs from code-behind so
-               it can honor the motion switch. -->
           <ContentControl x:Name="PageHost" Grid.Row="1" Margin="0,4,0,0"
                           Content="{Binding CurrentPage, NotifyOnTargetUpdated=True}"
                           Binding.TargetUpdated="OnPageChanged">

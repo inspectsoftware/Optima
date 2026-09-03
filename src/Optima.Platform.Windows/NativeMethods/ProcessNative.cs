@@ -5,7 +5,7 @@ namespace Optima.Platform.Windows.NativeMethods;
 /// <summary>Documented process QoS APIs: power throttling (EcoQoS) via Get/SetProcessInformation.</summary>
 public static class ProcessNative
 {
-    private const int ProcessPowerThrottling = 4; // PROCESS_INFORMATION_CLASS
+    private const int ProcessPowerThrottling = 4;
 
     internal const uint PROCESS_POWER_THROTTLING_CURRENT_VERSION = 1;
     internal const uint PROCESS_POWER_THROTTLING_EXECUTION_SPEED = 0x1;
@@ -24,7 +24,6 @@ public static class ProcessNative
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetProcessInformation(IntPtr hProcess, int processInformationClass, ref PROCESS_POWER_THROTTLING_STATE information, int informationSize);
 
-    /// <summary>True when EcoQoS execution-speed throttling is currently forced on for the process.</summary>
     public static bool IsPowerThrottlingEnabled(IntPtr processHandle)
     {
         var state = new PROCESS_POWER_THROTTLING_STATE { Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION };
@@ -36,13 +35,11 @@ public static class ProcessNative
             && (state.StateMask & PROCESS_POWER_THROTTLING_EXECUTION_SPEED) != 0;
     }
 
-    /// <summary>Explicitly disables (or re-enables system-managed) power throttling for the process.</summary>
     public static void SetPowerThrottling(IntPtr processHandle, bool? enabled)
     {
         var state = new PROCESS_POWER_THROTTLING_STATE
         {
             Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION,
-            // null → clear the control bit entirely: back to system-managed behavior.
             ControlMask = enabled is null ? 0 : PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
             StateMask = enabled == true ? PROCESS_POWER_THROTTLING_EXECUTION_SPEED : 0,
         };

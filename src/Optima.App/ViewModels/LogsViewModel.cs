@@ -36,7 +36,6 @@ public sealed partial class LogsViewModel : ObservableObject
     [ObservableProperty] private string _searchText = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;
 
-    /// <summary>When on, the view scrolls to follow new entries as they arrive.</summary>
     [ObservableProperty] private bool _tailEnabled = true;
 
     [ObservableProperty] private int _lineCount;
@@ -99,7 +98,6 @@ public sealed partial class LogsViewModel : ObservableObject
         }
     }
 
-    /// <summary>Serilog level mapping for the settings page.</summary>
     public static LogEventLevel ToSerilogLevel(string name) => name switch
     {
         "Trace" or "TRACE" => LogEventLevel.Verbose,

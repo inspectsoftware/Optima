@@ -11,10 +11,6 @@ public partial class ConsoleWindow : Window
         InitializeComponent();
     }
 
-    /// <summary>
-    /// The toggle must survive the user clicking X, so closing only hides. App shutdown is
-    /// unaffected: Application.Shutdown ignores the cancellation.
-    /// </summary>
     protected override void OnClosing(CancelEventArgs e)
     {
         e.Cancel = true;

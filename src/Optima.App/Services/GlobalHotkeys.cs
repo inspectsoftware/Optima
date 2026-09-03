@@ -5,11 +5,7 @@ using Serilog;
 
 namespace Optima.App.Services;
 
-/// <summary>
-/// System-wide hotkeys via RegisterHotKey, so they fire even while the game window has focus.
-/// The WPF InputBindings on MainWindow only work while Optima itself is the focused window,
-/// which is exactly when a console or kill switch is least needed.
-/// </summary>
+/// <summary>System-wide hotkeys via RegisterHotKey, so they fire even while the game window has focus.</summary>
 public sealed class GlobalHotkeys : IDisposable
 {
     private const int WmHotkey = 0x0312;
@@ -27,13 +23,10 @@ public sealed class GlobalHotkeys : IDisposable
     private readonly IntPtr _handle;
     private HwndSource? _source;
 
-    /// <summary>Alt+F9: toggle the floating log console.</summary>
     public event Action? ConsoleRequested;
 
-    /// <summary>Ctrl+Alt+K: kill the game process tree.</summary>
     public event Action? KillGameRequested;
 
-    /// <summary>Alt+F10: toggle the in-game FPS overlay.</summary>
     public event Action? OverlayRequested;
 
     public GlobalHotkeys(Window window)

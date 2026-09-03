@@ -14,11 +14,8 @@ public enum AmbientState
 }
 
 /// <summary>
-/// The in-app ambient field under everything: a diagonal band of the accent, a cool body in
-/// the opposite corner, a HUD grid fading toward the edges, and a red wash for attention.
-/// It drifts slowly (a ten second cycle at 30 fps) only while motion is allowed and the window
-/// is foreground. Every glass panel refracts this visual, which is what makes glass visible
-/// on a black desktop.
+/// The in-app ambient field under everything: a diagonal band of the accent, a cool body in the opposite corner, a HUD
+/// grid fading toward the edges, and a red wash for attention.
 /// </summary>
 public sealed class AmbientField : FrameworkElement
 {
@@ -56,11 +53,8 @@ public sealed class AmbientField : FrameworkElement
         Unloaded += (_, _) => { Motion.Changed -= OnMotionChanged; StopDrift(); };
     }
 
-    /// <summary>0..1 drift cycle position.</summary>
     public double Phase { get => (double)GetValue(PhaseProperty); set => SetValue(PhaseProperty, value); }
-    /// <summary>0 at rest, 1 during a session: the band brightens and rises.</summary>
     public double Warmth { get => (double)GetValue(WarmthProperty); set => SetValue(WarmthProperty, value); }
-    /// <summary>0..1 red wash for the attention state.</summary>
     public double Alarm { get => (double)GetValue(AlarmProperty); set => SetValue(AlarmProperty, value); }
     public Color Accent { get => (Color)GetValue(AccentProperty); set => SetValue(AccentProperty, value); }
     public Color Cool { get => (Color)GetValue(CoolProperty); set => SetValue(CoolProperty, value); }
@@ -90,8 +84,6 @@ public sealed class AmbientField : FrameworkElement
         {
             if (_drift is null)
             {
-                // 15 ticks per second is plenty for a ten second drift, and every tick
-                // re-renders every glass strip, so the tick rate is the biggest GPU lever.
                 var animation = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(10)) { RepeatBehavior = RepeatBehavior.Forever };
                 Timeline.SetDesiredFrameRate(animation, 15);
                 _drift = animation.CreateClock();
@@ -128,7 +120,6 @@ public sealed class AmbientField : FrameworkElement
         var warmth = Math.Clamp(Warmth, 0, 1);
         var alarm = Math.Clamp(Alarm, 0, 1);
 
-        // Diagonal band: an elongated ellipse with a radial falloff, so it needs no blur.
         var bandAlpha = 0.20 + 0.14 * warmth;
         var bandY = h * (0.32 - 0.10 * warmth) + cy * 18;
         var band = new RadialGradientBrush(
@@ -143,14 +134,12 @@ public sealed class AmbientField : FrameworkElement
         dc.DrawEllipse(band, null, new Point(w * 0.5 + sx * 60, bandY), w * 0.75, 150 + 30 * warmth);
         dc.Pop();
 
-        // Cool body, bottom right, drifting the other way.
         var cool = new RadialGradientBrush(
             Color.FromArgb(0x24, Cool.R, Cool.G, Cool.B),
             Color.FromArgb(0, Cool.R, Cool.G, Cool.B));
         cool.Freeze();
         dc.DrawEllipse(cool, null, new Point(w * 0.92 - sx * 40, h * 0.98 + cy * 24), 360, 260);
 
-        // Attention wash.
         if (alarm > 0.005)
         {
             var wash = new RadialGradientBrush(
@@ -160,8 +149,6 @@ public sealed class AmbientField : FrameworkElement
             dc.DrawEllipse(wash, null, new Point(w * 0.5, h * 0.5), w * 0.7, h * 0.7);
         }
 
-        // HUD grid, fading toward the edges: only when asked for (the shell draws its grid as
-        // a static layer instead, so the drifting field stays as cheap as possible).
         if (DrawGrid)
         {
             var grid = BuildGrid(GridColor);
@@ -183,7 +170,6 @@ public sealed class AmbientField : FrameworkElement
         nameof(DrawGrid), typeof(bool), typeof(AmbientField),
         new FrameworkPropertyMetadata(true, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    /// <summary>Draw the HUD grid inside the field (dialogs); the shell draws it as a static layer.</summary>
     public bool DrawGrid { get => (bool)GetValue(DrawGridProperty); set => SetValue(DrawGridProperty, value); }
 
     private static DrawingBrush? _gridCache;

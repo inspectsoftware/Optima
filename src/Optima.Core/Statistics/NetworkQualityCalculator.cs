@@ -2,12 +2,7 @@ using Optima.Core.Models;
 
 namespace Optima.Core.Statistics;
 
-/// <summary>
-/// Ping-result bookkeeping: rolling-window live values (what the readout shows) plus a
-/// whole-session aggregate (what the session row stores). Jitter is the mean absolute
-/// successive difference of round-trip times; loss is timeouts over pings sent.
-/// Not thread-safe; callers serialize access.
-/// </summary>
+/// <summary>Ping-result bookkeeping: rolling-window live values (what the readout shows) plus a whole-session aggregate (what the session row stores).</summary>
 public sealed class NetworkQualityCalculator
 {
     private readonly int _windowSize;
@@ -25,7 +20,6 @@ public sealed class NetworkQualityCalculator
         _windowSize = windowSize;
     }
 
-    /// <summary>Records one ping result; null means timeout / loss.</summary>
     public void AddResult(double? rttMs)
     {
         _window.Enqueue(rttMs);
@@ -38,7 +32,6 @@ public sealed class NetworkQualityCalculator
         if (rttMs is null)
         {
             _totalLost++;
-            // Loss does not reset the jitter baseline; the next success compares to the last one.
             return;
         }
         _totalRttSum += rttMs.Value;
@@ -80,7 +73,6 @@ public sealed class NetworkQualityCalculator
     public double PacketLossPct
         => _window.Count == 0 ? 0 : 100.0 * _window.Count(r => r is null) / _window.Count;
 
-    /// <summary>Whole-session aggregate for the session row.</summary>
     public NetworkQualityStats SessionAggregate
     {
         get

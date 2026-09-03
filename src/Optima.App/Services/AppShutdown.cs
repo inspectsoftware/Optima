@@ -5,19 +5,13 @@ using Serilog;
 
 namespace Optima.App.Services;
 
-/// <summary>
-/// The one way out of the app. Closing the window (without keep-in-tray) and EXIT in the
-/// tray menu both land in <see cref="RequestExit"/>, which warns that the virtual display
-/// driver stays installed after Optima quits and lets the user keep it, remove it, or stay.
-/// Crashes (<see cref="ShutdownNow"/>) and Windows logoff skip the question.
-/// </summary>
+/// <summary>The one way out of the app.</summary>
 public sealed class AppShutdown : IDisposable
 {
     private readonly Window _window;
     private readonly IDriverInstaller _driverInstaller;
     private bool _asking;
 
-    /// <summary>True once the exit is decided; window Closing handlers must let the close through.</summary>
     public bool IsShuttingDown { get; private set; }
 
     public AppShutdown(Window window, IDriverInstaller driverInstaller)
@@ -30,7 +24,6 @@ public sealed class AppShutdown : IDisposable
 
     private void OnSessionEnding(object sender, SessionEndingCancelEventArgs e) => IsShuttingDown = true;
 
-    /// <summary>Asks about the driver if it is installed, then shuts the application down.</summary>
     public void RequestExit()
     {
         if (IsShuttingDown || _asking)
@@ -41,7 +34,6 @@ public sealed class AppShutdown : IDisposable
         _ = RunAsync();
     }
 
-    /// <summary>Exit without the driver question; used by the crash handler.</summary>
     public void ShutdownNow(int exitCode = 0)
     {
         IsShuttingDown = true;
@@ -106,8 +98,6 @@ public sealed class AppShutdown : IDisposable
             return true;
         }
 
-        // The user asked for a removal that did not happen: say so and stay open rather than
-        // quietly leaving the driver behind.
         Log.Warning("Driver uninstall on exit failed: {Title}", result.Error?.Title);
         var detail = result.Error is { } error
             ? $"{error.Title}\n{error.SuggestedFixes.FirstOrDefault()}".TrimEnd()

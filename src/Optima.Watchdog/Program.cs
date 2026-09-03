@@ -13,7 +13,6 @@ if (pipeName is null)
     return 2;
 }
 
-// Only accept locally generated pipe names to avoid being pointed at arbitrary pipes.
 if (!pipeName.StartsWith("optima-elev-", StringComparison.Ordinal) || pipeName.Length > 64)
 {
     Console.Error.WriteLine("Refusing unexpected pipe name.");
@@ -44,7 +43,6 @@ await using var executor = new CommandExecutor(async evt =>
     }
     catch (Exception ex) when (ex is IOException or ObjectDisposedException)
     {
-        // Pipe gone, main loop will notice and exit.
     }
     finally
     {
@@ -59,7 +57,7 @@ try
         var request = await IpcFraming.ReadFrameAsync<IpcRequest>(pipe, shutdownCts.Token);
         if (request is null)
         {
-            break; // clean EOF, bootstrapper exited
+            break;
         }
 
         IpcResponse response;
@@ -95,7 +93,6 @@ try
 }
 catch (Exception ex) when (ex is IOException or EndOfStreamException or OperationCanceledException)
 {
-    // Connection lost or shutting down, fall through to cleanup.
 }
 
 return 0;

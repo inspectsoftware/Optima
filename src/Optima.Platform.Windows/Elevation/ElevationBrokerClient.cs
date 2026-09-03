@@ -9,12 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Platform.Windows.Elevation;
 
-/// <summary>
-/// Client side of the elevated helper (§20). The non-elevated app hosts a named-pipe server
-/// with a current-user-only ACL and an unguessable name, launches
-/// Optima.Watchdog.exe via the shell "runas" verb (one UAC prompt), and exchanges
-/// whitelisted, validated commands over length-prefixed JSON frames.
-/// </summary>
+/// <summary>Client side of the elevated helper (§20).</summary>
 public sealed class ElevationBrokerClient : IElevationBroker
 {
     private readonly ILogger<ElevationBrokerClient> _logger;
@@ -167,7 +162,7 @@ public sealed class ElevationBrokerClient : IElevationBroker
                 var envelope = await IpcFraming.ReadFrameAsync<IpcEnvelope>(pipe, ct).ConfigureAwait(false);
                 if (envelope is null)
                 {
-                    break; // clean EOF, helper exited
+                    break;
                 }
 
                 if (envelope.Response is { } response)
@@ -229,7 +224,6 @@ public sealed class ElevationBrokerClient : IElevationBroker
             }
             catch (Exception)
             {
-                // Best-effort shutdown; the helper also exits when the pipe closes.
             }
         }
         FailAllPending("The application is shutting down.");

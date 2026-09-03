@@ -4,11 +4,7 @@ using System.Windows.Interop;
 
 namespace Optima.App.Views;
 
-/// <summary>
-/// The in-game FPS overlay. Click-through (WS_EX_TRANSPARENT), never activated
-/// (WS_EX_NOACTIVATE) and hidden from Alt-Tab (WS_EX_TOOLWINDOW), so it can float over
-/// the borderless game without ever interfering with it.
-/// </summary>
+/// <summary>The in-game FPS overlay.</summary>
 public partial class OverlayWindow : Window
 {
     private const int GwlExStyle = -20;

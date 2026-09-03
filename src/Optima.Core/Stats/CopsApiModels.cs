@@ -9,8 +9,6 @@ public sealed record CopsModeStats(long Kills, long Deaths, long Assists, long W
 
     public long MatchesCounted => Wins + Losses;
 
-    /// <summary>Field-wise difference clamped at zero: the API is cumulative, so a negative
-    /// step means a season boundary or server correction, never real play.</summary>
     public static CopsModeStats DeltaOf(CopsModeStats before, CopsModeStats after) => new(
         Math.Max(0, after.Kills - before.Kills),
         Math.Max(0, after.Deaths - before.Deaths),
@@ -31,7 +29,6 @@ public sealed record CopsPlayerProfile(
     int Level,
     IReadOnlyList<CopsSeasonStats> Seasons)
 {
-    /// <summary>The newest season present in the profile; play always lands here.</summary>
     public CopsSeasonStats? CurrentSeason => Seasons.Count == 0 ? null : Seasons.MaxBy(s => s.Season);
 }
 
@@ -40,11 +37,6 @@ public sealed record CopsProfileDelta(int Season, CopsModeStats Ranked, CopsMode
 {
     public bool IsZero => Ranked.IsZero && Casual.IsZero && Custom.IsZero;
 
-    /// <summary>
-    /// Difference attributed to the window between two snapshots. The season used is the
-    /// AFTER snapshot's newest season; when the season rolled over mid-window, the new
-    /// season's raw values ARE the delta (a fresh season starts at zero).
-    /// </summary>
     public static CopsProfileDelta? Between(CopsPlayerProfile? before, CopsPlayerProfile? after)
     {
         var currentAfter = after?.CurrentSeason;
@@ -66,10 +58,7 @@ public sealed record CopsProfileDelta(int Season, CopsModeStats Ranked, CopsMode
     }
 }
 
-/// <summary>
-/// Tolerant parser for the public profile endpoint. Missing fields become zeros/empties
-/// rather than exceptions, because the API shape is observed, not contracted.
-/// </summary>
+/// <summary>Tolerant parser for the public profile endpoint.</summary>
 public static class CopsProfileParser
 {
     public static CopsPlayerProfile? Parse(string json)
@@ -79,8 +68,6 @@ public static class CopsProfileParser
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            // A multi-name query may answer with an array; a single-name query answers
-            // with one object. Take the first profile either way.
             if (root.ValueKind == JsonValueKind.Array)
             {
                 if (root.GetArrayLength() == 0)

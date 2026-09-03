@@ -4,12 +4,10 @@
              xmlns:ctl="clr-namespace:Optima.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1020" HorizontalAlignment="Left">
-
       <TextBlock Text="Sessions" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="History and trends of every recorded session · FPS over time · benchmark comparison"
                  Style="{StaticResource Text.PageSubtitle}" />
 
-      <!-- Trends -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="TRENDS">
         <StackPanel>
           <ctl:Sparkline Values="{Binding TrendValues}" Stroke="{DynamicResource Brush.Accent}" Height="64"
@@ -36,7 +34,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- History -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="HISTORY">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding ReloadCommand}" Padding="6,0" />
@@ -100,7 +97,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Matches: ranked history from profile deltas plus manual entries. -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="MATCHES">
         <HeaderedContentControl.Tag>
           <TextBlock Text="{Binding MatchesSummary}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
@@ -166,7 +162,6 @@
             </TextBlock.Style>
           </TextBlock>
 
-          <!-- Manual add / edit form -->
           <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <ComboBox ItemsSource="{Binding MatchModeOptions}" SelectedItem="{Binding AddMode}" Width="104" />
             <ComboBox ItemsSource="{Binding MatchResultOptions}" SelectedItem="{Binding AddResult}" Width="84" Margin="8,0,0,0" />
@@ -182,7 +177,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Detail -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="DETAIL"
                               Visibility="{Binding SelectedRow, Converter={StaticResource NullToCollapsed}}">
         <StackPanel>
@@ -194,7 +188,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Guided benchmark -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="GUIDED BENCHMARK">
         <StackPanel>
           <TextBlock Style="{StaticResource Text.Prose}" Margin="0,0,0,10" MaxWidth="720" HorizontalAlignment="Left"
@@ -270,7 +263,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Benchmark comparison -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="BENCHMARK COMPARISON">
         <StackPanel>
           <StackPanel Orientation="Horizontal">

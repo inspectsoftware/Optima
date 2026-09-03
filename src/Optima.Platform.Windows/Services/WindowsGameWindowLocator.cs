@@ -6,10 +6,7 @@ using Optima.Platform.Windows.NativeMethods;
 
 namespace Optima.Platform.Windows.Services;
 
-/// <summary>
-/// Finds the monitor showing the game window (matched by the configured title pattern) and
-/// returns its work area in device pixels. Read-only enumeration; nothing touches the game.
-/// </summary>
+/// <summary>Finds the monitor showing the game window (matched by the configured title pattern) and returns its work area in device pixels.</summary>
 public sealed class WindowsGameWindowLocator : IGameWindowLocator
 {
     private readonly Func<CancellationToken, Task<DetectionRules>> _rulesProvider;

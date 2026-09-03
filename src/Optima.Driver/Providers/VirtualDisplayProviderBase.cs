@@ -32,8 +32,6 @@ public abstract class VirtualDisplayProviderBase : IVirtualDisplayProvider
 
     public abstract Task RestoreOriginalStateAsync(CancellationToken ct = default);
 
-    // Width/height/refresh-only changes are compositions over SetModeAsync by default.
-
     public async Task SetResolutionAsync(int width, int height, CancellationToken ct = default)
     {
         var current = await GetCurrentModeAsync(ct).ConfigureAwait(false);

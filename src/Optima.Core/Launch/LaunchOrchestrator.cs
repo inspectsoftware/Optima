@@ -30,12 +30,8 @@ public sealed record LaunchResult
 }
 
 /// <summary>
-/// The §5 pipeline: validate → snapshot → apply profile → configure display → launch →
-/// detect runtime → monitor → wait for exit → restore → session stats. The recovery snapshot
-/// is persisted *before* each mutating step so a crash at any point is recoverable (§18).
-/// Watch mode enters the same pipeline through <see cref="AttachToRunningGameAsync"/>, which
-/// skips only the launch: environment changes, monitoring, restore and the session record are
-/// shared, and both entry points contend for the same single-session gate.
+/// The §5 pipeline: validate → snapshot → apply profile → configure display → launch → detect runtime → monitor → wait
+/// for exit → restore → session stats.
 /// </summary>
 public sealed class LaunchOrchestrator
 {
@@ -54,7 +50,7 @@ public sealed class LaunchOrchestrator
     private readonly ITweakService _tweaks;
     private readonly ILogger<LaunchOrchestrator> _logger;
 
-    private int _running; // 0/1 gate so PLAY and watch mode cannot double-apply
+    private int _running;
 
     /// <summary>Mutable per-session state, so the catch paths always restore the latest snapshot.</summary>
     private sealed class SessionContext
@@ -105,7 +101,6 @@ public sealed class LaunchOrchestrator
     public Task<LaunchResult> RunSessionAsync(LaunchProfile profile, LaunchKind kind, CancellationToken ct = default)
         => RunGatedAsync(profile, async (context, token) =>
         {
-            // ---- Validate -------------------------------------------------------------
             Report(LaunchPhase.Validating, "Checking Google Play Games and Critical Ops…");
             var platform = await _detector.DetectPlatformAsync(token).ConfigureAwait(false);
             if (platform is null)
@@ -125,11 +120,9 @@ public sealed class LaunchOrchestrator
                     "Run detection again from the Diagnostics page");
             }
 
-            // Snapshot exists on disk from here on, so any crash is recoverable.
             await _recovery.SavePendingAsync(context.Snapshot, token).ConfigureAwait(false);
             await ApplyEnvironmentAsync(profile, context, token).ConfigureAwait(false);
 
-            // ---- Launch ---------------------------------------------------------------
             Report(LaunchPhase.StartingPlatform, "Launching Critical Ops through Google Play Games…");
             var launched = false;
             foreach (var launcher in _launchers)
@@ -158,7 +151,6 @@ public sealed class LaunchOrchestrator
                     "Configure a custom launch command in Settings").ConfigureAwait(false);
             }
 
-            // ---- Wait for the game runtime -------------------------------------------
             Report(LaunchPhase.WaitingForGame, "Waiting for the game to start…");
             var emulatorPid = await _processMonitor.WaitForGameStartAsync(TimeSpan.FromMinutes(3), token).ConfigureAwait(false);
             if (emulatorPid is null)
@@ -175,13 +167,6 @@ public sealed class LaunchOrchestrator
                 profile, game.PackageId, emulatorPid.Value, context, kind, captureAllowed: true, token).ConfigureAwait(false);
         }, ct);
 
-    /// <summary>
-    /// Watch mode entry (§5): the game is already running, so this applies the full profile
-    /// around the existing process, monitors it, and restores on exit. Frametime capture is
-    /// started only when <paramref name="captureAllowed"/> is true; the caller passes false
-    /// when the elevated helper is not already connected, so watch mode never triggers a
-    /// surprise UAC prompt.
-    /// </summary>
     public Task<LaunchResult> AttachToRunningGameAsync(
         LaunchProfile profile, int emulatorPid, bool captureAllowed, CancellationToken ct = default)
         => RunGatedAsync(profile, async (context, token) =>
@@ -196,7 +181,6 @@ public sealed class LaunchOrchestrator
                 profile, game?.PackageId ?? "unknown", emulatorPid, context, LaunchKind.Watch, captureAllowed, token).ConfigureAwait(false);
         }, ct);
 
-    /// <summary>The single-session gate plus the shared error handling and restore paths.</summary>
     private async Task<LaunchResult> RunGatedAsync(
         LaunchProfile profile,
         Func<SessionContext, CancellationToken, Task<LaunchResult>> body,
@@ -246,13 +230,8 @@ public sealed class LaunchOrchestrator
         }
     }
 
-    /// <summary>
-    /// Pre-game environment changes shared by PLAY and watch mode: power plan, background
-    /// cleanup and the virtual display. Every mutation lands in the recovery snapshot first.
-    /// </summary>
     private async Task ApplyEnvironmentAsync(LaunchProfile profile, SessionContext context, CancellationToken ct)
     {
-        // ---- Performance profile --------------------------------------------------
         Report(LaunchPhase.ApplyingPerformanceProfile, "Applying performance profile…");
         if (profile.Performance.PowerPlan != PowerPlanKind.Unchanged)
         {
@@ -271,7 +250,6 @@ public sealed class LaunchOrchestrator
             }
         }
 
-        // ---- Virtual display ------------------------------------------------------
         if (profile.Display.VirtualDisplay)
         {
             Report(LaunchPhase.ConfiguringDisplay, $"Configuring virtual display {profile.Display.Mode}…");
@@ -279,7 +257,6 @@ public sealed class LaunchOrchestrator
             context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = true };
             await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
 
-            // Initialize captures the provider's restore baseline (settings backup, device state).
             await _virtualDisplay.InitializeAsync(ct).ConfigureAwait(false);
 
             var wasActive = await _virtualDisplay.IsDisplayActiveAsync(ct).ConfigureAwait(false);
@@ -293,9 +270,6 @@ public sealed class LaunchOrchestrator
             await _virtualDisplay.SetModeAsync(profile.Display.Mode, ct).ConfigureAwait(false);
             _logger.LogInformation("Resolution applied: {Mode} on virtual display", profile.Display.Mode);
 
-            // Capture the topology AFTER driver configuration: a driver reload re-creates the
-            // virtual display with new CCD target ids, so an earlier snapshot would reference
-            // targets that no longer exist and could not be re-applied.
             var topology = await _displayService.CaptureTopologyAsync(ct).ConfigureAwait(false);
             context.Snapshot = context.Snapshot with { DisplayTopology = topology };
             await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
@@ -303,22 +277,15 @@ public sealed class LaunchOrchestrator
             if (profile.Display.MakePrimary
                 && await _virtualDisplay.GetDisplayInfoAsync(ct).ConfigureAwait(false) is { } displayInfo)
             {
-                // Opt-in only: on a local machine the virtual display is invisible, so making
-                // it primary is for capture/streaming setups. Topology restore reverts it.
                 await _displayService.MakePrimaryAsync(displayInfo.DeviceName, ct).ConfigureAwait(false);
             }
         }
     }
 
-    /// <summary>
-    /// The shared session tail: process optimization, monitoring, exit wait, restore and the
-    /// session record. Identical for PLAY, watch and benchmark sessions.
-    /// </summary>
     private async Task<LaunchResult> MonitorAndCompleteAsync(
         LaunchProfile profile, string packageId, int emulatorPid,
         SessionContext context, LaunchKind kind, bool captureAllowed, CancellationToken ct)
     {
-        // ---- Process optimization + monitoring -------------------------------------
         var procSnapshot = await _processOptimizer.ApplyAsync(emulatorPid, profile.Performance, ct).ConfigureAwait(false);
         if (procSnapshot is not null)
         {
@@ -357,7 +324,6 @@ public sealed class LaunchOrchestrator
         stopwatch.Stop();
         _logger.LogInformation("Game exited after {Duration}", stopwatch.Elapsed);
 
-        // ---- Restore --------------------------------------------------------------
         Report(LaunchPhase.Restoring, "Restoring system settings…");
         // A session whose capture never started must save empty stats, not whatever the
         // provider still holds from a previous session.
@@ -390,7 +356,6 @@ public sealed class LaunchOrchestrator
         return new LaunchResult { Success = true, Session = session };
     }
 
-    /// <summary>Stops metrics + network on the failure paths; never throws.</summary>
     private async Task StopMonitoringAsync(SessionContext context)
     {
         if (context.MetricsStarted)
@@ -408,7 +373,6 @@ public sealed class LaunchOrchestrator
         await StopNetworkAsync().ConfigureAwait(false);
     }
 
-    /// <summary>Best-effort network stop; measurement problems never fail a session.</summary>
     private async Task<NetworkQualityStats?> StopNetworkAsync()
     {
         try
@@ -422,7 +386,6 @@ public sealed class LaunchOrchestrator
         }
     }
 
-    /// <summary>Enabled tweak ids at session end, best-effort: history context, never a failure.</summary>
     private async Task<IReadOnlyList<string>> GetEnabledTweakIdsAsync()
     {
         try
@@ -441,11 +404,6 @@ public sealed class LaunchOrchestrator
         }
     }
 
-    /// <summary>
-    /// Every game-related pid is a capture candidate: the DXGI presenter is not always the
-    /// emulator process, so the collector gets platform, emulator and game-window pids and
-    /// reports whichever one actually presents frames.
-    /// </summary>
     private async Task<IReadOnlyList<int>> CollectCandidatePidsAsync(int emulatorPid, CancellationToken ct)
     {
         var pids = new List<int> { emulatorPid };

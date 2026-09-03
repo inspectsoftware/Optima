@@ -5,8 +5,8 @@ using Optima.Core.Statistics;
 namespace Optima.Monitoring.Metrics;
 
 /// <summary>
-/// Deterministic synthetic FPS source used in tests and developer mode: a base FPS with mild
-/// noise and occasional stutter spikes so percentile math has something realistic to chew on.
+/// Deterministic synthetic FPS source used in tests and developer mode: a base FPS with mild noise and occasional
+/// stutter spikes so percentile math has something realistic to chew on.
 /// </summary>
 public sealed class MockMetricsProvider : IPerformanceMetricsProvider
 {
@@ -53,7 +53,6 @@ public sealed class MockMetricsProvider : IPerformanceMetricsProvider
         double avgFrametime;
         lock (_lock)
         {
-            // One second of synthetic frames.
             var frames = new List<double>();
             var produced = 0.0;
             while (produced < 1000)
@@ -62,7 +61,7 @@ public sealed class MockMetricsProvider : IPerformanceMetricsProvider
                 var jitter = target * (0.9 + _random.NextDouble() * 0.2);
                 if (_random.NextDouble() < 0.01)
                 {
-                    jitter *= 3; // stutter spike
+                    jitter *= 3;
                 }
                 frames.Add(jitter);
                 produced += jitter;

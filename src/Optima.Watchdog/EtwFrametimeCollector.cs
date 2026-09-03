@@ -7,21 +7,15 @@ using Microsoft.Diagnostics.Tracing.Session;
 namespace Optima.Watchdog;
 
 /// <summary>
-/// External frametime capture (§12/§13): a real-time ETW session on the Microsoft-Windows-DXGI
-/// provider records IDXGISwapChain::Present events for a set of candidate process ids, the
-/// PresentMon approach. Nothing is injected into any process; this only listens to events
-/// Windows already emits. The presenter is not always the emulator process itself, so each
-/// window reports whichever candidate presented the most frames (see PresentWindowAggregator).
-/// Publishes one "etwSample" event per interval and returns aggregate statistics on stop.
+/// External frametime capture (§12/§13): a real-time ETW session on the Microsoft-Windows-DXGI provider records
+/// IDXGISwapChain::Present events for a set of candidate process ids, the PresentMon approach.
 /// </summary>
 public sealed class EtwFrametimeCollector : IDisposable
 {
     private static readonly Guid DxgiProvider = new("CA11C036-0102-4A2D-A6AD-F03CFED5D3C9");
 
-    // Present_Start (42) and PresentMultiplaneOverlay_Start (55) mark a frame presentation.
     private static readonly int[] PresentStartEventIds = [42, 55];
 
-    // MAX_EVENT_FILTER_PID_COUNT: ETW rejects a process id filter with more entries.
     private const int MaxFilteredPids = 8;
 
     private readonly HashSet<int> _candidatePids;
@@ -49,10 +43,6 @@ public sealed class EtwFrametimeCollector : IDisposable
         {
             StopOnDispose = true,
         };
-        // Kernel-side filters: only the two present events, and (when the candidate list fits
-        // ETW's eight-pid limit) only from the candidate processes. Without them every DXGI
-        // event of every process on the machine lands in the session buffers, and the game
-        // itself pays the per-event cost of emitting the ones the callback then discards.
         var options = new TraceEventProviderOptions { EventIDsToEnable = [.. PresentStartEventIds] };
         if (_candidatePids.Count <= MaxFilteredPids)
         {
@@ -73,7 +63,6 @@ public sealed class EtwFrametimeCollector : IDisposable
             }
             catch (Exception)
             {
-                // Session disposed or lost, so processing simply ends.
             }
         })
         {
@@ -88,8 +77,6 @@ public sealed class EtwFrametimeCollector : IDisposable
 
     private void OnAnyEvent(TraceEvent ev)
     {
-        // Dynamic.All only sees manifest-resolved events; AllEvents is the safety net that
-        // matches by provider + event id even when the manifest lookup fails.
         if (ev.ProviderGuid != DxgiProvider || !_candidatePids.Contains(ev.ProcessID))
         {
             return;
@@ -106,7 +93,6 @@ public sealed class EtwFrametimeCollector : IDisposable
 
     private void OnEvent(TraceEvent ev)
     {
-        // Handled by OnAnyEvent; subscribing Dynamic.All keeps manifest parsing active.
     }
 
     private void PublishSample(object? state)
@@ -118,7 +104,7 @@ public sealed class EtwFrametimeCollector : IDisposable
         }
         if (sample is null)
         {
-            return; // game paused / minimized, so publish nothing rather than zeros
+            return;
         }
 
         _ = _publish(new IpcEvent
@@ -133,7 +119,6 @@ public sealed class EtwFrametimeCollector : IDisposable
         });
     }
 
-    /// <summary>Stops collection and returns aggregate statistics as IPC-friendly strings.</summary>
     public Dictionary<string, string> Stop()
     {
         _sampleTimer?.Dispose();

@@ -4,10 +4,7 @@ using System.Text.Json;
 
 namespace Optima.Core.Ipc;
 
-/// <summary>
-/// Length-prefixed JSON framing shared by both pipe ends. A frame is a 4-byte little-endian
-/// payload length followed by UTF-8 JSON. Length is capped to prevent hostile allocations.
-/// </summary>
+/// <summary>Length-prefixed JSON framing shared by both pipe ends.</summary>
 public static class IpcFraming
 {
     public const int MaxFrameBytes = 1024 * 1024;
@@ -27,7 +24,6 @@ public static class IpcFraming
         await stream.FlushAsync(ct).ConfigureAwait(false);
     }
 
-    /// <summary>Reads one frame; returns null on clean end-of-stream at a frame boundary.</summary>
     public static async Task<T?> ReadFrameAsync<T>(Stream stream, CancellationToken ct = default) where T : class
     {
         var header = new byte[4];

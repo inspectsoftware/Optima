@@ -8,7 +8,7 @@ public enum DiagnosticStatus
     Skipped,
 }
 
-/// <summary>Outcome of one diagnostics check (§15). Always carries a reason and a recommended fix.</summary>
+/// <summary>Outcome of one diagnostics check (§15).</summary>
 public sealed record DiagnosticResult
 {
     public required string CheckName { get; init; }
@@ -18,7 +18,7 @@ public sealed record DiagnosticResult
     public string Details { get; init; } = string.Empty;
 }
 
-/// <summary>Virtualization facts used by diagnostics (§16). Nulls mean "could not determine".</summary>
+/// <summary>Virtualization facts used by diagnostics (§16).</summary>
 public sealed record VirtualizationState
 {
     public bool? FirmwareVirtualizationEnabled { get; init; }

@@ -6,11 +6,7 @@ using static Optima.Platform.Windows.NativeMethods.DisplayNative;
 
 namespace Optima.Platform.Windows.Services;
 
-/// <summary>
-/// Display control via documented APIs. Mode changes use ChangeDisplaySettingsEx WITHOUT
-/// CDS_UPDATEREGISTRY so nothing persists; whole-desktop layout is snapshot/restored through
-/// the CCD API (QueryDisplayConfig / SetDisplayConfig) so the user can never be left stranded (§7).
-/// </summary>
+/// <summary>Display control via documented APIs.</summary>
 public sealed class WindowsDisplayService : IDisplayService
 {
     private readonly ILogger<WindowsDisplayService> _logger;
@@ -118,8 +114,6 @@ public sealed class WindowsDisplayService : IDisplayService
     public Task MakePrimaryAsync(string deviceName, CancellationToken ct = default)
         => Task.Run(() =>
         {
-            // Documented pattern: shift every active display so the target lands at (0,0),
-            // batch with CDS_NORESET, then commit with a null final call.
             var targetMode = DEVMODE.Create();
             if (!EnumDisplaySettingsEx(deviceName, ENUM_CURRENT_SETTINGS, ref targetMode, 0))
             {
@@ -131,7 +125,7 @@ public sealed class WindowsDisplayService : IDisplayService
             var offsetY = targetMode.dmPositionY;
             if (offsetX == 0 && offsetY == 0)
             {
-                return; // already primary
+                return;
             }
 
             const int CDS_NORESET = 0x10000000;
@@ -197,8 +191,6 @@ public sealed class WindowsDisplayService : IDisplayService
             var paths = MemoryMarshal.Cast<byte, DISPLAYCONFIG_PATH_INFO>(pathBytes).ToArray();
             var modes = MemoryMarshal.Cast<byte, DISPLAYCONFIG_MODE_INFO>(modeBytes).ToArray();
 
-            // Exact restore first, because SDC_ALLOW_CHANGES lets Windows remap unusual refresh rates
-            // (e.g. a virtual display idling at 999 Hz), so it is only the fallback.
             var result = SetDisplayConfig((uint)paths.Length, paths, (uint)modes.Length, modes,
                 SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG);
             if (result != 0)
@@ -220,7 +212,6 @@ public sealed class WindowsDisplayService : IDisplayService
             _logger.LogInformation("Display topology restored");
         }, ct);
 
-    /// <summary>GDI device name (\\.\DISPLAYn) for each active CCD path, with monitor friendly names.</summary>
     public Task<IReadOnlyList<(string GdiDevice, string MonitorName, string MonitorPath)>> GetActivePathNamesAsync(CancellationToken ct = default)
         => Task.Run<IReadOnlyList<(string, string, string)>>(() =>
         {
@@ -259,7 +250,6 @@ public sealed class WindowsDisplayService : IDisplayService
 
     private static (DISPLAYCONFIG_PATH_INFO[] Paths, DISPLAYCONFIG_MODE_INFO[] Modes) QueryActiveTopology()
     {
-        // Buffer sizes can change between the two calls (hotplug), so retry a few times.
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var sizeResult = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out var pathCount, out var modeCount);

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
 
-/// <summary>One sidebar row. <see cref="Key"/> doubles as the navigation command parameter.</summary>
+/// <summary>One sidebar row.</summary>
 public sealed partial class NavItem : ObservableObject
 {
     public NavItem(string index, string key, string? sectionHeader = null, string? iconKey = null)
@@ -22,18 +22,14 @@ public sealed partial class NavItem : ObservableObject
         Label = key.Length > 1 ? key[0] + key[1..].ToLowerInvariant() : key;
     }
 
-    /// <summary>Row number; also the Alt+N shortcut it answers to.</summary>
     public string Index { get; }
 
     public string Key { get; }
 
-    /// <summary>Display name of the row.</summary>
     public string Label { get; }
 
-    /// <summary>Icon resource suffix (Themes/Icons.xaml "Icon.&lt;key&gt;").</summary>
     public string IconKey { get; }
 
-    /// <summary>Group label rendered above this row when it opens a new sidebar section.</summary>
     public string SectionHeader { get; }
 
     [ObservableProperty]
@@ -41,8 +37,8 @@ public sealed partial class NavItem : ObservableObject
 }
 
 /// <summary>
-/// Application shell: sidebar navigation, startup sequence (crash recovery prompt → first-run
-/// wizard → detection + monitors), and page lifetimes.
+/// Application shell: sidebar navigation, startup sequence (crash recovery prompt → first-run wizard → detection +
+/// monitors), and page lifetimes.
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -132,14 +128,9 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _developerModeVisible;
 
-    /// <summary>Path-style label for the current page, shown in the title bar.</summary>
     [ObservableProperty]
     private string _breadcrumb = "HOME";
 
-    /// <summary>
-    /// Sidebar rows. Data-driven rather than hand-written elements so the active marker
-    /// follows every navigation route: mouse, Alt+N shortcut, or a programmatic jump.
-    /// </summary>
     public ObservableCollection<NavItem> NavItems { get; } =
     [
         new("01", "HOME", "PLAY") { IsActive = true },
@@ -158,7 +149,6 @@ public sealed partial class MainViewModel : ObservableObject
         new("14", "DEVELOPER"),
     ];
 
-    /// <summary>The rail shows icons only; persisted in settings.</summary>
     [ObservableProperty]
     private bool _railCollapsed;
 
@@ -205,7 +195,6 @@ public sealed partial class MainViewModel : ObservableObject
             _ => Home,
         };
 
-        // Page-specific refresh on entry, kept quick and cancel-safe.
         try
         {
             switch (CurrentPage)
@@ -255,7 +244,6 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            // 1. Crash recovery (§18): offer to restore before anything else touches the system.
             var pending = await _recovery.GetPendingAsync();
             if (pending is not null)
             {
@@ -276,13 +264,11 @@ public sealed partial class MainViewModel : ObservableObject
                 }
             }
 
-            // 2. Settings-driven state.
             var settings = await _settings.GetSettingsAsync();
             DeveloperModeVisible = settings.DeveloperMode;
             RailCollapsed = settings.RailCollapsed;
             App.LogLevelSwitch.MinimumLevel = LogsViewModel.ToSerilogLevel(settings.MinimumLogLevel);
 
-            // 3. First-run wizard (§23).
             if (!settings.FirstRunCompleted)
             {
                 var wizard = new SetupWizardWindow { Owner = Application.Current.MainWindow };
@@ -292,16 +278,13 @@ public sealed partial class MainViewModel : ObservableObject
                 wizard.ShowDialog();
             }
 
-            // 4. Background services.
             await _sessionStore.InitializeAsync();
             await Status.RefreshAsync();
             await Home.InitializeAsync();
             await Play.InitializeAsync();
-            // The hardware monitor is started and paused by App with the window's visibility.
             await _presence.StartAsync();
             await _gameWatch.StartAsync();
 
-            // 5. Keep the game process ids and the live status readouts current.
             _ = Task.Run(BackgroundStatusLoopAsync);
         }
         catch (Exception ex)
@@ -310,12 +293,6 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// The ten-second tick. Deliberately cheap: it used to re-run the whole environment
-    /// check (WMI, PnP, platform detection, two process scans) every time, which showed up
-    /// as periodic hitches in the game. Now it feeds the hardware monitor the game pids only
-    /// while the Watchdog says the game stack is up, and refreshes just the live readouts.
-    /// </summary>
     private async Task BackgroundStatusLoopAsync()
     {
         var hadGamePids = false;

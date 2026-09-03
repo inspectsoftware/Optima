@@ -5,9 +5,8 @@ using System.Windows.Media.Effects;
 namespace Optima.App.Effects;
 
 /// <summary>
-/// The glass pass (Effects/Glass.hlsl): rounded-rect mask, edge refraction with a chromatic
-/// fringe, pointer-reactive specular and a tint, applied to an already-blurred backdrop.
-/// Register numbers match the HLSL constants.
+/// The glass pass (Effects/Glass.hlsl): rounded-rect mask, edge refraction with a chromatic fringe, pointer-reactive
+/// specular and a tint, applied to an already-blurred backdrop.
 /// </summary>
 public sealed class GlassEffect : ShaderEffect
 {
@@ -59,7 +58,6 @@ public sealed class GlassEffect : ShaderEffect
         nameof(Chamfer), typeof(double), typeof(GlassEffect),
         new UIPropertyMetadata(0.0, PixelShaderConstantCallback(9)));
 
-    /// <summary>Chamfer size in DIPs; greater than zero selects the HUD shape over the rounded one.</summary>
     public double Chamfer
     {
         get => (double)GetValue(ChamferProperty);

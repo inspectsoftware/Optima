@@ -3,10 +3,9 @@ using Optima.Core.Models;
 namespace Optima.Core.Statistics;
 
 /// <summary>
-/// Compares two groups of sessions (§14) with a noise guard: a difference is reported as
-/// meaningful only when a Welch t-test over per-second FPS samples clears ~95% confidence
-/// AND the effect is at least 2% of the baseline average (guards against trivially "significant"
-/// micro-differences on huge sample counts).
+/// Compares two groups of sessions (§14) with a noise guard: a difference is reported as meaningful only when a Welch
+/// t-test over per-second FPS samples clears ~95% confidence AND the effect is at least 2% of the baseline average
+/// (guards against trivially "significant" micro-differences on huge sample counts).
 /// </summary>
 public static class BenchmarkComparer
 {
@@ -49,13 +48,6 @@ public static class BenchmarkComparer
         };
     }
 
-    /// <summary>
-    /// Per-run comparison for the guided benchmark: each run's average FPS is one observation.
-    /// The pooled comparison treats every per-second sample as independent, which inflates n by
-    /// orders of magnitude on autocorrelated frame data; runs are the honest unit of analysis.
-    /// Uses the Welch-Satterthwaite degrees of freedom with a t critical-value table, since n
-    /// is small here and 1.96 would be far too permissive.
-    /// </summary>
     public static PerRunComparison ComparePerRun(
         string profileA, IReadOnlyList<SessionRecord> sessionsA,
         string profileB, IReadOnlyList<SessionRecord> sessionsB)
@@ -113,7 +105,6 @@ public static class BenchmarkComparer
         };
     }
 
-    /// <summary>Welch-Satterthwaite effective degrees of freedom.</summary>
     public static double WelchSatterthwaiteDf(IReadOnlyList<double> a, IReadOnlyList<double> b)
     {
         if (a.Count < 2 || b.Count < 2)
@@ -135,7 +126,6 @@ public static class BenchmarkComparer
         return Math.Max(1, df);
     }
 
-    // Two-tailed critical values of Student's t at alpha = 0.05, df 1..30.
     private static readonly double[] TTable =
     [
         12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
@@ -143,7 +133,6 @@ public static class BenchmarkComparer
         2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052, 2.048, 2.045, 2.042,
     ];
 
-    /// <summary>Critical |t| at ~95% confidence; flooring df keeps the test conservative.</summary>
     public static double TCritical(double df)
     {
         var index = (int)Math.Floor(df);
@@ -154,7 +143,6 @@ public static class BenchmarkComparer
         return index <= TTable.Length ? TTable[index - 1] : 1.96;
     }
 
-    /// <summary>Welch's t statistic for two independent samples with unequal variances.</summary>
     public static double WelchT(IReadOnlyList<double> a, IReadOnlyList<double> b)
     {
         if (a.Count < 2 || b.Count < 2)
@@ -170,7 +158,6 @@ public static class BenchmarkComparer
         return denom == 0 ? 0 : (meanA - meanB) / denom;
     }
 
-    /// <summary>Sample-count weighted aggregate of several sessions' stats.</summary>
     public static SessionStats AggregateStats(IReadOnlyList<SessionRecord> sessions)
     {
         var withData = sessions.Where(s => s.Stats.HasData).ToArray();

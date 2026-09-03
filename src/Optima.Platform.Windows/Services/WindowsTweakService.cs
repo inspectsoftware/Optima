@@ -9,13 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Platform.Windows.Services;
 
-/// <summary>
-/// Applies the curated tweak catalog. Reading works non-elevated for both hives; writes go
-/// direct for HKCU and through the elevated helper's ApplyTweakValues command for HKLM.
-/// Before a tweak is first enabled, the actual current values are captured to
-/// tweaks-original-values.json, and disable restores exactly those (falling back to the
-/// documented Windows default when nothing was captured).
-/// </summary>
+/// <summary>Applies the curated tweak catalog.</summary>
 public sealed class WindowsTweakService : ITweakService
 {
     private readonly IElevationBroker _elevation;
@@ -51,8 +45,6 @@ public sealed class WindowsTweakService : ITweakService
             var backups = await _store.LoadAsync<Dictionary<string, Dictionary<string, string?>>>(
                 _paths.TweaksBackupFile, ct).ConfigureAwait(false) ?? [];
 
-            // Capture the true originals before the first write, and persist them before
-            // touching the registry so even a crash mid-apply leaves a usable restore point.
             if (enable && !backups.ContainsKey(tweakId))
             {
                 backups[tweakId] = definition.Values.ToDictionary(TweakCatalog.ValueKey, ReadData);
@@ -79,7 +71,6 @@ public sealed class WindowsTweakService : ITweakService
                 await ApplyElevatedAsync(tweakId, machineTargets, ct).ConfigureAwait(false);
             }
 
-            // The restore point has served its purpose once the original values are back.
             if (!enable && backups.Remove(tweakId))
             {
                 await _store.SaveAsync(_paths.TweaksBackupFile, backups, ct).ConfigureAwait(false);
@@ -132,7 +123,6 @@ public sealed class WindowsTweakService : ITweakService
             : TweakStatus.Mixed;
     }
 
-    /// <summary>Current registry data as a string (DWORDs as unsigned decimal), or null when absent.</summary>
     private static string? ReadData(TweakValue value)
     {
         var baseKey = value.Hive == TweakHive.CurrentUser ? Registry.CurrentUser : Registry.LocalMachine;

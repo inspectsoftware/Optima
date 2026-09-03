@@ -25,33 +25,25 @@ public interface IProcessMonitor
 {
     Task<IReadOnlyList<TrackedProcess>> GetTrackedProcessesAsync(CancellationToken ct = default);
 
-    /// <summary>Current runtime state of the target game (window title + emulator process heuristics).</summary>
     Task<GameRuntimeState> GetGameStateAsync(CancellationToken ct = default);
 
-    /// <summary>Waits until the game is detected as running, or the timeout elapses. Returns the emulator process id, or null.</summary>
     Task<int?> WaitForGameStartAsync(TimeSpan timeout, CancellationToken ct = default);
 
-    /// <summary>Completes when the running game exits.</summary>
     Task WaitForGameExitAsync(CancellationToken ct = default);
 }
 
 /// <summary>Outcome of a game kill request.</summary>
 public sealed record GameKillResult(bool Killed, string Message);
 
-/// <summary>
-/// Hard-kills the emulator process tree hosting the game. A deliberate user action, kept
-/// separate from <see cref="IBackgroundCleanupService"/>, whose never-touch list protects
-/// these exact processes from the cleanup feature.
-/// </summary>
+/// <summary>Hard-kills the emulator process tree hosting the game.</summary>
 public interface IGameTerminator
 {
     Task<GameKillResult> KillGameAsync(CancellationToken ct = default);
 }
 
-/// <summary>Applies reversible scheduling tweaks to processes (§9). Every change returns its undo state.</summary>
+/// <summary>Applies reversible scheduling tweaks to processes (§9).</summary>
 public interface IProcessOptimizer
 {
-    /// <summary>Applies priority / affinity / power-throttling settings, returning the original state for restore.</summary>
     Task<ProcessStateSnapshot?> ApplyAsync(int processId, PerformanceProfile profile, CancellationToken ct = default);
 
     Task RestoreAsync(ProcessStateSnapshot snapshot, CancellationToken ct = default);

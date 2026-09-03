@@ -1,18 +1,10 @@
 namespace Optima.Core.Statistics;
 
-/// <summary>
-/// Renders a numeric series as a block-character sparkline, the SESSIONS page's chart engine.
-/// Numbers always appear beside it, never replaced by it (UI convention shared with AsciiBar);
-/// no charting dependency required.
-/// </summary>
+/// <summary>Renders a numeric series as a block-character sparkline, the SESSIONS page's chart engine.</summary>
 public static class AsciiSparkline
 {
     private static readonly char[] Levels = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
-    /// <summary>
-    /// Renders values (left = first) into at most <paramref name="width"/> characters.
-    /// Longer series are down-sampled by bucket means; quantization spans the series min..max.
-    /// </summary>
     public static string Render(IReadOnlyList<double> values, int width)
     {
         if (values.Count == 0 || width <= 0)
@@ -28,7 +20,6 @@ public static class AsciiSparkline
         var chars = new char[samples.Count];
         for (var i = 0; i < samples.Count; i++)
         {
-            // A flat series renders mid-height rather than all-min glyphs.
             var level = range <= double.Epsilon
                 ? Levels.Length / 2
                 : (int)Math.Min(Levels.Length - 1, (samples[i] - min) / range * Levels.Length);
@@ -37,7 +28,6 @@ public static class AsciiSparkline
         return new string(chars);
     }
 
-    /// <summary>Renders a long series into multiple lines of at most <paramref name="width"/> characters, no downsampling.</summary>
     public static IReadOnlyList<string> RenderWrapped(IReadOnlyList<double> values, int width)
     {
         if (values.Count == 0 || width <= 0)
@@ -45,7 +35,6 @@ public static class AsciiSparkline
             return [];
         }
 
-        // Quantize against the whole series so wrapped rows share one scale.
         var min = values.Min();
         var max = values.Max();
         var range = max - min;

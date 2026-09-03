@@ -4,6 +4,13 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-09-03 - Attribution and housekeeping
+
+- Optima is made by Inspect Software. The Legal page, the Discord card and the accent
+  preset names no longer carry the old byline.
+- README rewritten as a short feature summary.
+- Source comments trimmed to the ones that explain a constraint or a non-obvious decision.
+
 ## 2026-09-03 - Optima 0.7.0: liquid glass, lighter beside the game
 
 - New liquid glass design on every page: chamfered glass over a drifting ambient field,
@@ -20,9 +27,9 @@ under it, plain text, no em dashes.
 
 ## 2026-08-30 - Company attribution
 
-- Optima is made by Aureum at Inspect Software: the assembly Company metadata,
+- Optima is made by Inspect Software: the assembly Company metadata,
   LICENSE copyright line, README and the LEGAL page now name Inspect Software as
-  the company. The "by Aureum" byline is unchanged.
+  the company.
 
 ## 2026-08-30 - Discord card buttons
 
@@ -94,7 +101,7 @@ under it, plain text, no em dashes.
   scale, and live CPU/GPU temperatures streamed through the administrator helper via
   LibreHardwareMonitor. Every readout states its honest measurement limits. The stress
   test from the original wishlist stays deliberately unbuilt.
-- Legal, a new page: what Optima is (made by Aureum, all rights reserved under the
+- Legal, a new page: what Optima is (made by Inspect Software, all rights reserved under the
   Optima holder), exactly how it stays outside the game, the exhaustive list of
   everything it talks to, and the shipped LICENSE and third-party notices rendered
   in-app. It promises behavior, never outcomes.
@@ -147,18 +154,18 @@ under it, plain text, no em dashes.
 - Session database schema v2: per-session stat deltas, game-version field and the new
   matches table, with the previous database backed up before migration.
 
-## 2026-08-30 - Liquid glass redesign, themes, accents and the Aureum rebrand (v0.2.0)
+## 2026-08-30 - Liquid glass redesign, themes, accents and the rebrand (v0.2.0)
 
 - Complete visual redesign: a liquid-glass interface with a deep blue-charcoal ground,
-  translucent layered surfaces, soft corners, and the new Aureum gold accent. The window
+  translucent layered surfaces, soft corners, and the new gold accent. The window
   now uses the Windows acrylic backdrop where available, with a solid fallback.
 - Dark mode and Light mode: pick a theme on the Settings page under APPEARANCE. The
   switch applies the moment you save, no restart needed, and both palettes keep the
   4.5:1 WCAG AA contrast floor on the dimmest text.
-- Accent customization: six presets (Aureum Gold, Frost, Mint, Rose, Violet, Slate) plus
+- Accent customization: six presets (Gold, Frost, Mint, Rose, Violet, Slate) plus
   a custom hex field. Hover, pressed, glow and on-accent ink colors are derived
   automatically, and the ink always stays readable on any accent you pick.
-- Rebrand: the app is now Optima by Aureum. The title bar carries the new wordmark and
+- Rebrand: the title bar carries the new wordmark and
   byline, and a LICENSE file (all rights reserved, source visible) now ships at the
   repository root.
 - Navigation regrouped into LAUNCH, MONITOR, CONFIGURE and SUPPORT sections with a glass

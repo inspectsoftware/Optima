@@ -4,12 +4,7 @@ using System.Windows.Interop;
 
 namespace Optima.App.Services;
 
-/// <summary>
-/// Raw-input mouse metering for the COMP page. WM_INPUT delivers the device's own motion
-/// packets, so the event rate approximates the mouse's polling rate and the deltas are
-/// hardware counts (independent of Windows pointer speed), which is what makes the DPI
-/// calculation honest. Purely observational; registration is removed on Stop.
-/// </summary>
+/// <summary>Raw-input mouse metering for the COMP page.</summary>
 public sealed class RawMouseMeter : IDisposable
 {
     private HwndSource? _source;
@@ -20,10 +15,8 @@ public sealed class RawMouseMeter : IDisposable
 
     public bool Active { get; private set; }
 
-    /// <summary>Accumulated |dx| hardware counts since the last reset.</summary>
     public long Counts => Interlocked.Read(ref _counts);
 
-    /// <summary>Event rate over the last completed one-second window while the mouse moves.</summary>
     public double PollingRateHz => _lastRateHz;
 
     public void Start(Window window)
@@ -38,8 +31,8 @@ public sealed class RawMouseMeter : IDisposable
 
         var device = new RawInputDevice
         {
-            UsagePage = 0x01, // generic desktop
-            Usage = 0x02,     // mouse
+            UsagePage = 0x01,
+            Usage = 0x02,
             Flags = RidevInputSink,
             Target = handle,
         };
@@ -101,7 +94,7 @@ public sealed class RawMouseMeter : IDisposable
                 return IntPtr.Zero;
             }
             var input = Marshal.PtrToStructure<RawInput>(buffer);
-            if (input.Header.Type != 0) // RIM_TYPEMOUSE
+            if (input.Header.Type != 0)
             {
                 return IntPtr.Zero;
             }

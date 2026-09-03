@@ -8,12 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Monitoring.Network;
 
-/// <summary>
-/// Passive ping loop (§ security boundaries: observation only). Prefers the game's own TCP
-/// endpoints when they answer ICMP; otherwise measures the configured reference host and says
-/// so, because loss against 1.1.1.1 reflects the user's link, not the game path. Runs
-/// non-elevated inside the app.
-/// </summary>
+/// <summary>Passive ping loop (§ security boundaries: observation only).</summary>
 public sealed class NetworkQualityMonitor : INetworkQualityMonitor
 {
     private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(1);
@@ -122,7 +117,6 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
                     }
                     catch (PingException)
                     {
-                        // Counted as loss below.
                     }
 
                     NetworkQualitySample sample;
@@ -151,7 +145,6 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
         }
     }
 
-    /// <summary>Game endpoints that answer ICMP, else the reference host.</summary>
     private async Task<(List<IPAddress> Targets, bool ReferenceMode)> DiscoverTargetsAsync(Ping ping, CancellationToken ct)
     {
         var responders = new List<IPAddress>();

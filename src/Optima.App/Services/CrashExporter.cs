@@ -6,9 +6,8 @@ using Optima.App.Logging;
 namespace Optima.App.Services;
 
 /// <summary>
-/// Turns a raw crash bundle into a shareable zip: every text file passes the secret
-/// redactor plus a personal-identifier scrub (Windows user name, machine name, user
-/// profile paths) so the archive is safe to hand to developers.
+/// Turns a raw crash bundle into a shareable zip: every text file passes the secret redactor plus a personal-identifier
+/// scrub (Windows user name, machine name, user profile paths) so the archive is safe to hand to developers.
 /// </summary>
 public static partial class CrashExporter
 {
@@ -32,7 +31,6 @@ public static partial class CrashExporter
         return redacted;
     }
 
-    /// <summary>Writes crash-[name]-redacted.zip next to the bundle and returns its path.</summary>
     public static string ExportRedactedZip(string bundleDirectory)
     {
         var name = Path.GetFileName(bundleDirectory.TrimEnd(Path.DirectorySeparatorChar));

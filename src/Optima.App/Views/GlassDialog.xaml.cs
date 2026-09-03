@@ -13,11 +13,7 @@ public enum DialogTone
     Danger,
 }
 
-/// <summary>
-/// The one dialog for questions and notices (replaces stock MessageBoxes). A glass strip over
-/// its own ambient field, a heading, prose, and up to three buttons; the last button is the
-/// primary and answers Enter, the first answers Escape.
-/// </summary>
+/// <summary>The one dialog for questions and notices (replaces stock MessageBoxes).</summary>
 public partial class GlassDialog : Window
 {
     public static readonly DependencyProperty HeadingProperty = DependencyProperty.Register(
@@ -37,7 +33,6 @@ public partial class GlassDialog : Window
     public string Kicker { get => (string)GetValue(KickerProperty); set => SetValue(KickerProperty, value); }
     public Brush? EdgeBrush { get => (Brush?)GetValue(EdgeBrushProperty); set => SetValue(EdgeBrushProperty, value); }
 
-    /// <summary>Index of the button that was pressed; -1 when closed another way.</summary>
     public int Answer { get; private set; } = -1;
 
     public GlassDialog()
@@ -45,11 +40,6 @@ public partial class GlassDialog : Window
         InitializeComponent();
     }
 
-    /// <summary>
-    /// Shows the dialog modally and returns the index of the chosen button (-1 if closed).
-    /// The owner is used when it is on screen; otherwise the dialog centers on the screen
-    /// and stays on top so it cannot get lost behind a game.
-    /// </summary>
     public static int Ask(Window? owner, string heading, string body, DialogTone tone, params string[] buttons)
     {
         var dialog = new GlassDialog
@@ -111,7 +101,6 @@ public partial class GlassDialog : Window
         return dialog.Answer;
     }
 
-    /// <summary>Yes/no convenience: true when the last (primary) button was chosen.</summary>
     public static bool Confirm(Window? owner, string heading, string body, string cancel, string confirm, DialogTone tone = DialogTone.Warning)
         => Ask(owner, heading, body, tone, cancel, confirm) == 1;
 

@@ -3,12 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Core.Stats;
 
-/// <summary>
-/// Read-only client for Critical Force's public profile API. Called only when the user
-/// has configured their in-game name: at session start, session end, and on a slow
-/// in-match cadence (>= 90 s) for match splits. Every failure returns null; stats are
-/// an enrichment, never a reason a session fails to record.
-/// </summary>
+/// <summary>Read-only client for Critical Force's public profile API.</summary>
 public sealed class CopsApiClient : IDisposable
 {
     private const string BaseUrl = "https://default.prod.copsapi.criticalforce.fi/api/public/";
@@ -39,7 +34,6 @@ public sealed class CopsApiClient : IDisposable
             using var response = await _http.GetAsync(relativeUrl, ct).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                // 500 is the API's "player not found"; anything else is transient noise.
                 _logger.LogDebug("Profile lookup answered {Status}", (int)response.StatusCode);
                 return null;
             }

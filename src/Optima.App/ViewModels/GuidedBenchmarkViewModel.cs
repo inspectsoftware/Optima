@@ -11,11 +11,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.App.ViewModels;
 
 /// <summary>
-/// The guided benchmark flow on the SESSIONS page (§14): "compare A vs B over N runs each",
-/// driving real sessions through the orchestrator with alternating profiles. Each run starts
-/// on an explicit click (a run ends when the user quits the game; relaunching it unasked
-/// would be hostile), configuration drift aborts the plan, and the result leads with the
-/// per-run Welch verdict since pooled per-second samples overstate significance.
+/// The guided benchmark flow on the SESSIONS page (§14): "compare A vs B over N runs each", driving real sessions
+/// through the orchestrator with alternating profiles.
 /// </summary>
 public sealed partial class GuidedBenchmarkViewModel : ObservableObject
 {
@@ -108,7 +105,6 @@ public sealed partial class GuidedBenchmarkViewModel : ObservableObject
 
         try
         {
-            // Refuse to run under a drifted configuration; a mixed comparison answers nothing.
             var currentA = await _profiles.GetProfileAsync(_plan.ProfileA);
             var currentB = await _profiles.GetProfileAsync(_plan.ProfileB);
             var drift = _plan.CheckDrift(
@@ -192,7 +188,6 @@ public sealed partial class GuidedBenchmarkViewModel : ObservableObject
         _cancelRequested = true;
         if (_plan.State == BenchmarkPlanState.Running)
         {
-            // The active session is cancelled and restored; RunNextAsync finishes the plan.
             _cts?.Cancel();
             Status = "cancelling · restoring settings";
             return;

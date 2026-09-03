@@ -7,19 +7,11 @@ using Optima.App.Effects;
 
 namespace Optima.App.Controls;
 
-/// <summary>
-/// A glass strip that refracts the in-app content beneath it. It snapshots the inherited
-/// <see cref="BackdropProperty"/> visual (the shell's ambient field, which the panel is not
-/// part of) through a live VisualBrush rendered at a fraction of device resolution, optionally
-/// blurs it, then runs <see cref="GlassEffect"/> for the shape mask, refraction, chroma and the
-/// pointer-reactive specular. A <see cref="ChamferBorder"/> on top draws the rim lines and
-/// hosts the child, clipped to the same shape.
-/// </summary>
+/// <summary>A glass strip that refracts the in-app content beneath it.</summary>
 public sealed class GlassPanel : Grid
 {
     private const double Bleed = 24;
 
-    /// <summary>Inherited: set once on the shell root, every panel below refracts that visual.</summary>
     public static readonly DependencyProperty BackdropProperty = DependencyProperty.RegisterAttached(
         "Backdrop", typeof(Visual), typeof(GlassPanel),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.Inherits, OnBackdropChanged));
@@ -71,7 +63,6 @@ public sealed class GlassPanel : Grid
         nameof(Fill), typeof(Brush), typeof(GlassPanel),
         new PropertyMetadata(null, (d, e) => ((GlassPanel)d)._frame.Background = e.NewValue as Brush));
 
-    /// <summary>Every live panel, so the shell can move the light on all of them at once.</summary>
     private static readonly List<WeakReference<GlassPanel>> Live = [];
 
     private readonly VisualBrush _brush;
@@ -111,25 +102,20 @@ public sealed class GlassPanel : Grid
     public double Chamfer { get => (double)GetValue(ChamferProperty); set => SetValue(ChamferProperty, value); }
     public double CornerRadius { get => (double)GetValue(CornerRadiusProperty); set => SetValue(CornerRadiusProperty, value); }
     public double BlurRadius { get => (double)GetValue(BlurRadiusProperty); set => SetValue(BlurRadiusProperty, value); }
-    /// <summary>Resolution divisor for the snapshot (4 = one sixteenth of the pixels). Minimum 1.</summary>
     public double Downsample { get => (double)GetValue(DownsampleProperty); set => SetValue(DownsampleProperty, value); }
     public Color Tint { get => (Color)GetValue(TintProperty); set => SetValue(TintProperty, value); }
     public Brush? TopLine { get => (Brush?)GetValue(TopLineProperty); set => SetValue(TopLineProperty, value); }
     public Brush? BottomLine { get => (Brush?)GetValue(BottomLineProperty); set => SetValue(BottomLineProperty, value); }
     public Brush? LeadingEdge { get => (Brush?)GetValue(LeadingEdgeProperty); set => SetValue(LeadingEdgeProperty, value); }
-    /// <summary>A flat fill drawn over the glass, for panels that need extra opacity (dialogs).</summary>
     public Brush? Fill { get => (Brush?)GetValue(FillProperty); set => SetValue(FillProperty, value); }
 
-    /// <summary>The glass pass; the Glass lab binds sliders to its inputs.</summary>
     public GlassEffect Glass { get; }
 
     public BlurEffect Blur { get; }
 
-    /// <summary>Moves this panel's specular light. The point is in the panel's own coordinates.</summary>
     public void SetLight(Point panelPoint)
         => Glass.Light = new Point(panelPoint.X + Bleed, panelPoint.Y + Bleed);
 
-    /// <summary>Moves the light on every live panel from a pointer position in root coordinates.</summary>
     public static void NotifyPointer(Visual root, Point rootPoint)
     {
         for (var i = Live.Count - 1; i >= 0; i--)
@@ -145,12 +131,10 @@ public sealed class GlassPanel : Grid
             }
             catch (InvalidOperationException)
             {
-                // Not in the same tree; leave the light where it is.
             }
         }
     }
 
-    /// <summary>Puts every light out of reach (reduced motion, window not foreground).</summary>
     public static void ClearLights()
     {
         foreach (var weak in Live)
@@ -192,7 +176,6 @@ public sealed class GlassPanel : Grid
         }
     }
 
-    /// <summary>Keeps the snapshot window aligned with where the panel sits over the source.</summary>
     private void UpdateViewbox()
     {
         var source = _brush.Visual;

@@ -8,7 +8,7 @@ namespace Optima.Tests.Configuration;
 public sealed class AppSettingsThemeTests
 {
     [Fact]
-    public void DefaultsAreDarkWithAureumGold()
+    public void DefaultsAreDarkWithGold()
     {
         var settings = new AppSettings();
         Assert.Equal("Dark", settings.Theme);

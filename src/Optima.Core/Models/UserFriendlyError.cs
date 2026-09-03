@@ -1,8 +1,8 @@
 namespace Optima.Core.Models;
 
 /// <summary>
-/// An error surfaced to the user (§24): plain-language message + suggested fixes + stable code,
-/// with raw developer details kept behind an expander.
+/// An error surfaced to the user (§24): plain-language message + suggested fixes + stable code, with raw developer
+/// details kept behind an expander.
 /// </summary>
 public sealed record UserFriendlyError
 {

@@ -34,12 +34,10 @@ public partial class MainWindow : Window
             Motion.Changed -= OnMotionChanged;
         };
 
-        // The pointer is the light source for every glass strip.
         MouseMove += OnPointerMoved;
         MouseLeave += (_, _) => GlassPanel.ClearLights();
         Activated += (_, _) => Motion.SetForeground(true);
         Deactivated += (_, _) => Motion.SetForeground(false);
-        // Hidden to the tray: nothing to light or drift, whatever the activation state says.
         IsVisibleChanged += (_, _) =>
         {
             if (!IsVisible)
@@ -66,7 +64,6 @@ public partial class MainWindow : Window
         };
     }
 
-    /// <summary>The shell's mood layer, driven by the launch state from App.</summary>
     public AmbientField AmbientLayer => Ambient;
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -98,7 +95,6 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Page transition: crossfade with an 8 px rise, instant under reduced motion.</summary>
     private void OnPageChanged(object sender, DataTransferEventArgs e)
     {
         if (!Motion.Enabled)
@@ -113,11 +109,6 @@ public partial class MainWindow : Window
         PageShift.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, new DoubleAnimation(8, 0, duration) { EasingFunction = ease });
     }
 
-    /// <summary>
-    /// Asks DWM for rounded corners, the acrylic backdrop at the window edge and the
-    /// theme-matched caption. When the backdrop is unavailable (older Windows), the
-    /// translucent window ground would sit on nothing, so it falls back to the solid brush.
-    /// </summary>
     private void ApplyWindowDressing(string theme)
     {
         if (!Dispatcher.CheckAccess())
@@ -156,12 +147,6 @@ public partial class MainWindow : Window
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
-    /// <summary>
-    /// A WindowChrome window sized to Maximized extends past the work area on every edge,
-    /// which clips the caption row and the right column. The overhang is measured against
-    /// the monitor the window is actually on rather than assumed from SystemParameters, which
-    /// keeps it correct across monitors with different DPI.
-    /// </summary>
     private void ApplyMaximizedCompensation()
     {
         if (WindowState != WindowState.Maximized)

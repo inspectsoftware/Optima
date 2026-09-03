@@ -4,7 +4,7 @@ using Microsoft.Win32;
 
 namespace Optima.Platform.Windows.Probes;
 
-/// <summary>Real registry access. Key paths use "HKLM\..." / "HKCU\..." prefixes.</summary>
+/// <summary>Real registry access.</summary>
 public sealed class WindowsRegistryProbe : IRegistryProbe
 {
     public string? GetValue(string keyPath, string valueName)
@@ -81,6 +81,5 @@ public sealed class WindowsFileSystemProbe : IFileSystemProbe
 
 public sealed class WindowsProcessProbe : IProcessProbe
 {
-    // Detection runs on every environment refresh; the snapshot keeps that a sub-millisecond scan.
     public IReadOnlyList<(int Id, string Name)> GetProcesses() => NativeMethods.ProcessSnapshot.GetRunning();
 }

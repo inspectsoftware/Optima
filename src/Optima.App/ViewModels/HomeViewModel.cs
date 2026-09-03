@@ -45,13 +45,10 @@ public sealed partial class HomeViewModel : ObservableObject
     [ObservableProperty] private string _ramUsage = "---";
     [ObservableProperty] private string _gpuTempText = string.Empty;
 
-    // Numeric counterparts driving the ASCII meters; the strings above are what gets read.
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private double _gpuPercent;
     [ObservableProperty] private double _ramPercent;
 
-    /// <summary>The automatic game-update notice (Q5): a version change on the official
-    /// updates page, detected by Optima itself, with no curated feed involved.</summary>
     [ObservableProperty] private string _gameUpdateBanner = string.Empty;
 
     public async Task InitializeAsync(CancellationToken ct = default)

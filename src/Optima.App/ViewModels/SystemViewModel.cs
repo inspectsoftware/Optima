@@ -45,7 +45,6 @@ public sealed partial class SystemViewModel : ObservableObject
 
     private void OnNetworkSample(object? sender, NetworkQualitySample sample)
     {
-        // Raised on the ping loop thread; marshal before touching bound properties.
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
         {
             _lastNetworkSample = DateTimeOffset.Now;
@@ -88,7 +87,6 @@ public sealed partial class SystemViewModel : ObservableObject
             VirtualizationRows.Add(new InfoRow("Virtual Machine Platform", Tri(virtualization.VirtualMachinePlatformEnabled)));
             VirtualizationRows.Add(new InfoRow("Windows Hypervisor Platform", Tri(virtualization.WindowsHypervisorPlatformEnabled)));
 
-            // Same naming layer as the DISPLAY page: a custom name follows the display everywhere.
             var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
             Displays.Clear();
             foreach (var display in inventory.Displays)

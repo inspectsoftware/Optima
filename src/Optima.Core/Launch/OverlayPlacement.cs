@@ -26,7 +26,6 @@ public static class OverlayPlacement
             _ => (workArea.Left + workArea.Width - overlayWidth - margin, workArea.Top + workArea.Height - overlayHeight - margin),
         };
 
-    /// <summary>Parses the persisted corner name; unknown values fall back to top right.</summary>
     public static OverlayCorner ParseCorner(string? text)
         => Enum.TryParse<OverlayCorner>(text, ignoreCase: true, out var corner) ? corner : OverlayCorner.TopRight;
 }

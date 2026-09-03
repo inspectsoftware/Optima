@@ -25,7 +25,6 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
     {
         if (_cached is not null)
         {
-            // Displays change at runtime; the rest of the inventory is static.
             return _cached with { Displays = await _displayService.GetDisplaysAsync(ct).ConfigureAwait(false) };
         }
 
@@ -38,10 +37,6 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
 
     public Task<VirtualizationState> GetVirtualizationStateAsync(CancellationToken ct = default)
     {
-        // Five WMI queries (three of them against Win32_OptionalFeature, the slow one) answer a
-        // question that only changes across a reboot, and the status bar used to ask it every
-        // ten seconds, game or no game. One query per launch; InvalidateCache after a feature
-        // enable so diagnostics see the new state without a restart of Optima.
         var pending = _virtualization;
         if (pending is null || pending.IsFaulted || pending.IsCanceled)
         {
@@ -76,8 +71,6 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
                 _logger.LogWarning(ex, "WMI virtualization query failed");
             }
 
-            // Note: when a hypervisor is already running, Win32_Processor reports firmware VT
-            // as false/null because the hypervisor owns it, so treat "hypervisor present" as proof.
             if (hypervisorPresent == true)
             {
                 firmware = true;
@@ -170,10 +163,6 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
         return GpuVendor.Unknown;
     }
 
-    /// <summary>
-    /// Reads optional-feature state from the servicing registry (readable without elevation,
-    /// unlike Win32_OptionalFeature which can be slow) with WMI as fallback. Null = unknown.
-    /// </summary>
     private bool? GetOptionalFeatureEnabled(string featureName)
     {
         try
@@ -182,7 +171,6 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
                 $"SELECT InstallState FROM Win32_OptionalFeature WHERE Name = '{featureName}'");
             foreach (var feature in searcher.Get())
             {
-                // InstallState: 1 = enabled, 2 = disabled, 3 = absent
                 return Convert.ToInt32(feature["InstallState"] ?? 0) == 1;
             }
             return false;

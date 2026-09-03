@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime">
   <UserControl.Resources>
-    <!-- Requirement badges shared by the tweak rows and the setting explanations. -->
     <Style x:Key="ReqBadge" TargetType="Border" BasedOn="{StaticResource Badge}">
       <Setter Property="Margin" Value="8,0,0,0" />
       <Setter Property="Padding" Value="6,1,6,2" />
@@ -12,12 +11,9 @@
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1040" HorizontalAlignment="Left">
-
       <TextBlock Text="Performance" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="WINDOWS TWEAKS · PROFILES · PER-SETTING DISCLOSURE" Style="{StaticResource Text.PageSubtitle}" />
 
-      <!-- Windows tweak catalog: persistent per-tweak toggles, originals captured before
-           any write, individually reversible. -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="WINDOWS TWEAKS">
         <HeaderedContentControl.Tag>
           <StackPanel Orientation="Horizontal">
@@ -54,7 +50,6 @@
                           <Expander Margin="0,1">
                             <Expander.Header>
                               <StackPanel Orientation="Horizontal">
-                                <!-- The switch: a chip that reads ON / OFF / MIXED. -->
                                 <Button MinWidth="64" Padding="8,3" MinHeight="24"
                                         Command="{Binding DataContext.ToggleTweakCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}"
@@ -130,7 +125,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Profile list + editor; the per-setting disclosure folds in below the editor. -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="PROFILES">
         <HeaderedContentControl.Tag>
           <StackPanel Orientation="Horizontal">
@@ -217,7 +211,6 @@
             </StackPanel>
           </Grid>
 
-          <!-- Per-setting disclosure, folded into the profile editor. -->
           <Expander Header="what each setting does" Margin="0,14,0,0">
             <ItemsControl ItemsSource="{Binding Explanations}" Margin="0,4,0,0">
               <ItemsControl.ItemTemplate>

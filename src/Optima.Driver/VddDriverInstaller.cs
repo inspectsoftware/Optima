@@ -10,15 +10,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Driver;
 
-/// <summary>
-/// Installs the virtual display driver that ships alongside the application, so an end user
-/// never opens Device Manager or runs devcon. The privileged steps (staging the package,
-/// creating the root device node, writing the driver's settings file) all go through the
-/// elevated helper behind a single UAC prompt.
-/// </summary>
+/// <summary>Installs the virtual display driver that ships alongside the application, so an end user never opens Device Manager or runs devcon.</summary>
 public sealed class VddDriverInstaller : IDriverInstaller
 {
-    /// <summary>Folder beside the executable that a driver package is shipped in.</summary>
     public const string BundledDriverFolder = "drivers";
 
     private readonly IElevationBroker _elevation;
@@ -39,12 +33,6 @@ public sealed class VddDriverInstaller : IDriverInstaller
         _logger = logger;
     }
 
-    /// <summary>
-    /// Picks the driver package to install. A distribution can hold several INFs (per
-    /// architecture, and sometimes unrelated devices such as a virtual audio driver), so
-    /// selection is explicit rather than "first file found": the package must be
-    /// Display-class and must target this machine's architecture.
-    /// </summary>
     public DriverPackageInfo? FindBundledPackage()
     {
         var folder = Path.Combine(AppContext.BaseDirectory, BundledDriverFolder);
@@ -60,7 +48,6 @@ public sealed class VddDriverInstaller : IDriverInstaller
         {
             try
             {
-                // ReadAllText honours the byte-order mark; these INFs are UTF-16.
                 var parsed = InfFile.Parse(File.ReadAllText(inf));
                 if (string.IsNullOrWhiteSpace(parsed.HardwareId))
                 {
@@ -87,8 +74,6 @@ public sealed class VddDriverInstaller : IDriverInstaller
 
                 if (parsed.TargetsArchitecture(osArchitecture))
                 {
-                    // Logged once per distinct package: the status loop calls this every few
-                    // seconds, and an Information line each time would drown the log.
                     if (Interlocked.Exchange(ref _lastLoggedInfPath, inf) != inf)
                     {
                         _logger.LogInformation("Bundled driver selected: {Name} {HardwareId} for {Arch} ({Inf})",
@@ -97,8 +82,6 @@ public sealed class VddDriverInstaller : IDriverInstaller
                     return package;
                 }
 
-                // Keep one non-matching candidate so the UI can explain the mismatch
-                // instead of claiming nothing is bundled at all.
                 fallback ??= package;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -228,7 +211,6 @@ public sealed class VddDriverInstaller : IDriverInstaller
             Args =
             {
                 ["hardwareId"] = package.HardwareId,
-                // Lets the helper also delete the staged package from the DriverStore.
                 ["infName"] = Path.GetFileName(package.InfPath),
             },
         }, ct).ConfigureAwait(false);
@@ -249,11 +231,6 @@ public sealed class VddDriverInstaller : IDriverInstaller
         return DriverInstallResult.Ok();
     }
 
-    /// <summary>
-    /// Writes the driver's settings file when it is missing. The driver reads it from a fixed
-    /// location under C:\, which needs administrator rights to create, hence the helper.
-    /// An existing file is never overwritten.
-    /// </summary>
     private async Task EnsureSettingsFileAsync(CancellationToken ct)
     {
         var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
@@ -282,10 +259,6 @@ public sealed class VddDriverInstaller : IDriverInstaller
         }
     }
 
-    /// <summary>
-    /// Default mode list written on a fresh install. Covers the resolutions Optima's built-in
-    /// profiles use; the driver replicates every global refresh rate across every resolution.
-    /// </summary>
     internal const string DefaultSettingsXml = """
         <?xml version='1.0' encoding='utf-8'?>
         <vdd_settings>

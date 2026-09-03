@@ -5,11 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Core.Detection;
 
-/// <summary>
-/// Rule-driven detection (§4/§29). All OS access goes through the injected probes so the
-/// evaluation order (registry → known folders → protocol handler → processes → manual path)
-/// is unit-testable with fakes. Platform.Windows provides the real probes.
-/// </summary>
+/// <summary>Rule-driven detection (§4/§29).</summary>
 public sealed class GameDetectionEngine : IGameDetector
 {
     private readonly IRegistryProbe _registry;
@@ -131,12 +127,10 @@ public sealed class GameDetectionEngine : IGameDetector
         return game;
     }
 
-    /// <summary>The executable registered for the googleplaygames:// protocol, or null.</summary>
     public string? ResolveProtocolHandlerExecutable(DetectionRules rules) => ResolveProtocolHandler(rules);
 
     private (string? Dir, string? Version) FindInstallDirectory(DetectionRules rules)
     {
-        // 1. Manual override wins.
         if (!string.IsNullOrWhiteSpace(rules.ManualInstallPath))
         {
             var manual = _expandEnvironment(rules.ManualInstallPath);
@@ -147,7 +141,6 @@ public sealed class GameDetectionEngine : IGameDetector
             _logger.LogWarning("Configured manual install path does not exist: {Path}", manual);
         }
 
-        // 2. Registry uninstall entries.
         var namePattern = new Regex(rules.UninstallDisplayNamePattern, RegexOptions.IgnoreCase);
         foreach (var keyPath in rules.UninstallKeyPaths)
         {
@@ -168,7 +161,6 @@ public sealed class GameDetectionEngine : IGameDetector
             }
         }
 
-        // 3. Protocol handler → executable directory.
         if (ResolveProtocolHandler(rules) is { } handlerExe)
         {
             var dir = Path.GetDirectoryName(handlerExe);
@@ -178,7 +170,6 @@ public sealed class GameDetectionEngine : IGameDetector
             }
         }
 
-        // 4. Known folders.
         foreach (var template in rules.KnownInstallFolders)
         {
             var folder = _expandEnvironment(template);
@@ -207,7 +198,6 @@ public sealed class GameDetectionEngine : IGameDetector
 
     private string? TryVersionFromManifest(string installDir)
     {
-        // current\client\manifest.xml carries the client version in recent GPG builds.
         var manifest = Path.Combine(installDir, "current", "client", "manifest.xml");
         var text = _fs.ReadAllText(manifest);
         if (text is null)
@@ -236,7 +226,6 @@ public sealed class GameDetectionEngine : IGameDetector
 
     public static string? ExtractPackageId(string uri)
     {
-        // googleplaygames://launch/?id=com.example.game&lid=2&pid=1
         var match = Regex.Match(uri, @"[?&]id=(?<id>[A-Za-z0-9._]+)");
         return match.Success ? match.Groups["id"].Value : null;
     }

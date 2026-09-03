@@ -15,29 +15,18 @@ public enum GamePresence
 /// <summary>One presence transition.</summary>
 public sealed record PresenceChange(GamePresence Previous, GamePresence Current, DateTimeOffset At);
 
-/// <summary>
-/// The synthesized end-of-run edge. <paramref name="EmulatorStillAlive"/> is a hint for the
-/// crash sentinel: the game window vanished while crosvm stayed up, which is how both a
-/// game crash and a menu-quit look from the Windows side; the logcat decides which.
-/// </summary>
+/// <summary>The synthesized end-of-run edge.</summary>
 public sealed record GameExit(DateTimeOffset At, TimeSpan RunDuration, bool EmulatorStillAlive);
 
 /// <summary>
-/// The Watchdog's always-on presence loop: one cheap poll (process list + window scan via
-/// IProcessMonitor) every couple of seconds, translated into edges everyone else consumes:
-/// Discord presence, session tracking, the watch-attach policy, and crash capture. It never
-/// takes the orchestrator's session gate and it never blocks on a session; attach work
-/// triggered from its ticks must run on its own task.
-/// It also synthesizes the exit edge the raw state machine never produced: the platform
-/// reports NotRunning/Starting/Running only, so "the game just ended" is derived here from
-/// InGame followed by a debounced fall to a lower state.
+/// The Watchdog's always-on presence loop: one cheap poll (process list + window scan via IProcessMonitor) every couple
+/// of seconds, translated into edges everyone else consumes: Discord presence, session tracking, the watch-attach
+/// policy, and crash capture.
 /// </summary>
 public sealed class GamePresenceService : IAsyncDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
-    /// <summary>Polls the window may flicker for (alt-tab, resolution change) before an
-    /// InGame -> Starting fall is believed to be a real exit.</summary>
     internal const int ExitDebouncePolls = 3;
 
     private readonly IProcessMonitor _processMonitor;
@@ -55,7 +44,6 @@ public sealed class GamePresenceService : IAsyncDisposable
         _logger = logger;
     }
 
-    /// <summary>Every poll's raw state, for consumers that count ticks (the watch policy).</summary>
     public event Action<GameRuntimeState>? Ticked;
 
     public event Action<PresenceChange>? PresenceChanged;
@@ -118,8 +106,6 @@ public sealed class GamePresenceService : IAsyncDisposable
         }
     }
 
-    /// <summary>One tick of the state machine. Public so tests (and diagnostics) can drive
-    /// the transitions without the timer; production code must only feed it from the loop.</summary>
     public void ApplyState(GameRuntimeState state, DateTimeOffset now)
     {
         Ticked?.Invoke(state);
@@ -133,12 +119,10 @@ public sealed class GamePresenceService : IAsyncDisposable
 
         if (_current == GamePresence.InGame && next != GamePresence.InGame)
         {
-            // The window is gone. Direct NotRunning (whole stack down) ends the run now;
-            // a fall to Starting (emulator alive) gets the flicker debounce first.
             var emulatorAlive = next == GamePresence.Starting;
             if (emulatorAlive && ++_fallingPolls < ExitDebouncePolls)
             {
-                return; // still InGame as far as consumers know
+                return;
             }
             EndRun(now, emulatorAlive);
             SetCurrent(GamePresence.NotRunning, now);

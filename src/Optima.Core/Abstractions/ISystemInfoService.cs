@@ -9,7 +9,6 @@ public interface ISystemInfoService
 
     Task<VirtualizationState> GetVirtualizationStateAsync(CancellationToken ct = default);
 
-    /// <summary>Forgets cached answers (the virtualization state) after something changed them, e.g. a feature enable.</summary>
     void InvalidateCache()
     {
     }

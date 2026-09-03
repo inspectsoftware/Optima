@@ -11,10 +11,7 @@ public sealed record LogEntry(DateTimeOffset Timestamp, string Level, string Sou
     public string TimeText => Timestamp.ToLocalTime().ToString("HH:mm:ss.fff");
 }
 
-/// <summary>
-/// Serilog sink feeding the in-app log viewer (§17). Keeps a bounded buffer on the UI thread's
-/// dispatcher so the LOGS page can bind directly to it.
-/// </summary>
+/// <summary>Serilog sink feeding the in-app log viewer (§17).</summary>
 public sealed class InAppLogSink : ILogEventSink
 {
     private const int MaxEntries = 2000;

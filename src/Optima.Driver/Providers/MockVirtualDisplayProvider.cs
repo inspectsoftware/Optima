@@ -4,11 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Driver.Providers;
 
-/// <summary>
-/// Fully functional in-memory provider (§6/§30): a complete state machine with configurable
-/// failure injection. Used in tests, developer mode, and as the fallback when no real virtual
-/// display driver is installed.
-/// </summary>
+/// <summary>Fully functional in-memory provider (§6/§30): a complete state machine with configurable failure injection.</summary>
 public sealed class MockVirtualDisplayProvider : VirtualDisplayProviderBase
 {
     private readonly ILogger<MockVirtualDisplayProvider> _logger;
@@ -26,7 +22,6 @@ public sealed class MockVirtualDisplayProvider : VirtualDisplayProviderBase
         _logger = logger;
     }
 
-    /// <summary>Test hook: when set, the named operation throws to exercise failure paths.</summary>
     public string? FailOperation { get; set; }
 
     public IReadOnlyList<DisplayMode> Modes { get; set; } =

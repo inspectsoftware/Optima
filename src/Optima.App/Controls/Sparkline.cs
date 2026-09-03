@@ -4,11 +4,7 @@ using System.Windows.Media;
 
 namespace Optima.App.Controls;
 
-/// <summary>
-/// A vector sparkline: one accent line over a soft fill, scaled to the min and max of the
-/// series (or to <see cref="Minimum"/>/<see cref="Maximum"/> when set). Replaces the block
-/// character sparklines of the terminal era.
-/// </summary>
+/// <summary>A vector sparkline: one accent line over a soft fill, scaled to the min and max of the series (or to Minimum/Maximum when set).</summary>
 public sealed class Sparkline : FrameworkElement
 {
     public static readonly DependencyProperty ValuesProperty = DependencyProperty.Register(

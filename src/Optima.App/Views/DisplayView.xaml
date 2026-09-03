@@ -4,7 +4,6 @@
              xmlns:ctl="clr-namespace:Optima.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="940" HorizontalAlignment="Left">
-
       <TextBlock Text="Display" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="Virtual display control and attached monitors" Style="{StaticResource Text.PageSubtitle}" />
 
@@ -107,7 +106,6 @@
                      HorizontalAlignment="Left"
                      Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToCollapsed}}" />
 
-          <!-- No driver device: offer to install the bundled package rather than dead-ending. -->
           <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,12,0,0"
                   Visibility="{Binding DriverMissing, Converter={StaticResource BoolToVis}}">
             <Grid>
@@ -122,8 +120,7 @@
                 <TextBlock Text="{Binding DriverPackageText}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0"
                            Visibility="{Binding DriverPackageText, Converter={StaticResource EmptyToCollapsed}}" />
               </StackPanel>
-              <!-- Only offer the install when there is something to install from; otherwise
-                   offer the folder to put a package in, rather than an unpressable button. -->
+
               <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
                       Padding="16,8" FontSize="{StaticResource Type.Label}"
                       Content="Install driver" Command="{Binding InstallDriverCommand}"
@@ -144,7 +141,6 @@
                        Text="Windows asked for a restart to finish installing the display driver. The virtual display will not appear until you restart." />
           </Border>
 
-          <!-- Safety net: the topology captured before any change can always be put back -->
           <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,12,0,0"
                   Visibility="{Binding CanEmergencyRestore, Converter={StaticResource BoolToVis}}">
             <Grid>
@@ -192,7 +188,6 @@
                   </Grid.ColumnDefinitions>
                   <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
 
-                  <!-- Name cell: custom name when set (original in the tooltip), or an inline editor. -->
                   <TextBlock Grid.Column="1" Text="{Binding DisplayedName}" ToolTip="{Binding OriginalName}"
                              Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
                     <TextBlock.Style>
@@ -247,7 +242,6 @@
                     </TextBlock.Style>
                   </TextBlock>
 
-                  <!-- Row controls: reorder / rename / hide, swapping to save / cancel while editing. -->
                   <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal"
                                 Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">

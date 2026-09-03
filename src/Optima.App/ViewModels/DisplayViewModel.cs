@@ -12,9 +12,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.App.ViewModels;
 
 /// <summary>
-/// DISPLAY page (§6/§7): attached displays, virtual display control, mode presets and custom
-/// modes, with a safety net: the topology is captured before any change and an emergency
-/// restore button puts everything back.
+/// DISPLAY page (§6/§7): attached displays, virtual display control, mode presets and custom modes, with a safety net:
+/// the topology is captured before any change and an emergency restore button puts everything back.
 /// </summary>
 public sealed partial class DisplayViewModel : ObservableObject
 {
@@ -66,14 +65,12 @@ public sealed partial class DisplayViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _canEmergencyRestore;
 
-    // Driver install state. Drives the actionable banner shown when no device exists.
     [ObservableProperty] private bool _driverMissing;
     [ObservableProperty] private bool _canInstallDriver;
     [ObservableProperty] private string _driverBannerText = string.Empty;
     [ObservableProperty] private string _driverPackageText = string.Empty;
     [ObservableProperty] private bool _restartRequired;
 
-    /// <summary>Filters for the attached-displays list. HideInactive is persisted; ShowHidden is not.</summary>
     [ObservableProperty] private bool _hideInactive;
     [ObservableProperty] private bool _showHidden;
 
@@ -112,8 +109,6 @@ public sealed partial class DisplayViewModel : ObservableObject
             _allDisplays = await _displayService.GetDisplaysAsync(ct);
             await RebuildRowsAsync(ct);
 
-            // Capabilities first: provider selection is lazy, and reading Name before it
-            // resolves would report "(not selected yet)".
             var capabilities = await _provider.GetCapabilitiesAsync(ct);
             ProviderName = _provider.Name;
             ProviderCapabilities =
@@ -163,7 +158,6 @@ public sealed partial class DisplayViewModel : ObservableObject
                 : string.Empty;
     }
 
-    /// <summary>Re-applies the user's cosmetic overrides (name / order / hidden) to the cached OS list.</summary>
     private async Task RebuildRowsAsync(CancellationToken ct = default)
     {
         var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
@@ -187,7 +181,6 @@ public sealed partial class DisplayViewModel : ObservableObject
     [RelayCommand]
     private void CancelRename(DisplayRowViewModel row) => row.IsEditing = false;
 
-    /// <summary>Saving an empty name clears the custom name back to the OS-reported one.</summary>
     [RelayCommand]
     private async Task SaveNameAsync(DisplayRowViewModel row)
     {
@@ -206,10 +199,6 @@ public sealed partial class DisplayViewModel : ObservableObject
     [RelayCommand]
     private Task MoveDownAsync(DisplayRowViewModel row) => MoveAsync(row, +1);
 
-    /// <summary>
-    /// Reorders within the visible list, then persists the whole visible order as explicit
-    /// sort indexes so the arrangement survives refreshes and restarts.
-    /// </summary>
     private async Task MoveAsync(DisplayRowViewModel row, int delta)
     {
         var index = DisplayRows.IndexOf(row);
@@ -253,14 +242,9 @@ public sealed partial class DisplayViewModel : ObservableObject
             return s with { DisplayOverrides = map };
         });
         await RebuildRowsAsync();
-        // Custom names surface in the HOME status readout too.
         await _status.RefreshAsync();
     }
 
-    /// <summary>
-    /// Opens the folder a driver package belongs in, creating it if needed. Turns the
-    /// "nothing bundled" state into something actionable instead of a dead end.
-    /// </summary>
     [RelayCommand]
     private void OpenDriversFolder()
     {
@@ -279,7 +263,6 @@ public sealed partial class DisplayViewModel : ObservableObject
         }
     }
 
-    /// <summary>Installs the bundled driver so the user never has to touch Device Manager.</summary>
     [RelayCommand]
     private Task InstallDriverAsync() => GuardedAsync(async ct =>
     {

@@ -4,7 +4,6 @@
              xmlns:ctl="clr-namespace:Optima.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}">
-
       <TextBlock Text="Diagnostics" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="Environment checks · each result carries a reason and a fix"
                  Style="{StaticResource Text.PageSubtitle}" />
@@ -20,10 +19,6 @@
         </HeaderedContentControl.Tag>
 
         <StackPanel>
-          <!--
-            One line per check, appended as each completes. The reason trails dimmed on
-            the same row; the fix line only appears under a WARN or FAIL.
-          -->
           <ItemsControl ItemsSource="{Binding Results}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
@@ -50,7 +45,6 @@
                                TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="440" />
                   </Grid>
 
-                  <!-- Fix, shown only where there is a problem to fix -->
                   <Border BorderBrush="{DynamicResource Brush.Warn}" BorderThickness="2,0,0,0" Padding="10,2" Margin="0,4,0,2"
                           HorizontalAlignment="Left"
                           Visibility="{Binding Status, Converter={StaticResource DiagStatusIsProblem}}">
@@ -69,7 +63,6 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <!-- Sweep while checks are still arriving -->
           <ctl:AsciiSpinner Cells="10" HorizontalAlignment="Left" Margin="0,6,0,0"
                             Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}" />
 
@@ -78,7 +71,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Repair: the actions that fix a broken environment without a reinstall. -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="REPAIR">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="run setup wizard again" Padding="6,0"
@@ -121,7 +113,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Crash bundles captured by the Watchdog on game exits with failure markers. -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="CRASHES">
         <HeaderedContentControl.Tag>
           <StackPanel Orientation="Horizontal">

@@ -9,11 +9,7 @@ using Optima.Core.Models;
 
 namespace Optima.Watchdog;
 
-/// <summary>
-/// Executes the whitelisted elevated commands (§20). Every argument is validated before use:
-/// device ids must belong to an actual virtual display device, pipe writes are limited to the
-/// known driver pipe and known command strings, and nothing else is accepted.
-/// </summary>
+/// <summary>Executes the whitelisted elevated commands (§20).</summary>
 public sealed partial class CommandExecutor : IAsyncDisposable
 {
     private const string AllowedVddPipe = "MTTVirtualDisplayPipe";
@@ -102,7 +98,6 @@ public sealed partial class CommandExecutor : IAsyncDisposable
 
             case IpcCommand.StartEtw:
             {
-                // "pids" is the current form (comma-separated candidates); "pid" stays accepted.
                 var pidsText = request.Args.TryGetValue("pids", out var multi) ? multi
                     : request.Args.TryGetValue("pid", out var single) ? single
                     : null;
@@ -194,8 +189,6 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail("Invalid hardware id.");
                 }
 
-                // Stage the package into the DriverStore first; this is where an unsigned
-                // or untrusted catalog is rejected, so report that plainly.
                 var (stageCode, stageOutput) = await RunProcessAsync("pnputil.exe", $"/add-driver \"{infPath}\" /install", ct);
                 HelperLog.Write($"pnputil /add-driver exit={stageCode}: {Truncate(stageOutput)}");
                 if (stageCode != 0)
@@ -225,10 +218,6 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail(removeError);
                 }
 
-                // With the device gone, also drop the staged package from the DriverStore so
-                // this is a real uninstall rather than a device removal that leaves the driver
-                // behind. Best effort: the device removal already succeeded, so a DriverStore
-                // hiccup is logged instead of failing the whole operation.
                 var packagesDeleted = 0;
                 if (request.Args.TryGetValue("infName", out var infName) && IsSafeInfName(infName))
                 {
@@ -297,7 +286,6 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail("Values payload is empty.");
                 }
 
-                // Validate everything before writing anything.
                 var writes = new List<(TweakValue Value, string? Data)>();
                 foreach (var (key, data) in targets)
                 {
@@ -386,7 +374,6 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 }
                 var (exitCode, output) = await RunProcessAsync(
                     "dism.exe", $"/online /enable-feature /featurename:{feature} /norestart", ct);
-                // 3010 is DISM's "success, restart required".
                 if (exitCode is not (0 or 3010))
                 {
                     return fail($"dism exited with {exitCode}: {Truncate(output)}");
@@ -406,12 +393,6 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         }
     }
 
-    /// <summary>
-    /// A driver package may only be installed from inside the application's own directory.
-    /// The helper is elevated while its caller is not, so accepting an arbitrary path would
-    /// let a non-elevated process install any driver it liked, which is a privilege-escalation hole.
-    /// Constraining installs to files shipped beside the app closes it.
-    /// </summary>
     private static bool IsAcceptableInfPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || path.Length > 400)
@@ -438,14 +419,9 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         {
             root += Path.DirectorySeparatorChar;
         }
-        // GetFullPath already normalized any "..", so a prefix test is sound here.
         return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full);
     }
 
-    /// <summary>
-    /// Restricts the writable settings file to the driver's own well-known filename, so this
-    /// command cannot be turned into an arbitrary elevated file write.
-    /// </summary>
     private static bool IsAcceptableSettingsPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || path.Length > 400)
@@ -462,7 +438,6 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         }
     }
 
-    /// <summary>Confirms via WMI that the instance id belongs to a display-class virtual display device.</summary>
     private static Task<bool> IsVirtualDisplayDeviceAsync(string instanceId, CancellationToken ct)
         => Task.Run(() =>
         {
@@ -483,24 +458,16 @@ public sealed partial class CommandExecutor : IAsyncDisposable
             }
             catch (Exception)
             {
-                // Treat lookup failure as "not verified".
             }
             return false;
         }, ct);
 
-    /// <summary>
-    /// The original INF filename (e.g. MttVDD.inf) used to locate the staged package; a plain
-    /// filename only, so the argument can never smuggle a path or extra pnputil switches.
-    /// </summary>
     private static bool IsSafeInfName(string name)
         => name.Length is > 4 and <= 100 && SafeInfNamePattern().IsMatch(name);
 
     [GeneratedRegex(@"^[A-Za-z0-9_.\-]+\.inf$", RegexOptions.IgnoreCase)]
     private static partial Regex SafeInfNamePattern();
 
-    /// <summary>
-    /// Deletes every DriverStore package whose original INF name matches <paramref name="infName"/>.
-    /// </summary>
     private static async Task<int> DeleteStagedDriverPackagesAsync(string infName, CancellationToken ct)
     {
         var (enumCode, enumOutput) = await RunProcessAsync("pnputil.exe", "/enum-drivers", ct);
@@ -523,15 +490,9 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         return deleted;
     }
 
-    /// <summary>
-    /// Extracts the oemNN.inf published names of packages whose original INF is
-    /// <paramref name="originalInfName"/>. Matching is done on the values, never on
-    /// pnputil's field labels, because those are localized.
-    /// </summary>
     internal static IReadOnlyList<string> FindPublishedDriverNames(string pnputilOutput, string originalInfName)
     {
         var results = new List<string>();
-        // pnputil separates driver entries with blank lines.
         foreach (var block in pnputilOutput.Split(["\r\n\r\n", "\n\n"], StringSplitOptions.RemoveEmptyEntries))
         {
             if (!block.Contains(originalInfName, StringComparison.OrdinalIgnoreCase))

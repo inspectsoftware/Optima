@@ -6,10 +6,6 @@
         ResizeMode="NoResize" SizeToContent="WidthAndHeight"
         Topmost="True" ShowActivated="False" ShowInTaskbar="False"
         UseLayoutRounding="True">
-  <!-- Ownerless, click-through, never activated: sits over the borderless game without
-       touching it. Extended styles are applied in code behind on SourceInitialized.
-       Overlay brushes are theme-invariant (always dark) for in-game readability;
-       text brushes resolve against the dark palette values in both themes by design. -->
   <Border Background="{StaticResource Brush.Overlay.Ground}"
           BorderBrush="{StaticResource Brush.Overlay.Border}" BorderThickness="1"
           CornerRadius="10" Padding="11,7">

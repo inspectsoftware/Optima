@@ -4,7 +4,6 @@
              Loaded="OnLoaded" Unloaded="OnUnloaded">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="900" HorizontalAlignment="Left">
-
       <TextBlock Text="Comp" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="Gear checks for competitive play · every readout states its honest limits"
                  Style="{StaticResource Text.PageSubtitle}" />

@@ -17,11 +17,8 @@ public sealed record LauncherRelease(
     DateTimeOffset PublishedAt);
 
 /// <summary>
-/// Self-update against the project's GitHub releases, downloaded anonymously (which is why
-/// shipping this feature required the repository to become public). Apply is a staged swap:
-/// the new build is extracted next to the install, a tiny script waits for this process to
-/// exit, mirrors the staged files over the install folder and relaunches; the previous
-/// build is kept for one-click rollback. The install folder is treated as updater-managed.
+/// Self-update against the project's GitHub releases, downloaded anonymously (which is why shipping this feature
+/// required the repository to become public).
 /// </summary>
 public sealed class LauncherUpdateService : IDisposable
 {
@@ -49,8 +46,6 @@ public sealed class LauncherUpdateService : IDisposable
 
     public bool RollbackAvailable => File.Exists(Path.Combine(PreviousDirectory, "Optima.exe"));
 
-    /// <summary>Latest published release, or null when unreachable (offline, or the
-    /// repository is not public yet) - the UI reports "update check unavailable".</summary>
     public async Task<LauncherRelease?> CheckAsync(CancellationToken ct = default)
     {
         try
@@ -71,7 +66,6 @@ public sealed class LauncherUpdateService : IDisposable
         }
     }
 
-    /// <summary>Pure parser, fixture-tested: tag, semver, first .zip asset, notes.</summary>
     public static LauncherRelease? ParseLatestRelease(string json)
     {
         try
@@ -127,7 +121,6 @@ public sealed class LauncherUpdateService : IDisposable
 
     public static bool IsNewer(LauncherRelease release) => release.Version > CurrentVersion;
 
-    /// <summary>Downloads and extracts the release; returns the staged files folder.</summary>
     public async Task<string> DownloadAndStageAsync(LauncherRelease release, CancellationToken ct = default)
     {
         var stageRoot = Path.Combine(UpdatesRoot, release.TagName);
@@ -154,14 +147,9 @@ public sealed class LauncherUpdateService : IDisposable
         return filesDir;
     }
 
-    /// <summary>
-    /// Backs up the current install for rollback, then launches the swap script and
-    /// returns; the CALLER must exit the application immediately afterwards.
-    /// </summary>
     public Task PrepareApplyAndLaunchSwapAsync(string stagedFilesDir, CancellationToken ct = default)
         => LaunchSwapAsync(stagedFilesDir, backupCurrent: true, ct);
 
-    /// <summary>Rolls back to the kept previous build (no new backup; the caller exits).</summary>
     public Task LaunchRollbackAsync(CancellationToken ct = default)
         => LaunchSwapAsync(PreviousDirectory, backupCurrent: false, ct);
 
@@ -169,7 +157,6 @@ public sealed class LauncherUpdateService : IDisposable
     {
         var installDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
 
-        // Fail here, honestly, rather than half-way through a swap script.
         var probe = Path.Combine(installDir, ".optima-write-probe");
         await File.WriteAllTextAsync(probe, "probe", ct).ConfigureAwait(false);
         File.Delete(probe);

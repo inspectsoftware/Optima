@@ -96,7 +96,6 @@ internal static class PowerNative
         return schemes;
     }
 
-    /// <summary>Creates a duplicate of the Ultimate Performance template when it is not yet listed.</summary>
     internal static Guid EnsureUltimatePerformance()
     {
         var existing = EnumerateSchemes();
@@ -109,7 +108,6 @@ internal static class PowerNative
         var result = PowerDuplicateScheme(IntPtr.Zero, ref source, out var destPtr);
         if (result != ERROR_SUCCESS)
         {
-            // Template not available (e.g. Home SKU restrictions), so fall back to High Performance.
             return HighPerformanceScheme;
         }
         try

@@ -27,7 +27,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<AccentPreset> AccentPresets { get; } =
     [
-        new("Aureum Gold", "#E8B45A"),
+        new("Gold", "#E8B45A"),
         new("Frost", "#6FB7E8"),
         new("Mint", "#7FD6A4"),
         new("Rose", "#E88A9E"),

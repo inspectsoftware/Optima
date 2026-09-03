@@ -7,10 +7,9 @@ using Optima.Core.Configuration;
 namespace Optima.App.ViewModels;
 
 /// <summary>
-/// First-launch setup (§23), rebuilt around the fix-everything engine (Q7): detect, show
-/// findings, one consent to run every automatable fix, an honest BIOS walkthrough for the
-/// firmware-only case, reboot orchestration with automatic resume (first-run stays
-/// incomplete until Finish, so the wizard reopens by itself), and the personalize step
+/// First-launch setup (§23), rebuilt around the fix-everything engine (Q7): detect, show findings, one consent to run
+/// every automatable fix, an honest BIOS walkthrough for the firmware-only case, reboot orchestration with automatic
+/// resume (first-run stays incomplete until Finish, so the wizard reopens by itself), and the personalize step
 /// (autostart pre-checked per Q12, player name, Discord application id).
 /// </summary>
 public sealed partial class SetupWizardViewModel : ObservableObject
@@ -45,7 +44,6 @@ public sealed partial class SetupWizardViewModel : ObservableObject
     [ObservableProperty] private string _restartStatus = string.Empty;
     [ObservableProperty] private bool _firmwareGuideVisible;
 
-    // ---- Personalize ----
     [ObservableProperty] private bool _startWithWindows = true;
     [ObservableProperty] private string _playerIgn = string.Empty;
     [ObservableProperty] private string _discordApplicationId = string.Empty;

@@ -3,13 +3,8 @@ using System.Text.RegularExpressions;
 namespace Optima.Core.Detection;
 
 /// <summary>
-/// Minimal INF reader, just enough to learn the hardware id a root-enumerated driver
-/// must be installed against, plus the provider/description for display.
-///
-/// Root devices do not appear on their own, so installing one means creating the node
-/// explicitly with its hardware id; that id only exists inside the INF's Models section.
-/// This parses the subset of the INF grammar that matters and is deliberately tolerant:
-/// a package that does not parse is reported as unusable rather than guessed at.
+/// Minimal INF reader, just enough to learn the hardware id a root-enumerated driver must be installed against, plus
+/// the provider/description for display.
 /// </summary>
 public static partial class InfFile
 {
@@ -19,7 +14,7 @@ public static partial class InfFile
     [GeneratedRegex(@"^\s*(?<key>[^=;]+?)\s*=\s*(?<value>[^;]*?)\s*(;.*)?$")]
     private static partial Regex KeyValue();
 
-    /// <summary>Parsed INF facts. Null fields mean the INF did not declare them.</summary>
+    /// <summary>Parsed INF facts.</summary>
     public sealed record InfInfo(
         string? HardwareId,
         string? Provider,
@@ -27,13 +22,10 @@ public static partial class InfFile
         string? DeviceClass = null,
         IReadOnlyList<string>? Architectures = null)
     {
-        /// <summary>Target decorations found on the Models section, e.g. NTamd64, NTARM64.</summary>
         public IReadOnlyList<string> Architectures { get; init; } = Architectures ?? [];
 
-        /// <summary>True when this package targets the given <see cref="System.Runtime.InteropServices.Architecture"/>.</summary>
         public bool TargetsArchitecture(System.Runtime.InteropServices.Architecture architecture)
         {
-            // An INF with no target decoration applies everywhere.
             if (Architectures.Count == 0)
             {
                 return true;
@@ -63,7 +55,6 @@ public static partial class InfFile
             deviceClass = Expand(FirstValue(version, "Class"), strings);
         }
 
-        // [Manufacturer] maps a display name to one or more Models sections.
         var modelSectionNames = new List<string>();
         var architectures = new List<string>();
         if (sections.TryGetValue("Manufacturer", out var manufacturer))
@@ -75,8 +66,6 @@ public static partial class InfFile
                 {
                     continue;
                 }
-                // "%Mfg% = Models, NTamd64.10.0...": the section is the first value, the
-                // rest are target decorations that suffix it (Models.NTamd64.10.0).
                 var parts = kv.Groups["value"].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 0)
                 {
@@ -91,7 +80,6 @@ public static partial class InfFile
             }
         }
 
-        // Prefer a decorated (architecture-specific) section; that is what Windows uses.
         foreach (var name in modelSectionNames.OrderByDescending(n => n.Count(c => c == '.')))
         {
             if (!sections.TryGetValue(name, out var models))
@@ -110,7 +98,6 @@ public static partial class InfFile
                 {
                     continue;
                 }
-                // "%Desc% = Install, Root\MyDevice"
                 var parts = kv.Groups["value"].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length >= 2 && Expand(parts[1], strings) is { Length: > 0 } id)
                 {
@@ -162,7 +149,6 @@ public static partial class InfFile
         var strings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, lines) in sections)
         {
-            // [Strings] plus localized variants like [Strings.0409]
             if (!name.StartsWith("Strings", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
@@ -192,7 +178,6 @@ public static partial class InfFile
         return null;
     }
 
-    /// <summary>Resolves %Token% references against the INF's [Strings] table.</summary>
     private static string? Expand(string? value, Dictionary<string, string> strings)
     {
         if (string.IsNullOrWhiteSpace(value))

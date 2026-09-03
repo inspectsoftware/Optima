@@ -3,18 +3,12 @@ using Microsoft.Diagnostics.Tracing.Session;
 
 namespace Optima.Watchdog;
 
-/// <summary>
-/// Short diagnostic trace (§12): listens to DXGI present events with NO process filter and
-/// counts presents per process id. Answers "which process actually presents frames" when the
-/// filtered capture stays silent, e.g. because the presenter is not the emulator process.
-/// Read-only observation of events Windows already emits; nothing touches any process.
-/// </summary>
+/// <summary>Short diagnostic trace (§12): listens to DXGI present events with NO process filter and counts presents per process id.</summary>
 public static class EtwPresentProbe
 {
     private static readonly Guid DxgiProvider = new("CA11C036-0102-4A2D-A6AD-F03CFED5D3C9");
     private static readonly int[] PresentStartEventIds = [42, 55];
 
-    /// <summary>Runs the probe for the given duration and returns present counts per pid.</summary>
     public static async Task<Dictionary<int, long>> RunAsync(TimeSpan duration, CancellationToken ct)
     {
         var counts = new Dictionary<int, long>();
@@ -41,7 +35,6 @@ public static class EtwPresentProbe
             }
             catch (Exception)
             {
-                // Session disposed, processing ends.
             }
         })
         {
@@ -79,7 +72,6 @@ public static class EtwPresentProbe
 
         static void OnManifestEvent(TraceEvent ev)
         {
-            // Subscribing Dynamic.All keeps manifest parsing active; AllEvents does the work.
         }
     }
 }

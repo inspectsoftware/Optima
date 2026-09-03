@@ -7,9 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Driver;
 
 /// <summary>
-/// Routes IVirtualDisplayProvider calls to the configured provider (§6): "Auto" probes the real
-/// driver and falls back to the mock; "MttVdd" / "Mock" force a specific one. The choice is made
-/// once per app run (re-evaluated when settings change).
+/// Routes IVirtualDisplayProvider calls to the configured provider (§6): "Auto" probes the real driver and falls back
+/// to the mock; "MttVdd" / "Mock" force a specific one.
 /// </summary>
 public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider
 {
@@ -30,7 +29,7 @@ public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider
         _mock = mock;
         _settings = settings;
         _logger = logger;
-        _settings.SettingsChanged += (_, _) => _selected = null; // re-probe after settings edits
+        _settings.SettingsChanged += (_, _) => _selected = null;
     }
 
     public string Name => _selected?.Name ?? "(not selected yet)";

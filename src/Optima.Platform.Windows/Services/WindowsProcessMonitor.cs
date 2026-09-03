@@ -7,14 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Platform.Windows.Services;
 
-/// <summary>
-/// Watches Google Play Games / emulator / game processes by polling (§9). Process names come
-/// from configurable detection rules, never hardcoded (§29). "Game running" means a visible
-/// top-level window whose title matches the configured pattern while the emulator process lives.
-/// Every scan is a Toolhelp snapshot plus one window enumeration (see <see cref="ProcessSnapshot"/>),
-/// because the Watchdog's presence loop, the session exit wait and the status tick all run
-/// these while the game is on screen.
-/// </summary>
+/// <summary>Watches Google Play Games / emulator / game processes by polling (§9).</summary>
 public sealed class WindowsProcessMonitor : IProcessMonitor
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
@@ -47,7 +40,6 @@ public sealed class WindowsProcessMonitor : IProcessMonitor
                     continue;
                 }
 
-                // Start time needs a handle; access denied / already exited leaves it unknown.
                 DateTimeOffset? started = null;
                 using (var handle = ProcessQuery.Open(id))
                 {
@@ -122,8 +114,6 @@ public sealed class WindowsProcessMonitor : IProcessMonitor
                 return;
             }
 
-            // The emulator can outlive the game, so the window disappearing is the real exit signal,
-            // debounced so brief mode switches / focus changes do not end the session early.
             absentPolls = GameWindowPresent(rules) ? 0 : absentPolls + 1;
             if (absentPolls >= ExitConfirmationPolls)
             {

@@ -1,15 +1,10 @@
 namespace Optima.Core.Theming;
 
-/// <summary>
-/// Pure color math for deriving the accent family (hover, pressed, glow, on-accent)
-/// from a single user-chosen color. Lives in Core so it is unit-testable without WPF;
-/// values travel as 0xAARRGGBB.
-/// </summary>
+/// <summary>Pure color math for deriving the accent family (hover, pressed, glow, on-accent) from a single user-chosen color.</summary>
 public static class AccentMath
 {
     public const string DefaultAccentHex = "#E8B45A";
 
-    /// <summary>Parses #RGB, #RRGGBB or #AARRGGBB (leading # optional). Null when invalid.</summary>
     public static uint? TryParse(string? hex)
     {
         if (string.IsNullOrWhiteSpace(hex))
@@ -32,7 +27,6 @@ public static class AccentMath
         return argb;
     }
 
-    /// <summary>WCAG relative luminance of the color, alpha ignored. 0 = black, 1 = white.</summary>
     public static double Luminance(uint argb)
     {
         static double Lin(double c) => c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
@@ -42,7 +36,6 @@ public static class AccentMath
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }
 
-    /// <summary>WCAG contrast ratio between two colors (alpha ignored), always >= 1.</summary>
     public static double Contrast(uint a, uint b)
     {
         var la = Luminance(a);
@@ -51,23 +44,15 @@ public static class AccentMath
         return (hi + 0.05) / (lo + 0.05);
     }
 
-    /// <summary>Moves the color toward white by <paramref name="amount"/> (0..1), keeping alpha.</summary>
     public static uint Lighten(uint argb, double amount) => Blend(argb, 0xFFFFFFFF, amount);
 
-    /// <summary>Moves the color toward black by <paramref name="amount"/> (0..1), keeping alpha.</summary>
     public static uint Darken(uint argb, double amount) => Blend(argb, 0xFF000000, amount);
 
-    /// <summary>Replaces the alpha channel (0..255).</summary>
     public static uint WithAlpha(uint argb, byte alpha) => (argb & 0x00FFFFFF) | ((uint)alpha << 24);
 
-    /// <summary>
-    /// Ink for text on an accent fill: pure black or pure white, whichever contrasts more.
-    /// The winner clears WCAG AA (4.5:1) for every possible accent; tinted inks do not.
-    /// </summary>
     public static uint OnAccent(uint accent)
         => Contrast(accent, 0xFF000000) >= Contrast(accent, 0xFFFFFFFF) ? 0xFF000000u : 0xFFFFFFFFu;
 
-    /// <summary>The full derived family for one accent, ready for the theme layer.</summary>
     public static AccentFamily Derive(uint accent) => new(
         Base: accent,
         Hover: Lighten(accent, 0.12),

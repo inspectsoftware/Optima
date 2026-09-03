@@ -53,8 +53,8 @@ public sealed record ProfileTrendRow(string ProfileName, double AverageFps, doub
 }
 
 /// <summary>
-/// SESSIONS page (§13/§14): history and trends over the recorded sessions, per-session
-/// drill-down of the persisted per-second FPS series, and benchmark comparison.
+/// SESSIONS page (§13/§14): history and trends over the recorded sessions, per-session drill-down of the persisted
+/// per-second FPS series, and benchmark comparison.
 /// </summary>
 public sealed partial class SessionsViewModel : ObservableObject
 {
@@ -83,28 +83,22 @@ public sealed partial class SessionsViewModel : ObservableObject
     public ObservableCollection<ProfileTrendRow> ProfileTrends { get; } = [];
     public ObservableCollection<LaunchProfile> Profiles { get; } = [];
 
-    // ---- Trends ----
     [ObservableProperty] private string _trendSparkline = string.Empty;
-    /// <summary>Average fps per session, oldest to newest, for the vector sparkline.</summary>
     [ObservableProperty] private IReadOnlyList<double> _trendValues = [];
     [ObservableProperty] private string _trendLegend = "no completed sessions with fps data yet";
     [ObservableProperty] private bool _hasTrend;
 
-    // ---- Detail ----
     [ObservableProperty] private SessionRowViewModel? _selectedRow;
     public ObservableCollection<InfoRow> DetailRows { get; } = [];
     public ObservableCollection<string> DetailSparklineLines { get; } = [];
-    /// <summary>The stored per-second fps series of the selected session.</summary>
     [ObservableProperty] private IReadOnlyList<double> _detailValues = [];
     [ObservableProperty] private string _detailTweaks = string.Empty;
     [ObservableProperty] private string _detailSparklineLegend = string.Empty;
 
-    // ---- Benchmark comparison ----
     [ObservableProperty] private LaunchProfile? _compareProfileA;
     [ObservableProperty] private LaunchProfile? _compareProfileB;
     [ObservableProperty] private BenchmarkComparison? _comparison;
 
-    // ---- Matches ----
     public ObservableCollection<MatchRowViewModel> Matches { get; } = [];
     public IReadOnlyList<string> MatchModeOptions { get; } = ["ranked", "casual", "custom"];
     public IReadOnlyList<string> MatchResultOptions { get; } = ["win", "loss"];

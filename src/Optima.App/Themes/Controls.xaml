@@ -3,16 +3,6 @@
                     xmlns:conv="clr-namespace:Optima.App.Converters"
                     xmlns:ctl="clr-namespace:Optima.App.Controls"
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
-
-  <!--
-    Control templates in the HUD glass language: chamfered vessels, recessed square
-    fields, a leading edge that carries the chroma split, one accent family. Every
-    interactive control is re-templated so no stock Aero chrome survives. Brush and color
-    lookups are DynamicResource throughout (live theme/accent swaps repaint in place);
-    structural tokens (fonts, sizes, chamfers) stay StaticResource on purpose.
-  -->
-
-  <!-- ============================================================== CONVERTERS -->
   <BooleanToVisibilityConverter x:Key="BoolToVis" />
   <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
   <conv:InverseBoolConverter x:Key="InverseBool" />
@@ -28,7 +18,6 @@
   <conv:HexToBrushConverter x:Key="HexToBrush" />
   <conv:IconKeyConverter x:Key="IconKey" />
 
-  <!-- =========================================================== FOCUS VISUAL -->
   <Style x:Key="Focus.Ring">
     <Setter Property="Control.Template">
       <Setter.Value>
@@ -39,7 +28,6 @@
     </Setter>
   </Style>
 
-  <!-- ==================================================================== ICON -->
   <Style TargetType="ctl:Icon">
     <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
     <Setter Property="IsTabStop" Value="False" />
@@ -60,13 +48,6 @@
     </Setter>
   </Style>
 
-  <!-- ==================================================================== TEXT -->
-  <!--
-    Deliberately NOT an implicit TargetType="TextBlock" style (it would also hit the
-    TextBlock a ContentPresenter generates inside every control template). App-wide text
-    defaults are inheritable TextElement values on the window root; these keyed styles
-    handle specific roles. UI text is the grotesk; values and data are monospace.
-  -->
   <Style x:Key="Text.Base" TargetType="TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Body}" />
@@ -117,7 +98,6 @@
     <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
   </Style>
 
-  <!-- Running prose is the one place long-form proportional text is expected. -->
   <Style x:Key="Text.Prose" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
     <Setter Property="FontFamily" Value="{StaticResource Font.Prose}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Body}" />
@@ -127,16 +107,12 @@
     <Setter Property="LineHeight" Value="19" />
   </Style>
 
-  <!-- Badge text: monospace, small, on a leading-edge badge. -->
   <Style x:Key="Text.Badge" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
     <Setter Property="FontFamily" Value="{StaticResource Font.Mono}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Micro}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
-  <!-- =================================================================== BADGE -->
-  <!-- A status word with a 2 px leading edge in its status color; set BorderBrush and the
-       inner TextBlock Foreground to the same brush. -->
   <Style x:Key="Badge" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Brush.TextMuted}" />
@@ -146,7 +122,6 @@
     <Setter Property="SnapsToDevicePixels" Value="True" />
   </Style>
 
-  <!-- ================================================================ SCROLLBAR -->
   <Style x:Key="ScrollBar.PageButton" TargetType="RepeatButton">
     <Setter Property="OverridesDefaultStyle" Value="True" />
     <Setter Property="Background" Value="Transparent" />
@@ -254,8 +229,6 @@
     <Setter Property="PanningMode" Value="VerticalOnly" />
   </Style>
 
-  <!-- ================================================================== BUTTONS -->
-  <!-- Primary: the accent fill, chamfered. The single strongest object on screen. -->
   <Style x:Key="PrimaryButton" TargetType="Button">
     <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
     <Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" />
@@ -293,7 +266,6 @@
     </Setter>
   </Style>
 
-  <!-- Secondary: chamfered glass. -->
   <Style x:Key="SecondaryButton" TargetType="Button">
     <Setter Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
     <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
@@ -332,7 +304,6 @@
     </Setter>
   </Style>
 
-  <!-- Danger: the terminate action. -->
   <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
     <Setter Property="Foreground" Value="{DynamicResource Brush.Fail}" />
     <Setter Property="Template">
@@ -359,7 +330,6 @@
     </Setter>
   </Style>
 
-  <!-- Tertiary: text only. -->
   <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
     <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Label}" />
@@ -385,7 +355,6 @@
     </Setter>
   </Style>
 
-  <!-- Chip: a selectable option (profiles). Bind Tag to a bool for the selected state. -->
   <Style x:Key="ChipButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
     <Setter Property="FontSize" Value="{StaticResource Type.Label}" />
     <Setter Property="Padding" Value="12,6" />
@@ -419,7 +388,6 @@
     </Setter>
   </Style>
 
-  <!-- Window caption buttons for the custom title bar. -->
   <Style x:Key="CaptionButton" TargetType="Button">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
@@ -460,13 +428,6 @@
     </Setter>
   </Style>
 
-  <!-- ====================================================== NAV (sidebar rows) -->
-  <!--
-    Driven by the bound NavItem's IsActive rather than the control's own checked state,
-    so the active treatment follows navigation from any source. Tag carries the icon key.
-    Active = accent bleeding in from a 2 px leading edge. With the rail collapsed the
-    label hides and the row becomes an icon with a tooltip.
-  -->
   <Style x:Key="NavButton" TargetType="Button">
     <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Body}" />
@@ -515,7 +476,6 @@
     </Style.Triggers>
   </Style>
 
-  <!-- ================================================================= TEXTBOX -->
   <Style TargetType="TextBox">
     <Setter Property="Background" Value="{DynamicResource Brush.Field}" />
     <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
@@ -555,8 +515,6 @@
     </Setter>
   </Style>
 
-  <!-- ================================================================ CHECKBOX -->
-  <!-- A small chamfered box; checked fills with the accent and inks the check. -->
   <Style TargetType="CheckBox">
     <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Body}" />
@@ -597,7 +555,6 @@
     </Setter>
   </Style>
 
-  <!-- ================================================================= COMBOBOX -->
   <Style x:Key="ComboBox.ToggleButton" TargetType="ToggleButton">
     <Setter Property="OverridesDefaultStyle" Value="True" />
     <Setter Property="IsTabStop" Value="False" />
@@ -711,7 +668,6 @@
     </Setter>
   </Style>
 
-  <!-- ================================================================== LISTBOX -->
   <Style TargetType="ListBox">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
@@ -758,7 +714,6 @@
     </Setter>
   </Style>
 
-  <!-- ================================================================= EXPANDER -->
   <Style x:Key="Expander.Toggle" TargetType="ToggleButton">
     <Setter Property="OverridesDefaultStyle" Value="True" />
     <Setter Property="Cursor" Value="Hand" />
@@ -817,8 +772,6 @@
     </Setter>
   </Style>
 
-  <!-- ============================================================== PROGRESSBAR -->
-  <!-- Determinate: a recessed track with the HUD dashed accent fill. -->
   <Style TargetType="ProgressBar">
     <Setter Property="Height" Value="4" />
     <Setter Property="BorderThickness" Value="0" />
@@ -839,7 +792,6 @@
     </Setter>
   </Style>
 
-  <!-- =================================================================== SLIDER -->
   <Style x:Key="Slider.Thumb" TargetType="Thumb">
     <Setter Property="OverridesDefaultStyle" Value="True" />
     <Setter Property="Width" Value="12" />
@@ -888,7 +840,6 @@
     </Setter>
   </Style>
 
-  <!-- =================================================================== MISC -->
   <Style TargetType="ToolTip">
     <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
     <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
@@ -923,8 +874,6 @@
     </Setter>
   </Style>
 
-  <!-- Tray icon menu (TrayService): solid with glass cues, since a popup has nothing in-app
-       behind it to refract. -->
   <Style TargetType="ContextMenu">
     <Setter Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
     <Setter Property="HasDropShadow" Value="False" />

@@ -6,10 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Platform.Windows.Services;
 
-/// <summary>
-/// Reversible per-process tuning (§9): priority class, CPU affinity, EcoQoS power throttling.
-/// Original values are captured first and returned so the recovery system can undo them.
-/// </summary>
+/// <summary>Reversible per-process tuning (§9): priority class, CPU affinity, EcoQoS power throttling.</summary>
 public sealed class WindowsProcessOptimizer : IProcessOptimizer
 {
     private readonly ILogger<WindowsProcessOptimizer> _logger;
@@ -97,7 +94,7 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
             }
             catch (ArgumentException)
             {
-                return; // Process already gone, nothing to restore.
+                return;
             }
 
             using (process)
@@ -115,7 +112,6 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
                     {
                         process.ProcessorAffinity = (nint)snapshot.OriginalAffinityMask;
                     }
-                    // Return throttling control to the system (matches pre-session behavior).
                     ProcessNative.SetPowerThrottling(process.Handle, snapshot.PowerThrottlingWasEnabled ? true : null);
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)

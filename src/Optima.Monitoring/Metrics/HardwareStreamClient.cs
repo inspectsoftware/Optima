@@ -9,9 +9,8 @@ namespace Optima.Monitoring.Metrics;
 public sealed record HardwareSample(double? CpuTempC, double? GpuTempC, double? CpuLoadPct, double? GpuLoadPct);
 
 /// <summary>
-/// Client side of the helper's hardware stream (LibreHardwareMonitor lives in the
-/// elevated process because sensor access needs its kernel driver). Starting the
-/// stream can therefore raise a UAC prompt; callers say so in their UI.
+/// Client side of the helper's hardware stream (LibreHardwareMonitor lives in the elevated process because sensor
+/// access needs its kernel driver).
 /// </summary>
 public sealed class HardwareStreamClient
 {
@@ -29,7 +28,6 @@ public sealed class HardwareStreamClient
 
     public bool IsStreaming { get; private set; }
 
-    /// <summary>Starts the stream; false when the user declined elevation or the helper failed.</summary>
     public async Task<bool> StartAsync(CancellationToken ct = default)
     {
         if (!await _broker.EnsureStartedAsync(ct).ConfigureAwait(false))

@@ -3,12 +3,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Optima.Platform.Windows.NativeMethods;
 
-/// <summary>
-/// Per-process queries on a handle that is opened once and kept: start time, CPU time and
-/// working set. Every System.Diagnostics.Process lookup by pid re-enumerates the whole
-/// process table first, which is why the monitors that poll a handful of game processes
-/// every second must not go through it.
-/// </summary>
+/// <summary>Per-process queries on a handle that is opened once and kept: start time, CPU time and working set.</summary>
 public static class ProcessQuery
 {
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -37,7 +32,6 @@ public static class ProcessQuery
     [DllImport("psapi.dll", SetLastError = true)]
     private static extern bool GetProcessMemoryInfo(SafeProcessHandle process, out PROCESS_MEMORY_COUNTERS counters, uint size);
 
-    /// <summary>A query-only handle, or null when the process is gone or protected.</summary>
     public static SafeProcessHandle? Open(int processId)
     {
         var handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
@@ -54,7 +48,6 @@ public static class ProcessQuery
             ? DateTimeOffset.FromFileTime(creation)
             : null;
 
-    /// <summary>Kernel plus user time so far, or null when the handle no longer answers.</summary>
     public static TimeSpan? GetTotalProcessorTime(SafeProcessHandle process)
         => GetProcessTimes(process, out _, out _, out var kernel, out var user)
             ? TimeSpan.FromTicks(kernel + user)

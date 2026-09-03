@@ -10,12 +10,10 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Driver.Providers;
 
 /// <summary>
-/// Provider for the MikeTheTech-style IddCx "Virtual Display Driver":
-///  - modes are declared in vdd_settings.xml (edited non-destructively, original backed up first),
-///  - the driver re-reads settings when RELOAD_DRIVER is written to \\.\pipe\MTTVirtualDisplayPipe,
-///  - the display device itself is enabled/disabled through the elevated helper (pnputil),
-///  - the Windows-side mode switch goes through IDisplayService (temporary, registry untouched).
-/// Everything done here is recorded and reverted by RestoreOriginalStateAsync.
+/// Provider for the MikeTheTech-style IddCx "Virtual Display Driver": - modes are declared in vdd_settings.xml (edited
+/// non-destructively, original backed up first), - the driver re-reads settings when RELOAD_DRIVER is written to
+/// \\.\pipe\MTTVirtualDisplayPipe, - the display device itself is enabled/disabled through the elevated helper
+/// (pnputil), - the Windows-side mode switch goes through IDisplayService (temporary, registry untouched).
 /// </summary>
 public sealed class MttVddProvider : VirtualDisplayProviderBase
 {
@@ -56,7 +54,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
 
     public override string Name => "Optima Virtualization";
 
-    /// <summary>Path of the backup taken before we first rewrote the driver settings, if any.</summary>
     public string? SettingsBackupPath => _settingsChanged ? _backupPath : null;
 
     public override async Task<bool> IsAvailableAsync(CancellationToken ct = default)
@@ -76,19 +73,17 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
     public override Task<DriverCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
         => Task.FromResult(new DriverCapabilities
         {
-            SupportsCustomModes = true,          // any mode can be added to vdd_settings.xml
+            SupportsCustomModes = true,
             SupportsRefreshRateChange = true,
-            SupportsGpuPinning = true,           // <gpu><friendlyname> in the settings file
+            SupportsGpuPinning = true,
             SupportsEnableDisable = true,
-            RequiresElevation = true,            // device toggle + settings file under C:\
+            RequiresElevation = true,
         });
 
     private string MarkerPath => Path.Combine(_paths.BackupsDirectory, "vdd-settings.pending");
 
     public override async Task InitializeAsync(CancellationToken ct = default)
     {
-        // A leftover marker means a previous session modified the driver settings and crashed
-        // before restoring them, so put the original file back before doing anything else.
         await RestoreSettingsFromMarkerAsync(ct).ConfigureAwait(false);
 
         var settingsPath = await GetSettingsPathAsync(ct).ConfigureAwait(false);
@@ -135,7 +130,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
             _weEnabledDevice = true;
         }
 
-        // The device is enabled but the monitor can take a moment to attach to the desktop.
         if (!await WaitForDisplayStateAsync(active: true, TimeSpan.FromSeconds(15), ct).ConfigureAwait(false))
         {
             throw OptimaException.From("VDD_NO_DISPLAY",
@@ -182,7 +176,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         {
             mode = await MakeDriverAdvertiseModeAsync(mode, ct).ConfigureAwait(false);
 
-            // The reload detaches and re-attaches the monitor, so re-resolve it.
             display = await GetDisplayInfoAsync(ct).ConfigureAwait(false)
                 ?? throw OptimaException.From("VDD_NO_DISPLAY",
                     "The virtual display did not come back after the driver reload.",
@@ -194,22 +187,15 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         // 2. Apply the mode on the Windows side (temporary; never persisted to the registry).
         await _displayService.ApplyModeAsync(display.DeviceName, mode, ct).ConfigureAwait(false);
 
-        // 3. The driver can still snap back to its preferred mode while it finishes
-        //    re-attaching, silently undoing the change; verify instead of assuming.
         await VerifyModeAppliedAsync(mode, ct).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Rewrites vdd_settings.xml when needed and reloads the driver until it advertises
-    /// <paramref name="mode"/>. When the settings file cannot be rewritten (it usually needs
-    /// admin), fails safely by snapping to the closest mode already advertised (§7).
-    /// </summary>
     private async Task<DisplayMode> MakeDriverAdvertiseModeAsync(DisplayMode mode, CancellationToken ct)
     {
         var settingsPath = await GetSettingsPathAsync(ct).ConfigureAwait(false);
         if (!File.Exists(settingsPath))
         {
-            return mode; // nothing to edit; ApplyModeAsync's CDS_TEST will judge the mode
+            return mode;
         }
 
         var document = VddSettingsDocument.Load(settingsPath);
@@ -219,8 +205,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
             {
                 if (_backupPath is not null)
                 {
-                    // Persist the pending-change marker BEFORE the edit so even a crash right
-                    // after the write is recoverable on the next start (§18).
                     await File.WriteAllLinesAsync(MarkerPath, [_backupPath, settingsPath], ct).ConfigureAwait(false);
                 }
                 document.Save(settingsPath);
@@ -228,8 +212,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
                 _logger.LogInformation("Added {Mode} to vdd_settings.xml, reloading driver", mode);
             }
 
-            // Reload even when the XML already listed the mode: the driver has not picked it
-            // up yet, or the mode would already be in the live Windows mode list.
             await ReloadDriverAsync(ct).ConfigureAwait(false);
             if (!await WaitForAdvertisedModeAsync(mode, TimeSpan.FromSeconds(10), ct).ConfigureAwait(false))
             {
@@ -256,13 +238,11 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
     }
 
-    /// <summary>Polls until the live display's Windows mode list contains <paramref name="mode"/>.</summary>
     private async Task<bool> WaitForAdvertisedModeAsync(DisplayMode mode, TimeSpan timeout, CancellationToken ct)
     {
         var deadline = DateTimeOffset.UtcNow + timeout;
         while (DateTimeOffset.UtcNow < deadline)
         {
-            // The display can be mid re-attach and briefly gone; keep polling through that.
             if (await GetDisplayInfoAsync(ct).ConfigureAwait(false) is { } display)
             {
                 var modes = await _displayService.GetSupportedModesAsync(display.DeviceName, ct).ConfigureAwait(false);
@@ -276,10 +256,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         return false;
     }
 
-    /// <summary>
-    /// Confirms the display actually runs at <paramref name="requested"/>, re-applying once if
-    /// the driver reverted it, and failing loudly rather than reporting a mode it never granted.
-    /// </summary>
     private async Task VerifyModeAppliedAsync(DisplayMode requested, CancellationToken ct)
     {
         for (var attempt = 0; attempt < 2; attempt++)
@@ -311,7 +287,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
             "Check the refresh rates listed in vdd_settings.xml, then reload the driver");
     }
 
-    /// <summary>GDI rounds fractional rates (239.96 reads back as 239), so allow 1 Hz of slack.</summary>
     private static bool IsModeApplied(DisplayMode? current, DisplayMode requested)
         => current is { } mode
             && mode.Width == requested.Width
@@ -320,12 +295,10 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
 
     public override async Task<IReadOnlyList<DisplayMode>> GetSupportedModesAsync(CancellationToken ct = default)
     {
-        // Prefer the Windows-reported mode list of the live display; fall back to the settings file.
         var display = await GetDisplayInfoAsync(ct).ConfigureAwait(false);
         if (display is not null)
         {
             var windowsModes = await _displayService.GetSupportedModesAsync(display.DeviceName, ct).ConfigureAwait(false);
-            // Do not offer the driver's 999/9999 placeholder rates as if they were real modes.
             var plausible = windowsModes.Where(m => m.IsValid).ToList();
             if (plausible.Count > 0)
             {
@@ -354,7 +327,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
 
     public override async Task RestoreOriginalStateAsync(CancellationToken ct = default)
     {
-        // Restore driver settings first so a reload advertises the original modes again.
         if (_settingsChanged && _originalSettingsXml is not null)
         {
             var settingsPath = await GetSettingsPathAsync(ct).ConfigureAwait(false);
@@ -373,7 +345,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
         else
         {
-            // Fresh process (crash recovery): fall back to the on-disk pending marker.
             await RestoreSettingsFromMarkerAsync(ct).ConfigureAwait(false);
         }
 
@@ -384,7 +355,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
     }
 
-    /// <summary>Restores the settings file recorded in the crash marker, then reloads the driver.</summary>
     private async Task RestoreSettingsFromMarkerAsync(CancellationToken ct)
     {
         if (!File.Exists(MarkerPath))
@@ -424,7 +394,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
     }
 
-    /// <summary>Writes RELOAD_DRIVER to the driver's control pipe (directly, or elevated as fallback).</summary>
     public async Task ReloadDriverAsync(CancellationToken ct = default)
     {
         try
@@ -462,7 +431,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
     }
 
-    /// <summary>Same resolution at the nearest refresh rate, else the overall nearest mode.</summary>
     internal static DisplayMode? ClosestAdvertisedMode(IReadOnlyList<DisplayMode> advertised, DisplayMode requested)
     {
         if (advertised.Count == 0)
@@ -499,7 +467,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
     {
         await using var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
         await pipe.ConnectAsync(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
-        // The driver reads wide-character text; send UTF-16LE with a terminating null.
         var bytes = Encoding.Unicode.GetBytes(command + "\0");
         await pipe.WriteAsync(bytes, ct).ConfigureAwait(false);
         await pipe.FlushAsync(ct).ConfigureAwait(false);

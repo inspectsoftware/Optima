@@ -18,13 +18,7 @@ public sealed record CopsNewsEntry(
     public bool IsLive => string.Equals(Status, "LIVE", StringComparison.OrdinalIgnoreCase);
 }
 
-/// <summary>
-/// Parser for criticalopsgame.com/updates/. The page is plain server-rendered HTML with a
-/// stable per-entry shape (verified 2026-08-30): an article holding a status tag, an
-/// "NAME - X.Y.Z" heading and headline paragraphs. There is no feed or API on the site, so
-/// this is scraping by explicit decision (Q4/Q5) and it fails SOFT: shape drift yields an
-/// empty list, and the UI says the feed is unavailable rather than guessing.
-/// </summary>
+/// <summary>Parser for criticalopsgame.com/updates/.</summary>
 public static partial class CopsNewsParser
 {
     private const string BaseUrl = "https://criticalopsgame.com";
@@ -65,7 +59,6 @@ public static partial class CopsNewsParser
                 foreach (Match paragraph in ParagraphPattern().Matches(body))
                 {
                     var text = WebUtility.HtmlDecode(TagPattern().Replace(paragraph.Groups["text"].Value, "")).Trim();
-                    // The trailing "Full ... patch notes!" paragraph is the link, not a headline.
                     if (text.Length > 0 && !text.Contains("patch notes", StringComparison.OrdinalIgnoreCase))
                     {
                         headlines.Add(text);
@@ -91,15 +84,11 @@ public static partial class CopsNewsParser
         return entries;
     }
 
-    /// <summary>Newest LIVE version on the page, or null when none parses.</summary>
     public static string? LatestLiveVersion(IReadOnlyList<CopsNewsEntry> entries)
         => entries.FirstOrDefault(e => e.IsLive && e.Version.Length > 0)?.Version;
 }
 
-/// <summary>
-/// Fetch + cache for the official updates page. One request per refresh, cached to disk so
-/// the page renders offline; the site is the only endpoint this service ever contacts.
-/// </summary>
+/// <summary>Fetch + cache for the official updates page.</summary>
 public sealed class CopsNewsService : IDisposable
 {
     private const string UpdatesUrl = "https://criticalopsgame.com/updates/";
@@ -117,7 +106,6 @@ public sealed class CopsNewsService : IDisposable
 
     private string CachePath => Path.Combine(_paths.Root, "news-cache.json");
 
-    /// <summary>Fetches and caches the feed; falls back to the disk cache on any failure.</summary>
     public async Task<IReadOnlyList<CopsNewsEntry>> GetEntriesAsync(CancellationToken ct = default)
     {
         try

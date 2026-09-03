@@ -12,10 +12,8 @@ using Serilog;
 namespace Optima.App.Services;
 
 /// <summary>
-/// Lifecycle of the in-game FPS overlay: shows it when a session reaches the Monitoring
-/// phase (PLAY and watch sessions share that pipeline), hides it when the session ends,
-/// and Alt+F10 toggles it by hand. Positions the window in the configured corner of the
-/// monitor the game renders on.
+/// Lifecycle of the in-game FPS overlay: shows it when a session reaches the Monitoring phase (PLAY and watch sessions
+/// share that pipeline), hides it when the session ends, and Alt+F10 toggles it by hand.
 /// </summary>
 public sealed class OverlayController : IDisposable
 {
@@ -84,7 +82,6 @@ public sealed class OverlayController : IDisposable
 
     private void OnLaunchProgress(object? sender, LaunchProgress progress)
     {
-        // Sessions run on background threads; every window operation goes through the dispatcher.
         Application.Current?.Dispatcher.BeginInvoke(() =>
         {
             switch (progress.Phase)
@@ -111,7 +108,6 @@ public sealed class OverlayController : IDisposable
         });
     }
 
-    /// <summary>Alt+F10: manual toggle, independent of the automatic session lifecycle.</summary>
     public void Toggle()
     {
         Application.Current?.Dispatcher.BeginInvoke(() =>
@@ -157,8 +153,6 @@ public sealed class OverlayController : IDisposable
             var workAreaDevice = await _gameWindow.GetGameMonitorWorkAreaAsync();
             var dpi = VisualTreeHelper.GetDpi(window);
 
-            // Device pixels to DIPs; fall back to the primary work area (already DIPs) when
-            // no game window is visible.
             var workArea = workAreaDevice is { } device
                 ? new OverlayRect(
                     device.Left / dpi.DpiScaleX,

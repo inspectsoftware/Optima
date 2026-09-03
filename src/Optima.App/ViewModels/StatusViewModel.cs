@@ -34,13 +34,7 @@ public sealed partial class StatusItem : ObservableObject
     private StatusKind _kind = StatusKind.Unknown;
 }
 
-/// <summary>
-/// Shared environment status shown on HOME and in the sidebar footer (§3). Two refresh
-/// paths on purpose: <see cref="RefreshAsync"/> is the full environment check (detection,
-/// WMI, driver state) for startup, the refresh button and after a change on the Display
-/// page; <see cref="RefreshLiveAsync"/> is the cheap tick for the things that actually
-/// move while the app sits beside a game (running badge, display readout).
-/// </summary>
+/// <summary>Shared environment status shown on HOME and in the sidebar footer (§3).</summary>
 public sealed partial class StatusViewModel : ObservableObject
 {
     private readonly IGameDetector _detector;
@@ -72,8 +66,6 @@ public sealed partial class StatusViewModel : ObservableObject
         _settings = settings;
         _logger = logger;
 
-        // The Watchdog already scans for the game every couple of seconds; the badge follows
-        // its edges instead of running a scan of its own.
         _presence.PresenceChanged += _ => Application.Current?.Dispatcher.BeginInvoke(
             () => GameIsRunning = _presence.Current == GamePresence.InGame);
     }
@@ -90,13 +82,11 @@ public sealed partial class StatusViewModel : ObservableObject
     public InstalledGame? DetectedGame { get; private set; }
     public GooglePlayGamesInstallation? DetectedPlatform { get; private set; }
 
-    /// <summary>The full environment check. Not for a timer: it costs WMI and PnP queries.</summary>
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken ct = default)
     {
         try
         {
-            // Values render inside bracket tags, so status words are upper-case by design.
             DetectedPlatform = await _detector.DetectPlatformAsync(ct);
             Set(GooglePlayGames,
                 DetectedPlatform is null ? "NOT FOUND" : DetectedPlatform.ServiceRunning ? "READY" : "INSTALLED",
@@ -107,8 +97,6 @@ public sealed partial class StatusViewModel : ObservableObject
                 DetectedGame is null ? "NOT INSTALLED" : "INSTALLED",
                 DetectedGame is null ? StatusKind.Bad : StatusKind.Good);
 
-            // Device presence is the authority. A leftover settings file from a driver that
-            // has since been uninstalled would otherwise report READY with no device at all.
             _lastDriverState = await _driverInstaller.GetStateAsync(ct);
             await RefreshVirtualDisplayAsync(ct);
 
@@ -131,7 +119,6 @@ public sealed partial class StatusViewModel : ObservableObject
         }
     }
 
-    /// <summary>The periodic tick: only what moves at runtime, nothing that needs WMI.</summary>
     public async Task RefreshLiveAsync(CancellationToken ct = default)
     {
         try
@@ -168,17 +155,11 @@ public sealed partial class StatusViewModel : ObservableObject
 
     private async Task RefreshDisplayReadoutAsync(CancellationToken ct)
     {
-        // Not a status word but a measurement, so it keeps its natural casing.
-        // The readout answers "which display drives the FPS cap": the virtual display
-        // whenever it is attached (that is where the game renders during an uncapped
-        // session), otherwise the physical primary.
         var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
         var virtualInfo = await _virtualDisplay.GetDisplayInfoAsync(ct);
         if (virtualInfo is not null)
         {
             var name = DisplayPresentation.CustomName(virtualInfo, overrides) ?? "virtual";
-            // Between sessions the driver parks the display on a bogus placeholder mode
-            // (999/9999 Hz); report that as idle rather than as a real mode.
             Set(Display,
                 virtualInfo.CurrentMode.IsValid ? $"{virtualInfo.CurrentMode} on {name}" : $"idle on {name}",
                 StatusKind.Good);

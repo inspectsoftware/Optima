@@ -70,7 +70,6 @@ public partial class App : Application
         // Theme must be on the wall before the first window paints.
         var initialSettings = settingsService.GetSettingsAsync().GetAwaiter().GetResult();
         _theme.Initialize(initialSettings);
-        // Motion follows the Windows animation switch unless the user opted out.
         Motion.SetFollowWindows(initialSettings.FollowWindowsMotion);
         settingsService.SettingsChanged += (_, s) => Dispatcher.BeginInvoke(() => Motion.SetFollowWindows(s.FollowWindowsMotion));
 
@@ -79,8 +78,6 @@ public partial class App : Application
         MainWindow = window;
         // The hidden console window must not keep the app alive after the main window closes.
         ShutdownMode = ShutdownMode.OnMainWindowClose;
-        // --tray (the start-with-Windows entry): the Watchdog starts in the tray;
-        // the window appears on demand via the tray menu.
         var startInTray = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase));
         if (!startInTray)
         {
@@ -92,7 +89,6 @@ public partial class App : Application
             // the ambient drift ticking on a window nobody can see.
             Motion.SetForeground(false);
         }
-        // --glass-lab: the v0.7 glass renderer prototype in its own window, for measurement.
         if (e.Args.Any(a => string.Equals(a, "--glass-lab", StringComparison.OrdinalIgnoreCase)))
         {
             new GlassLabWindow().Show();
@@ -110,14 +106,11 @@ public partial class App : Application
             _host.Services.GetRequiredService<INetworkQualityMonitor>());
         _hotkeys.OverlayRequested += () => _overlay!.Toggle();
 
-        // Every deliberate exit (window close, tray EXIT) goes through here, so the user is
-        // warned that the virtual display driver stays installed and can remove it on the way out.
         _shutdown = new AppShutdown(window, _host.Services.GetRequiredService<IDriverInstaller>());
 
         _tray = new TrayService(window, _host.Services.GetRequiredService<SettingsService>(), _shutdown);
         var orchestrator = _host.Services.GetRequiredService<LaunchOrchestrator>();
         _tray.AttachOrchestrator(orchestrator);
-        // The ambient field carries the launch state: rest, session running, attention.
         orchestrator.ProgressChanged += (_, progress) => Dispatcher.BeginInvoke(() =>
             window.AmbientLayer.State = progress.Phase switch
             {
@@ -125,7 +118,6 @@ public partial class App : Application
                 LaunchPhase.Idle or LaunchPhase.Completed => Controls.AmbientState.Rest,
                 _ => Controls.AmbientState.Session,
             });
-        // Same route as Ctrl+Alt+K, so the result text lands in the UI either way.
         _tray.TerminateGameRequested += KillGameFromHotkey;
         _tray.NavigateRequested += page =>
         {
@@ -133,20 +125,14 @@ public partial class App : Application
             _ = mainViewModel.NavigateCommand.ExecuteAsync(page);
         };
 
-        // The Watchdog's crash arm: passive logcat correlation on game exits.
         _host.Services.GetRequiredService<Optima.Core.Crashes.CrashSentinel>().Start();
         // The Watchdog's stats arm: public-profile deltas around each run (needs the
         // player's in-game name in Settings; without it, it never touches the network).
         _host.Services.GetRequiredService<Optima.Core.Stats.SessionStatsEnricher>().Start();
-        // Discord activity (dormant until an Application ID is configured). The window is
-        // attached so "browsing the launcher" presence follows its visibility.
         var discord = _host.Services.GetRequiredService<Services.DiscordPresenceService>();
         discord.AttachLauncherWindow(window);
         _ = discord.StartAsync();
 
-        // The dashboard tiles are the only reader of the hardware monitor, so it samples only
-        // while the window can be seen. Hidden to the tray or minimized, it pauses, and with
-        // it the per-second counter, NVML and per-process traffic beside a running game.
         var hardware = _host.Services.GetRequiredService<IPerformanceMonitor>();
         void SyncHardwareMonitor()
         {
@@ -157,8 +143,6 @@ public partial class App : Application
         window.StateChanged += (_, _) => SyncHardwareMonitor();
         SyncHardwareMonitor();
 
-        // Game first: while the game is on screen, Optima's own process runs below normal
-        // priority so none of its background work competes with the emulator for CPU time.
         var presence = _host.Services.GetRequiredService<Optima.Core.Monitoring.GamePresenceService>();
         presence.PresenceChanged += change =>
             SetOwnPriority(gameOnScreen: change.Current == Optima.Core.Monitoring.GamePresence.InGame);
@@ -198,7 +182,6 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Global Alt+F9: floating log console over whatever is on screen, without stealing focus.</summary>
     private void ToggleConsole()
     {
         if (_console is { IsVisible: true })
@@ -211,8 +194,6 @@ public partial class App : Application
         _console.Show();
     }
 
-    /// <summary>Global Ctrl+Alt+K routes through the same command as the kill buttons, so the
-    /// result text lands in the UI either way.</summary>
     private void KillGameFromHotkey()
     {
         var play = _host!.Services.GetRequiredService<PlayViewModel>();
@@ -229,7 +210,6 @@ public partial class App : Application
             "Any temporary system changes have been rolled back. Details were written to the log folder.",
             "Optima", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
-        // A crash exit skips the driver question.
         if (_shutdown is not null)
         {
             _shutdown.ShutdownNow(1);

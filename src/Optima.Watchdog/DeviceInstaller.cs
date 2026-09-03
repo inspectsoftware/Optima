@@ -3,16 +3,11 @@ using System.Runtime.InteropServices;
 namespace Optima.Watchdog;
 
 /// <summary>
-/// Creates and removes root-enumerated device nodes via SetupAPI, the work `devcon install`
-/// does, done in-process so no WDK tool has to be redistributed.
-///
-/// This is required because an IddCx virtual display is enumerated by ROOT rather than by a
-/// bus: staging the package with pnputil alone installs the driver but never produces a
-/// device, so nothing appears until the node is created explicitly against its hardware id.
+/// Creates and removes root-enumerated device nodes via SetupAPI, the work `devcon install` does, done in-process so no
+/// WDK tool has to be redistributed.
 /// </summary>
 internal static class DeviceInstaller
 {
-    // {4d36e968-e325-11ce-bfc1-08002be10318} is the Display device class.
     private static readonly Guid DisplayClassGuid = new("4d36e968-e325-11ce-bfc1-08002be10318");
 
     private const uint DICD_GENERATE_ID = 0x00000001;
@@ -65,10 +60,6 @@ internal static class DeviceInstaller
     private static extern bool UpdateDriverForPlugAndPlayDevices(
         IntPtr hwndParent, string hardwareId, string fullInfPath, uint installFlags, out bool rebootRequired);
 
-    /// <summary>
-    /// Creates the device node for <paramref name="hardwareId"/> and binds the driver in
-    /// <paramref name="infPath"/> to it. Idempotent: an existing node is reused.
-    /// </summary>
     internal static (bool Success, bool RebootRequired, string Error) CreateRootDevice(string hardwareId, string infPath)
     {
         var classGuid = DisplayClassGuid;
@@ -86,7 +77,6 @@ internal static class DeviceInstaller
                 return (false, false, $"SetupDiCreateDeviceInfo failed ({Marshal.GetLastWin32Error()}).");
             }
 
-            // Hardware id is REG_MULTI_SZ: the id, then a terminating empty string.
             var idBuffer = MultiSz(hardwareId);
             if (!SetupDiSetDeviceRegistryProperty(deviceInfoSet, ref deviceInfoData, SPDRP_HARDWAREID, idBuffer, (uint)idBuffer.Length))
             {
@@ -103,11 +93,8 @@ internal static class DeviceInstaller
             SetupDiDestroyDeviceInfoList(deviceInfoSet);
         }
 
-        // Bind the staged driver to the freshly created node.
         if (!UpdateDriverForPlugAndPlayDevices(IntPtr.Zero, hardwareId, infPath, INSTALLFLAG_FORCE, out var rebootRequired))
         {
-            // SetupAPI reports failures as 0xE0000xxx codes; surface the raw value rather
-            // than guessing at a meaning, since the common causes all look alike here.
             var code = Marshal.GetLastWin32Error();
             return (false, false,
                 $"Binding the driver to the device failed (0x{code:X8}). The package is most likely unsigned, "
@@ -117,7 +104,6 @@ internal static class DeviceInstaller
         return (true, rebootRequired, string.Empty);
     }
 
-    /// <summary>Removes every device node carrying <paramref name="hardwareId"/>.</summary>
     internal static (bool Success, int Removed, string Error) RemoveRootDevices(string hardwareId)
     {
         var classGuid = DisplayClassGuid;
@@ -189,7 +175,7 @@ internal static class DeviceInstaller
     {
         var bytes = new byte[(value.Length + 2) * 2];
         System.Text.Encoding.Unicode.GetBytes(value, 0, value.Length, bytes, 0);
-        return bytes; // trailing four zero bytes terminate the string and the list
+        return bytes;
     }
 
     private static IEnumerable<string> ParseMultiSz(byte[] buffer)

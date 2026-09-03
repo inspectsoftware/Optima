@@ -9,10 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
 
-/// <summary>
-/// UPDATES page: launcher self-update (check / install / rollback) and the shipped
-/// changelog with the running build's identity. Game news lives on the NEWS page.
-/// </summary>
+/// <summary>UPDATES page: launcher self-update (check / install / rollback) and the shipped changelog with the running build's identity.</summary>
 public sealed partial class UpdateLogViewModel : ObservableObject
 {
     private readonly LauncherUpdateService _updates;
@@ -33,7 +30,6 @@ public sealed partial class UpdateLogViewModel : ObservableObject
     [ObservableProperty] private string _buildInfo = string.Empty;
     [ObservableProperty] private string _status = string.Empty;
 
-    // ---- Launcher update ----
     [ObservableProperty] private string _launcherStatus = "not checked yet";
     [ObservableProperty] private bool _updateAvailable;
     [ObservableProperty] private bool _updateBusy;

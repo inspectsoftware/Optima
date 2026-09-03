@@ -3,9 +3,8 @@ using System.Runtime.InteropServices;
 namespace Optima.Platform.Windows.NativeMethods;
 
 /// <summary>
-/// Documented display APIs: EnumDisplayDevices / EnumDisplaySettingsEx / ChangeDisplaySettingsEx
-/// for per-device modes, and the CCD API (QueryDisplayConfig / SetDisplayConfig) for whole-topology
-/// snapshot and restore. Struct layouts follow wingdi.h.
+/// Documented display APIs: EnumDisplayDevices / EnumDisplaySettingsEx / ChangeDisplaySettingsEx for per-device modes,
+/// and the CCD API (QueryDisplayConfig / SetDisplayConfig) for whole-topology snapshot and restore.
 /// </summary>
 internal static partial class DisplayNative
 {
@@ -96,11 +95,8 @@ internal static partial class DisplayNative
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     internal static extern int ChangeDisplaySettingsEx(string lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
 
-    /// <summary>Null-devmode overload used to commit a batch of CDS_NORESET changes.</summary>
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "ChangeDisplaySettingsExW")]
     internal static extern int ChangeDisplaySettingsExCommit(string? lpszDeviceName, IntPtr lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
-
-    // ---------------------------------------------------------------- CCD API
 
     internal const uint QDC_ONLY_ACTIVE_PATHS = 0x2;
 

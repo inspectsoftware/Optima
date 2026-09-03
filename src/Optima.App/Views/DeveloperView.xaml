@@ -4,12 +4,10 @@
              xmlns:v="clr-namespace:Optima.App.Views">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="980" HorizontalAlignment="Left">
-
       <TextBlock Text="Developer" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="Raw detection data · first place to look after a Google Play Games update"
                  Style="{StaticResource Text.PageSubtitle}" />
 
-      <!-- Glass renderer prototype for the v0.7 redesign (also opens standalone with the glass-lab switch). -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="GLASS LAB">
         <v:GlassLabView Height="520" />
       </HeaderedContentControl>

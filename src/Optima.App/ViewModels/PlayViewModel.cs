@@ -64,8 +64,8 @@ public sealed partial class ProfileChip : ObservableObject
 }
 
 /// <summary>
-/// The launch surface (Home) and the session page (Play): profile choice, the PLAY button,
-/// live pipeline progress as a step list, session result (§3/§5/§32).
+/// The launch surface (Home) and the session page (Play): profile choice, the PLAY button, live pipeline progress as a
+/// step list, session result (§3/§5/§32).
 /// </summary>
 public sealed partial class PlayViewModel : ObservableObject
 {
@@ -106,10 +106,8 @@ public sealed partial class PlayViewModel : ObservableObject
 
     public ObservableCollection<LaunchProfile> Profiles { get; } = [];
 
-    /// <summary>The same profiles as chips, with the selected one marked.</summary>
     public ObservableCollection<ProfileChip> ProfileChips { get; } = [];
 
-    /// <summary>The launch pipeline as rows; the session page ticks them off as phases complete.</summary>
     public ObservableCollection<LaunchStep> Steps { get; } =
     [
         new("Launcher resolved", "checking the install"),
@@ -135,7 +133,6 @@ public sealed partial class PlayViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ElapsedText))]
     private TimeSpan _sessionElapsed;
 
-    /// <summary>Caption state tag, visible from every page.</summary>
     public string SessionTag => IsSessionActive
         ? $"RUNNING {SessionElapsed:mm\\:ss}"
         : "IDLE";
@@ -148,7 +145,6 @@ public sealed partial class PlayViewModel : ObservableObject
     [ObservableProperty]
     private LaunchPhase _phase = LaunchPhase.Idle;
 
-    /// <summary>0..1 progress of the launch pipeline, for the PLAY capsule and the session track.</summary>
     [ObservableProperty]
     private double _sessionProgress;
 
@@ -271,11 +267,6 @@ public sealed partial class PlayViewModel : ObservableObject
     [ObservableProperty]
     private string _killStatusText = string.Empty;
 
-    /// <summary>
-    /// One click, no confirmation: hard-kills the emulator process tree. Also bound to the
-    /// global Ctrl+Alt+K hotkey, since the moment a kill switch is needed is usually the
-    /// moment the game is hung fullscreen.
-    /// </summary>
     [RelayCommand]
     private async Task KillGameAsync()
     {
@@ -302,8 +293,6 @@ public sealed partial class PlayViewModel : ObservableObject
             ApplyPhase(progress.Phase, progress.Message);
         });
     }
-
-    // ---- step list --------------------------------------------------------------------
 
     private void ResetSteps()
     {

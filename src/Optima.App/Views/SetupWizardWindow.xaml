@@ -7,7 +7,6 @@
         Width="760" Height="760" WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Brush.Background}" ResizeMode="NoResize"
         UseLayoutRounding="True">
-
   <shell:WindowChrome.WindowChrome>
     <shell:WindowChrome CaptionHeight="40" ResizeBorderThickness="0"
                         CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
@@ -18,7 +17,6 @@
           TextElement.FontFamily="{StaticResource Font.Body}"
           TextElement.FontSize="{StaticResource Type.Body}">
     <Grid>
-      <!-- The first thing a new user sees: the same ambient field and glass as the shell. -->
       <ctl:AmbientField x:Name="Ambient" />
 
       <Grid Margin="12" ctl:GlassPanel.Backdrop="{Binding ElementName=Ambient}">
@@ -49,7 +47,6 @@
 
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="12,0,12,0">
           <StackPanel>
-            <!-- Beat 1: detection -->
             <HeaderedContentControl Style="{StaticResource Section}" Header="DETECTION">
               <StackPanel>
                 <ContentControl Content="{Binding Status.GooglePlayGames}" ContentTemplate="{StaticResource StatusItemTemplate}" />
@@ -60,7 +57,6 @@
               </StackPanel>
             </HeaderedContentControl>
 
-            <!-- Beat 2: the one-consent fix-everything card -->
             <HeaderedContentControl Style="{StaticResource Section}" Header="FIX EVERYTHING"
                                     Visibility="{Binding ShowFixAll, Converter={StaticResource BoolToVis}}">
               <StackPanel>
@@ -95,7 +91,6 @@
               </StackPanel>
             </Border>
 
-            <!-- The firmware case is guided, never faked (no software can flip BIOS settings). -->
             <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Fail}" Margin="0,0,0,12"
                     Visibility="{Binding FirmwareGuideVisible, Converter={StaticResource BoolToVis}}">
               <StackPanel>
@@ -129,7 +124,6 @@
               </ItemsControl>
             </HeaderedContentControl>
 
-            <!-- Beat 3: make it yours -->
             <HeaderedContentControl Style="{StaticResource Section}" Header="MAKE IT YOURS">
               <StackPanel>
                 <CheckBox IsChecked="{Binding StartWithWindows}" Margin="0,2"

@@ -9,17 +9,9 @@ public sealed record PresentCaptureResult(
     IReadOnlyList<double> FpsSamples,
     int DominantProcessId);
 
-/// <summary>
-/// Pure present-event bookkeeping for the ETW collector (§12/§13). Present timestamps arrive
-/// tagged with a process id; the aggregator keeps per-process deltas (mixing processes would
-/// corrupt frametimes), and each window reports the candidate that presented the most frames.
-/// The DXGI presenter for the game is not always the emulator process itself, which is why a
-/// set of candidate pids is tracked instead of one.
-/// Not thread-safe; callers serialize access.
-/// </summary>
+/// <summary>Pure present-event bookkeeping for the ETW collector (§12/§13).</summary>
 public sealed class PresentWindowAggregator
 {
-    // Deltas outside this range are a paused game (>2 s) or duplicate/out-of-order timestamps.
     private const double MinDeltaMs = 0.05;
     private const double MaxDeltaMs = 2000;
 
@@ -46,7 +38,6 @@ public sealed class PresentWindowAggregator
         _intervalMs = intervalMs;
     }
 
-    /// <summary>Records one present event; timestamps from non-candidate processes are ignored.</summary>
     public void RecordPresent(int processId, double timestampMs)
     {
         if (!_candidates.TryGetValue(processId, out var state))
@@ -67,10 +58,6 @@ public sealed class PresentWindowAggregator
         state.LastPresentMs = timestampMs;
     }
 
-    /// <summary>
-    /// Closes the current window and returns the dominant presenter's sample, or null when no
-    /// candidate presented anything (game paused / minimized: publish nothing rather than zeros).
-    /// </summary>
     public PresentWindowSample? CompleteWindow()
     {
         PidState? best = null;
@@ -101,10 +88,6 @@ public sealed class PresentWindowAggregator
         return sample;
     }
 
-    /// <summary>
-    /// Final capture data: frametimes of the process that presented the most frames overall,
-    /// plus every published per-window fps value.
-    /// </summary>
     public PresentCaptureResult Complete()
     {
         var dominant = _candidates.OrderByDescending(kv => kv.Value.TotalPresents).First();

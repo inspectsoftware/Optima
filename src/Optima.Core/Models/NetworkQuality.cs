@@ -7,13 +7,8 @@ public sealed record NetworkQualitySample
     public double JitterMs { get; init; }
     public double PacketLossPct { get; init; }
 
-    /// <summary>The host the sample was measured against.</summary>
     public string Target { get; init; } = string.Empty;
 
-    /// <summary>
-    /// True when measuring the fallback reference host rather than a discovered game endpoint;
-    /// the readout then reflects link quality, not game-server latency.
-    /// </summary>
     public bool IsReferenceHost { get; init; }
 }
 

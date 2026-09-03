@@ -1,12 +1,6 @@
 namespace Optima.Core.Crashes;
 
-/// <summary>
-/// Passive reader for Google Play Games on PC's own log folder
-/// (%LOCALAPPDATA%\Google\Play Games\Logs). AndroidSerial.log mirrors logcat and is
-/// rotated to AndroidSerial-bkup-* files; a crash can land on either side of a
-/// rotation, so the tail is read across the live file plus the newest backup.
-/// Read-only by design: Optima never writes into the platform's folders.
-/// </summary>
+/// <summary>Passive reader for Google Play Games on PC's own log folder (%LOCALAPPDATA%\Google\Play Games\Logs).</summary>
 public sealed class GpgLogReader
 {
     private const string SerialLogName = "AndroidSerial.log";
@@ -21,12 +15,10 @@ public sealed class GpgLogReader
     {
     }
 
-    /// <summary>Test constructor pointing at an arbitrary logs folder.</summary>
     public GpgLogReader(string logsDirectory) => _logsDirectory = logsDirectory;
 
     public bool LogsFolderExists => Directory.Exists(_logsDirectory);
 
-    /// <summary>The platform's minidump folder next to Logs, when present.</summary>
     public string? CrashReportingDirectory
     {
         get
@@ -41,11 +33,6 @@ public sealed class GpgLogReader
         }
     }
 
-    /// <summary>
-    /// Last <paramref name="maxLines"/> lines of the logcat mirror, newest rotation aware:
-    /// when the live file is short (it just rotated), the newest backup's tail is prepended.
-    /// Returns an empty list when the folder or files are missing; never throws.
-    /// </summary>
     public IReadOnlyList<string> ReadRecentSerialLines(int maxLines = 400)
     {
         try
@@ -81,8 +68,6 @@ public sealed class GpgLogReader
         }
     }
 
-    /// <summary>Minutes since Google Play Games' Service.log was last written, or null when
-    /// it does not exist. A fresh write is the cheapest sign the platform is alive.</summary>
     public double? ServiceLogAgeMinutes()
     {
         try
@@ -100,8 +85,6 @@ public sealed class GpgLogReader
         }
     }
 
-    /// <summary>Names and sizes of the platform's minidump files, newest first. The dumps
-    /// themselves are never copied: they can contain process memory.</summary>
     public IReadOnlyList<string> ListMinidumpNames(int max = 10)
     {
         try
@@ -131,7 +114,6 @@ public sealed class GpgLogReader
             return [];
         }
 
-        // Share-friendly open: the platform keeps these files open for writing.
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         if (stream.Length > TailBytes)
         {
@@ -143,7 +125,6 @@ public sealed class GpgLogReader
         {
             lines.Add(line);
         }
-        // The first line after a mid-file seek is almost always torn; drop it.
         if (stream.Length > TailBytes && lines.Count > 0)
         {
             lines.RemoveAt(0);

@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="clr-namespace:Optima.App.Controls">
   <UserControl.Resources>
-    <!-- One launch step: state glyph, title, detail. -->
     <DataTemplate x:Key="StepRow">
       <Grid Margin="0,0,0,8">
         <Grid.ColumnDefinitions>
@@ -59,7 +58,6 @@
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1040" HorizontalAlignment="Left">
-
       <Grid Margin="0,0,0,14">
         <Grid.ColumnDefinitions>
           <ColumnDefinition />
@@ -70,7 +68,6 @@
                    Margin="0,0,4,0" VerticalAlignment="Bottom" />
       </Grid>
 
-      <!-- Session strip: the launch steps, elapsed time, and the controls -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="LAUNCH STEPS">
         <HeaderedContentControl.Tag>
           <TextBlock Text="{Binding SelectedProfile.Name, FallbackValue=''}" Style="{StaticResource Text.Micro}" />
@@ -119,7 +116,6 @@
         </Grid>
       </HeaderedContentControl>
 
-      <!-- Session result -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="LAST SESSION"
                               Visibility="{Binding LastSession, Converter={StaticResource NullToCollapsed}}">
         <StackPanel>
@@ -161,7 +157,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Friendly error -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="ERROR"
                               Visibility="{Binding LastError, Converter={StaticResource NullToCollapsed}}">
         <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Fail}">

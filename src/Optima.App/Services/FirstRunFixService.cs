@@ -19,11 +19,8 @@ public sealed record ReadinessReport(
 public sealed record FixRunResult(IReadOnlyList<string> Log, bool RestartRequired);
 
 /// <summary>
-/// The "fix everything" engine behind the first-run wizard (Q7): one consent, then every
-/// automatable fix runs through the existing elevation broker. The honest boundaries:
-/// firmware virtualization is a BIOS/UEFI toggle no software can flip (the wizard shows a
-/// walkthrough instead), and Google publishes no stable direct installer URL, so the GPG
-/// fix opens the official download page for the one manual click.
+/// The "fix everything" engine behind the first-run wizard (Q7): one consent, then every automatable fix runs through
+/// the existing elevation broker.
 /// </summary>
 public sealed class FirstRunFixService
 {
@@ -62,7 +59,6 @@ public sealed class FirstRunFixService
             GpgMissing: platform is null);
     }
 
-    /// <summary>Runs every automatable fix; the caller already collected the one consent.</summary>
     public async Task<FixRunResult> RunFixesAsync(ReadinessReport report, CancellationToken ct = default)
     {
         var log = new List<string>();
@@ -96,15 +92,12 @@ public sealed class FirstRunFixService
                     _logger.LogInformation("EnableWindowsFeature {Feature}: {Ok} {Error}",
                         feature, response.Success, response.Error);
                 }
-                // The feature state is cached for the life of the process; it just changed.
                 _systemInfo.InvalidateCache();
             }
         }
 
         if (report.GpgMissing)
         {
-            // Google publishes no stable direct installer URL; the official page is the
-            // sanctioned path, so the fix is opening it rather than fetching a moving target.
             try
             {
                 Process.Start(new ProcessStartInfo(GpgDownloadPage) { UseShellExecute = true });
@@ -119,10 +112,6 @@ public sealed class FirstRunFixService
         return new FixRunResult(log, restartRequired);
     }
 
-    /// <summary>
-    /// Arms a resume for after the reboot and restarts Windows with a short grace period.
-    /// The wizard reopens automatically because first-run is not yet marked complete.
-    /// </summary>
     public string? ScheduleRestart()
     {
         try
@@ -146,7 +135,6 @@ public sealed class FirstRunFixService
         }
     }
 
-    /// <summary>Removes the resume entry once setup completes normally.</summary>
     public static void ClearResume()
     {
         try
@@ -157,7 +145,6 @@ public sealed class FirstRunFixService
         }
         catch
         {
-            // A leftover RunOnce entry is harmless; it runs once and disappears.
         }
     }
 }

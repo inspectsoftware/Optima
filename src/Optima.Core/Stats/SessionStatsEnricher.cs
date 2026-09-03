@@ -7,17 +7,11 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Core.Stats;
 
 /// <summary>
-/// Turns public-profile snapshots around a game run into per-session stat deltas and,
-/// when a delta contains exactly one match of a mode, an attributable match row.
-/// API traffic policy: the profile is fetched only when the player's in-game name is
-/// configured, and only at run start and run end (no in-match polling in this version).
-/// A missing start snapshot skips enrichment entirely; attributing whole-career totals
-/// to one session would be worse than no numbers.
+/// Turns public-profile snapshots around a game run into per-session stat deltas and, when a delta contains exactly one
+/// match of a mode, an attributable match row.
 /// </summary>
 public sealed class SessionStatsEnricher : IDisposable
 {
-    /// <summary>Grace for the orchestrator to finish writing the session row before the
-    /// delta looks for it, and for the API to reflect the finished match.</summary>
     private static readonly TimeSpan SettleDelay = TimeSpan.FromSeconds(4);
 
     private readonly GamePresenceService _presence;
@@ -130,11 +124,6 @@ public sealed class SessionStatsEnricher : IDisposable
         }
     }
 
-    /// <summary>
-    /// Auto match rows: only a mode whose delta holds exactly one decided match is
-    /// attributable (its k/d/a are that match's numbers). Multi-match sessions keep
-    /// their aggregate on the session and leave the splits to manual entry.
-    /// </summary>
     public static IReadOnlyList<MatchRecord> ExtractAutoMatches(
         CopsProfileDelta delta, DateTimeOffset startedAt, long? sessionId)
     {

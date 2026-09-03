@@ -15,12 +15,10 @@ public sealed record GooglePlayGamesInstallation
 /// <summary>One installed Android game surfaced by Google Play Games.</summary>
 public sealed record InstalledGame
 {
-    /// <summary>Android package id, e.g. com.criticalforceentertainment.criticalops.</summary>
     public required string PackageId { get; init; }
 
     public string DisplayName { get; init; } = string.Empty;
 
-    /// <summary>Full launch URI, e.g. googleplaygames://launch/?id=&lt;pkg&gt;.</summary>
     public string LaunchUri { get; init; } = string.Empty;
 
     public string ShortcutPath { get; init; } = string.Empty;

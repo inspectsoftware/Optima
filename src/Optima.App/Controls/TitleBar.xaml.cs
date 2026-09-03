@@ -4,11 +4,7 @@ using System.Windows.Media;
 
 namespace Optima.App.Controls;
 
-/// <summary>
-/// Caption row used by the shell and the secondary windows. The host supplies the
-/// breadcrumb and the session tag; drag and double-click-maximize come from
-/// <see cref="System.Windows.Shell.WindowChrome"/>, so native snap and resize survive.
-/// </summary>
+/// <summary>Caption row used by the shell and the secondary windows.</summary>
 public partial class TitleBar : UserControl
 {
     public static readonly DependencyProperty BreadcrumbProperty = DependencyProperty.Register(
@@ -77,7 +73,6 @@ public partial class TitleBar : UserControl
 
     private void OnClose(object sender, RoutedEventArgs e) => Host?.Close();
 
-    /// <summary>Keeps the glyph honest when the state changes by any route (snap, double-click, Win+Up).</summary>
     public void SyncMaximizeGlyph()
     {
         var maximized = Host?.WindowState == WindowState.Maximized;

@@ -3,11 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="920" HorizontalAlignment="Left">
-
       <TextBlock Text="Updates" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="{Binding BuildInfo}" Style="{StaticResource Text.PageSubtitle}" />
 
-      <!-- Launcher self-update -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="LAUNCHER">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="check now" Padding="6,0"
@@ -30,7 +28,6 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <!-- Optima changelog (the shipped CHANGELOG.md) -->
       <HeaderedContentControl Style="{StaticResource Section}" Header="OPTIMA UPDATE LOG">
         <StackPanel>
           <TextBlock Text="{Binding Status}" Style="{StaticResource Text.Label}" Margin="0,0,0,6"

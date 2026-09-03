@@ -32,11 +32,7 @@ public sealed partial class TweakRowViewModel : ObservableObject
 
 public sealed record TweakGroupViewModel(string Category, IReadOnlyList<TweakRowViewModel> Tweaks);
 
-/// <summary>
-/// PERFORMANCE page (§8/§22): the Windows tweak catalog with per-tweak toggles and profile
-/// editing with full per-setting disclosure. Session history and benchmark comparison live
-/// on the SESSIONS page.
-/// </summary>
+/// <summary>PERFORMANCE page (§8/§22): the Windows tweak catalog with per-tweak toggles and profile editing with full per-setting disclosure.</summary>
 public sealed partial class PerformanceViewModel : ObservableObject
 {
     private readonly ProfileService _profiles;
@@ -66,7 +62,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
     public IReadOnlyList<PowerPlanKind> PowerPlanOptions { get; } = Enum.GetValues<PowerPlanKind>();
     public IReadOnlyList<ProcessPriorityLevel> PriorityOptions { get; } = Enum.GetValues<ProcessPriorityLevel>();
 
-    // ---- Editor fields ----
     [ObservableProperty] private LaunchProfile? _selectedProfile;
     [ObservableProperty] private string _editName = string.Empty;
     [ObservableProperty] private bool _editVirtualDisplay;
@@ -106,7 +101,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
         }
     }
 
-    /// <summary>Enabled and Mixed both toggle to off; only a clean Disabled toggles to on.</summary>
     [RelayCommand]
     private async Task ToggleTweakAsync(TweakRowViewModel row)
     {
@@ -139,7 +133,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
         }
     }
 
-    /// <summary>The panic button: reverts every applied tweak to its captured original.</summary>
     [RelayCommand]
     private async Task DisableAllTweaksAsync()
     {
@@ -301,5 +294,4 @@ public sealed partial class PerformanceViewModel : ObservableObject
             _logger.LogWarning(ex, "Profile import failed");
         }
     }
-
 }

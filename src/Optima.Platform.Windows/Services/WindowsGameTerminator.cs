@@ -7,11 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Platform.Windows.Services;
 
 /// <summary>
-/// The kill switch: terminates every process matching the emulator patterns (the Android VM
-/// hosting the game), tree included, without confirmation or grace. Deliberately not routed
-/// through <see cref="WindowsBackgroundCleanupService"/>: its never-touch list exists to keep
-/// the *cleanup* feature away from these processes, while killing the game is an explicit
-/// user action targeting exactly them.
+/// The kill switch: terminates every process matching the emulator patterns (the Android VM hosting the game), tree
+/// included, without confirmation or grace.
 /// </summary>
 public sealed class WindowsGameTerminator : IGameTerminator
 {

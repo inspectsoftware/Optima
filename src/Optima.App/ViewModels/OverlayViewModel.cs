@@ -6,8 +6,8 @@ using Optima.Core.Abstractions;
 namespace Optima.App.ViewModels;
 
 /// <summary>
-/// Data for the in-game FPS overlay: the live sample stream with a staleness reset, because
-/// the ETW collector goes silent (rather than reporting zeros) when the game stops presenting.
+/// Data for the in-game FPS overlay: the live sample stream with a staleness reset, because the ETW collector goes
+/// silent (rather than reporting zeros) when the game stops presenting.
 /// </summary>
 public sealed partial class OverlayViewModel : ObservableObject, IDisposable
 {
@@ -43,7 +43,6 @@ public sealed partial class OverlayViewModel : ObservableObject, IDisposable
 
     private void OnSample(object? sender, (double Fps, double FrametimeMs) sample)
     {
-        // Raised on the IPC read-loop thread; marshal before touching bound properties.
         Application.Current?.Dispatcher.BeginInvoke(() =>
         {
             _lastSample = DateTimeOffset.Now;
@@ -52,7 +51,6 @@ public sealed partial class OverlayViewModel : ObservableObject, IDisposable
         });
     }
 
-    /// <summary>Called by the network monitor pipeline (already marshalled to the dispatcher).</summary>
     public void UpdateNetwork(string text)
     {
         NetworkText = text;

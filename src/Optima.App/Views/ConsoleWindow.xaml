@@ -9,10 +9,6 @@
         Background="{DynamicResource Brush.Background}"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Ideal">
-  <!--
-    The floating console (global Alt+F9): the LOGS page in a topmost window, shown without
-    stealing focus so it can sit over a borderless game while it keeps running.
-  -->
   <Border Background="{DynamicResource Brush.Background}"
           TextElement.Foreground="{DynamicResource Brush.Text}"
           TextElement.FontFamily="{StaticResource Font.Mono}"

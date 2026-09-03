@@ -3,11 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace Optima.Platform.Windows.NativeMethods;
 
-/// <summary>
-/// Read-only view of the IPv4 TCP connection table with owning pids (iphlpapi). Used to find
-/// the remote endpoints of game processes; no sockets are opened or touched.
-/// The UDP table carries no remote addresses, so TCP is the only usable endpoint source.
-/// </summary>
+/// <summary>Read-only view of the IPv4 TCP connection table with owning pids (iphlpapi).</summary>
 internal static class IpHelperNative
 {
     private const int AfInet = 2;
@@ -32,7 +28,6 @@ internal static class IpHelperNative
             var result = GetExtendedTcpTable(buffer, ref size, sort: false, AfInet, TcpTableOwnerPidAll, 0);
             if (result == ErrorInsufficientBuffer)
             {
-                // The table grew between the two calls; the next poll gets it.
                 return [];
             }
             if (result != 0)
@@ -50,7 +45,6 @@ internal static class IpHelperNative
                 connections.Add(new TcpConnection(
                     (int)row.OwningPid,
                     new IPAddress(row.RemoteAddr),
-                    // Port bytes are network order in the low word.
                     (ushort)IPAddress.NetworkToHostOrder((short)(row.RemotePort & 0xFFFF)),
                     row.State == MibTcpStateEstablished));
                 }

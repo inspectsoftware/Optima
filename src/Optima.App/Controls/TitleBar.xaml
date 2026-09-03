@@ -4,8 +4,6 @@
              xmlns:ctl="clr-namespace:Optima.App.Controls"
              xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
              x:Name="Root" Height="28">
-  <!-- Dissolved into the shell: no ground, no rule. Breadcrumb left, session tag and the
-       caption buttons right. Drag comes from WindowChrome's caption area. -->
   <Grid Background="Transparent">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="Auto" />

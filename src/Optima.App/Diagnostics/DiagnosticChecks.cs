@@ -5,7 +5,7 @@ using Optima.Driver;
 
 namespace Optima.App.Diagnostics;
 
-/// <summary>Diagnostics page checks (§15/§16). Each returns status + reason + recommended fix.</summary>
+/// <summary>Diagnostics page checks (§15/§16).</summary>
 public sealed class VirtualizationCheck : IDiagnosticCheck
 {
     private readonly ISystemInfoService _systemInfo;
@@ -166,8 +166,6 @@ public sealed class VirtualDriverCheck : IDiagnosticCheck
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
-        // Device state is the authority here; the provider can look "available" from a
-        // leftover settings file long after the device itself has been removed.
         var driverState = await _installer.GetStateAsync(ct);
         if (driverState != DriverState.Installed)
         {

@@ -73,7 +73,6 @@ public sealed class ProfileService
         if (_profiles is null)
         {
             var stored = await _store.LoadAsync<List<LaunchProfile>>(_paths.ProfilesFile, ct).ConfigureAwait(false) ?? [];
-            // Built-ins always present and always current; user profiles follow.
             _profiles = BuiltInProfiles
                 .Concat(stored.Where(p => !p.IsBuiltIn && BuiltInProfiles.All(b => b.Name != p.Name)))
                 .ToList();
@@ -115,7 +114,6 @@ public sealed class ProfileService
         }
     }
 
-    /// <summary>Exports one profile as standalone JSON (§22).</summary>
     public async Task ExportProfileAsync(string name, string targetPath, CancellationToken ct = default)
     {
         var profile = await GetProfileAsync(name, ct).ConfigureAwait(false);

@@ -11,12 +11,7 @@ using Serilog;
 
 namespace Optima.App.Services;
 
-/// <summary>
-/// Notification-area icon for Optima. Always present while the app runs; left or
-/// right click opens a small menu (Show / Terminate Process / Logs / Performance).
-/// During a game session the main window hides to the tray once the game is running
-/// and comes back when the session ends, per <see cref="TrayVisibilityPolicy"/>.
-/// </summary>
+/// <summary>Notification-area icon for Optima.</summary>
 public sealed class TrayService : IDisposable
 {
     // WM_APP range so the callback can never collide with a system message.
@@ -48,10 +43,8 @@ public sealed class TrayService : IDisposable
     private bool _keepInTrayOnClose;
     private bool _watchModeEnabled;
 
-    /// <summary>Tray "Terminate Process": kill the game, same route as the kill buttons.</summary>
     public event Action? TerminateGameRequested;
 
-    /// <summary>Tray "Logs"/"Performance": show the window and open the given page.</summary>
     public event Action<string>? NavigateRequested;
 
     public TrayService(Window window, SettingsService settings, AppShutdown shutdown)
@@ -121,11 +114,6 @@ public sealed class TrayService : IDisposable
         }
     }
 
-    /// <summary>
-    /// The window's close button never quits on its own. With "keep in tray" enabled it hides
-    /// the window; otherwise the close is handed to <see cref="AppShutdown"/>, which asks about
-    /// the installed driver first and then shuts the application down.
-    /// </summary>
     private void OnWindowClosing(object? sender, CancelEventArgs e)
     {
         if (_shutdown.IsShuttingDown)
@@ -143,7 +131,6 @@ public sealed class TrayService : IDisposable
         }
     }
 
-    /// <summary>Hide the window while the game runs; bring it back when the session ends.</summary>
     public void AttachOrchestrator(LaunchOrchestrator orchestrator)
     {
         _orchestrator = orchestrator;
@@ -169,7 +156,6 @@ public sealed class TrayService : IDisposable
 
     private void OnLaunchProgress(object? sender, LaunchProgress progress)
     {
-        // Orchestrator events arrive on a background thread.
         _window.Dispatcher.BeginInvoke(() =>
         {
             switch (_policy.OnPhase(progress.Phase))
@@ -183,10 +169,6 @@ public sealed class TrayService : IDisposable
             }
         });
     }
-
-    // ---- launch choreography ----------------------------------------------------------
-    // The window slips toward the tray corner and dissolves when the game is confirmed
-    // running; the reverse plays when the session ends. Instant under reduced motion.
 
     private static readonly TimeSpan Slip = TimeSpan.FromMilliseconds(500);
 
@@ -266,8 +248,6 @@ public sealed class TrayService : IDisposable
 
     private void OpenMenu()
     {
-        // Classic tray fix: without foregrounding our window first, the popup
-        // would not close when the user clicks elsewhere or presses Esc.
         SetForegroundWindow(_handle);
         _menu.Placement = PlacementMode.MousePoint;
         _menu.IsOpen = true;
@@ -296,7 +276,6 @@ public sealed class TrayService : IDisposable
         szInfoTitle = string.Empty,
     };
 
-    /// <summary>The tray icon is the app icon, read straight from the exe.</summary>
     private static (IntPtr Icon, bool Owned) LoadTrayIcon()
     {
         var exe = Environment.ProcessPath;

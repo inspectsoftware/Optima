@@ -2,7 +2,7 @@ using Optima.Core.Models;
 
 namespace Optima.Core.Abstractions;
 
-/// <summary>One row on the diagnostics page (§15). Checks are registered in DI and run in order.</summary>
+/// <summary>One row on the diagnostics page (§15).</summary>
 public interface IDiagnosticCheck
 {
     string Name { get; }

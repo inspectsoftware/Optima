@@ -8,14 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.Monitoring;
 
-/// <summary>
-/// Live dashboard feed (§12): one sample per second while someone can see it. CPU comes from
-/// GetSystemTimes deltas, RAM from GlobalMemoryStatusEx, GPU from NVML when present (RTX
-/// systems) with one "GPU Engine" category read as the fallback, and per-process usage for
-/// the game pids through kept handles. Start and stop are cheap and repeatable: the app
-/// pauses the loop whenever the window is hidden or minimized, so a game on screen never
-/// pays for tiles nobody is looking at.
-/// </summary>
+/// <summary>Live dashboard feed (§12): one sample per second while someone can see it.</summary>
 public sealed class HardwareMonitor : IPerformanceMonitor
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
@@ -125,7 +118,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         }
     }
 
-    /// <summary>Counter handles survive pause/resume; opening them is the expensive part.</summary>
     private void InitializeCountersOnce()
     {
         if (_countersInitialized)
@@ -138,7 +130,7 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         try
         {
             _cpuPerformanceCounter = new PerformanceCounter("Processor Information", "% Processor Performance", "_Total", readOnly: true);
-            _ = _cpuPerformanceCounter.NextValue(); // warm-up; first read is always 0
+            _ = _cpuPerformanceCounter.NextValue();
         }
         catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
         {
@@ -168,10 +160,9 @@ public sealed class HardwareMonitor : IPerformanceMonitor
 
     private HardwareMetrics Sample()
     {
-        // ---- CPU ----
         ProcessNative.GetSystemTimes(out var idle, out var kernel, out var user);
         var idleDelta = idle - _prevIdle;
-        var busyDelta = (kernel - _prevKernel) + (user - _prevUser) - idleDelta; // kernel includes idle
+        var busyDelta = (kernel - _prevKernel) + (user - _prevUser) - idleDelta;
         var totalDelta = (kernel - _prevKernel) + (user - _prevUser);
         (_prevIdle, _prevKernel, _prevUser) = (idle, kernel, user);
         var cpuPercent = totalDelta > 0 ? Math.Clamp(100.0 * busyDelta / totalDelta, 0, 100) : 0;
@@ -189,10 +180,8 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             }
         }
 
-        // ---- RAM ----
         var (totalRam, availableRam) = ProcessNative.GetMemoryStatus();
 
-        // ---- GPU ----
         double gpuUtil = 0;
         ulong gpuMemory = 0;
         double? gpuTemp = null, gpuClock = null;
@@ -209,7 +198,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             gpuUtil = SampleGpuEngines();
         }
 
-        // ---- Game processes ----
         var (gameCpu, gameRam) = SampleGameProcesses();
 
         return new HardwareMetrics
@@ -244,8 +232,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             ulong ramBytes = 0;
             foreach (var (pid, handle) in _gameProcesses)
             {
-                // A process that exited keeps answering with its final numbers until the next
-                // pid refresh drops it; a stale handle that stops answering is simply skipped.
                 if (ProcessQuery.GetWorkingSetBytes(handle) is { } workingSet)
                 {
                     ramBytes += workingSet;
@@ -264,7 +250,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         }
     }
 
-    /// <summary>Fallback GPU utilization (documented PDH "GPU Engine" counters, one category read per tick).</summary>
     private double SampleGpuEngines()
     {
         if (_gpuEnginesUnavailable)
@@ -291,12 +276,11 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             using var searcher = new System.Management.ManagementObjectSearcher("SELECT MaxClockSpeed FROM Win32_Processor");
             foreach (var cpu in searcher.Get())
             {
-                return Convert.ToDouble(cpu["MaxClockSpeed"] ?? 0); // MHz
+                return Convert.ToDouble(cpu["MaxClockSpeed"] ?? 0);
             }
         }
         catch (Exception)
         {
-            // WMI unavailable, so frequency will simply read 0.
         }
         return 0;
     }

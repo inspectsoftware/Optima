@@ -3,42 +3,23 @@ using System.Text.Json.Serialization;
 
 namespace Optima.Core.Ipc;
 
-/// <summary>
-/// Commands the elevated helper accepts (§20). This is a closed whitelist; the helper
-/// rejects anything not in this enum, and validates every argument per command.
-/// </summary>
+/// <summary>Commands the elevated helper accepts (§20).</summary>
 public enum IpcCommand
 {
     Ping,
-    /// <summary>Enable a display device by PnP instance id (restricted to virtual display devices).</summary>
     EnableDevice,
-    /// <summary>Disable a display device by PnP instance id (restricted to virtual display devices).</summary>
     DisableDevice,
-    /// <summary>Write one whitelisted command string to the virtual display driver control pipe.</summary>
     WriteVddPipe,
-    /// <summary>Start the ETW present-statistics session for a set of candidate process ids.</summary>
     StartEtw,
     StopEtw,
-    /// <summary>
-    /// Run a short unfiltered DXGI present trace and return per-process present counts.
-    /// Diagnostics only: answers "which process actually presents frames" when capture is silent.
-    /// </summary>
     RunEtwProbe,
-    /// <summary>Read bcdedit hypervisorlaunchtype (diagnostics only, no modification).</summary>
     ReadBcdVirtualization,
-    /// <summary>Stage a bundled driver package and create its root device node.</summary>
     InstallDriver,
-    /// <summary>Remove the device node created by InstallDriver and unstage the package.</summary>
     UninstallDriver,
-    /// <summary>Create the virtual display driver's settings file if it is missing.</summary>
     EnsureVddSettings,
-    /// <summary>Write the HKLM values of one catalog tweak (restricted to TweakCatalog paths).</summary>
     ApplyTweakValues,
-    /// <summary>Stream CPU/GPU temperature and load samples (LibreHardwareMonitor) as events.</summary>
     StartHardwareStream,
     StopHardwareStream,
-    /// <summary>Enable one whitelisted Windows optional feature via DISM (HypervisorPlatform,
-    /// VirtualMachinePlatform). Returns restartRequired; never restarts by itself.</summary>
     EnableWindowsFeature,
     Shutdown,
 }

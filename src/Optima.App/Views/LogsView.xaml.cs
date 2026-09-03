@@ -49,7 +49,6 @@ public partial class LogsView : UserControl
         }
     }
 
-    /// <summary>Follows the newest entry. Scrolling is a view concern, so it lives here rather than in the VM.</summary>
     private void ScrollToEnd()
     {
         if (LogList.Items.Count > 0)

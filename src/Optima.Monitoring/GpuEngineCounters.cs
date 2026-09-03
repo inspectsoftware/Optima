@@ -3,14 +3,7 @@ using System.Diagnostics;
 
 namespace Optima.Monitoring;
 
-/// <summary>
-/// Fallback GPU utilization for systems without NVML: the documented "GPU Engine" performance
-/// counters, read as ONE category snapshot per tick. Holding a PerformanceCounter per 3D
-/// engine instance costs a full category collection per instance per read, dozens of them a
-/// second on a busy desktop, and that churn is exactly what a game running beside Optima
-/// notices. The counter is 100 ns of engine busy time, so utilization is the busy delta over
-/// the wall-clock delta between two snapshots.
-/// </summary>
+/// <summary>Fallback GPU utilization for systems without NVML: the documented "GPU Engine" performance counters, read as ONE category snapshot per tick.</summary>
 public sealed class GpuEngineCounters
 {
     private const string CategoryName = "GPU Engine";
@@ -20,7 +13,6 @@ public sealed class GpuEngineCounters
     private PerformanceCounterCategory? _category;
     private Dictionary<string, (long Raw, long Timestamp)> _previous = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Summed 3D-engine utilization since the previous call; 0 on the first call.</summary>
     public double Sample()
     {
         _category ??= new PerformanceCounterCategory(CategoryName);
@@ -48,7 +40,6 @@ public sealed class GpuEngineCounters
         return utilization;
     }
 
-    /// <summary>Pure delta math, separated so it can be tested without a performance counter.</summary>
     public static (double Utilization, Dictionary<string, (long Raw, long Timestamp)> Next) Compute(
         IReadOnlyDictionary<string, (long Raw, long Timestamp)> previous,
         IReadOnlyList<(string Instance, long Raw, long Timestamp)> current)

@@ -68,8 +68,6 @@ public sealed partial class DiagnosticsViewModel : ObservableObject
         }
     }
 
-    // ---- Repair actions ----
-
     [RelayCommand]
     private async Task RefreshHeartbeatAsync()
         => HeartbeatText = await _repair.HeartbeatAsync();

@@ -6,7 +6,6 @@
         Title="Optima"
         Width="560" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
         Background="{DynamicResource Brush.Background}" UseLayoutRounding="True">
-
   <shell:WindowChrome.WindowChrome>
     <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="0"
                         CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />

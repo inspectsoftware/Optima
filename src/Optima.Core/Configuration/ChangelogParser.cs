@@ -8,12 +8,7 @@ public sealed record ChangelogEntry
     public IReadOnlyList<string> Changes { get; init; } = [];
 }
 
-/// <summary>
-/// Parses the shipped CHANGELOG.md for the UPDATE LOG page. Deliberately minimal markdown:
-/// `## heading` starts an entry (a leading `date - ` prefix is split into date and title),
-/// `- ` lines are bullets (continuation lines indented under a bullet are joined), and
-/// everything before the first `##` (the `# Changelog` title and its prose) is ignored.
-/// </summary>
+/// <summary>Parses the shipped CHANGELOG.md for the UPDATE LOG page.</summary>
 public static class ChangelogParser
 {
     public static IReadOnlyList<ChangelogEntry> Parse(string markdown)
@@ -56,7 +51,7 @@ public static class ChangelogParser
 
             if (title is null)
             {
-                continue; // preamble before the first entry
+                continue;
             }
 
             var trimmed = line.TrimStart();
@@ -66,7 +61,6 @@ public static class ChangelogParser
             }
             else if (trimmed.Length > 0 && changes.Count > 0 && line.StartsWith(" ", StringComparison.Ordinal))
             {
-                // Indented continuation of the previous bullet.
                 changes[^1] += " " + trimmed;
             }
         }

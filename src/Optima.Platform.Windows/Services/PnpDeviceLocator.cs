@@ -15,7 +15,6 @@ public sealed class PnpDeviceLocator
 
     public sealed record PnpDevice(string InstanceId, string Name, bool Enabled);
 
-    /// <summary>Display-class devices whose name contains the given text (case-insensitive).</summary>
     public Task<IReadOnlyList<PnpDevice>> FindDisplayDevicesAsync(string nameContains, CancellationToken ct = default)
         => Task.Run<IReadOnlyList<PnpDevice>>(() =>
         {
@@ -33,7 +32,6 @@ public sealed class PnpDeviceLocator
                     {
                         continue;
                     }
-                    // ConfigManagerErrorCode 22 = device disabled.
                     var errorCode = Convert.ToInt32(entity["ConfigManagerErrorCode"] ?? 0);
                     devices.Add(new PnpDevice(id, name, Enabled: errorCode != 22));
                 }

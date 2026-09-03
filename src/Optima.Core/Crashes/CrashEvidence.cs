@@ -9,11 +9,7 @@ public sealed record CrashEvidence(
     public static readonly CrashEvidence Empty = new(false, false, []);
 }
 
-/// <summary>
-/// Pure extraction of crash-relevant lines from a logcat tail. The interesting lines are
-/// the game's own (package id), Android's process lifecycle (ActivityManager), and the
-/// classic failure markers. Kept free of IO so it is trivially testable.
-/// </summary>
+/// <summary>Pure extraction of crash-relevant lines from a logcat tail.</summary>
 public static class CrashSignals
 {
     private static readonly string[] FatalMarkers =
@@ -63,10 +59,5 @@ public static class CrashSignals
         return new CrashEvidence(fatal, forceStop, excerpt);
     }
 
-    /// <summary>
-    /// The capture decision: a bundle is written only when the logcat carries a real
-    /// failure marker. A quiet exit, even one where the emulator stayed up (which is how
-    /// a normal menu-quit also looks from Windows), is not a crash.
-    /// </summary>
     public static bool ShouldCapture(CrashEvidence evidence) => evidence.FatalSeen;
 }

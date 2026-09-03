@@ -4,12 +4,7 @@ using Optima.Core.Theming;
 
 namespace Optima.App.Services;
 
-/// <summary>
-/// App-wide motion switch. Combines the Windows animation setting (via
-/// <see cref="MotionPolicy"/>), the user's "follow Windows" preference and whether the
-/// window is foreground. Everything that moves asks <see cref="Enabled"/> and listens to
-/// <see cref="Changed"/>; when it is false, drift and light stop and transitions are instant.
-/// </summary>
+/// <summary>App-wide motion switch.</summary>
 public static class Motion
 {
     private static bool _followWindows = true;
@@ -22,10 +17,8 @@ public static class Motion
 
     public static event Action? Changed;
 
-    /// <summary>True when transitions, drift and the pointer light may run right now.</summary>
     public static bool Enabled => MotionPolicy.IsEnabled(SystemParameters.ClientAreaAnimation, _followWindows) && _foreground;
 
-    /// <summary>True when the user allows motion at all, regardless of foreground state.</summary>
     public static bool Allowed => MotionPolicy.IsEnabled(SystemParameters.ClientAreaAnimation, _followWindows);
 
     public static TimeSpan Duration(int milliseconds)

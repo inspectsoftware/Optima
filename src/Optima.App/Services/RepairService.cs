@@ -10,9 +10,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.App.Services;
 
 /// <summary>
-/// The repair actions behind the DIAGNOSTICS page: platform heartbeat, clean restart,
-/// re-detection, settings restore from the rolling backups, and the redacted support
-/// archive. Everything reports outcomes as plain sentences for the status line.
+/// The repair actions behind the DIAGNOSTICS page: platform heartbeat, clean restart, re-detection, settings restore
+/// from the rolling backups, and the redacted support archive.
 /// </summary>
 public sealed class RepairService
 {
@@ -36,7 +35,6 @@ public sealed class RepairService
         _logger = logger;
     }
 
-    /// <summary>One-line health verdict for Google Play Games on this machine.</summary>
     public async Task<string> HeartbeatAsync(CancellationToken ct = default)
     {
         var rules = await _settings.GetDetectionRulesAsync(ct);
@@ -50,17 +48,11 @@ public sealed class RepairService
             : $"{alive} platform process(es) running · {logText}";
     }
 
-    /// <summary>
-    /// Restarts the platform cleanly: game-facing processes first, then services, then the
-    /// Bootstrapper is launched fresh. Kills only the platform's own processes, by the same
-    /// name patterns detection uses.
-    /// </summary>
     public async Task<string> RestartPlatformAsync(CancellationToken ct = default)
     {
         var rules = await _settings.GetDetectionRulesAsync(ct);
         var killed = 0;
 
-        // Emulator first (the game dies with it), then the client/service processes.
         foreach (var pattern in rules.EmulatorProcessPatterns.Concat(rules.PlatformProcessPatterns))
         {
             var name = pattern.Trim('^', '$');
@@ -100,7 +92,6 @@ public sealed class RepairService
         }
     }
 
-    /// <summary>Clears the cached fast-start paths and re-runs detection from scratch.</summary>
     public async Task<string> RedetectAsync(CancellationToken ct = default)
     {
         await _settings.UpdateSettingsAsync(s => s with
@@ -128,7 +119,6 @@ public sealed class RepairService
         }
     }
 
-    /// <summary>Restores config/detection/profiles from the .bak generation JsonStore keeps.</summary>
     public string RestoreSettingsBackups()
     {
         var restored = 0;
@@ -153,11 +143,6 @@ public sealed class RepairService
             : $"restored {restored} file(s) from backup; restart Optima to load them";
     }
 
-    /// <summary>
-    /// Builds the redacted support archive: recent Optima logs, the diagnostics results,
-    /// the newest crash bundle, and the settings files, every text entry scrubbed of
-    /// secrets, user names and machine names first.
-    /// </summary>
     public string CreateSupportArchive(IReadOnlyList<DiagnosticResult> diagnostics)
     {
         try
@@ -183,9 +168,6 @@ public sealed class RepairService
                     $"windows {Environment.OSVersion.VersionString} 64bit={Environment.Is64BitOperatingSystem}\r\n" +
                     $"created {DateTimeOffset.Now:O}");
 
-                // The app's own logs are optima-YYYYMMDD.log; the admin arm writes
-                // optima-watchdog-*.log. Both matter for support, newest first by write
-                // time (a name sort would rank the helper's prefix above the app's dates).
                 var appLogs = Directory.EnumerateFiles(_paths.LogsDirectory, "optima-*.log")
                     .Where(f => System.Text.RegularExpressions.Regex.IsMatch(
                         Path.GetFileName(f), @"^optima-\d{8}\.log$"))

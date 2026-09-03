@@ -49,7 +49,6 @@ public sealed class WindowsPowerProfileService : IPowerProfileService
             _logger.LogInformation("Power plan restored to {Plan}", PowerNative.GetFriendlyName(previousScheme));
         }, ct);
 
-    /// <summary>High Performance can be hidden on modern-standby machines; fall back to any listed scheme with that name.</summary>
     private static Guid ResolveHighPerformance()
     {
         var schemes = PowerNative.EnumerateSchemes();
@@ -64,7 +63,6 @@ public sealed class WindowsPowerProfileService : IPowerProfileService
                 return scheme;
             }
         }
-        // Nothing matching, but the built-in GUID still activates the hidden scheme on most systems.
         return PowerNative.HighPerformanceScheme;
     }
 }

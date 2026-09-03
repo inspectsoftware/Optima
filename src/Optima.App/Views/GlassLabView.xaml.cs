@@ -9,12 +9,7 @@ using System.Windows.Threading;
 
 namespace Optima.App.Views;
 
-/// <summary>
-/// The glass renderer prototype (Phase 1 gate). A live content plane, an ambient field that
-/// drifts, and one draggable glass panel over it, with sliders for every shader input and
-/// a frame-rate readout. Drift and the pointer light stop when the window is not foreground
-/// and under the Windows "animation effects" switch.
-/// </summary>
+/// <summary>The glass renderer prototype (Phase 1 gate).</summary>
 public partial class GlassLabView : UserControl
 {
     private const int SeriesLength = 60;
@@ -51,7 +46,6 @@ public partial class GlassLabView : UserControl
 
     private sealed record Row(string Label, string Value);
 
-    /// <summary>The Windows "animation effects" switch, with a lab-only override for measuring.</summary>
     private bool MotionAllowed => SystemParameters.ClientAreaAnimation || ForceMotionBox?.IsChecked == true;
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -94,12 +88,9 @@ public partial class GlassLabView : UserControl
         }
     }
 
-    // ---- ambient drift ------------------------------------------------------------------
-
     private void StartDrift()
     {
         StopDrift();
-        // Checked fires during XAML load, before the rest of the view exists.
         if (!IsLoaded || !MotionAllowed || DriftBox?.IsChecked != true)
         {
             return;
@@ -114,8 +105,6 @@ public partial class GlassLabView : UserControl
 
     private void Drive(Shape blob, double from, double to, double seconds, DependencyProperty property)
     {
-        // Each body is a cached bitmap, so drifting it is a blit rather than a gradient fill,
-        // and 30 ticks per second is plenty for a ten-second drift.
         blob.CacheMode ??= new BitmapCache();
         var animation = new DoubleAnimation(from, to, TimeSpan.FromSeconds(seconds))
         {
@@ -151,15 +140,12 @@ public partial class GlassLabView : UserControl
 
     private void OnWindowDeactivated(object? sender, EventArgs e)
     {
-        // Not foreground: freeze everything that costs a frame.
         foreach (var clock in _drift)
         {
             clock.Controller?.Pause();
         }
         _tick.Stop();
     }
-
-    // ---- live chart ---------------------------------------------------------------------
 
     private void Advance(bool redraw = true)
     {
@@ -193,8 +179,6 @@ public partial class GlassLabView : UserControl
         Spark.Points = points;
     }
 
-    // ---- frame readout ------------------------------------------------------------------
-
     private void OnRendering(object? sender, EventArgs e)
     {
         _frames++;
@@ -208,8 +192,6 @@ public partial class GlassLabView : UserControl
             _frameStamp = now;
         }
     }
-
-    // ---- pointer light and drag ---------------------------------------------------------
 
     private void OnStageMouseMove(object sender, MouseEventArgs e)
     {

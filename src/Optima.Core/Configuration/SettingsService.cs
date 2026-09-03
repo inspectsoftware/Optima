@@ -38,7 +38,6 @@ public sealed class SettingsService
         return updated;
     }
 
-    /// <summary>Detection rules: user override file when present, otherwise built-in defaults (§29).</summary>
     public async Task<DetectionRules> GetDetectionRulesAsync(CancellationToken ct = default)
     {
         if (_rules is not null)

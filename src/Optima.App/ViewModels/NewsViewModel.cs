@@ -35,7 +35,6 @@ public sealed partial class NewsEntryViewModel : ObservableObject
         }
         catch
         {
-            // The browser refusing to open is not worth a crash.
         }
     }
 }

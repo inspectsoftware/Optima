@@ -1,6 +1,6 @@
 namespace Optima.Core.Configuration;
 
-/// <summary>Well-known storage locations (§21). Everything lives under %LOCALAPPDATA%\Optima.</summary>
+/// <summary>Well-known storage locations (§21).</summary>
 public sealed class AppPaths
 {
     public AppPaths() : this(Path.Combine(
@@ -8,7 +8,6 @@ public sealed class AppPaths
     {
     }
 
-    /// <summary>Test constructor. Points all paths at an arbitrary root.</summary>
     public AppPaths(string root)
     {
         Root = root;
@@ -34,10 +33,8 @@ public sealed class AppPaths
     public string PendingSnapshotFile { get; }
     public string BackupsDirectory { get; }
 
-    /// <summary>Original registry values captured before a Windows tweak is first applied.</summary>
     public string TweaksBackupFile { get; }
 
-    /// <summary>Crash report bundles captured by the Watchdog, one folder per incident.</summary>
     public string CrashesDirectory { get; }
 
     public void EnsureCreated()

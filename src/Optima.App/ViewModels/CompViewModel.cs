@@ -11,11 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
 
-/// <summary>
-/// COMP page: gear checks for competitive play. Network (ad-hoc ping + wifi link),
-/// input (raw-input mouse meter, key timing, display scale) and thermals (streamed
-/// through the elevated helper). Every readout carries its honest precision limit.
-/// </summary>
+/// <summary>COMP page: gear checks for competitive play.</summary>
 public sealed partial class CompViewModel : ObservableObject
 {
     private readonly SettingsService _settings;
@@ -38,13 +34,11 @@ public sealed partial class CompViewModel : ObservableObject
         _hardware.SampleReceived += OnHardwareSample;
     }
 
-    // ---- Network ----
     [ObservableProperty] private string _pingTarget = "1.1.1.1";
     [ObservableProperty] private string _pingResult = string.Empty;
     [ObservableProperty] private bool _pingBusy;
     [ObservableProperty] private string _wifiResult = "not checked yet";
 
-    // ---- Input ----
     [ObservableProperty] private bool _mouseMeterActive;
     [ObservableProperty] private string _mouseCounts = "0";
     [ObservableProperty] private string _mousePollingRate = "move the mouse...";
@@ -54,7 +48,6 @@ public sealed partial class CompViewModel : ObservableObject
     [ObservableProperty] private string _keyIntervalResult = "press keys in the box...";
     [ObservableProperty] private string _displayScaleText = "---";
 
-    // ---- Thermals ----
     [ObservableProperty] private bool _thermalsActive;
     [ObservableProperty] private string _cpuThermalText = "---";
     [ObservableProperty] private string _gpuThermalText = "---";
@@ -176,8 +169,6 @@ public sealed partial class CompViewModel : ObservableObject
         }
     }
 
-    // ---- Input ----
-
     [RelayCommand]
     private void ToggleMouseMeter()
     {
@@ -198,7 +189,6 @@ public sealed partial class CompViewModel : ObservableObject
         }
     }
 
-    /// <summary>Called by the view's dispatcher timer while the meter runs.</summary>
     public void RefreshMouseReadout()
     {
         if (!MouseMeterActive)
@@ -257,8 +247,6 @@ public sealed partial class CompViewModel : ObservableObject
         }
         _lastKeyDownMs = now;
     }
-
-    // ---- Thermals ----
 
     [RelayCommand]
     private async Task ToggleThermalsAsync()

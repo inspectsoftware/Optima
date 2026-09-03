@@ -27,17 +27,14 @@ public static class AppServices
 {
     public static void Register(IServiceCollection services, AppPaths paths)
     {
-        // ---- Configuration ----
         services.AddSingleton(paths);
         services.AddSingleton<JsonStore>();
         services.AddSingleton<SettingsService>();
         services.AddSingleton<ProfileService>();
 
-        // Rule provider delegate shared by detection, process monitoring and launching (§29).
         services.AddSingleton<Func<CancellationToken, Task<DetectionRules>>>(sp =>
             ct => sp.GetRequiredService<SettingsService>().GetDetectionRulesAsync(ct));
 
-        // ---- Platform probes + services ----
         services.AddSingleton<IRegistryProbe, WindowsRegistryProbe>();
         services.AddSingleton<IFileSystemProbe, WindowsFileSystemProbe>();
         services.AddSingleton<IProcessProbe, WindowsProcessProbe>();
@@ -62,17 +59,14 @@ public static class AppServices
         services.AddSingleton<PnpDeviceLocator>();
         services.AddSingleton<IElevationBroker, ElevationBrokerClient>();
 
-        // ---- Virtual display providers (§6) ----
         services.AddSingleton<MttVddProvider>();
         services.AddSingleton<MockVirtualDisplayProvider>();
         services.AddSingleton<SelectingVirtualDisplayProvider>();
         services.AddSingleton<IVirtualDisplayProvider>(sp => sp.GetRequiredService<SelectingVirtualDisplayProvider>());
         services.AddSingleton<IDriverInstaller, VddDriverInstaller>();
 
-        // ---- Recovery / safety (§18/§19) ----
         services.AddSingleton<IRecoveryService, RecoveryService>();
 
-        // ---- Launch strategies (§5) ----
         services.AddSingleton<IGameLauncher, ProtocolUriLauncher>();
         services.AddSingleton<IGameLauncher, BootstrapperExeLauncher>();
         services.AddSingleton<IGameLauncher, ShortcutLauncher>();
@@ -95,12 +89,10 @@ public static class AppServices
             (ign, ct) => sp.GetRequiredService<Optima.Core.Stats.CopsApiClient>().GetProfileByNameAsync(ign, ct),
             sp.GetRequiredService<ILogger<Optima.Core.Stats.SessionStatsEnricher>>()));
 
-        // ---- Monitoring (§12-14) ----
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();
         services.AddSingleton<EtwMetricsProviderClient>();
         services.AddSingleton<HardwareStreamClient>();
         services.AddSingleton(_ => new MockMetricsProvider());
-        // Developer setting: swap the ETW provider for the deterministic mock (restart applies it).
         services.AddSingleton<IPerformanceMetricsProvider>(sp =>
             sp.GetRequiredService<SettingsService>().GetSettingsAsync().GetAwaiter().GetResult().UseMockMetricsProvider
                 ? sp.GetRequiredService<MockMetricsProvider>()
@@ -110,7 +102,6 @@ public static class AppServices
         services.AddSingleton<IRemoteEndpointSource, WindowsEndpointDiscovery>();
         services.AddSingleton<INetworkQualityMonitor, NetworkQualityMonitor>();
 
-        // ---- Diagnostics (§15/§16) ----
         services.AddSingleton<IDiagnosticCheck, VirtualizationCheck>();
         services.AddSingleton<IDiagnosticCheck, WindowsHypervisorCheck>();
         services.AddSingleton<IDiagnosticCheck, GooglePlayGamesCheck>();
@@ -121,7 +112,6 @@ public static class AppServices
         services.AddSingleton<IDiagnosticCheck, DiskSpaceCheck>();
         services.AddSingleton<IDiagnosticCheck, AdminPermissionsCheck>();
 
-        // ---- View models ----
         services.AddSingleton<StatusViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<HomeViewModel>();

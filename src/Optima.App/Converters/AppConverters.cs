@@ -6,10 +6,7 @@ using Optima.Core.Models;
 
 namespace Optima.App.Converters;
 
-/// <summary>
-/// StatusKind → tint. Hue appears only inside status tags, so this is one of the few
-/// places in the app that returns anything other than a gray.
-/// </summary>
+/// <summary>StatusKind → tint.</summary>
 public sealed class StatusKindToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -72,10 +69,7 @@ public sealed class DiagnosticStatusToTextConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>
-/// Bracket tag for a diagnostic row. Every result is padded to exactly six characters
-/// so the tag column stays aligned down the whole checklist.
-/// </summary>
+/// <summary>Bracket tag for a diagnostic row.</summary>
 public sealed class DiagnosticStatusToTagConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -92,7 +86,7 @@ public sealed class DiagnosticStatusToTagConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>True for Warning/Fail. Drives the indented fix line, which never shows under a pass.</summary>
+/// <summary>True for Warning/Fail.</summary>
 public sealed class DiagnosticStatusIsProblemConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -142,10 +136,7 @@ public sealed class InverseBoolToVisibilityConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>
-/// Hides the DEVELOPER sidebar row unless developer mode is on; every other row is
-/// always visible. Takes (navKey, developerModeVisible).
-/// </summary>
+/// <summary>Hides the DEVELOPER sidebar row unless developer mode is on; every other row is always visible.</summary>
 public sealed class NavItemVisibilityConverter : IMultiValueConverter
 {
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)

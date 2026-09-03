@@ -7,33 +7,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.App.Services;
 
-/// <summary>
-/// Discord Rich Presence, fed by the Watchdog's presence service. Local IPC to the user's
-/// running Discord client only: no bot, no server, no account access. Active while the game
-/// is starting or running, and (behind its own toggle) while the launcher window is open;
-/// the tray/background Watchdog never broadcasts, so a hidden window counts as closed.
-/// Everything degrades silently when Discord is not running.
-/// Live ranked-vs-casual detail is intentionally absent this phase (no passive signal
-/// exists during a match); the session's mode lands in history via the stats delta.
-/// </summary>
+/// <summary>Discord Rich Presence, fed by the Watchdog's presence service.</summary>
 public sealed class DiscordPresenceService : IDisposable
 {
     private readonly GamePresenceService _presence;
     private readonly SettingsService _settings;
     private readonly ILogger<DiscordPresenceService> _logger;
 
-    // Presence updates arrive from the Watchdog's background thread and from UI-thread
-    // window visibility changes; the gate keeps decision and RPC call together.
     private readonly object _gate = new();
 
-    // Served straight from the public repo: Discord's media proxy fetches URLs given as
-    // image keys, so no art asset upload in the Discord application is needed. Stable on
-    // master; keep in step with src/Optima.App/Assets/optima-presence.png.
     private const string LargeImageUrl =
         "https://raw.githubusercontent.com/inspectsoftware/Optima/master/src/Optima.App/Assets/optima-presence.png";
 
-    // Discord renders these to OTHER viewers of the card; the local user's own client
-    // does not show its own buttons as clickable, so absence on your own card is normal.
     private static readonly Button[] PresenceButtons =
     [
         new Button { Label = "Join Discord", Url = "https://discord.gg/tktZe8fkmj" },
@@ -70,10 +55,6 @@ public sealed class DiscordPresenceService : IDisposable
         }
     }
 
-    /// <summary>
-    /// Watch the launcher window: menu presence shows only while the window is on screen
-    /// (minimized still counts; hidden to the tray does not).
-    /// </summary>
     public void AttachLauncherWindow(Window window)
     {
         lock (_gate)
@@ -113,7 +94,6 @@ public sealed class DiscordPresenceService : IDisposable
         }
         else
         {
-            // Re-assert current state under the new settings.
             UpdatePresence();
         }
     }
@@ -143,7 +123,7 @@ public sealed class DiscordPresenceService : IDisposable
                             Assets = new Assets
                             {
                                 LargeImageKey = LargeImageUrl,
-                                LargeImageText = "Optima by Aureum",
+                                LargeImageText = "Optima",
                             },
                             Buttons = PresenceButtons,
                         });
@@ -155,7 +135,7 @@ public sealed class DiscordPresenceService : IDisposable
                             Assets = new Assets
                             {
                                 LargeImageKey = LargeImageUrl,
-                                LargeImageText = "Optima by Aureum",
+                                LargeImageText = "Optima",
                             },
                             Buttons = PresenceButtons,
                         });
@@ -171,7 +151,7 @@ public sealed class DiscordPresenceService : IDisposable
                                 Assets = new Assets
                                 {
                                     LargeImageKey = LargeImageUrl,
-                                    LargeImageText = "Optima by Aureum",
+                                    LargeImageText = "Optima",
                                 },
                                 Buttons = PresenceButtons,
                             });

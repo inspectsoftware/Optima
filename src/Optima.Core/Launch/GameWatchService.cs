@@ -7,14 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Core.Launch;
 
 /// <summary>
-/// Watch mode (§5): notices the game starting outside Optima and runs the orchestrator's
-/// attach path around it (full profile, monitoring, restore on exit). Since the Watchdog
-/// rework it owns no poll loop of its own: it consumes the presence service's ticks, so
-/// there is exactly one process scan in the app and an attach can never block presence.
-/// The decision logic lives in <see cref="GameWatchPolicy"/>; the orchestrator's session
-/// gate guarantees a watch session and a PLAY session can never double-apply. Frametime
-/// capture joins only when the elevated helper is already connected, so watch mode never
-/// causes a surprise UAC prompt.
+/// Watch mode (§5): notices the game starting outside Optima and runs the orchestrator's attach path around it (full
+/// profile, monitoring, restore on exit).
 /// </summary>
 public sealed class GameWatchService : IAsyncDisposable
 {
@@ -50,10 +44,8 @@ public sealed class GameWatchService : IAsyncDisposable
         _settings.SettingsChanged += (_, s) => _watchEnabled = s.EnableWatchMode;
     }
 
-    /// <summary>Raised when a watch session begins applying the profile.</summary>
     public event Action? WatchSessionStarted;
 
-    /// <summary>Raised when a watch session finished (restored) or failed.</summary>
     public event Action<LaunchResult>? WatchSessionEnded;
 
     public async Task StartAsync(CancellationToken ct = default)
