@@ -1,7 +1,7 @@
 # Optima
 
 A Windows launcher and performance companion for **Critical Ops** on **Google Play Games for PC**.
-Made by Inspect Software; see [LICENSE](LICENSE).
+By Inspect Software; see [LICENSE](LICENSE).
 
 Optima runs beside the game, never inside it: no injection, no memory access, no binary or
 network tampering. It sets up the environment with documented Windows APIs and restores every
