@@ -1,0 +1,265 @@
+<Window x:Class="Optima.App.Views.PlayGuideWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="clr-namespace:Optima.App.Controls"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Critical Ops on PC — setup guide"
+        Width="880" Height="700" WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Brush.Background}" ResizeMode="NoResize"
+        UseLayoutRounding="True">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="40" ResizeBorderThickness="0"
+                        CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Border Background="{DynamicResource Brush.Background}"
+          TextElement.Foreground="{DynamicResource Brush.Text}"
+          TextElement.FontFamily="{StaticResource Font.Body}"
+          TextElement.FontSize="{StaticResource Type.Body}">
+    <Grid>
+      <ctl:AmbientField x:Name="Ambient" />
+
+      <Grid Margin="12" ctl:GlassPanel.Backdrop="{Binding ElementName=Ambient}">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="28" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ctl:TitleBar Grid.Row="0" ShowMinimize="False" ShowMaximize="False"
+                      Breadcrumb="SETUP GUIDE" />
+
+        <Grid Grid.Row="1" Margin="12,10,12,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="Play Critical Ops on PC" Style="{StaticResource Text.PageTitle}" />
+            <TextBlock Text="{Binding ScanStatus}" Style="{StaticResource Text.PageSubtitle}" />
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+              <ProgressBar Width="240" Height="8" VerticalAlignment="Center"
+                           Minimum="0" Maximum="100"
+                           Value="{Binding GuideProgress, Mode=OneWay}" />
+              <TextBlock Text="{Binding GuideProgressText}" Style="{StaticResource Text.Micro}"
+                         VerticalAlignment="Center" Margin="10,0,0,0"
+                         Foreground="{DynamicResource Brush.TextMuted}" />
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0"
+                      Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}">
+            <ctl:AsciiSpinner Cells="14" Margin="0,0,10,0" />
+            <TextBlock Text="scanning" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0"
+                      Visibility="{Binding IsFixing, Converter={StaticResource BoolToVis}}">
+            <ctl:AsciiSpinner Cells="10" Margin="0,0,8,0" />
+            <TextBlock Text="enabling Windows features" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+            <ProgressBar Width="140" Height="8" Margin="10,0,0,0" VerticalAlignment="Center"
+                         Minimum="0" Maximum="100"
+                         Value="{Binding FixProgress, Mode=OneWay}" />
+          </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="12,10,12,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition />
+          </Grid.ColumnDefinitions>
+
+          <!-- Step rail: the five official steps with live state badges. -->
+          <ItemsControl ItemsSource="{Binding Steps}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Margin="0,2" Padding="10,8" CornerRadius="3" BorderThickness="1"
+                        BorderBrush="{DynamicResource Brush.Hairline}" Background="Transparent"
+                        x:Name="StepCard" Cursor="Hand" MouseLeftButtonUp="OnStepCardClick">
+                  <Border.Style>
+                    <Style TargetType="Border">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                          <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                          <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Border.Style>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Number}" FontFamily="{StaticResource Font.Mono}"
+                               FontSize="{StaticResource Type.Label}" VerticalAlignment="Top"
+                               Foreground="{DynamicResource Brush.TextMuted}" Margin="0,1,10,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
+                          <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding State}" Value="Pass">
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding State}" Value="Fail">
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Fail}" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                    <ctl:Icon Grid.Column="2" Size="14" StrokeThickness="2" Margin="8,1,0,0">
+                      <ctl:Icon.Style>
+                        <Style TargetType="ctl:Icon" BasedOn="{StaticResource {x:Type ctl:Icon}}">
+                          <Setter Property="Symbol" Value="{StaticResource Icon.Circle}" />
+                          <Setter Property="Foreground" Value="{DynamicResource Brush.HairlineStrong}" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding State}" Value="Pass">
+                              <Setter Property="Symbol" Value="{StaticResource Icon.Check}" />
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding State}" Value="Warn">
+                              <Setter Property="Symbol" Value="{StaticResource Icon.Dot}" />
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Warn}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding State}" Value="Fail">
+                              <Setter Property="Symbol" Value="{StaticResource Icon.Close}" />
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Fail}" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </ctl:Icon.Style>
+                    </ctl:Icon>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- Step body: headline, explanation, per-step result, action. -->
+          <ContentControl Grid.Column="2" Content="{Binding CurrentStep}">
+            <ContentControl.ContentTemplate>
+              <DataTemplate>
+                <StackPanel>
+                  <TextBlock Text="{Binding ProgressText}" Style="{StaticResource Text.Micro}"
+                             Foreground="{DynamicResource Brush.Accent}" Margin="0,2,0,2" />
+                  <TextBlock Text="{Binding Title}" Style="{StaticResource Text.PageTitle}" Margin="0,0,0,2" />
+                  <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Text.PageSubtitle}" Margin="0,0,0,10" />
+                  <TextBlock Text="{Binding Body}" Style="{StaticResource Text.Prose}"
+                             MaxWidth="470" HorizontalAlignment="Left" TextWrapping="Wrap" />
+
+                  <Border Style="{StaticResource Callout}" Margin="0,14,0,0" Padding="12,10"
+                          BorderBrush="{Binding State, Converter={StaticResource GuideStateBrush}}">
+                    <StackPanel>
+                      <StackPanel Orientation="Horizontal">
+                        <Border Style="{StaticResource Badge}" MinWidth="52" Margin="0,0,10,0"
+                                BorderBrush="{Binding State, Converter={StaticResource GuideStateBrush}}">
+                          <TextBlock Text="{Binding StateText}" Style="{StaticResource Text.Badge}" HorizontalAlignment="Center"
+                                     Foreground="{Binding State, Converter={StaticResource GuideStateBrush}}" />
+                        </Border>
+                        <TextBlock Text="{Binding Checks[0].Detail}" Style="{StaticResource Text.Label}"
+                                   VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="380" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+
+                  <StackPanel Orientation="Horizontal" Margin="0,14,0,0"
+                              Visibility="{Binding HasAction, Converter={StaticResource BoolToVis}}">
+                    <Button Padding="16,8"
+                            Command="{Binding DataContext.RunStepActionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Content="{Binding DataContext.CurrentStep.ActionLabel, RelativeSource={RelativeSource AncestorType=Window}}">
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                          <Setter Property="IsEnabled" Value="True" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding DataContext.IsScanning, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                              <Setter Property="IsEnabled" Value="False" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding DataContext.IsFixing, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                              <Setter Property="Content" Value="working…" />
+                              <Setter Property="IsEnabled" Value="False" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                    <Button Style="{StaticResource SecondaryButton}" Padding="16,8" Margin="10,0,0,0"
+                            Content="Restart now"
+                            Command="{Binding DataContext.RestartNowCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Visibility="{Binding DataContext.RestartNeeded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
+                  </StackPanel>
+                  <TextBlock Text="{Binding DataContext.ActionStatus, RelativeSource={RelativeSource AncestorType=Window}}"
+                             Style="{StaticResource Text.Micro}" Margin="0,8,0,0" TextWrapping="Wrap" MaxWidth="470" />
+                  <StackPanel Margin="0,6,0,0" Visibility="{Binding DataContext.IsFixing, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
+                    <ProgressBar Height="10"
+                                 Minimum="0" Maximum="100"
+                                 Value="{Binding DataContext.FixProgress, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0"
+                               Foreground="{DynamicResource Brush.TextMuted}"
+                               Text="DISM reports its own percentage; the bar moves in two halves, one per Windows feature." />
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </Grid>
+
+        <ctl:GlassPanel Grid.Row="3" Chamfer="{StaticResource Chamfer.Strip}" Padding="18,12" Margin="12,0,12,12"
+                        Tint="{DynamicResource Color.Glass.Tint}"
+                        TopLine="{DynamicResource Brush.Strip.Top}"
+                        BottomLine="{DynamicResource Brush.Strip.Bottom}"
+                        LeadingEdge="{DynamicResource Brush.Strip.Edge}">
+          <ctl:GlassPanel.Child>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Button Style="{StaticResource GhostButton}" Content="Rescan PC"
+                      Command="{Binding ScanCommand}"
+                      IsEnabled="{Binding IsScanning, Converter={StaticResource InverseBool}}"
+                      ToolTip="Re-run the readiness scan (virtualization, hypervisor, platform, game)" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,12,0">
+                <TextBlock Text="{Binding OverallStateText}" Style="{StaticResource Text.Micro}"
+                           VerticalAlignment="Center"
+                           Visibility="{Binding IsFixing, Converter={StaticResource InverseBoolToVis}}" />
+                <ctl:AsciiSpinner Cells="10" Margin="0,0,8,0" VerticalAlignment="Center"
+                                  Visibility="{Binding IsFixing, Converter={StaticResource BoolToVis}}" />
+                <ProgressBar Width="220" Height="8" VerticalAlignment="Center"
+                             Minimum="0" Maximum="100"
+                             Value="{Binding FixProgress, Mode=OneWay}"
+                             Visibility="{Binding IsFixing, Converter={StaticResource BoolToVis}}" />
+              </StackPanel>
+              <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Back" MinWidth="110"
+                      Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack, Mode=OneWay}" Margin="0,0,10,0" />
+              <Button Grid.Column="3" MinWidth="110" Content="Finish"
+                      Command="{Binding FinishCommand}">
+                <Button.Style>
+                  <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                    <Setter Property="Content" Value="Next" />
+                    <Setter Property="Command" Value="{Binding GoForwardCommand}" />
+                    <Setter Property="IsEnabled" Value="{Binding CanGoForward, Mode=OneWay}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsLastStep}" Value="True">
+                        <Setter Property="Content" Value="Finish" />
+                        <Setter Property="Command" Value="{Binding FinishCommand}" />
+                        <Setter Property="IsEnabled" Value="True" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Button.Style>
+              </Button>
+            </Grid>
+          </ctl:GlassPanel.Child>
+        </ctl:GlassPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

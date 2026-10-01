@@ -8,6 +8,27 @@
       <TextBlock Text="History and trends of every recorded session · FPS over time · benchmark comparison"
                  Style="{StaticResource Text.PageSubtitle}" />
 
+      <HeaderedContentControl Style="{StaticResource Section}" Header="THIS WEEK">
+        <HeaderedContentControl.Tag>
+          <StackPanel Orientation="Horizontal">
+            <Button Style="{StaticResource GhostButton}" Content="export csv" Padding="6,0" Command="{Binding ExportCsvCommand}" />
+            <Button Style="{StaticResource GhostButton}" Content="export pdf" Padding="6,0" Margin="6,0,0,0" Command="{Binding ExportPdfCommand}" />
+          </StackPanel>
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <TextBlock Text="{Binding WeeklyHeadline}" Style="{StaticResource Text.Value}"
+                     Visibility="{Binding HasWeekly, Converter={StaticResource BoolToVis}}" />
+          <TextBlock Text="{Binding WeeklyDetails}" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.TextMuted}" Margin="0,4,0,0"
+                     Visibility="{Binding HasWeekly, Converter={StaticResource BoolToVis}}" />
+          <TextBlock Text="No sessions in the last seven days. Play a session and this card fills in." Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.TextMuted}"
+                     Visibility="{Binding HasWeekly, Converter={StaticResource InverseBoolToVis}}" />
+          <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.Ok}"
+                     Margin="0,6,0,0" Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToCollapsed}}" />
+        </StackPanel>
+      </HeaderedContentControl>
+
       <HeaderedContentControl Style="{StaticResource Section}" Header="TRENDS">
         <StackPanel>
           <ctl:Sparkline Values="{Binding TrendValues}" Stroke="{DynamicResource Brush.Accent}" Height="64"

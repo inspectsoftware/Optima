@@ -21,6 +21,7 @@ public enum IpcCommand
     StartHardwareStream,
     StopHardwareStream,
     EnableWindowsFeature,
+    SetDevEmulatorRefreshRate,
     Shutdown,
 }
 

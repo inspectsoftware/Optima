@@ -51,9 +51,28 @@ public partial class LogsView : UserControl
 
     private void ScrollToEnd()
     {
-        if (LogList.Items.Count > 0)
+        if (LogList.Items.Count == 0)
         {
-            LogList.ScrollIntoView(LogList.Items[^1]);
+            return;
         }
+        // Defer out of the collection-changed notification: calling ScrollIntoView while the
+        // virtualizing panel is still processing the add/remove batch races its internal index
+        // bookkeeping and has thrown ArgumentOutOfRangeException from BringContainerIntoView.
+        // Loaded priority also coalesces the flood of entries that arrives when a page opens.
+        LogList.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+        {
+            try
+            {
+                if (LogList.Items.Count > 0)
+                {
+                    LogList.ScrollIntoView(LogList.Items[^1]);
+                }
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                // The collection changed again between scheduling and running; the next
+                // arriving entry schedules another scroll, so nothing is lost.
+            }
+        });
     }
 }

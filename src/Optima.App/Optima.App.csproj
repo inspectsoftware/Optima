@@ -7,9 +7,16 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\optima.ico</ApplicationIcon>
+    <!-- "Dev edition" (publish.ps1 -DevEdition): shows the DEVELOPER EMULATOR settings
+         section. The normal install stays clean. -->
+    <DefineConstants Condition="'$(DevEdition)' == 'true'">$(DefineConstants);DEVEDITION</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets\optima.ico" />
+    <!-- The splash and the Discord card share this mark. -->
+    <Resource Include="Assets\optima-presence.png" />
+    <!-- Official Critical Ops ranked icons (Critical Force media kit, V0.9.0). -->
+    <Resource Include="Assets\Ranks\*.png" />
     <!-- Compiled pixel shader for the glass layer (source: Effects\Glass.hlsl, built with fxc). -->
     <Resource Include="Effects\Glass.ps" />
   </ItemGroup>

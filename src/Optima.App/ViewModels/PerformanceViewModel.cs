@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
@@ -32,25 +33,78 @@ public sealed partial class TweakRowViewModel : ObservableObject
 
 public sealed record TweakGroupViewModel(string Category, IReadOnlyList<TweakRowViewModel> Tweaks);
 
-/// <summary>PERFORMANCE page (§8/§22): the Windows tweak catalog with per-tweak toggles and profile editing with full per-setting disclosure.</summary>
+/// <summary>
+/// PERFORMANCE page (§8/§22): the live system visualizer, hardware inventory and virtualization
+/// facts (merged from the old SYSTEM page), the Windows tweak catalog, and profile editing.
+/// </summary>
 public sealed partial class PerformanceViewModel : ObservableObject
 {
+    private const int HistoryLength = 120;
+    private static readonly TimeSpan NetworkStaleness = TimeSpan.FromSeconds(5);
+    private const string NetworkIdleText = "not measuring · starts with a game session";
+
     private readonly ProfileService _profiles;
     private readonly ITweakService _tweaks;
     private readonly PlayViewModel _play;
+    private readonly ISystemInfoService _systemInfo;
+    private readonly SettingsService _settings;
+    private readonly IPerformanceMonitor _monitor;
     private readonly ILogger<PerformanceViewModel> _logger;
+
+    private DateTimeOffset _lastNetworkSample = DateTimeOffset.MinValue;
 
     public PerformanceViewModel(
         ProfileService profiles,
         ITweakService tweaks,
         PlayViewModel play,
+        ISystemInfoService systemInfo,
+        SettingsService settings,
+        IPerformanceMonitor monitor,
+        INetworkQualityMonitor network,
         ILogger<PerformanceViewModel> logger)
     {
         _profiles = profiles;
         _tweaks = tweaks;
         _play = play;
+        _systemInfo = systemInfo;
+        _settings = settings;
+        _monitor = monitor;
         _logger = logger;
+
+        network.SampleArrived += OnNetworkSample;
+        _monitor.MetricsUpdated += OnMetrics;
+
+        var staleness = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        staleness.Tick += (_, _) =>
+        {
+            if (DateTimeOffset.Now - _lastNetworkSample > NetworkStaleness)
+            {
+                NetworkStatus = NetworkIdleText;
+            }
+        };
+        staleness.Start();
     }
+
+    // ── Live system load (1 s ticks from the hardware monitor) ──
+    public ObservableCollection<double> CpuHistory { get; } = [];
+    public ObservableCollection<double> GpuHistory { get; } = [];
+    public ObservableCollection<double> RamHistory { get; } = [];
+
+    [ObservableProperty] private double _cpuPercent;
+    [ObservableProperty] private string _cpuText = "---";
+    [ObservableProperty] private double _gpuPercent;
+    [ObservableProperty] private string _gpuText = "---";
+    [ObservableProperty] private double _ramPercent;
+    [ObservableProperty] private string _ramText = "---";
+    [ObservableProperty] private string _gameLoadText = string.Empty;
+    [ObservableProperty] private string _gpuTempText = string.Empty;
+
+    // ── Hardware inventory and virtualization (from the old SYSTEM page) ──
+    public ObservableCollection<InfoRow> HardwareRows { get; } = [];
+    public ObservableCollection<InfoRow> VirtualizationRows { get; } = [];
+    public ObservableCollection<MonitorRow> Displays { get; } = [];
+
+    [ObservableProperty] private string _networkStatus = NetworkIdleText;
 
     public ObservableCollection<LaunchProfile> Profiles { get; } = [];
     public ObservableCollection<TweakGroupViewModel> TweakGroups { get; } = [];
@@ -58,6 +112,9 @@ public sealed partial class PerformanceViewModel : ObservableObject
 
     [ObservableProperty] private string _tweaksStatus = string.Empty;
     [ObservableProperty] private bool _tweaksBusy;
+    [ObservableProperty] private bool _sessionHdrOff;
+    [ObservableProperty] private bool _sessionGameBarOff;
+    [ObservableProperty] private bool _sessionFseOff;
 
     public IReadOnlyList<PowerPlanKind> PowerPlanOptions { get; } = Enum.GetValues<PowerPlanKind>();
     public IReadOnlyList<ProcessPriorityLevel> PriorityOptions { get; } = Enum.GetValues<ProcessPriorityLevel>();
@@ -76,8 +133,28 @@ public sealed partial class PerformanceViewModel : ObservableObject
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
+        await RefreshSystemAsync(ct);
         await ReloadProfilesAsync(ct);
         await ReloadTweaksAsync(ct);
+
+        var settings = await _settings.GetSettingsAsync(ct);
+        SessionHdrOff = settings.SessionTweakHdrOff;
+        SessionGameBarOff = settings.SessionTweakGameBarOff;
+        SessionFseOff = settings.SessionTweakFseOff;
+    }
+
+    partial void OnSessionHdrOffChanged(bool value) => _ = PersistSessionTweakAsync();
+    partial void OnSessionGameBarOffChanged(bool value) => _ = PersistSessionTweakAsync();
+    partial void OnSessionFseOffChanged(bool value) => _ = PersistSessionTweakAsync();
+
+    private async Task PersistSessionTweakAsync()
+    {
+        await _settings.UpdateSettingsAsync(s => s with
+        {
+            SessionTweakHdrOff = SessionHdrOff,
+            SessionTweakGameBarOff = SessionGameBarOff,
+            SessionTweakFseOff = SessionFseOff,
+        });
     }
 
     [RelayCommand]
@@ -294,4 +371,104 @@ public sealed partial class PerformanceViewModel : ObservableObject
             _logger.LogWarning(ex, "Profile import failed");
         }
     }
+
+    [RelayCommand]
+    private async Task RefreshSystemAsync(CancellationToken ct = default)
+    {
+        var inventory = await _systemInfo.GetInventoryAsync(ct);
+
+        HardwareRows.Clear();
+        HardwareRows.Add(new InfoRow("CPU", $"{inventory.CpuName} ({inventory.CpuCores}C/{inventory.CpuThreads}T)"));
+        foreach (var gpu in inventory.Gpus)
+        {
+            var vram = gpu.VramBytes > 0 ? $", {gpu.VramBytes / (1024.0 * 1024 * 1024):F0} GB VRAM" : string.Empty;
+            HardwareRows.Add(new InfoRow($"GPU ({gpu.Vendor})", $"{gpu.Name}, driver {gpu.DriverVersion}{vram}"));
+        }
+        HardwareRows.Add(new InfoRow("RAM", $"{inventory.TotalRamBytes / (1024.0 * 1024 * 1024):F0} GB"));
+        HardwareRows.Add(new InfoRow("Windows", inventory.WindowsVersion));
+
+        var virtualization = inventory.Virtualization;
+        VirtualizationRows.Clear();
+        VirtualizationRows.Add(new InfoRow("Firmware virtualization", Tri(virtualization.FirmwareVirtualizationEnabled)));
+        VirtualizationRows.Add(new InfoRow("Hypervisor running", Tri(virtualization.HypervisorPresent)));
+        VirtualizationRows.Add(new InfoRow("Hyper-V feature", Tri(virtualization.HyperVFeatureEnabled)));
+        VirtualizationRows.Add(new InfoRow("Virtual Machine Platform", Tri(virtualization.VirtualMachinePlatformEnabled)));
+        VirtualizationRows.Add(new InfoRow("Windows Hypervisor Platform", Tri(virtualization.WindowsHypervisorPlatformEnabled)));
+
+        var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
+        Displays.Clear();
+        foreach (var display in inventory.Displays)
+        {
+            Displays.Add(new MonitorRow(
+                display.DeviceName,
+                DisplayPresentation.CustomName(display, overrides) ?? display.FriendlyName,
+                display.CurrentMode.ToString()));
+        }
+    }
+
+    private void OnNetworkSample(object? sender, NetworkQualitySample sample)
+    {
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            _lastNetworkSample = DateTimeOffset.Now;
+            var suffix = sample.IsReferenceHost ? " [ REF HOST ] link quality" : $" · {sample.Target}";
+            NetworkStatus = $"{sample.PingMs:F0} ms · {sample.JitterMs:F1} ms jitter · {sample.PacketLossPct:F1}% loss{suffix}";
+        });
+    }
+
+    private void OnMetrics(object? sender, HardwareMetrics metrics)
+    {
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            CpuPercent = metrics.CpuUtilizationPercent;
+            GpuPercent = metrics.GpuUtilizationPercent;
+            RamPercent = metrics.RamTotalBytes > 0
+                ? 100.0 * metrics.RamUsedBytes / metrics.RamTotalBytes
+                : 0;
+
+            CpuText = $"{CpuPercent:F0}%";
+            GpuText = $"{GpuPercent:F0}%";
+            RamText = $"{metrics.RamUsedBytes / (1024.0 * 1024 * 1024):F1} / {metrics.RamTotalBytes / (1024.0 * 1024 * 1024):F0} GB";
+            GpuTempText = metrics.GpuTemperatureCelsius is { } temp ? $"{temp:F0}°C" : string.Empty;
+
+            Append(CpuHistory, CpuPercent);
+            Append(GpuHistory, GpuPercent);
+            Append(RamHistory, RamPercent);
+
+            var parts = new List<string>();
+            if (metrics.GameCpuPercent > 0)
+            {
+                parts.Add($"game cpu {metrics.GameCpuPercent:F0}%");
+            }
+            if (metrics.GameRamBytes > 0)
+            {
+                parts.Add($"game ram {metrics.GameRamBytes / (1024.0 * 1024 * 1024):F1} GB");
+            }
+            if (metrics.CurrentFps is { } fps)
+            {
+                parts.Add($"{fps:F0} fps");
+            }
+            GameLoadText = string.Join(" · ", parts);
+        });
+    }
+
+    private static void Append(ObservableCollection<double> series, double value)
+    {
+        series.Add(value);
+        while (series.Count > HistoryLength)
+        {
+            series.RemoveAt(0);
+        }
+    }
+
+    private static string Tri(bool? value) => value switch
+    {
+        true => "Enabled",
+        false => "Disabled",
+        null => "Unknown",
+    };
 }
+
+public sealed record InfoRow(string Label, string Value);
+
+public sealed record MonitorRow(string DeviceName, string Name, string Mode);

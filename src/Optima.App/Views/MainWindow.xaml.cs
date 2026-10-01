@@ -95,6 +95,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnAccountSwitchRequested(object? sender, object e)
+    {
+        if (DataContext is MainViewModel main && e is Optima.Core.Models.PlayerAccount account)
+        {
+            _ = main.SwitchAccountCommand.ExecuteAsync(account);
+        }
+    }
+
+    private void OnAccountSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (DataContext is MainViewModel main
+            && e.AddedItems.Count > 0
+            && e.AddedItems[0] is Optima.Core.Models.PlayerAccount account)
+        {
+            _ = main.SwitchAccountCommand.ExecuteAsync(account);
+        }
+    }
+
     private void OnPageChanged(object sender, DataTransferEventArgs e)
     {
         if (!Motion.Enabled)

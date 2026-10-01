@@ -1,9 +1,12 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
 using Optima.Core.News;
+using Optima.Core.Stats;
 
 namespace Optima.App.ViewModels;
 
@@ -14,26 +17,67 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly IPerformanceMonitor _monitor;
     private readonly CopsNewsService _news;
     private readonly SettingsService _settings;
+    private readonly Services.PlayerSwitcherService _players;
 
     public HomeViewModel(
         StatusViewModel status,
         PlayViewModel play,
+        PlayerStatsViewModel playerStats,
         ISystemInfoService systemInfo,
         IPerformanceMonitor monitor,
         CopsNewsService news,
-        SettingsService settings)
+        SettingsService settings,
+        Services.PlayerSwitcherService players)
     {
         Status = status;
         Play = play;
+        Player = playerStats;
         _systemInfo = systemInfo;
         _monitor = monitor;
         _news = news;
         _settings = settings;
+        _players = players;
         _monitor.MetricsUpdated += OnMetrics;
+        // The friends strip must follow Settings edits immediately, not only on next visit.
+        _settings.SettingsChanged += OnSettingsChanged;
+    }
+
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => _ = RefreshFriendsCommand.ExecuteAsync(null));
     }
 
     public StatusViewModel Status { get; }
     public PlayViewModel Play { get; }
+
+    /// <summary>The player panel shown directly below LAUNCH.</summary>
+    public PlayerStatsViewModel Player { get; }
+
+    /// <summary>Friends and clanmates tracked alongside the main account.</summary>
+    public ObservableCollection<Optima.Core.Stats.TrackedPlayerRow> Friends { get; } = [];
+
+    [ObservableProperty] private string _friendsStatus = string.Empty;
+    [ObservableProperty] private bool _hasFriends;
+
+    [RelayCommand]
+    private async Task RefreshFriendsAsync()
+    {
+        try
+        {
+            var rows = await _players.GetTrackedRowsAsync();
+            Friends.Clear();
+            foreach (var row in rows)
+            {
+                Friends.Add(row);
+            }
+            HasFriends = Friends.Count > 0;
+            FriendsStatus = Friends.Count == 0 ? "Add friends or clanmates from the PLAYER panel in Settings." : string.Empty;
+        }
+        catch (Exception)
+        {
+            FriendsStatus = "Could not reach the stats API.";
+        }
+    }
 
     [ObservableProperty] private string _gpuText = "---";
     [ObservableProperty] private string _cpuText = "---";
@@ -54,6 +98,8 @@ public sealed partial class HomeViewModel : ObservableObject
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         _ = Task.Run(() => CheckGameVersionAsync(ct), CancellationToken.None);
+        _ = Player.InitializeAsync(ct);
+        _ = RefreshFriendsCommand.ExecuteAsync(null);
 
         var inventory = await _systemInfo.GetInventoryAsync(ct);
         var gpu = inventory.Gpus

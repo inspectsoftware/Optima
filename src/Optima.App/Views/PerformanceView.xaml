@@ -1,6 +1,7 @@
 <UserControl x:Class="Optima.App.Views.PerformanceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:Optima.App.Controls"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime">
   <UserControl.Resources>
     <Style x:Key="ReqBadge" TargetType="Border" BasedOn="{StaticResource Badge}">
@@ -12,7 +13,116 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1040" HorizontalAlignment="Left">
       <TextBlock Text="Performance" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="WINDOWS TWEAKS · PROFILES · PER-SETTING DISCLOSURE" Style="{StaticResource Text.PageSubtitle}" />
+      <TextBlock Text="LIVE SYSTEM LOAD · WINDOWS TWEAKS · PROFILES" Style="{StaticResource Text.PageSubtitle}" />
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="SYSTEM LOAD">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding GameLoadText}" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.Accent}" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <UniformGrid Columns="3">
+            <Border Style="{StaticResource Tile}" Margin="0,0,10,0">
+              <StackPanel>
+                <Grid>
+                  <TextBlock Text="CPU" Style="{StaticResource Text.Label}" />
+                  <TextBlock Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}"
+                             HorizontalAlignment="Right" Visibility="{Binding GpuTempText, Converter={StaticResource EmptyToCollapsed}}" />
+                </Grid>
+                <TextBlock Text="{Binding CpuText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+                <ctl:AsciiBar Value="{Binding CpuPercent}" Maximum="100" Cells="22" />
+                <ctl:Sparkline Values="{Binding CpuHistory}" Height="44" Margin="0,8,0,0"
+                               Stroke="{DynamicResource Brush.Accent}" Minimum="0" Maximum="100" />
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Tile}" Margin="0,0,10,0">
+              <StackPanel>
+                <TextBlock Text="GPU" Style="{StaticResource Text.Label}" />
+                <TextBlock Text="{Binding GpuText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+                <ctl:AsciiBar Value="{Binding GpuPercent}" Maximum="100" Cells="22" />
+                <ctl:Sparkline Values="{Binding GpuHistory}" Height="44" Margin="0,8,0,0"
+                               Stroke="{DynamicResource Brush.Accent}" Minimum="0" Maximum="100" />
+              </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Tile}">
+              <StackPanel>
+                <TextBlock Text="RAM" Style="{StaticResource Text.Label}" />
+                <TextBlock Text="{Binding RamText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+                <ctl:AsciiBar Value="{Binding RamPercent}" Maximum="100" Cells="22" />
+                <ctl:Sparkline Values="{Binding RamHistory}" Height="44" Margin="0,8,0,0"
+                               Stroke="{DynamicResource Brush.Accent}" Minimum="0" Maximum="100" />
+              </StackPanel>
+            </Border>
+          </UniformGrid>
+          <TextBlock Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}"
+                     Margin="0,8,0,0"
+                     Text="Traces cover the last two minutes, one sample per second. The tag on this section shows what the game itself is using when a session runs." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="HARDWARE">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding RefreshSystemCommand}" Padding="6,0" />
+        </HeaderedContentControl.Tag>
+        <ItemsControl ItemsSource="{Binding HardwareRows}" ItemTemplate="{StaticResource InfoRowTemplate}" />
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="VIRTUALIZATION">
+        <StackPanel>
+          <ItemsControl ItemsSource="{Binding VirtualizationRows}" ItemTemplate="{StaticResource InfoRowTemplate}" />
+          <TextBlock Style="{StaticResource Text.Prose}" Margin="0,10,0,0" MaxWidth="720" HorizontalAlignment="Left"
+                     Text="If firmware virtualization is disabled it must be enabled in the BIOS/UEFI. Windows cannot change it, and this application never modifies firmware or boot settings." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="NETWORK">
+        <StackPanel>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" MinWidth="16" /><ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Connection quality" Style="{StaticResource Text.Label}" />
+            <Rectangle Grid.Column="1" Style="{StaticResource Leader}" />
+            <TextBlock Grid.Column="2" Text="{Binding NetworkStatus}" Style="{StaticResource Text.Value}" />
+          </Grid>
+          <TextBlock Style="{StaticResource Text.Prose}" Margin="0,10,0,0" MaxWidth="720" HorizontalAlignment="Left"
+                     Text="Measured passively with pings while a game session runs. Game endpoints are preferred; when none answer, the reference host from Settings is measured instead and the readout reflects link quality rather than game-server latency." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="MONITORS">
+        <ItemsControl ItemsSource="{Binding Displays}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource TableRow}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="170" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" Style="{StaticResource Text.Cell}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Mode}" Style="{StaticResource Text.Cell}" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="SESSION TWEAKS">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="820" HorizontalAlignment="Left" Margin="0,0,0,8"
+                     Text="These apply only while a game session runs and are restored the moment it ends, even after a crash. Unlike the persistent tweaks below, nothing survives the session." />
+          <CheckBox IsChecked="{Binding SessionHdrOff}" Margin="0,2"
+                    Content="switch HDR off while the game runs" />
+          <CheckBox IsChecked="{Binding SessionGameBarOff}" Margin="0,2"
+                    Content="Xbox Game Bar off while the game runs" />
+          <CheckBox IsChecked="{Binding SessionFseOff}" Margin="0,2"
+                    Content="fullscreen optimizations off while the game runs" />
+        </StackPanel>
+      </HeaderedContentControl>
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="WINDOWS TWEAKS">
         <HeaderedContentControl.Tag>

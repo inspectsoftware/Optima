@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.App.Logging;
 using Optima.Core.Configuration;
+using Optima.Core.Models;
 using Microsoft.Win32;
 using Serilog.Events;
 
@@ -36,6 +37,20 @@ public sealed partial class LogsViewModel : ObservableObject
     [ObservableProperty] private string _searchText = string.Empty;
     [ObservableProperty] private string _statusMessage = string.Empty;
 
+    [ObservableProperty] private string _errorSearchText = string.Empty;
+
+    /// <summary>The error guide, filtered by the guide's own search box.</summary>
+    public IReadOnlyList<ErrorCatalogEntry> ErrorEntries
+        => ErrorSearchText.Trim().Length == 0
+            ? ErrorCatalog.All
+            : ErrorCatalog.All
+                .Where(e => e.Code.Contains(ErrorSearchText, StringComparison.OrdinalIgnoreCase)
+                    || e.Title.Contains(ErrorSearchText, StringComparison.OrdinalIgnoreCase)
+                    || e.WhatHappened.Contains(ErrorSearchText, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+    partial void OnErrorSearchTextChanged(string value) => OnPropertyChanged(nameof(ErrorEntries));
+
     [ObservableProperty] private bool _tailEnabled = true;
 
     [ObservableProperty] private int _lineCount;
@@ -62,6 +77,20 @@ public sealed partial class LogsViewModel : ObservableObject
 
     [RelayCommand]
     private void Clear() => Entries.Clear();
+
+    [RelayCommand]
+    private void CopyError(ErrorCatalogEntry entry)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(ErrorCatalog.FormatPlaintext(entry));
+            StatusMessage = "Copied " + entry.Code + ".";
+        }
+        catch (Exception)
+        {
+            StatusMessage = "Could not reach the clipboard.";
+        }
+    }
 
     [RelayCommand]
     private async Task ExportAsync()

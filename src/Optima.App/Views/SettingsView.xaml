@@ -8,11 +8,11 @@
     </Style>
   </UserControl.Resources>
 
-  <ScrollViewer VerticalScrollBarVisibility="Auto">
+  <Grid>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1100" HorizontalAlignment="Left">
       <TextBlock Text="Settings" Style="{StaticResource Text.PageTitle}" />
       <TextBlock Text="%LOCALAPPDATA%\Optima" Style="{StaticResource Text.PageSubtitle}" />
-
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition />
@@ -120,7 +120,7 @@
                 <ColumnDefinition />
               </Grid.ColumnDefinitions>
               <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
               </Grid.RowDefinitions>
 
               <TextBlock Text="fps overlay" Style="{StaticResource RowLabel}" />
@@ -144,8 +144,16 @@
                        HorizontalAlignment="Left" Margin="0,5"
                        ToolTip="pinged for link quality when no game endpoint answers ICMP" />
 
-              <TextBlock Grid.Row="5" Text="watchdog auto-attach" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
+              <TextBlock Grid.Row="5" Text="crash relaunch" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
               <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,5">
+                <CheckBox IsChecked="{Binding AutoRelaunchOnCrash}" VerticalAlignment="Center"
+                          Content="relaunch once if the game dies within five minutes" />
+                <TextBlock Style="{StaticResource Text.Micro}" Margin="25,3,0,0" TextWrapping="Wrap"
+                           Text="A normal quit is never relaunched: only a game process that dies on its own early in a session triggers one automatic relaunch of the same profile. Off by default." />
+              </StackPanel>
+
+              <TextBlock Grid.Row="6" Text="watchdog auto-attach" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
+              <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,5">
                 <CheckBox IsChecked="{Binding EnableWatchMode}" VerticalAlignment="Center"
                           Content="apply the profile when the game starts outside Optima" />
                 <TextBlock Style="{StaticResource Text.Micro}" Margin="25,3,0,0" TextWrapping="Wrap"
@@ -162,11 +170,64 @@
                 <ColumnDefinition Width="150" />
                 <ColumnDefinition />
               </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition /><RowDefinition /><RowDefinition />
+              </Grid.RowDefinitions>
               <TextBlock Text="in-game name" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
               <StackPanel Grid.Column="1" Margin="0,5">
-                <TextBox Text="{Binding PlayerIgn, UpdateSourceTrigger=PropertyChanged}" Width="240" HorizontalAlignment="Left" />
+                <TextBox Text="{Binding PlayerIgn, UpdateSourceTrigger=PropertyChanged}" MaxWidth="320" HorizontalAlignment="Left" />
                 <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Used only to read your public profile from Critical Force's public API so sessions can record ranked kills, deaths and wins. Leave empty to disable all stat lookups." />
+                           Text="Reads your public profile from Critical Force's public API so sessions can record ranked kills, deaths and wins. Either this or the account id below enables all stat lookups." />
+              </StackPanel>
+              <TextBlock Grid.Row="1" Text="account id" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
+              <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,5">
+                <TextBox Text="{Binding PlayerAccountId, UpdateSourceTrigger=PropertyChanged}" MaxWidth="320" HorizontalAlignment="Left" />
+                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="The number on your Critical Ops profile. The id is checked first and is exact, so it keeps working if you rename. The in-game name is the fallback when no id is set." />
+                <Grid Margin="0,8,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="200" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Text="{Binding SaveAccountLabel, UpdateSourceTrigger=PropertyChanged}"
+                           VerticalAlignment="Center"
+                           ToolTip="Optional label, e.g. Main or Smurf" />
+                  <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="save as account" Margin="8,0,0,0"
+                          Command="{Binding SaveAsAccountCommand}"
+                          ToolTip="Stores this identity so it can be switched to from the title bar" />
+                </Grid>
+                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Saved identities appear in the switcher at the top of the window. The current one is marked ACTIVE there." />
+              </StackPanel>
+
+              <TextBlock Grid.Row="2" Text="tracked players" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
+              <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,5">
+                <ItemsControl ItemsSource="{Binding TrackedPlayers}" Margin="0,2,0,6">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Orientation="Horizontal" Margin="0,2">
+                        <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+                        <Button Style="{StaticResource GhostButton}" Content="remove" Padding="6,0" Margin="10,0,0,0"
+                                Command="{Binding DataContext.RemoveTrackedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="200" />
+                    <ColumnDefinition Width="*" MaxWidth="140" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Text="{Binding NewTrackedIgn, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                           ToolTip="Friend's in-game name" />
+                  <TextBox Grid.Column="1" Text="{Binding NewTrackedAccountId, UpdateSourceTrigger=PropertyChanged}" Margin="8,0,0,0" VerticalAlignment="Center"
+                           ToolTip="Optional account id" />
+                  <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="track" Margin="8,0,0,0"
+                          Command="{Binding TrackPlayerCommand}"
+                          ToolTip="Adds the player to the HOME friends strip" />
+                </Grid>
               </StackPanel>
             </Grid>
           </HeaderedContentControl>
@@ -178,7 +239,7 @@
                 <ColumnDefinition />
               </Grid.ColumnDefinitions>
               <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
               </Grid.RowDefinitions>
 
               <TextBlock Text="display provider" Style="{StaticResource RowLabel}" />
@@ -208,7 +269,126 @@
               <TextBlock Grid.Row="6" Text="mock fps provider" Style="{StaticResource RowLabel}" />
               <CheckBox Grid.Row="6" Grid.Column="1" IsChecked="{Binding UseMockMetricsProvider}" VerticalAlignment="Center" Margin="0,5"
                         Content="developer: synthetic fps data (applies after restart)" />
+
+              <TextBlock Grid.Row="7" Text="developer emulator" Style="{StaticResource RowLabel}" />
+              <CheckBox Grid.Row="7" Grid.Column="1" IsChecked="{Binding UseDeveloperEmulator}" VerticalAlignment="Center" Margin="0,5"
+                        Content="start Critical Ops in the Google Play Games Developer Emulator (adb localhost:6520)" />
             </Grid>
+          </HeaderedContentControl>
+
+          <HeaderedContentControl Style="{StaticResource Section}" Header="DEVELOPER EMULATOR"
+                                  Visibility="{Binding DevEmulatorSectionVisible, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+              <TextBlock Style="{StaticResource Text.Micro}" Margin="0,0,0,8" TextWrapping="Wrap"
+                         Text="Switches for the Google Play Games Developer Emulator, the experimental test bed for forcing the game onto the GPU. These write the Windows GPU preference for the emulator and Google's startup flags; the emulator's own Vulkan/DirectX backend and display-ratio toggles stay in its tray menu. Click APPLY to save — GPU changes take effect the next time the emulator starts." />
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="150" />
+                  <ColumnDefinition />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="emulator" Style="{StaticResource RowLabel}" />
+                <TextBlock Grid.Column="1" Text="{Binding DevEmulatorStatus}" Style="{StaticResource Text.Label}"
+                           VerticalAlignment="Center" Margin="0,5" TextWrapping="Wrap" />
+
+                <TextBlock Grid.Row="1" Text="graphics adapters" Style="{StaticResource RowLabel}" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DevGpuSummary}" Style="{StaticResource Text.Label}"
+                           VerticalAlignment="Center" Margin="0,5" TextWrapping="Wrap" />
+
+                <TextBlock Grid.Row="2" Text="gpu preference" Style="{StaticResource RowLabel}" />
+                <Grid Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Margin="0,5">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition />
+                  </Grid.ColumnDefinitions>
+                  <CheckBox IsChecked="{Binding DevGpuHighPerformance}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="pin the emulator to the high-performance GPU (Windows per-app setting)"
+                             TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
+                </Grid>
+
+                <TextBlock Grid.Row="3" Text="gpu prioritization" Style="{StaticResource RowLabel}" />
+                <Grid Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="0,5"
+                      ToolTip="Google startup flag: enable_idxgi_factory6_gpu_prioritization">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition />
+                  </Grid.ColumnDefinitions>
+                  <CheckBox IsChecked="{Binding DevGpuPrioritization}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="IDXGI factory 6 GPU prioritization (startup flag)"
+                             TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
+                </Grid>
+
+                <TextBlock Grid.Row="4" Text="gpu retry" Style="{StaticResource RowLabel}" />
+                <Grid Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" Margin="0,5"
+                      ToolTip="Google startup flag: enable_gpu_retrieval_retry_on_mismatch">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition />
+                  </Grid.ColumnDefinitions>
+                  <CheckBox IsChecked="{Binding DevGpuRetrievalRetry}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="retry GPU retrieval on adapter mismatch (startup flag)"
+                             TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
+                </Grid>
+
+                <TextBlock Grid.Row="5" Text="game status" Style="{StaticResource RowLabel}" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding DevGameStatus}" Style="{StaticResource Text.Label}"
+                           VerticalAlignment="Center" Margin="0,5" TextWrapping="Wrap" />
+
+                <TextBlock Grid.Row="7" Text="guest renderer" Style="{StaticResource RowLabel}" />
+                <Grid Grid.Row="7" Grid.Column="1" VerticalAlignment="Center" Margin="0,5"
+                      ToolTip="forces the game's OpenGL ES through ANGLE onto Vulkan inside the emulator — the scriptable equivalent of the backend toggle">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition />
+                  </Grid.ColumnDefinitions>
+                  <CheckBox IsChecked="{Binding DevForceAngle}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="force ANGLE/Vulkan for the game inside the guest (scriptable backend)"
+                             TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
+                </Grid>
+
+                <TextBlock Grid.Row="8" Text="renderer status" Style="{StaticResource RowLabel}" />
+                <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding DevRendererStatus}" Style="{StaticResource Text.Label}"
+                           VerticalAlignment="Center" Margin="0,5" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Brush.TextDim}" />
+
+                <TextBlock Grid.Row="9" Text="fps unlock" Style="{StaticResource RowLabel}" />
+                <StackPanel Grid.Row="9" Grid.Column="1" Margin="0,5">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBox Text="{Binding DevRefreshRateText, UpdateSourceTrigger=PropertyChanged}" Width="70" VerticalContentAlignment="Center"
+                             ToolTip="display refresh rate in Hz (60 = stock clamp)" />
+                    <TextBlock Text="Hz" VerticalAlignment="Center" Margin="6,0,0,0" Style="{StaticResource Text.Label}" />
+                    <Button Padding="14,6" MinWidth="130" Margin="12,0,0,0" Content="Apply refresh rate"
+                            Command="{Binding ApplyDevRefreshRateCommand}" IsEnabled="{Binding DevBusy, Converter={StaticResource InverseBool}}"
+                            ToolTip="writes the guest peak/min refresh rate over adb and updates Service.exe.config through the elevated helper; restart the emulator afterwards" />
+                  </StackPanel>
+                  <TextBlock Text="{Binding DevRefreshStatus}" Style="{StaticResource Text.Micro}"
+                             Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Brush.TextDim}" />
+                </StackPanel>
+
+                <WrapPanel Grid.Row="10" Grid.ColumnSpan="2" Margin="0,5">
+                  <Button Style="{StaticResource PrimaryButton}" Padding="18,8" MinWidth="150" Content="Launch Critical Ops"
+                          Command="{Binding LaunchDevGameCommand}" IsEnabled="{Binding DevBusy, Converter={StaticResource InverseBool}}"
+                          ToolTip="starts the developer emulator if needed, then boots the game inside it over adb" />
+                  <Button Padding="18,8" MinWidth="150" Margin="10,0,0,0" Content="Apply to emulator"
+                          Command="{Binding ApplyDevEmulatorCommand}" />
+                  <Button Padding="18,8" MinWidth="90" Margin="10,0,0,0" Content="Refresh"
+                          Command="{Binding RefreshDevEmulatorCommand}" />
+                  <Button Padding="18,8" MinWidth="100" Margin="10,0,0,0" Content="Game status"
+                          Command="{Binding RefreshDevGameStatusCommand}" />
+                  <Button Padding="18,8" MinWidth="110" Margin="10,0,0,0" Content="Apply renderer"
+                          Command="{Binding ApplyGuestRendererCommand}" IsEnabled="{Binding DevBusy, Converter={StaticResource InverseBool}}"
+                          ToolTip="applies the guest renderer checkbox over adb" />
+                  <Button Padding="18,8" MinWidth="90" Margin="10,0,0,0" Content="Open logs"
+                          Command="{Binding OpenDevEmulatorLogsCommand}" />
+                </WrapPanel>
+                <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="{Binding DevStatusLine}" Style="{StaticResource Text.Micro}"
+                           Margin="0,4,0,5" TextWrapping="Wrap" Foreground="{DynamicResource Brush.TextDim}"
+                           Visibility="{Binding DevStatusLine, Converter={StaticResource EmptyToCollapsed}}" />
+              </Grid>
+            </StackPanel>
           </HeaderedContentControl>
 
           <HeaderedContentControl Style="{StaticResource Section}" Header="PATH OVERRIDES">
@@ -221,7 +401,7 @@
                   <ColumnDefinition />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                  <RowDefinition /><RowDefinition /><RowDefinition />
+                  <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
                 <TextBlock Text="play games folder" Style="{StaticResource RowLabel}" />
@@ -234,24 +414,41 @@
                 <TextBlock Grid.Row="2" Text="custom launch command" Style="{StaticResource RowLabel}" />
                 <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CustomLaunchCommand}" Margin="0,5"
                          ToolTip="last launch strategy. placeholders: {uri} and {package}" />
+
+                <TextBlock Grid.Row="3" Text="developer emulator folder" Style="{StaticResource RowLabel}" />
+                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding DeveloperEmulatorInstallPath}" Margin="0,5"
+                         ToolTip="default: C:\Program Files\Google\Play Games Developer Emulator" />
               </Grid>
             </StackPanel>
           </HeaderedContentControl>
         </StackPanel>
       </Grid>
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="SAVE">
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource Brush.Ok}"
-                     Style="{StaticResource Text.Value}" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Padding="20,8"
-                  Content="Save settings" Command="{Binding SaveCommand}" />
-        </Grid>
-      </HeaderedContentControl>
     </StackPanel>
   </ScrollViewer>
+
+  <!-- Pinned save bar: the one save control on the page. It appears whenever anything
+       differs from the last save, and confirms in place with [ OK ] before fading out. -->
+  <Border x:Name="SaveBar" VerticalAlignment="Bottom"
+          Background="{DynamicResource Brush.Surface}"
+          BorderBrush="{DynamicResource Brush.Accent}" BorderThickness="0,1,0,0"
+          Padding="22,10" Visibility="{Binding SaveBarVisible, Converter={StaticResource BoolToVis}}">
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Text="{Binding SaveBarMark}" FontSize="{StaticResource Type.Label}"
+                   Foreground="{Binding SaveBarMark, Converter={StaticResource SaveMarkBrush}}"
+                   VerticalAlignment="Center" Margin="0,0,10,0" />
+        <TextBlock Text="{Binding SaveBarText}" Style="{StaticResource Text.Label}"
+                   VerticalAlignment="Center" />
+      </StackPanel>
+      <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Padding="28,10" MinWidth="200" MinHeight="40"
+              Content="Save settings" Command="{Binding SaveCommand}"
+              Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}" />
+    </Grid>
+  </Border>
+  </Grid>
 </UserControl>

@@ -1,0 +1,221 @@
+namespace Optima.Core.Models;
+
+/// <summary>One entry of the error guide: what a code means and how to get past it.</summary>
+public sealed record ErrorCatalogEntry(
+    string Code,
+    string Title,
+    string WhatHappened,
+    string WhyItHappens,
+    IReadOnlyList<string> HowToFix);
+
+/// <summary>
+/// Every known Optima error code with a plain-language explanation, so the LOGS page can show
+/// one discrete guide instead of scattered messages. The tests assert this catalog stays in
+/// step with every OptimaException code raised in the app.
+/// </summary>
+public static class ErrorCatalog
+{
+    public static IReadOnlyList<ErrorCatalogEntry> All { get; } =
+    [
+        new(
+            "VDD_NO_DISPLAY",
+            "The virtual display did not appear",
+            "Optima enabled the virtual display driver, but Windows never attached a display to the desktop within 15 seconds.",
+            "The driver device was enabled but its monitor output stayed parked. This is the most common virtual display fault; a settings reload almost always wakes it.",
+            [
+                "Open the Display page and press RELOAD DRIVER so the driver re-reads vdd_settings.xml",
+                "Check vdd_settings.xml (default C:\\VirtualDisplayDriver\\vdd_settings.xml) has a monitor count of at least 1",
+                "Reinstall the virtual display driver from the Display page",
+            ]),
+        new(
+            "VDD_NOT_INSTALLED",
+            "No virtual display driver was found",
+            "Optima looked for the virtual display driver device and it is not present in Windows.",
+            "The driver was never installed on this machine, or it was removed by hand or by a cleanup tool.",
+            [
+                "Install the driver from the Display page (one administrator prompt, no Device Manager needed)",
+                "Check Device Manager under Display adapters if the install reports success but the device is missing",
+            ]),
+        new(
+            "VDD_PIPE_FAILED",
+            "The virtual display driver did not accept the reload",
+            "Optima wrote RELOAD_DRIVER to the driver's control pipe, but the driver never acknowledged it.",
+            "The driver service is loaded but not answering: it can be stuck, partially installed, or its control pipe is held by another program.",
+            [
+                "Restart the machine once, then press RELOAD DRIVER again",
+                "Reinstall the virtual display driver from the Display page",
+                "Check the Logs page for the underlying pipe error",
+            ]),
+        new(
+            "VDD_PIPE_DENIED",
+            "Administrator access is needed to signal the driver",
+            "Writing RELOAD_DRIVER to the driver's control pipe requires administrator rights and the elevated helper was not available.",
+            "The UAC prompt was declined, or the elevated helper could not start.",
+            [
+                "Approve the administrator prompt when Optima asks for it",
+                "Retry; the prompt only appears once per session",
+            ]),
+        new(
+            "VDD_SETTINGS_LOCKED",
+            "The driver settings file could not be updated",
+            "Optima needs to edit vdd_settings.xml to apply the requested mode, and writing it requires administrator access.",
+            "The file sits in a protected folder and no equivalent mode was available without an edit.",
+            [
+                "Pick a mode the driver already advertises (the Display page lists them)",
+                "Run the request once more and approve the administrator prompt",
+            ]),
+        new(
+            "VDD_MODE_NOT_APPLIED",
+            "The display stayed at a different mode",
+            "Windows accepted the mode change, but the display kept running at its own preferred mode instead of the requested one.",
+            "The driver reverted to a mode it prefers; some driver builds do this for modes that were never loaded from its settings file.",
+            [
+                "Add the exact mode to vdd_settings.xml, then press RELOAD DRIVER on the Display page",
+                "Pick the mode from the live list on the Display page instead of typing one",
+            ]),
+        new(
+            "DEVICE_TOGGLE_FAILED",
+            "Windows refused to change the virtual display device",
+            "Optima asked the elevated helper to enable or disable the driver device and Windows refused the request.",
+            "The device can be in a bad state (code 43, install half-finished) or another program holds it.",
+            [
+                "Check the device in Device Manager under Display adapters",
+                "Reinstall the virtual display driver from the Display page",
+            ]),
+        new(
+            "DISPLAY_ACCESS_DENIED",
+            "Unable to change the display configuration",
+            "Windows refused a display mode change Optima tried to apply.",
+            "Another display-control utility was holding the display settings at the same moment.",
+            [
+                "Close other display-control utilities and try again",
+                "Try the mode change once more; transient failures are common",
+            ]),
+        new(
+            "DISPLAY_MODE_UNSUPPORTED",
+            "That mode is not supported",
+            "The requested resolution or refresh rate is not in the display's advertised mode list.",
+            "The display (or driver, as configured) does not offer that mode on this machine.",
+            [
+                "Pick a mode from the list instead of typing a custom one",
+                "For the virtual display, add the mode to vdd_settings.xml and press RELOAD DRIVER",
+            ]),
+        new(
+            "DISPLAY_NOT_ACTIVE",
+            "That display is not active",
+            "The display Optima was asked to use has no current mode, so it cannot be part of the layout.",
+            "The display was disabled, disconnected, or is a phantom entry that Windows no longer drives.",
+            [
+                "Enable the display on the Display page first",
+                "Hide inactive displays on the Display page to drop phantom entries",
+            ]),
+        new(
+            "DISPLAY_PRIMARY_FAILED",
+            "Windows refused to change the primary display",
+            "Optima tried to make a display the primary one and Windows rejected the change.",
+            "Windows can refuse a primary switch while another display change is still settling.",
+            [
+                "Retry the request",
+                "Change the primary display in Windows Settings once, then let Optima manage modes again",
+            ]),
+        new(
+            "DISPLAY_RESTORE_FAILED",
+            "Unable to restore the previous display layout",
+            "After a session, Windows refused to re-apply the display layout that was saved before it started.",
+            "The saved layout references a display that is no longer connected, or Windows is in a state where the topology cannot be applied exactly.",
+            [
+                "Reconnect any display that was attached when the session started",
+                "Use the emergency-restore button on the Display page",
+                "Set the layout by hand once; a later session will snapshot the new layout",
+            ]),
+        new(
+            "ELEVATION_DECLINED",
+            "Administrator access was declined",
+            "Optima asked for the elevated helper for a system-level change and the prompt was declined or failed.",
+            "Driver installs, driver device toggles, HKLM tweaks and ETW capture all need one approval; without it the affected feature skips that step.",
+            [
+                "Approve the administrator prompt and try again",
+                "If no prompt appeared, check whether prompts are suppressed by policy and start the helper manually from the Diagnostics page",
+            ]),
+        new(
+            "TWEAK_WRITE_FAILED",
+            "Windows refused the tweak change",
+            "The elevated helper tried to write a performance tweak to the registry and Windows refused the write.",
+            "Security software can block registry writes, or the value is owned by a policy.",
+            [
+                "Check the Logs page for which value was refused",
+                "Apply the tweak by hand if group policy manages it",
+            ]),
+        new(
+            "GAME_NOT_FOUND",
+            "Critical Ops is not installed in Google Play Games",
+            "Detection could not find a playable Critical Ops install.",
+            "The game is not installed, Google Play Games was updated and moved its data, or detection rules are stale.",
+            [
+                "Open Google Play Games and install Critical Ops",
+                "Run detection again from the Diagnostics page",
+                "Set the Google Play Games folder under Settings, Path overrides, if it is installed somewhere unusual",
+            ]),
+        new(
+            "LAUNCH_FAILED",
+            "Could not start Critical Ops",
+            "Every launch strategy failed, and the session's temporary system changes were rolled back.",
+            "Google Play Games may be signed out, outdated, or its bootstrapper refuses the launch URI.",
+            [
+                "Start Google Play Games manually and check it opens and is signed in",
+                "Re-run detection from the Diagnostics page",
+                "Configure a custom launch command in Settings as the last-resort strategy",
+            ]),
+        new(
+            "GAME_START_TIMEOUT",
+            "The game did not start within three minutes",
+            "Google Play Games opened, but the game runtime never appeared, so the session was rolled back.",
+            "The game can stall on a sign-in prompt, an update, or a first-time download.",
+            [
+                "Check Google Play Games for sign-in prompts or updates",
+                "Try launching once from Google Play Games directly to clear any pending prompts",
+            ]),
+        new(
+            "DRIVER_PACKAGE_MISSING",
+            "No driver package is bundled with this build",
+            "Optima installs a virtual display driver from its drivers folder, but that folder is empty or absent.",
+            "This build was published without the bundled driver package, or the folder was deleted after publishing.",
+            [
+                "Re-publish or re-download the full build (the drivers folder must ship next to Optima.exe)",
+                "Use the mock provider meanwhile; every display feature stays usable in simulation",
+            ]),
+        new(
+            "DRIVER_INSTALL_FAILED",
+            "The virtual display driver could not be installed",
+            "Windows rejected the driver package during staging or device creation.",
+            "The package signature may not be trusted on this machine, or the package targets a different Windows version.",
+            [
+                "Confirm the bundled driver package is digitally signed, since Windows refuses unsigned driver packages",
+                "Check that the package targets 64-bit Windows 11",
+                "See the Logs page for the exact installer error",
+            ]),
+        new(
+            "DRIVER_UNINSTALL_FAILED",
+            "The virtual display driver could not be removed",
+            "Windows refused to remove the driver device or package.",
+            "The device was busy or the helper's remove request was refused mid-operation.",
+            [
+                "Close any program using the virtual display and retry",
+                "Remove the device from Device Manager under Display adapters",
+            ]),
+    ];
+
+    /// <summary>Case-insensitive lookup by code; null when unknown.</summary>
+    public static ErrorCatalogEntry? Find(string code)
+        => All.FirstOrDefault(e => string.Equals(e.Code, code, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The entry as plain text, ready for the clipboard or a support ticket.</summary>
+    public static string FormatPlaintext(ErrorCatalogEntry entry)
+    {
+        var fixes = string.Join("\n", entry.HowToFix.Select(f => "- " + f));
+        return "[" + entry.Code + "] " + entry.Title + "\n"
+            + "What: " + entry.WhatHappened + "\n"
+            + "Why: " + entry.WhyItHappens + "\n"
+            + "How to fix:\n" + fixes;
+    }
+}

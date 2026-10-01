@@ -31,6 +31,21 @@ pick a profile → PLAY
 - **Discord activity**, ranked session stats from the public Critical Ops profile API, news,
   and a self-updater from GitHub releases.
 
+## Downloading
+
+The latest build is on the [releases page](https://github.com/inspectsoftware/Optima/releases).
+Every release carries:
+
+- `Optima-Setup-<version>.exe`, the installer. Per-user, so there is no administrator prompt;
+  it adds the Start Menu shortcut, offers the optional sign-in autostart, and uninstalls
+  cleanly while keeping your data in `%LOCALAPPDATA%\Optima`. This is the one to take.
+- `Optima-v<version>-win-x64.zip`, the same build as a portable folder. Unpack it anywhere and
+  run `Optima.exe`. The in-app updater downloads this same archive to update an existing copy.
+- Source code (zip / tar.gz), the repository at that tag, for building it yourself.
+
+Both binaries are unsigned, so Windows SmartScreen warns about an unknown publisher the first
+time you run either of them.
+
 ## Building
 
 Requires the .NET 10 SDK on Windows 10/11.
@@ -42,6 +57,10 @@ dotnet test
 
 `.\publish.ps1` produces the runnable self-contained build in `publish/` (it stops a running
 Optima first). Add `-Run` to start it.
+
+`.\installer.ps1` packages that build into `artifacts/Optima-Setup-<version>.exe`, a per-user
+installer (Start Menu shortcut, optional sign-in autostart, proper uninstaller; user data is
+kept on uninstall). Add `-Publish` to republish first, `-Run` to launch the setup when done.
 
 ```
 src/Optima.Core               logic, models, orchestrator, statistics (no Windows deps)

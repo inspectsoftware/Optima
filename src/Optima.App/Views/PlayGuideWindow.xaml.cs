@@ -1,0 +1,37 @@
+using System.Windows;
+using System.Windows.Input;
+using Optima.App.ViewModels;
+
+namespace Optima.App.Views;
+
+/// <summary>
+/// Hosts the five-step Critical Ops on PC setup guide; clicking a rail card or the Next/Back buttons
+/// moves between steps, and the window closes when the last step's action finishes the guide.
+/// </summary>
+public partial class PlayGuideWindow : Window
+{
+    public PlayGuideWindow()
+    {
+        InitializeComponent();
+        DataContextChanged += (_, args) =>
+        {
+            if (args.NewValue is PlayGuideViewModel viewModel)
+            {
+                viewModel.RequestClose += Close;
+            }
+            if (args.OldValue is PlayGuideViewModel oldViewModel)
+            {
+                oldViewModel.RequestClose -= Close;
+            }
+        };
+    }
+
+    private void OnStepCardClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PlayGuideStep step }
+            && DataContext is PlayGuideViewModel viewModel)
+        {
+            viewModel.CurrentStepIndex = step.Index;
+        }
+    }
+}

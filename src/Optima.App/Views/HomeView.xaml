@@ -158,6 +158,133 @@
           </Grid>
         </StackPanel>
       </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PLAYER">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource GhostButton}" Content="refresh" Padding="6,0"
+                  Command="{Binding Player.RefreshCommand}"
+                  ToolTip="Re-reads the public profile from Critical Force's API" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Player.PlayerName}" FontSize="{StaticResource Type.Title}" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.Accent}" />
+                <!-- Rank emblem: tier-colored shield with motif and division chevrons, elo beside it. -->
+                <StackPanel Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center"
+                            Visibility="{Binding Player.HasRank, Converter={StaticResource BoolToVis}}">
+                  <ctl:RankEmblem Width="34" VerticalAlignment="Center" Margin="0,0,2,0"
+                                  Tier="{Binding Player.RankTier}" Division="{Binding Player.RankDivision}"
+                                  ColorHex="{Binding Player.RankColorHex}"
+                                  ToolTip="Current ranked tier" />
+                  <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Player.RankText}" Style="{StaticResource Text.Label}"
+                               Foreground="{Binding Player.RankColorHex, Converter={StaticResource HexToBrush}}" />
+                    <TextBlock Text="{Binding Player.EloText}" Style="{StaticResource Text.Micro}"
+                               Foreground="{DynamicResource Brush.TextMuted}" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+              <TextBlock Text="{Binding Player.ClanText}" Style="{StaticResource Text.Label}"
+                         Foreground="{DynamicResource Brush.TextMuted}" Margin="0,2,0,0"
+                         Visibility="{Binding Player.ClanText, Converter={StaticResource EmptyToCollapsed}}" />
+              <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <TextBlock Text="{Binding Player.LevelText}" Style="{StaticResource Text.Label}" Margin="0,0,14,0" />
+                <TextBlock Text="{Binding Player.SeasonText}" Style="{StaticResource Text.Label}" Margin="0,0,14,0" />
+                <TextBlock Text="{Binding Player.AccountIdText, StringFormat='id {0}'}" Style="{StaticResource Text.Label}"
+                           Foreground="{DynamicResource Brush.TextMuted}" />
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+
+          <Grid Margin="0,12,0,0" Visibility="{Binding Player.HasProfile, Converter={StaticResource BoolToVis}}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="90" />
+              <ColumnDefinition Width="64" />
+              <ColumnDefinition Width="64" />
+              <ColumnDefinition Width="64" />
+              <ColumnDefinition Width="96" />
+              <ColumnDefinition Width="80" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="MODE" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            <TextBlock Grid.Column="1" Text="K" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            <TextBlock Grid.Column="2" Text="D" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            <TextBlock Grid.Column="3" Text="A" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            <TextBlock Grid.Column="4" Text="RECORD" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            <TextBlock Grid.Column="5" Text="K/D" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Player.Modes}"
+                        Visibility="{Binding Player.HasProfile, Converter={StaticResource BoolToVis}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,3">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="90" />
+                    <ColumnDefinition Width="64" />
+                    <ColumnDefinition Width="64" />
+                    <ColumnDefinition Width="64" />
+                    <ColumnDefinition Width="96" />
+                    <ColumnDefinition Width="80" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding Mode}" Style="{StaticResource Text.Label}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Kills}" Style="{StaticResource Text.Value}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Deaths}" Style="{StaticResource Text.Value}" />
+                  <TextBlock Grid.Column="3" Text="{Binding Assists}" Style="{StaticResource Text.Value}" />
+                  <TextBlock Grid.Column="4" Text="{Binding Record}" Style="{StaticResource Text.Value}" />
+                  <TextBlock Grid.Column="5" Text="{Binding Kd}" Style="{StaticResource Text.Value}"
+                             Foreground="{DynamicResource Brush.Accent}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="{Binding Player.StatusText}" Style="{StaticResource Text.Micro}" Margin="0,10,0,0"
+                     TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" />
+
+          <!-- Friends strip: tracked players beside the main account. -->
+          <StackPanel Margin="0,14,0,0" Visibility="{Binding HasFriends, Converter={StaticResource BoolToVis}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="70" />
+                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="90" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="TRACKED" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+              <TextBlock Grid.Column="1" Text="LEVEL" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+              <TextBlock Grid.Column="2" Text="RECORD" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+              <TextBlock Grid.Column="3" Text="WIN RATE" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Friends}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,3">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="150" />
+                      <ColumnDefinition Width="70" />
+                      <ColumnDefinition Width="90" />
+                      <ColumnDefinition Width="90" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Label}" />
+                    <TextBlock Grid.Column="1" Text="{Binding LevelText}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.TextMuted}" />
+                    <TextBlock Grid.Column="2" Text="{Binding RecordText}" Style="{StaticResource Text.Value}" />
+                    <TextBlock Grid.Column="3" Text="{Binding WinRateText}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.Accent}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+
+          <TextBlock Text="{Binding FriendsStatus}" Style="{StaticResource Text.Micro}" Margin="0,10,0,0"
+                     TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
+                     Visibility="{Binding FriendsStatus, Converter={StaticResource EmptyToCollapsed}}" />
+        </StackPanel>
+      </HeaderedContentControl>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

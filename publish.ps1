@@ -14,7 +14,9 @@ param(
     [switch]$Run,
     [string]$Output = "publish",
     [string]$Runtime = "win-x64",
-    [string]$Configuration = "Release"
+    [string]$Configuration = "Release",
+    # Dev edition: compiles in the DEVELOPER EMULATOR settings section.
+    [switch]$DevEdition
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,7 +61,9 @@ dotnet publish (Join-Path $root "src\Optima.Watchdog") -c $Configuration -r $Run
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.Watchdog failed (exit $LASTEXITCODE)" }
 
 Write-Host "publishing Optima.App ($Configuration $Runtime)"
-dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet
+$devProps = @()
+if ($DevEdition) { $devProps += "-p:DevEdition=true" }
+dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet @devProps
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.App failed (exit $LASTEXITCODE)" }
 
 $exe = Join-Path $out "Optima.exe"

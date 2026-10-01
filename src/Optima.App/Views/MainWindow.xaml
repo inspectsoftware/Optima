@@ -22,12 +22,11 @@
     <KeyBinding Modifiers="Alt" Key="D2" Command="{Binding NavigateCommand}" CommandParameter="PLAY" />
     <KeyBinding Modifiers="Alt" Key="D3" Command="{Binding NavigateCommand}" CommandParameter="PERFORMANCE" />
     <KeyBinding Modifiers="Alt" Key="D4" Command="{Binding NavigateCommand}" CommandParameter="SESSIONS" />
-    <KeyBinding Modifiers="Alt" Key="D5" Command="{Binding NavigateCommand}" CommandParameter="SYSTEM" />
-    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="COMP" />
-    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
+    <KeyBinding Modifiers="Alt" Key="D5" Command="{Binding NavigateCommand}" CommandParameter="COMP" />
+    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
+    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="EXPLORE" />
     <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
     <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
-    <KeyBinding Modifiers="Alt" Key="D0" Command="{Binding NavigateCommand}" CommandParameter="LOGS" />
     <KeyBinding Modifiers="Alt" Key="N" Command="{Binding NavigateCommand}" CommandParameter="NEWS" />
     <KeyBinding Modifiers="Alt" Key="U" Command="{Binding NavigateCommand}" CommandParameter="UPDATES" />
     <KeyBinding Modifiers="Alt" Key="L" Command="{Binding NavigateCommand}" CommandParameter="LEGAL" />
@@ -41,8 +40,8 @@
     <DataTemplate DataType="{x:Type vm:PerformanceViewModel}"><views:PerformanceView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SessionsViewModel}"><views:SessionsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:DisplayViewModel}"><views:DisplayView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:SystemViewModel}"><views:SystemView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:CompViewModel}"><views:CompView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:ExploreViewModel}"><views:ExploreView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:LegalViewModel}"><views:LegalView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}"><views:DiagnosticsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:LogsViewModel}"><views:LogsView /></DataTemplate>
@@ -174,6 +173,7 @@
         <Grid Grid.Column="2">
           <Grid.RowDefinitions>
             <RowDefinition Height="28" />
+            <RowDefinition Height="Auto" />
             <RowDefinition />
           </Grid.RowDefinitions>
 
@@ -181,7 +181,46 @@
                         Breadcrumb="{Binding Breadcrumb}"
                         SessionTag="{Binding Play.SessionTag}" />
 
-          <ContentControl x:Name="PageHost" Grid.Row="1" Margin="0,4,0,0"
+          <!-- Account bar: always visible at the top of the page area. -->
+          <Border Grid.Row="1" Height="30" Margin="0,2,0,0"
+                  Background="{DynamicResource Brush.Surface}"
+                  BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="1"
+                  CornerRadius="4">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Margin="10,0,0,0" VerticalAlignment="Center"
+                         Text="ACCOUNT" FontFamily="{StaticResource Font.Mono}"
+                         FontSize="{StaticResource Type.Label}"
+                         Foreground="{DynamicResource Brush.TextMuted}" />
+              <ComboBox Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center"
+                        MinWidth="200" MaxWidth="360" Height="22" Margin="12,0,0,0"
+                        FontSize="{StaticResource Type.Label}"
+                        ItemsSource="{Binding SavedAccounts}"
+                        SelectedItem="{Binding ActiveAccount, Mode=TwoWay}"
+                        SelectionChanged="OnAccountSelectionChanged"
+                        ToolTip="Switch the active player identity (saved in Settings, Player)">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding DisplayName}" />
+                      <TextBlock Text="  [ACTIVE]" Foreground="{DynamicResource Brush.Accent}"
+                                 Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Grid.Column="2" Margin="0,0,10,0" VerticalAlignment="Center"
+                         Style="{StaticResource Text.Micro}"
+                         Foreground="{DynamicResource Brush.TextMuted}"
+                         Text="switch identities from here · saved in Settings, Player" />
+            </Grid>
+          </Border>
+
+          <ContentControl x:Name="PageHost" Grid.Row="2" Margin="0,4,0,0"
                           Content="{Binding CurrentPage, NotifyOnTargetUpdated=True}"
                           Binding.TargetUpdated="OnPageChanged">
             <ContentControl.RenderTransform>

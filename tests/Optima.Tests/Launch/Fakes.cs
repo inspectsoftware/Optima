@@ -27,6 +27,30 @@ internal sealed class FakeLauncher : IGameLauncher
 
     public string Name => "Fake";
     public int Order => 10;
+    // Standard strategies are always allowed once they claim the launch.
+    public bool IsEnabled { get; set; } = true;
+    public Task<bool> CanLaunchAsync(InstalledGame game, CancellationToken ct = default) => Task.FromResult(CanLaunch);
+    public Task<bool> LaunchAsync(InstalledGame game, CancellationToken ct = default)
+    {
+        LaunchCalls++;
+        return Task.FromResult(LaunchSucceeds);
+    }
+}
+
+/// <summary>Opt-in strategy whose IsEnabled reflects what the user asked for. Mirrors the real
+/// DeveloperEmulatorLauncher: enabled strategies are exclusive when they fail.</summary>
+internal sealed class FakeOptInLauncher : IGameLauncher
+{
+    public bool CanLaunch { get; set; } = true;
+    public bool LaunchSucceeds { get; set; } = true;
+    public bool IsEnabled { get; set; }
+
+    public bool IsExclusive => true;
+
+    public int LaunchCalls { get; private set; }
+
+    public string Name => "OptIn";
+    public int Order => 5;
     public Task<bool> CanLaunchAsync(InstalledGame game, CancellationToken ct = default) => Task.FromResult(CanLaunch);
     public Task<bool> LaunchAsync(InstalledGame game, CancellationToken ct = default)
     {

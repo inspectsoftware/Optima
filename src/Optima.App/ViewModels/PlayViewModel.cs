@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
+using Optima.Core.Crashes;
 using Optima.Core.Launch;
 using Optima.Core.Models;
 using Microsoft.Extensions.Logging;
@@ -83,6 +85,10 @@ public sealed partial class PlayViewModel : ObservableObject
     private readonly SettingsService _settings;
     private readonly StatusViewModel _status;
     private readonly IGameTerminator _terminator;
+    private readonly Core.Launch.CrashAutoRelaunchService _crashRelaunch;
+    private readonly PlayGuideViewModel _playGuide;
+    private readonly CrashSentinel _crashSentinel;
+    private readonly AppPaths _paths;
     private readonly ILogger<PlayViewModel> _logger;
     private CancellationTokenSource? _sessionCts;
     private DispatcherTimer? _elapsedTimer;
@@ -93,6 +99,10 @@ public sealed partial class PlayViewModel : ObservableObject
         SettingsService settings,
         StatusViewModel status,
         IGameTerminator terminator,
+        Core.Launch.CrashAutoRelaunchService crashRelaunch,
+        PlayGuideViewModel playGuide,
+        CrashSentinel crashSentinel,
+        AppPaths paths,
         ILogger<PlayViewModel> logger)
     {
         _orchestrator = orchestrator;
@@ -100,8 +110,79 @@ public sealed partial class PlayViewModel : ObservableObject
         _settings = settings;
         _status = status;
         _terminator = terminator;
+        _crashRelaunch = crashRelaunch;
+        _playGuide = playGuide;
+        _crashSentinel = crashSentinel;
+        _paths = paths;
         _logger = logger;
         _orchestrator.ProgressChanged += OnProgress;
+        // New crash bundles surface on the Play tab as a dismissible banner; dismissal is persisted.
+        _crashSentinel.BundleWritten += folder => Application.Current?.Dispatcher.BeginInvoke(() => _ = RefreshCrashBannerAsync());
+    }
+
+    public async Task InitializeCrashBannerAsync(CancellationToken ct = default)
+    {
+        await RefreshCrashBannerAsync(ct);
+    }
+
+    private async Task RefreshCrashBannerAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var seen = (await _settings.GetSettingsAsync(ct)).LastCrashSeenAt;
+            var newest = Directory.Exists(_paths.CrashesDirectory)
+                ? Directory.EnumerateDirectories(_paths.CrashesDirectory)
+                    .Select(d => new DirectoryInfo(d))
+                    .OrderByDescending(d => d.Name, StringComparer.Ordinal)
+                    .FirstOrDefault()
+                : null;
+            if (newest is null)
+            {
+                CrashBannerText = string.Empty;
+                return;
+            }
+            var written = newest.LastWriteTime;
+            CrashBannerVisible = seen is null || written > seen.Value;
+            CrashBundleName = newest.Name;
+            CrashBundleTimeText = written.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+            CrashBannerText =
+                "Critical Ops ended with failure markers in Google Play Games' logs. A crash bundle was saved with a " +
+                "timeline and the relevant log excerpt — export a redacted zip from Diagnostics to share it.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Crash banner refresh failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task DismissCrashBannerAsync()
+    {
+        CrashBannerVisible = false;
+        await _settings.UpdateSettingsAsync(s => s with { LastCrashSeenAt = DateTimeOffset.UtcNow });
+    }
+
+    [ObservableProperty]
+    private bool _crashBannerVisible;
+
+    [ObservableProperty]
+    private string _crashBannerText = string.Empty;
+
+    [ObservableProperty]
+    private string _crashBundleName = string.Empty;
+
+    [ObservableProperty]
+    private string _crashBundleTimeText = string.Empty;
+
+    /// <summary>Entry point for the crash auto-relaunch service; reuses the normal launch path.</summary>
+    public async Task RelaunchAfterCrashAsync(LaunchProfile? profile)
+    {
+        if (profile is null)
+        {
+            return;
+        }
+        SelectedProfile = Profiles.FirstOrDefault(p => string.Equals(p.Name, profile.Name, StringComparison.OrdinalIgnoreCase)) ?? profile;
+        await PlayCommand.ExecuteAsync(null);
     }
 
     public ObservableCollection<LaunchProfile> Profiles { get; } = [];
@@ -224,6 +305,7 @@ public sealed partial class PlayViewModel : ObservableObject
 
         try
         {
+            _crashRelaunch.NoteSessionStart(profile);
             var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, _sessionCts.Token));
             if (result.Success)
             {
@@ -263,6 +345,20 @@ public sealed partial class PlayViewModel : ObservableObject
 
     [RelayCommand(CanExecute = nameof(IsSessionActive))]
     private void Cancel() => _sessionCts?.Cancel();
+
+    /// <summary>Opens the five-step Critical Ops on PC setup guide as a dialog, with a fresh PC scan.</summary>
+    [RelayCommand]
+    private void OpenSetupGuide()
+    {
+        var window = new Views.PlayGuideWindow
+        {
+            Owner = Application.Current.MainWindow,
+        };
+        _playGuide.CurrentStepIndex = 0;
+        window.DataContext = _playGuide;
+        _ = _playGuide.ScanCommand.ExecuteAsync(null);
+        window.ShowDialog();
+    }
 
     [ObservableProperty]
     private string _killStatusText = string.Empty;

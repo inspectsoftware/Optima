@@ -132,11 +132,24 @@ public sealed class LaunchOrchestrator
                 {
                     continue;
                 }
+                // Opt-in strategies never become silent fallbacks: if the user asked for them and
+                // they cannot launch, the session fails visibly instead of drifting to another one.
+                if (!launcher.IsEnabled)
+                {
+                    continue;
+                }
                 _logger.LogInformation("Trying launch strategy {Strategy}", launcher.Name);
                 if (await launcher.LaunchAsync(game, token).ConfigureAwait(false))
                 {
                     launched = true;
                     _logger.LogInformation("Launch strategy {Strategy} succeeded", launcher.Name);
+                    break;
+                }
+                // An exclusive strategy owns the launch: falling through would start the game in
+                // a way the user did not ask for (e.g. the consumer client while the developer
+                // emulator is already booting), so surface the failure instead.
+                if (launcher.IsExclusive)
+                {
                     break;
                 }
             }

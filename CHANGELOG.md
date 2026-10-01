@@ -4,6 +4,113 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-01 - 0.7.5: leaderboards, accounts and a real installer
+
+- Optima ships as an installer now: a per-user setup with the Start Menu shortcut, the
+  optional autostart and a proper uninstaller, so the download is one .exe instead of a
+  folder to unpack. Your data in %LOCALAPPDATA%\Optima is kept when you uninstall. The
+  portable zip is still published, and it stays the artefact the in-app updater pulls.
+- EXPLORE is the big new page: Critical Ops ranked, casual, elite and clan leaderboards
+  plus a player lookup, straight from Critical Force's public API, with clan rosters that
+  fill in as names appear on the boards.
+- The icon rail is complete again. The EXPLORE row was drawing an empty slot because the
+  icon set had no Explore glyph, so the data-driven lookup came back with nothing; it now
+  shows a trophy on the same 24 px stroke grid as its neighbours.
+- The rest of the September work is below, newest first: the account switcher in the title
+  bar, the ranked badge and ladder, clan tags and friends on HOME, the developer emulator
+  path, session tweaks and crash auto-relaunch, the weekly export to CSV or PDF, and a
+  richer Discord card.
+
+## 2026-09-27 - Indev: rank badge and a switching account bar
+
+- The HOME player panel shows the ranked tier beside the name: a tier-colored badge with
+  the tier, division and elo. The ladder is taken from Critical Force's own ranked page
+  (Iron below Bronze, Spec Ops, Elite Ops) and resolves by matchmaking rating, with the
+  API's tier index as cross-check; rank 0 means still calibrating. Divisions are derived
+  from the rating in 25-point steps.
+- The ACCOUNT bar at the top of the window now actually switches: picking an identity
+  writes it and the HOME panel retargets immediately, replacing whatever was in Settings.
+
+## 2026-09-27 - Indev: clan tag, friends auto-refresh, identity autosave
+
+- The HOME player panel now shows the clan membership read straight from the public
+  profile ([DK] Dawning Knights), no input needed. The API exposes the clan of the
+  profile but no roster endpoint, so friends are still added by name, one by one.
+- The friends strip refreshes the moment Settings changes instead of on the next visit.
+- The player identity (in-game name and account id) is saved as it is typed, debounced,
+  so closing Optima never loses it; the Save button remains for everything else.
+
+## 2026-09-27 - Indev: accounts, friends, crash relaunch, session tweaks, weekly export
+
+- Saved identities: store your main and alternates in Settings, Player ("save as account"),
+  then switch between them from the switcher centered in the title bar. Switching updates
+  every stat lookup at once.
+- Friends tracker: add tracked players in Settings and their level, ranked record and win
+  rate appear on HOME beside your own stats, ordered by wins.
+- Crash auto-relaunch (off by default): when the game process dies on its own within five
+  minutes of launch, Optima relaunches the same profile once. A normal quit is never
+  touched.
+- Session tweaks on PERFORMANCE: HDR off, Game Bar off and fullscreen optimizations off
+  can now be session-scoped, applied when the game starts and restored when it ends,
+  including after a crash or app exit.
+- SESSIONS opens with a THIS WEEK card (sessions, playtime, W-L, average fps) and the
+  history exports to CSV, or to a dependency-free PDF digest.
+
+## 2026-09-27 - Indev: a richer Discord card
+
+- The Discord activity stopped being a static caption and now shows what Optima actually
+  knows. In game: "Critical Ops · 41W-23L" as the line, and "frosty · 141 fps" under it,
+  with the elapsed time ticking. The ranked record comes from the public profile (per
+  Discord's own guidance: short, actionable, no repetition) and the fps is live, pushed
+  every 15 seconds so the card stays fresh without spamming. Launching shows the profile
+  being applied ("applying Competitive"). All eight string shapes are unit-tested.## 2026-09-27 - Indev: launch splash
+
+- A launch splash in the style of a certain gaming browser: a true-black card with the
+  Optima mark breathing over an accent sweep line, status text cycling while the app
+  builds, and the version tag. It holds for a beat so a fast start never flashes, then
+  expands into the main window's exact bounds while dissolving, so the card reads as
+  becoming the app. Tray autostart skips it entirely, and with the Windows animation
+  setting off it closes as a static frame.
+
+## 2026-09-27 - Indev: Performance absorbs System, with a live load visualizer
+
+- The SYSTEM page is gone and PERFORMANCE now opens with a SYSTEM LOAD section: CPU, GPU
+  and RAM each show the live percentage, an ASCII bar and a two-minute trace (one sample
+  per second). While a game session runs, the section tag carries what the game itself
+  is using, including the live fps readout when capture is on.
+- Everything the SYSTEM page held moved here unchanged: hardware inventory, the
+  virtualization facts, the passive network quality readout and the monitor list, all
+  above the tweaks and profiles sections.
+- Navigation renumbered: COMP is now 05 and Alt+5, and the sidebar lost a row.
+
+## 2026-09-27 - Indev: player stats on Home, account id, save bar, error guide, exit and presence fixes
+
+- HOME gained a PLAYER panel directly below LAUNCH: the current player's name, level,
+  account id and season with ranked, casual and custom kills, deaths, assists, record
+  and K/D, read live from Critical Force's public profile API. A refresh button sits on
+  the panel and the answer carries a status line, so a silent empty panel is gone.
+- Settings gained an account id field next to the in-game name. The id is checked first
+  (exact, survives renames) and the name is the fallback, so either one enables stat
+  lookups. The API was verified live during the build: name and id lookups both work,
+  unknown players answer with a server error (now reported as "player not found" instead
+  of a silent blank), and a mistyped id comes back as a scaffold account, which Optima
+  detects and warns about instead of showing empty stats as real ones.
+- Settings got an impossible-to-miss save: a pinned bar with "Unsaved changes" and a
+  large Save settings button appears the moment anything differs from the last save,
+  wherever the user happens to be scrolled. Saving confirms in place with [ OK ] and
+  the bar fades out; the old SAVE section at the bottom was removed.
+- Fixed: Optima sometimes failed to exit and the next start stacked a second instance.
+  There is now a single-instance guard, and a second launch brings the running window
+  back instead of starting a twin. Exit no longer hangs forever on a stuck background
+  service; past five seconds it logs the stall and forces the exit.
+- Fixed: Discord presence vanished when the window went to the tray. The launcher card
+  now stays while Optima is hidden to the tray (the elapsed timer restarts on return);
+  an autostart instance that was never shown still never broadcasts.
+- LOGS gained an ERROR GUIDE: a collapsed panel listing every error code the app can
+  raise (driver, display, elevation, tweaks, launch) with what happened, why, and the
+  numbered fixes. RELOAD_DRIVER failures are explained there. A test keeps the guide in
+  step with the code, so a new error without an entry fails the build.
+
 ## 2026-09-03 - 0.7.2: the busy indicator, fixed for real
 
 - 0.7.1 still closed with the same error box as soon as a page with a busy indicator

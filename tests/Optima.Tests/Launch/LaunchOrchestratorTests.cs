@@ -126,6 +126,42 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task RunSession_DisabledOptInLauncher_IsSkippedNotFatal()
+    {
+        var optIn = new FakeOptInLauncher { CanLaunch = true, IsEnabled = false };
+        var orchestrator = new LaunchOrchestrator(
+            _detector, [optIn, _launcher], _virtualDisplay, _displayService, _power,
+            _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
+            NullLogger<LaunchOrchestrator>.Instance);
+
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
+
+        // A disabled opt-in strategy never blocks the standard strategies.
+        Assert.True(result.Success);
+        Assert.Equal(0, optIn.LaunchCalls);
+        Assert.Equal(1, _launcher.LaunchCalls);
+    }
+
+    [Fact]
+    public async Task RunSession_EnabledOptInLauncherFailure_DoesNotFallThrough()
+    {
+        var optIn = new FakeOptInLauncher { CanLaunch = true, IsEnabled = true, LaunchSucceeds = false };
+        var orchestrator = new LaunchOrchestrator(
+            _detector, [optIn, _launcher], _virtualDisplay, _displayService, _power,
+            _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
+            NullLogger<LaunchOrchestrator>.Instance);
+
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
+
+        // An enabled opt-in strategy that claims but fails the launch must not silently
+        // fall through to the consumer-client launchers.
+        Assert.False(result.Success);
+        Assert.Equal("LAUNCH_FAILED", result.Error?.Code);
+        Assert.Equal(1, optIn.LaunchCalls);
+        Assert.Equal(0, _launcher.LaunchCalls);
+    }
+
+    [Fact]
     public async Task RunSession_GameNeverStarts_TimesOutAndRestores()
     {
         _processMonitor.GameStartPid = null;

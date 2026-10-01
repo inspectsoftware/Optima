@@ -24,6 +24,14 @@ public partial class App : Application
     private ConsoleWindow? _console;
     private OverlayController? _overlay;
     private ThemeService? _theme;
+    private SplashWindow? _splash;
+
+    // One instance at a time: a second launch must never stack a second Optima, it should
+    // bring the running one back instead (the exit path can stall, so users relaunch).
+    private const string SingleInstanceMutexName = "Local\\Optima.SingleInstance";
+    private const string SingleInstanceActivateEventName = "Local\\Optima.SingleInstance.Activate";
+    private static Mutex? _singleInstanceMutex;
+    private static EventWaitHandle? _activateEvent;
 
     public static LoggingLevelSwitch LogLevelSwitch { get; } = new(LogEventLevel.Information);
     public static InAppLogSink LogSink { get; } = new();
@@ -32,8 +40,27 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Before anything else, and before the log is opened: a second instance must exit
+        // quietly without touching files the first one owns.
+        if (!TryAcquireSingleInstance())
+        {
+            SignalExistingInstance();
+            Shutdown(0);
+            return;
+        }
+        StartActivationListener();
+
         var paths = new AppPaths();
         paths.EnsureCreated();
+
+        // The splash owns the screen while the host builds; skipped for a tray autostart,
+        // where no window is wanted at all.
+        var startInTrayArg = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase));
+        if (!startInTrayArg)
+        {
+            _splash = new SplashWindow();
+            _splash.Show();
+        }
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.ControlledBy(LogLevelSwitch)
@@ -82,6 +109,9 @@ public partial class App : Application
         if (!startInTray)
         {
             window.Show();
+            // The splash sits on top and expands into the window's bounds, revealing the
+            // app that was already rendered underneath; no flash of empty desktop.
+            _ = _splash?.ExpandIntoAsync(window, TimeSpan.FromSeconds(1.2));
         }
         else
         {
@@ -144,6 +174,11 @@ public partial class App : Application
         SyncHardwareMonitor();
 
         var presence = _host.Services.GetRequiredService<Optima.Core.Monitoring.GamePresenceService>();
+        var crashRelaunch = _host.Services.GetRequiredService<Optima.Core.Launch.CrashAutoRelaunchService>();
+        crashRelaunch.Start(presence);
+        var sessionTweaks = _host.Services.GetRequiredService<Optima.Core.Launch.SessionTweakService>();
+        sessionTweaks.Start();
+        _ = SyncSessionTweaksAsync(sessionTweaks);
         presence.PresenceChanged += change =>
             SetOwnPriority(gameOnScreen: change.Current == Optima.Core.Monitoring.GamePresence.InGame);
 
@@ -159,6 +194,38 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Warning(ex, "{What} failed", what);
+        }
+    }
+
+    private async Task SyncSessionTweaksAsync(Core.Launch.SessionTweakService sessionTweaks)
+    {
+        try
+        {
+            var settingsService = _host!.Services.GetRequiredService<SettingsService>();
+            var sync = async () =>
+            {
+                var s = await settingsService.GetSettingsAsync();
+                var ids = new List<string>();
+                if (s.SessionTweakHdrOff)
+                {
+                    ids.Add("session-hdr-off");
+                }
+                if (s.SessionTweakGameBarOff)
+                {
+                    ids.Add("session-gamebar-off");
+                }
+                if (s.SessionTweakFseOff)
+                {
+                    ids.Add("session-fse-off");
+                }
+                sessionTweaks.EnabledIds = ids;
+            };
+            await sync();
+            settingsService.SettingsChanged += async (_, _) => await sync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Session tweak sync failed");
         }
     }
 
@@ -241,6 +308,78 @@ public partial class App : Application
         }
     }
 
+    private bool TryAcquireSingleInstance()
+    {
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
+        if (createdNew)
+        {
+            return true;
+        }
+        _singleInstanceMutex.Dispose();
+        _singleInstanceMutex = null;
+        return false;
+    }
+
+    private static void SignalExistingInstance()
+    {
+        try
+        {
+            using var existing = EventWaitHandle.OpenExisting(SingleInstanceActivateEventName);
+            existing.Set();
+        }
+        catch
+        {
+            // The owner may be exiting right now; the user can just start Optima again.
+        }
+    }
+
+    private void StartActivationListener()
+    {
+        _activateEvent = new EventWaitHandle(false, EventResetMode.AutoReset, SingleInstanceActivateEventName);
+        var dispatcher = Dispatcher;
+        Task.Run(async () =>
+        {
+            while (_activateEvent is { } evt)
+            {
+                try
+                {
+                    await Task.Run(evt.WaitOne).ConfigureAwait(true);
+                }
+                catch (ObjectDisposedException)
+                {
+                    return;
+                }
+                _ = dispatcher.BeginInvoke(() =>
+                {
+                    var window = MainWindow;
+                    if (window is null)
+                    {
+                        return;
+                    }
+                    window.Show();
+                    window.WindowState = WindowState.Normal;
+                    window.Activate();
+                });
+            }
+        });
+    }
+
+    private void ReleaseSingleInstance()
+    {
+        _activateEvent?.Dispose();
+        _activateEvent = null;
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+        }
+        catch (ApplicationException)
+        {
+            // The mutex may be held by a different thread; abandoning it is fine on process exit.
+        }
+        _singleInstanceMutex?.Dispose();
+        _singleInstanceMutex = null;
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeys?.Dispose();
@@ -248,17 +387,39 @@ public partial class App : Application
         _tray?.Dispose();
         _shutdown?.Dispose();
         _theme?.Dispose();
+        var hostStopped = false;
         try
         {
-            _host?.StopAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
-            _host?.Dispose();
+            // Bounded: a hung background service must never keep a dead instance alive,
+            // which is how users ended up launching a second Optima over the first.
+            hostStopped = _host?.StopAsync(TimeSpan.FromSeconds(3)).Wait(TimeSpan.FromSeconds(5)) == true;
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "Host shutdown reported an error");
         }
+        if (hostStopped)
+        {
+            try
+            {
+                _host?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Host dispose reported an error");
+            }
+        }
+        else
+        {
+            Log.Error("Host shutdown stalled past 5 seconds; forcing exit");
+        }
+        ReleaseSingleInstance();
         Log.Information("Optima exited");
         Log.CloseAndFlush();
+        if (!hostStopped)
+        {
+            Environment.Exit(e.ApplicationExitCode);
+        }
         base.OnExit(e);
     }
 }

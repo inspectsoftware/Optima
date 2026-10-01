@@ -18,11 +18,14 @@ public sealed record ReadinessReport(
 
 public sealed record FixRunResult(IReadOnlyList<string> Log, bool RestartRequired);
 
+/// <summary>Live progress for a fix that has a natural percent scale (e.g. Windows feature enabling).</summary>
+public sealed record FixProgress(double? Percent, string Detail);
+
 /// <summary>
 /// The "fix everything" engine behind the first-run wizard (Q7): one consent, then every automatable fix runs through
 /// the existing elevation broker.
 /// </summary>
-public sealed class FirstRunFixService
+public sealed class FirstRunFixService : IDisposable
 {
     private const string GpgDownloadPage = "https://play.google.com/googleplaygames";
 
@@ -30,6 +33,11 @@ public sealed class FirstRunFixService
     private readonly ISystemInfoService _systemInfo;
     private readonly IGameDetector _detector;
     private readonly ILogger<FirstRunFixService> _logger;
+
+    /// <summary>Live progress while RunFixesAsync is running; consumed by the setup guide's progress bar.</summary>
+    public event EventHandler<FixProgress>? Progress;
+
+    private double? _lastPercent;
 
     public FirstRunFixService(
         IElevationBroker broker,
@@ -41,6 +49,34 @@ public sealed class FirstRunFixService
         _systemInfo = systemInfo;
         _detector = detector;
         _logger = logger;
+        _broker.EventReceived += OnHelperEvent;
+    }
+
+    public void Dispose() => _broker.EventReceived -= OnHelperEvent;
+
+    private void OnHelperEvent(object? sender, IpcEvent evt)
+    {
+        if (evt.Kind != "feature-progress")
+        {
+            return;
+        }
+        if (!evt.Data.TryGetValue("feature", out var feature)
+            || !evt.Data.TryGetValue("percent", out var percentText)
+            || !double.TryParse(percentText, System.Globalization.CultureInfo.InvariantCulture, out var percent))
+        {
+            return;
+        }
+        // Two features run back to back; map each feature's 0-100 onto half of the overall bar and
+        // never let the bar move backwards if an event races in out of order.
+        var overall = feature.Equals("HypervisorPlatform", StringComparison.OrdinalIgnoreCase)
+            ? percent / 2
+            : 50 + percent / 2;
+        var scaled = Math.Clamp(overall, 0, 100);
+        if (scaled >= _lastPercent)
+        {
+            _lastPercent = scaled;
+            Progress?.Invoke(this, new FixProgress(scaled, feature));
+        }
     }
 
     public async Task<ReadinessReport> AnalyzeAsync(CancellationToken ct = default)
@@ -63,12 +99,14 @@ public sealed class FirstRunFixService
     {
         var log = new List<string>();
         var restartRequired = false;
+        _lastPercent = 0;
 
         if (report.HypervisorFeaturesMissing)
         {
             if (!await _broker.EnsureStartedAsync(ct))
             {
                 log.Add("Hypervisor features: skipped, the administrator prompt was declined.");
+                _lastPercent = null;
             }
             else
             {

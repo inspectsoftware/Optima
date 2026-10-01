@@ -17,7 +17,7 @@ public sealed class SessionStatsEnricher : IDisposable
     private readonly GamePresenceService _presence;
     private readonly SettingsService _settings;
     private readonly ISessionStore _store;
-    private readonly Func<string, CancellationToken, Task<CopsPlayerProfile?>> _fetchProfile;
+    private readonly Func<string, long?, CancellationToken, Task<CopsPlayerProfile?>> _fetchProfile;
     private readonly ILogger<SessionStatsEnricher> _logger;
 
     private (CopsPlayerProfile Profile, DateTimeOffset At)? _startSnapshot;
@@ -27,7 +27,7 @@ public sealed class SessionStatsEnricher : IDisposable
         GamePresenceService presence,
         SettingsService settings,
         ISessionStore store,
-        Func<string, CancellationToken, Task<CopsPlayerProfile?>> fetchProfile,
+        Func<string, long?, CancellationToken, Task<CopsPlayerProfile?>> fetchProfile,
         ILogger<SessionStatsEnricher> logger)
     {
         _presence = presence;
@@ -59,12 +59,12 @@ public sealed class SessionStatsEnricher : IDisposable
     {
         try
         {
-            var ign = (await _settings.GetSettingsAsync().ConfigureAwait(false)).PlayerIgn;
-            if (string.IsNullOrWhiteSpace(ign))
+            var settings = await _settings.GetSettingsAsync().ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(settings.PlayerIgn) && settings.PlayerAccountId is not > 0)
             {
                 return;
             }
-            var profile = await _fetchProfile(ign, CancellationToken.None).ConfigureAwait(false);
+            var profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, CancellationToken.None).ConfigureAwait(false);
             if (profile is not null)
             {
                 _startSnapshot = (profile, at);
@@ -91,14 +91,14 @@ public sealed class SessionStatsEnricher : IDisposable
                 return;
             }
 
-            var ign = (await _settings.GetSettingsAsync().ConfigureAwait(false)).PlayerIgn;
-            if (string.IsNullOrWhiteSpace(ign))
+            var settings = await _settings.GetSettingsAsync().ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(settings.PlayerIgn) && settings.PlayerAccountId is not > 0)
             {
                 return;
             }
 
             await Task.Delay(SettleDelay).ConfigureAwait(false);
-            var after = await _fetchProfile(ign, CancellationToken.None).ConfigureAwait(false);
+            var after = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, CancellationToken.None).ConfigureAwait(false);
             var delta = CopsProfileDelta.Between(start.Value.Profile, after);
             if (delta is null || delta.IsZero)
             {

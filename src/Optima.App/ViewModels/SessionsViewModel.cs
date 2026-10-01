@@ -1,11 +1,15 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
 using Optima.Core.Statistics;
+using Optima.Core.Stats;
+using Optima.Core.Exports;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
@@ -124,6 +128,71 @@ public sealed partial class SessionsViewModel : ObservableObject
         }
     }
 
+    [ObservableProperty] private string _statusMessage = string.Empty;
+
+    [ObservableProperty] private string _weeklyHeadline = string.Empty;
+    [ObservableProperty] private string _weeklyDetails = string.Empty;
+    [ObservableProperty] private bool _hasWeekly;
+
+    private void BuildWeeklyDigest(IReadOnlyList<SessionRecord> history)
+    {
+        var digest = TrackedPlayerDigest.BuildWeekly(history, DateTimeOffset.Now);
+        HasWeekly = digest.SessionCount > 0;
+        WeeklyHeadline = digest.Headline;
+        WeeklyDetails = digest.SessionCount == 0
+            ? string.Empty
+            : $"win rate {digest.WinRateText} · 1% low {digest.OnePercentLow:F0} · best of {digest.SessionCount} sessions";
+    }
+
+    [RelayCommand]
+    private async Task ExportCsvAsync()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = $"optima-sessions-{DateTimeOffset.Now:yyyyMMdd}.csv",
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+        var history = await _sessions.GetSessionsAsync(500);
+        await File.WriteAllTextAsync(dialog.FileName, TrackedPlayerDigest.ToCsv(history));
+        StatusMessage = $"Exported {history.Count} sessions to {dialog.FileName}.";
+    }
+
+    [RelayCommand]
+    private async Task ExportPdfAsync()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "PDF (*.pdf)|*.pdf",
+            FileName = $"optima-weekly-{DateTimeOffset.Now:yyyyMMdd}.pdf",
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var history = await _sessions.GetSessionsAsync(500);
+        var digest = TrackedPlayerDigest.BuildWeekly(history, DateTimeOffset.Now);
+        var lines = new List<string>
+        {
+            "WEEKLY DIGEST",
+            digest.Headline,
+            digest.SessionCount == 0 ? string.Empty : $"win rate {digest.WinRateText} · 1% low {digest.OnePercentLow:F0}",
+            string.Empty,
+            "SESSIONS (newest first)",
+        };
+        foreach (var row in Rows.Take(60))
+        {
+            lines.Add($"{row.StartedText}  {row.ProfileName,-18} {row.KindTag,-6} {row.DurationText}  {row.AvgFpsText,6} fps  {row.NetworkText}");
+        }
+
+        await File.WriteAllBytesAsync(dialog.FileName, Optima.Core.Exports.SimplePdf.Render(lines, "Optima sessions"));
+        StatusMessage = $"Exported to {dialog.FileName}.";
+    }
+
     [RelayCommand]
     private async Task ReloadAsync(CancellationToken ct = default)
     {
@@ -139,6 +208,7 @@ public sealed partial class SessionsViewModel : ObservableObject
 
         BuildTrend(trend);
         BuildProfileTrends(history);
+        BuildWeeklyDigest(history);
 
         Profiles.Clear();
         foreach (var profile in await _profiles.GetProfilesAsync(ct))

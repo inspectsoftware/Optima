@@ -17,6 +17,10 @@ public sealed record DetectionRules
         @"%ProgramFiles(x86)%\Google\Play Games",
     ];
 
+    /// <summary>Developer emulator install root override. Empty falls back to
+    /// %ProgramFiles%\Google\Play Games Developer Emulator, then the uninstall registry entry.</summary>
+    public string? DeveloperEmulatorInstallPath { get; init; }
+
     public string ProtocolScheme { get; init; } = "googleplaygames";
 
     public IReadOnlyList<string> PlatformProcessPatterns { get; init; } =

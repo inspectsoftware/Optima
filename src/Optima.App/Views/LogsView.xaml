@@ -5,6 +5,8 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
       <RowDefinition />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
@@ -15,7 +17,75 @@
                  Style="{StaticResource Text.PageSubtitle}" />
     </StackPanel>
 
-    <Border Grid.Row="1" Background="{DynamicResource Brush.Surface}"
+    <!-- Error guide: one discrete place that explains every error code and its fix. -->
+    <Expander Grid.Row="1" Margin="22,10,22,0" HorizontalAlignment="Stretch"
+              HorizontalContentAlignment="Stretch">
+      <Expander.Header>
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="ERROR GUIDE" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+          <TextBlock Text="what every error means and how to fix it" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.TextMuted}" Margin="10,0,0,0" VerticalAlignment="Center" />
+        </StackPanel>
+      </Expander.Header>
+      <!-- Height-capped and scrolled inside its own pane: an expanded guide must never
+           grow past the window with nothing left to scroll. -->
+      <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto" Margin="0,6,0,4">
+      <StackPanel Margin="0">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="filter" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,0,6,0" />
+          <TextBox Grid.Column="1" Text="{Binding ErrorSearchText, UpdateSourceTrigger=PropertyChanged}"
+                   VerticalAlignment="Center" MaxWidth="360" HorizontalAlignment="Left" MinWidth="220"
+                   ToolTip="Filter by code, title or description" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding ErrorEntries}" Margin="0,8,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Expander Margin="0,0,0,6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                  <StackPanel Orientation="Horizontal">
+                    <Border Background="{DynamicResource Brush.Deep}" BorderBrush="{DynamicResource Brush.Hairline}"
+                            BorderThickness="1" Padding="6,2" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Code}" FontSize="{StaticResource Type.Micro}"
+                                 Foreground="{DynamicResource Brush.Accent}" />
+                    </Border>
+                    <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Label}" Margin="10,0,0,0"
+                               VerticalAlignment="Center" />
+                    <Button Style="{StaticResource GhostButton}" Content="copy" Padding="6,0" Margin="10,0,0,0"
+                            VerticalAlignment="Center"
+                            Command="{Binding DataContext.CopyErrorCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            ToolTip="Copy this entry as text" />
+                  </StackPanel>
+                </Expander.Header>
+                <!-- Selectable text: read-only TextBoxes so any part can be highlighted and copied. -->
+                <StackPanel Margin="12,6,0,2">
+                  <TextBox Text="{Binding WhatHappened, Mode=OneWay}" Style="{StaticResource SelectableText}" />
+                  <TextBox Text="{Binding WhyItHappens, Mode=OneWay, StringFormat='Why: {0}'}" Style="{StaticResource SelectableText}"
+                           Margin="0,4,0,0" />
+                  <TextBlock Text="HOW TO FIX" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.Accent}"
+                             Margin="0,6,0,2" />
+                  <ItemsControl ItemsSource="{Binding HowToFix}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBox Text="{Binding Mode=OneWay, StringFormat='- {0}'}" Style="{StaticResource SelectableText}"
+                                 Margin="0,1,0,1" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Expander>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      </ScrollViewer>
+    </Expander>
+
+    <Border Grid.Row="2" Background="{DynamicResource Brush.Surface}"
             BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,1,0,1" Padding="22,7">
       <Grid>
         <Grid.ColumnDefinitions>
@@ -46,7 +116,9 @@
       </Grid>
     </Border>
 
-    <Border Grid.Row="2" Background="{DynamicResource Brush.Deep}">
+    <!-- The log list owns the * row: a bounded viewport is what makes virtualization and its own
+         scrollbar work. In an Auto row it would render every line and overflow the window. -->
+    <Border Grid.Row="4" Background="{DynamicResource Brush.Deep}">
       <ListBox x:Name="LogList" ItemsSource="{Binding FilteredView}"
                Background="Transparent" BorderThickness="0" Padding="16,8"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -79,7 +151,7 @@
       </ListBox>
     </Border>
 
-    <Border Grid.Row="3" Background="{DynamicResource Brush.Surface}"
+    <Border Grid.Row="5" Background="{DynamicResource Brush.Surface}"
             BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,1,0,0" Padding="22,6">
       <Grid>
         <StackPanel Orientation="Horizontal">

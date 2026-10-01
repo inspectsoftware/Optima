@@ -7,6 +7,13 @@ artifacts/
 .vscode/
 TestResults/
 publish/
+Optima Indev/
+Optima Indev Dev/
+
+# Installer output and the portable Inno Setup compiler (fetched by installer.ps1).
+artifacts/
+tools/InnoSetup/
+tools/innosetup-*.exe
 *.binlog
 
 # Seeded design canvas (regenerated from design/*.dc.html by the design skill)

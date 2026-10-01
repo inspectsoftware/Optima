@@ -6,6 +6,7 @@ using Optima.App.Views;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Launch;
+using Optima.Core.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
@@ -44,6 +45,7 @@ public sealed partial class MainViewModel : ObservableObject
 {
     private readonly IRecoveryService _recovery;
     private readonly SettingsService _settings;
+    private readonly Services.PlayerSwitcherService _players;
     private readonly IPerformanceMonitor _monitor;
     private readonly ISessionStore _sessionStore;
     private readonly IProcessMonitor _processMonitor;
@@ -58,8 +60,8 @@ public sealed partial class MainViewModel : ObservableObject
         PerformanceViewModel performance,
         SessionsViewModel sessions,
         DisplayViewModel display,
-        SystemViewModel system,
         CompViewModel comp,
+        ExploreViewModel explore,
         DiagnosticsViewModel diagnostics,
         LogsViewModel logs,
         SettingsViewModel settingsPage,
@@ -70,6 +72,7 @@ public sealed partial class MainViewModel : ObservableObject
         StatusViewModel status,
         IRecoveryService recovery,
         SettingsService settings,
+        Services.PlayerSwitcherService players,
         IPerformanceMonitor monitor,
         ISessionStore sessionStore,
         IProcessMonitor processMonitor,
@@ -83,8 +86,8 @@ public sealed partial class MainViewModel : ObservableObject
         Performance = performance;
         Sessions = sessions;
         Display = display;
-        System = system;
         Comp = comp;
+        Explore = explore;
         Legal = legal;
         Diagnostics = diagnostics;
         Logs = logs;
@@ -95,6 +98,7 @@ public sealed partial class MainViewModel : ObservableObject
         Status = status;
         _recovery = recovery;
         _settings = settings;
+        _players = players;
         _monitor = monitor;
         _sessionStore = sessionStore;
         _processMonitor = processMonitor;
@@ -111,8 +115,8 @@ public sealed partial class MainViewModel : ObservableObject
     public PerformanceViewModel Performance { get; }
     public SessionsViewModel Sessions { get; }
     public DisplayViewModel Display { get; }
-    public SystemViewModel System { get; }
     public CompViewModel Comp { get; }
+    public ExploreViewModel Explore { get; }
     public LegalViewModel Legal { get; }
     public DiagnosticsViewModel Diagnostics { get; }
     public LogsViewModel Logs { get; }
@@ -121,6 +125,62 @@ public sealed partial class MainViewModel : ObservableObject
     public NewsViewModel News { get; }
     public UpdateLogViewModel UpdateLog { get; }
     public StatusViewModel Status { get; }
+
+    /// <summary>Saved identities for the title-bar account switcher.</summary>
+    public ObservableCollection<PlayerAccount> SavedAccounts { get; } = [];
+
+    [ObservableProperty]
+    private PlayerAccount? _activeAccount;
+
+    [RelayCommand]
+    private async Task SwitchAccountAsync(PlayerAccount? account)
+    {
+        // The placeholder (empty key) and the already-active identity never switch; snap
+        // the selection back so the closed combobox keeps showing the active account.
+        if (account is null || account.Key.Length == 0)
+        {
+            OnPropertyChanged(nameof(ActiveAccount));
+            return;
+        }
+        var settings = await _settings.GetSettingsAsync();
+        if (account.Matches(settings.PlayerIgn, settings.PlayerAccountId))
+        {
+            OnPropertyChanged(nameof(ActiveAccount));
+            return;
+        }
+        try
+        {
+            await _players.SwitchToAsync(account);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Switching the active account failed");
+        }
+    }
+
+    /// <summary>Placeholder shown in the switcher when there is nothing else to switch to.</summary>
+    public static readonly PlayerAccount NoOtherAccountPlaceholder =
+        new() { Key = string.Empty, Ign = "No other accounts added" };
+
+    private async Task ReloadSavedAccountsAsync()
+    {
+        var settings = await _settings.GetSettingsAsync();
+        SavedAccounts.Clear();
+        foreach (var account in settings.SavedAccounts)
+        {
+            SavedAccounts.Add(account with
+            {
+                IsActive = string.Equals(account.Ign.Trim(), settings.PlayerIgn.Trim(), StringComparison.OrdinalIgnoreCase),
+            });
+        }
+        // The dropdown must always open with something meaningful, even for a single account.
+        if (SavedAccounts.Count <= 1)
+        {
+            SavedAccounts.Add(NoOtherAccountPlaceholder);
+        }
+        ActiveAccount = SavedAccounts.FirstOrDefault(a => a.IsActive)
+            ?? SavedAccounts.FirstOrDefault(a => a.Matches(settings.PlayerIgn, settings.PlayerAccountId));
+    }
 
     [ObservableProperty]
     private object _currentPage;
@@ -137,9 +197,9 @@ public sealed partial class MainViewModel : ObservableObject
         new("02", "PLAY"),
         new("03", "PERFORMANCE"),
         new("04", "SESSIONS"),
-        new("05", "SYSTEM", "TUNE"),
-        new("06", "COMP"),
-        new("07", "DISPLAY"),
+        new("05", "COMP", "TUNE"),
+        new("06", "DISPLAY"),
+        new("07", "EXPLORE"),
         new("08", "SETTINGS", "SUPPORT"),
         new("09", "DIAGNOSTICS"),
         new("10", "LOGS"),
@@ -183,8 +243,8 @@ public sealed partial class MainViewModel : ObservableObject
             "PERFORMANCE" => Performance,
             "SESSIONS" => Sessions,
             "DISPLAY" => Display,
-            "SYSTEM" => System,
             "COMP" => Comp,
+            "EXPLORE" => Explore,
             "LEGAL" => Legal,
             "DIAGNOSTICS" => Diagnostics,
             "LOGS" => Logs,
@@ -208,11 +268,11 @@ public sealed partial class MainViewModel : ObservableObject
                 case DisplayViewModel d:
                     await d.InitializeAsync();
                     break;
-                case SystemViewModel s:
-                    await s.InitializeAsync();
-                    break;
                 case CompViewModel c:
                     await c.InitializeAsync();
+                    break;
+                case ExploreViewModel e:
+                    await e.InitializeAsync();
                     break;
                 case LegalViewModel l:
                     await l.InitializeAsync();
@@ -268,6 +328,9 @@ public sealed partial class MainViewModel : ObservableObject
             DeveloperModeVisible = settings.DeveloperMode;
             RailCollapsed = settings.RailCollapsed;
             App.LogLevelSwitch.MinimumLevel = LogsViewModel.ToSerilogLevel(settings.MinimumLogLevel);
+            await ReloadSavedAccountsAsync();
+            // SettingsChanged can fire from any thread; the collections must be touched on the UI one.
+            _settings.SettingsChanged += async (_, _) => await Application.Current.Dispatcher.InvokeAsync(ReloadSavedAccountsAsync);
 
             if (!settings.FirstRunCompleted)
             {
@@ -282,6 +345,7 @@ public sealed partial class MainViewModel : ObservableObject
             await Status.RefreshAsync();
             await Home.InitializeAsync();
             await Play.InitializeAsync();
+            _ = Play.InitializeCrashBannerAsync();
             await _presence.StartAsync();
             await _gameWatch.StartAsync();
 

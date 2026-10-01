@@ -27,7 +27,13 @@ public sealed record CopsPlayerProfile(
     long UserId,
     string Name,
     int Level,
-    IReadOnlyList<CopsSeasonStats> Seasons)
+    IReadOnlyList<CopsSeasonStats> Seasons,
+    string? ClanName = null,
+    string? ClanTag = null,
+    int? Rank = null,
+    long? Mmr = null,
+    int? HighestRank = null,
+    long? LeaderboardPosition = null)
 {
     public CopsSeasonStats? CurrentSeason => Seasons.Count == 0 ? null : Seasons.MaxBy(s => s.Season);
 }
@@ -117,9 +123,59 @@ public static class CopsProfileParser
                 }
             }
 
+            // Ranked ladder facts live next to the seasonal rows.
+            int? rank = null;
+            long? mmr = null;
+            int? highestRank = null;
+            long? leaderboardPosition = null;
+            if (root.TryGetProperty("stats", out var statsRoot))
+            {
+                if (statsRoot.TryGetProperty("ranked", out var ranked)
+                    && ranked.ValueKind == JsonValueKind.Object)
+                {
+                    if (ranked.TryGetProperty("rank", out var r) && r.TryGetInt32(out var rv))
+                    {
+                        rank = rv;
+                    }
+                    if (ranked.TryGetProperty("mmr", out var m) && m.TryGetInt64(out var mv))
+                    {
+                        mmr = mv;
+                    }
+                    if (ranked.TryGetProperty("highest_rank", out var hr) && hr.TryGetInt32(out var hrv))
+                    {
+                        highestRank = hrv;
+                    }
+                }
+                if (statsRoot.TryGetProperty("leaderboard_data", out var lb)
+                    && lb.ValueKind == JsonValueKind.Object
+                    && lb.TryGetProperty("position", out var pos)
+                    && pos.TryGetInt64(out var posv))
+                {
+                    leaderboardPosition = posv;
+                }
+            }
+
+            // Clan membership travels with the profile when the player is in one.
+            string? clanName = null;
+            string? clanTag = null;
+            if (root.TryGetProperty("clan", out var clan)
+                && clan.ValueKind == JsonValueKind.Object
+                && clan.TryGetProperty("basicInfo", out var clanBasic)
+                && clanBasic.ValueKind == JsonValueKind.Object)
+            {
+                if (clanBasic.TryGetProperty("name", out var cn) && cn.ValueKind == JsonValueKind.String)
+                {
+                    clanName = cn.GetString();
+                }
+                if (clanBasic.TryGetProperty("tag", out var ct) && ct.ValueKind == JsonValueKind.String)
+                {
+                    clanTag = ct.GetString();
+                }
+            }
+
             return name.Length == 0 && userId == 0 && seasons.Count == 0
                 ? null
-                : new CopsPlayerProfile(userId, name, level, seasons);
+                : new CopsPlayerProfile(userId, name, level, seasons, clanName, clanTag, rank, mmr, highestRank, leaderboardPosition);
         }
         catch (JsonException)
         {

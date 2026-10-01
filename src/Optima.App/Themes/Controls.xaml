@@ -8,8 +8,26 @@
   <conv:InverseBoolConverter x:Key="InverseBool" />
   <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
   <conv:EmptyStringToCollapsedConverter x:Key="EmptyToCollapsed" />
+  <conv:SaveMarkToBrushConverter x:Key="SaveMarkBrush" />
+
+  <!-- Selectable prose: read-only, chrome-free TextBox so any text on a page can be
+       highlighted and copied (Ctrl+C or the context menu) like ordinary text. -->
+  <Style x:Key="SelectableText" TargetType="TextBox">
+    <Setter Property="IsReadOnly" Value="True" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Micro}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    <Setter Property="SelectionBrush" Value="{DynamicResource Brush.Accent}" />
+    <Setter Property="SelectionTextBrush" Value="{DynamicResource Brush.Text}" />
+    <Setter Property="Cursor" Value="IBeam" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
   <conv:StatusKindToBrushConverter x:Key="StatusKindBrush" />
   <conv:DiagnosticStatusToBrushConverter x:Key="DiagStatusBrush" />
+  <conv:PlayGuideCheckStateToBrushConverter x:Key="GuideStateBrush" />
   <conv:DiagnosticStatusToTextConverter x:Key="DiagStatusText" />
   <conv:DiagnosticStatusToTagConverter x:Key="DiagStatusTag" />
   <conv:DiagnosticStatusIsProblemConverter x:Key="DiagStatusIsProblem" />
@@ -641,13 +659,14 @@
                        Foreground="{DynamicResource Brush.TextMuted}"
                        VerticalAlignment="Center" Visibility="Collapsed" />
             <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False"
-                   Placement="Bottom" HorizontalOffset="-12" VerticalOffset="-8"
+                   Placement="Bottom" HorizontalOffset="0" VerticalOffset="1"
                    PopupAnimation="None"
                    IsOpen="{TemplateBinding IsDropDownOpen}">
               <ctl:ChamferBorder Background="{DynamicResource Brush.SurfaceRaised}"
                                  Chamfer="{StaticResource Chamfer.Control}"
                                  TopLine="{DynamicResource Brush.Glass.Highlight}" Padding="4"
-                                 Margin="12" Effect="{StaticResource Shadow.Popup}"
+                                 Margin="0" Effect="{StaticResource Shadow.Popup}"
+                                 HorizontalAlignment="Left"
                                  MinWidth="{TemplateBinding ActualWidth}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="{TemplateBinding MaxDropDownHeight}">
                   <ItemsPresenter />

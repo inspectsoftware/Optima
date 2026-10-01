@@ -35,6 +35,26 @@ public sealed class InverseBoolConverter : IValueConverter
         => value is not true;
 }
 
+/// <summary>PlayGuideCheckState → tint, so the setup guide badges reuse the same palette as diagnostics.</summary>
+public sealed class PlayGuideCheckStateToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var key = value switch
+        {
+            PlayGuideCheckState.Pass => "Brush.Ok",
+            PlayGuideCheckState.Warn => "Brush.Warn",
+            PlayGuideCheckState.Fail => "Brush.Fail",
+            PlayGuideCheckState.Running => "Brush.Accent",
+            _ => "Brush.TextMuted",
+        };
+        return Application.Current.FindResource(key);
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 public sealed class DiagnosticStatusToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -157,6 +177,19 @@ public sealed class EmptyStringToCollapsedConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object parameter, CultureInfo culture)
         => string.IsNullOrWhiteSpace(value as string) ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+/// <summary>The save bar's [ OK ] / [ ! ] tag: green when saved, accent when there is work to do.</summary>
+public sealed class SaveMarkToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var key = value as string == "[ OK ]" ? "Brush.Ok" : "Brush.Accent";
+        return Application.Current.FindResource(key);
+    }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();

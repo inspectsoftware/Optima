@@ -34,6 +34,8 @@ public static class AppServices
 
         services.AddSingleton<Func<CancellationToken, Task<DetectionRules>>>(sp =>
             ct => sp.GetRequiredService<SettingsService>().GetDetectionRulesAsync(ct));
+        services.AddSingleton<Func<CancellationToken, Task<AppSettings>>>(sp =>
+            ct => sp.GetRequiredService<SettingsService>().GetSettingsAsync(ct));
 
         services.AddSingleton<IRegistryProbe, WindowsRegistryProbe>();
         services.AddSingleton<IFileSystemProbe, WindowsFileSystemProbe>();
@@ -56,6 +58,7 @@ public static class AppServices
         services.AddSingleton<IGameTerminator, WindowsGameTerminator>();
         services.AddSingleton<ITweakService, WindowsTweakService>();
         services.AddSingleton<IBackgroundCleanupService, WindowsBackgroundCleanupService>();
+        services.AddSingleton<Optima.Platform.Windows.Services.DevEmulatorSettingsService>();
         services.AddSingleton<PnpDeviceLocator>();
         services.AddSingleton<IElevationBroker, ElevationBrokerClient>();
 
@@ -68,6 +71,7 @@ public static class AppServices
         services.AddSingleton<IRecoveryService, RecoveryService>();
 
         services.AddSingleton<IGameLauncher, ProtocolUriLauncher>();
+        services.AddSingleton<IGameLauncher, DeveloperEmulatorLauncher>();
         services.AddSingleton<IGameLauncher, BootstrapperExeLauncher>();
         services.AddSingleton<IGameLauncher, ShortcutLauncher>();
         services.AddSingleton<IGameLauncher, CustomCommandLauncher>();
@@ -77,7 +81,13 @@ public static class AppServices
         services.AddSingleton<GpgLogReader>();
         services.AddSingleton<CrashSentinel>();
         services.AddSingleton<Optima.Core.Stats.CopsApiClient>();
+        services.AddSingleton<Optima.App.Services.PlayerSwitcherService>();
         services.AddSingleton<Optima.App.Services.DiscordPresenceService>();
+        services.AddSingleton(sp => new Optima.Core.Launch.CrashAutoRelaunchService(
+            sp.GetRequiredService<SettingsService>(),
+            profile => sp.GetRequiredService<PlayViewModel>().RelaunchAfterCrashAsync(profile),
+            sp.GetRequiredService<ILogger<Optima.Core.Launch.CrashAutoRelaunchService>>()));
+        services.AddSingleton<Optima.Core.Launch.SessionTweakService>();
         services.AddSingleton<Optima.Core.News.CopsNewsService>();
         services.AddSingleton<Optima.Core.Updates.LauncherUpdateService>();
         services.AddSingleton<Optima.App.Services.FirstRunFixService>();
@@ -86,7 +96,11 @@ public static class AppServices
             sp.GetRequiredService<GamePresenceService>(),
             sp.GetRequiredService<SettingsService>(),
             sp.GetRequiredService<ISessionStore>(),
-            (ign, ct) => sp.GetRequiredService<Optima.Core.Stats.CopsApiClient>().GetProfileByNameAsync(ign, ct),
+            async (ign, accountId, ct) =>
+            {
+                var lookup = await sp.GetRequiredService<Optima.Core.Stats.CopsApiClient>().LookupPlayerAsync(ign, accountId, ct).ConfigureAwait(false);
+                return lookup.IsFound ? lookup.Profile : null;
+            },
             sp.GetRequiredService<ILogger<Optima.Core.Stats.SessionStatsEnricher>>()));
 
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();
@@ -113,15 +127,17 @@ public static class AppServices
         services.AddSingleton<IDiagnosticCheck, AdminPermissionsCheck>();
 
         services.AddSingleton<StatusViewModel>();
+        services.AddSingleton<PlayerStatsViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<HomeViewModel>();
         services.AddSingleton<PlayViewModel>();
+        services.AddSingleton<PlayGuideViewModel>();
         services.AddSingleton<PerformanceViewModel>();
         services.AddSingleton<SessionsViewModel>();
         services.AddSingleton<GuidedBenchmarkViewModel>();
         services.AddSingleton<DisplayViewModel>();
-        services.AddSingleton<SystemViewModel>();
         services.AddSingleton<CompViewModel>();
+        services.AddSingleton<ExploreViewModel>();
         services.AddSingleton<LegalViewModel>();
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<LogsViewModel>();

@@ -20,6 +20,8 @@ public sealed partial class CommandExecutor : IAsyncDisposable
 
     private static readonly string[] AllowedWindowsFeatures = ["HypervisorPlatform", "VirtualMachinePlatform"];
 
+    private static readonly Regex ProgressPercentPattern = new(@"(\d+(?:\.\d+)?)%", RegexOptions.Compiled);
+
     private readonly Func<IpcEvent, Task> _publishEvent;
     private EtwFrametimeCollector? _etw;
     private HardwareStreamer? _hardware;
@@ -373,7 +375,25 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail("The feature name is not on the allowed list.");
                 }
                 var (exitCode, output) = await RunProcessAsync(
-                    "dism.exe", $"/online /enable-feature /featurename:{feature} /norestart", ct);
+                    "dism.exe", $"/online /enable-feature /featurename:{feature} /norestart", ct,
+                    timeout: TimeSpan.FromMinutes(8),
+                    onOutputLine: async line =>
+                    {
+                        var match = ProgressPercentPattern.Match(line);
+                        if (match.Success)
+                        {
+                            var percent = double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+                            await _publishEvent(new IpcEvent
+                            {
+                                Kind = "feature-progress",
+                                Data =
+                                {
+                                    ["feature"] = feature,
+                                    ["percent"] = percent.ToString("0.#", CultureInfo.InvariantCulture),
+                                },
+                            });
+                        }
+                    });
                 if (exitCode is not (0 or 3010))
                 {
                     return fail($"dism exited with {exitCode}: {Truncate(output)}");
@@ -383,6 +403,63 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     ["restartRequired"] = exitCode == 3010
                         || output.Contains("restart", StringComparison.OrdinalIgnoreCase) ? "1" : "0",
                 });
+            }
+
+            case IpcCommand.SetDevEmulatorRefreshRate:
+            {
+                // The community FPS-unlock: Google's Service.exe.config clamps the developer
+                // emulator display to 60 Hz; these two settings carry the real refresh rate.
+                if (!request.Args.TryGetValue("refreshRate", out var rateText)
+                    || !int.TryParse(rateText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rate)
+                    || rate is < 30 or > 240)
+                {
+                    return fail("The refresh rate must be a number between 30 and 240.");
+                }
+
+                var configPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "Google", "Play Games Developer Emulator", "current", "service", "Service.exe.config");
+                if (!File.Exists(configPath))
+                {
+                    return fail("Service.exe.config was not found: " + configPath);
+                }
+
+                try
+                {
+                    var doc = new System.Xml.XmlDocument();
+                    doc.Load(configPath);
+                    var settings = doc.SelectSingleNode(
+                        "configuration/applicationSettings/Google.Hpe.Service.Properties.EmulatorSettings");
+                    if (settings is null)
+                    {
+                        return fail("The EmulatorSettings section is missing from Service.exe.config.");
+                    }
+
+                    foreach (var (name, value) in new[]
+                    {
+                        ("EmulatorRefreshRate", rate.ToString(CultureInfo.InvariantCulture)),
+                        ("EmulatorGpuRefreshRate", $"refresh-rate={rate}"),
+                    })
+                    {
+                        var node = settings.SelectSingleNode($"setting[@name='{name}']/value");
+                        if (node is null)
+                        {
+                            return fail($"The {name} setting is missing from Service.exe.config.");
+                        }
+                        node.InnerText = value;
+                    }
+
+                    doc.Save(configPath);
+                    return ok(new Dictionary<string, string>
+                    {
+                        ["configPath"] = configPath,
+                        ["refreshRate"] = rate.ToString(CultureInfo.InvariantCulture),
+                    });
+                }
+                catch (Exception ex)
+                {
+                    return fail("Could not update Service.exe.config: " + ex.Message);
+                }
             }
 
             case IpcCommand.Shutdown:
@@ -508,7 +585,9 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         return results.Distinct().ToList();
     }
 
-    private static async Task<(int ExitCode, string Output)> RunProcessAsync(string fileName, string arguments, CancellationToken ct)
+    private static async Task<(int ExitCode, string Output)> RunProcessAsync(
+        string fileName, string arguments, CancellationToken ct, TimeSpan? timeout = null,
+        Func<string, Task>? onOutputLine = null)
     {
         using var process = new Process
         {
@@ -521,10 +600,87 @@ public sealed partial class CommandExecutor : IAsyncDisposable
             },
         };
         process.Start();
-        var output = await process.StandardOutput.ReadToEndAsync(ct);
-        var error = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
-        return (process.ExitCode, output + error);
+        // A hung tool (dism against a stuck servicing stack, for example) must not wedge the elevated
+        // helper forever: after the timeout the process tree is killed and a synthetic failure returns.
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        if (timeout is { } limit)
+        {
+            lifetime.CancelAfter(limit);
+        }
+        try
+        {
+            string output;
+            if (onOutputLine is null)
+            {
+                output = await process.StandardOutput.ReadToEndAsync(lifetime.Token);
+            }
+            else
+            {
+                // Tools like dism redraw progress with \r on one line, so ReadLine/ReadToEnd never see the
+                // intermediate updates. Split on both \r and \n as characters arrive to stream them.
+                var errorTask = process.StandardError.ReadToEndAsync(lifetime.Token);
+                output = await StreamLinesAsync(process.StandardOutput, onOutputLine, lifetime.Token);
+                var error = await errorTask;
+                await process.WaitForExitAsync(lifetime.Token);
+                return (process.ExitCode, output + error);
+            }
+            var errorText = await process.StandardError.ReadToEndAsync(lifetime.Token);
+            await process.WaitForExitAsync(lifetime.Token);
+            return (process.ExitCode, output + errorText);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // already gone or access denied; either way there is nothing more to do
+            }
+            return (-1, $"{fileName} was killed after {timeout?.TotalMinutes ?? 0:F0} min with no result.");
+        }
+    }
+
+    private static async Task<string> StreamLinesAsync(
+        StreamReader reader, Func<string, Task> onLine, CancellationToken ct)
+    {
+        var buffer = new char[512];
+        var line = new StringBuilder();
+        var all = new StringBuilder();
+        while (true)
+        {
+            var read = await reader.ReadAsync(buffer.AsMemory(), ct);
+            if (read == 0)
+            {
+                break;
+            }
+            for (var i = 0; i < read; i++)
+            {
+                var ch = buffer[i];
+                if (ch is '\r' or '\n')
+                {
+                    if (line.Length > 0)
+                    {
+                        var text = line.ToString();
+                        all.AppendLine(text);
+                        await onLine(text);
+                        line.Clear();
+                    }
+                }
+                else
+                {
+                    line.Append(ch);
+                }
+            }
+        }
+        if (line.Length > 0)
+        {
+            var text = line.ToString();
+            all.Append(text);
+            await onLine(text);
+        }
+        return all.ToString();
     }
 
     private static string Truncate(string text)
