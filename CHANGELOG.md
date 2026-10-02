@@ -4,6 +4,24 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-02 - 0.7.5: the installer installs the virtual display driver
+
+- The setup now installs the Optima virtual display driver as part of installing Optima: one
+  administrator prompt once the files are in place, with the step listed on the task page so it
+  can be unchecked. Before this the setup only copied the driver files next to Optima.exe and
+  left the install to be found on the DISPLAY page, so a fresh Optima could come up with no
+  virtual display at all. The app keeps its own Install driver button for anyone who skips the
+  step, declines the prompt, or removes the driver later.
+- Installing twice no longer doubles anything: a run over an existing install refreshes the
+  staged driver package and leaves the display device alone, because a second device node would
+  mean a second virtual display.
+- The driver's settings file is written before its device node exists, so the driver has modes
+  the first time it loads, and the app now repairs a missing settings file instead of leaving
+  the driver advertising nothing.
+- The setup refuses to build when the publish folder has no driver package or no elevated
+  helper, so a driver-less installer cannot be published again.
+- The version stays 0.7.5: this release only fixes the installer.
+
 ## 2026-10-01 - 0.7.5: leaderboards, accounts and a real installer
 
 - Optima ships as an installer now: a per-user setup with the Start Menu shortcut, the

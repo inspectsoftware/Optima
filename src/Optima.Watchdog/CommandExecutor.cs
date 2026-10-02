@@ -191,18 +191,10 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail("Invalid hardware id.");
                 }
 
-                var (stageCode, stageOutput) = await RunProcessAsync("pnputil.exe", $"/add-driver \"{infPath}\" /install", ct);
-                HelperLog.Write($"pnputil /add-driver exit={stageCode}: {Truncate(stageOutput)}");
-                if (stageCode != 0)
-                {
-                    return fail($"pnputil could not stage the driver package (exit {stageCode}). {Truncate(stageOutput)}");
-                }
-
-                var (created, reboot, createError) = DeviceInstaller.CreateRootDevice(hardwareId, infPath);
-                HelperLog.Write($"CreateRootDevice created={created} reboot={reboot} error={createError}");
-                return created
-                    ? ok(new Dictionary<string, string> { ["restartRequired"] = reboot ? "1" : "0" })
-                    : fail(createError);
+                var installed = await InstallDriverPackageAsync(infPath, hardwareId, ct);
+                return installed.Success
+                    ? ok(new Dictionary<string, string> { ["restartRequired"] = installed.RebootRequired ? "1" : "0" })
+                    : fail(installed.Error);
             }
 
             case IpcCommand.UninstallDriver:
@@ -468,6 +460,35 @@ public sealed partial class CommandExecutor : IAsyncDisposable
             default:
                 return fail($"Command {request.Command} is not supported.");
         }
+    }
+
+    /// <summary>
+    /// Stages a driver package and gives it a device node. Both callers go through here: the
+    /// InstallDriver command from the running app, and the installer's one-shot mode, which runs
+    /// the elevated helper directly. Re-running it is safe, because the device node is only
+    /// created when no present device carries the hardware id yet.
+    /// </summary>
+    internal static async Task<(bool Success, bool RebootRequired, bool AlreadyPresent, string Error)> InstallDriverPackageAsync(
+        string infPath, string hardwareId, CancellationToken ct)
+    {
+        var (stageCode, stageOutput) = await RunProcessAsync("pnputil.exe", $"/add-driver \"{infPath}\" /install", ct);
+        HelperLog.Write($"pnputil /add-driver exit={stageCode}: {Truncate(stageOutput)}");
+        if (stageCode != 0)
+        {
+            return (false, false, false, $"pnputil could not stage the driver package (exit {stageCode}). {Truncate(stageOutput)}");
+        }
+
+        if (DeviceInstaller.RootDeviceExists(hardwareId))
+        {
+            HelperLog.Write($"A present device already carries {hardwareId}; the package was updated in place");
+            return (true, false, true, string.Empty);
+        }
+
+        var (created, reboot, createError) = DeviceInstaller.CreateRootDevice(hardwareId, infPath);
+        HelperLog.Write($"CreateRootDevice created={created} reboot={reboot} error={createError}");
+        return created
+            ? (true, reboot, false, string.Empty)
+            : (false, false, false, createError);
     }
 
     private static bool IsAcceptableInfPath(string path)

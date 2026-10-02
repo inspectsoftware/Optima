@@ -5,10 +5,14 @@
 ; The script packs whatever publish\ currently holds, so run publish.ps1 first
 ; (installer.ps1 does both steps). Produces artifacts\Optima-Setup-<version>.exe.
 ;
-; Install model: per-user, no administrator prompt. Files go to
-; %LOCALAPPDATA%\Programs\Optima; registry writes are HKCU only. Uninstall
-; removes the files, the shortcuts and Optima's own registry values, but never
-; touches user data under %LOCALAPPDATA%\Optima\ (config, profiles, sessions).
+; Install model: per-user, so the wizard itself never asks for administrator rights:
+; files go to %LOCALAPPDATA%\Programs\Optima and registry writes are HKCU only. The
+; one step that does need them is the bundled virtual display driver, so a task
+; (checked by default) hands that to Optima's own elevated helper once the files are
+; in place: one UAC prompt. Declining it still leaves a working Optima, because the
+; Display page offers the same install later. Uninstall removes the files, the
+; shortcuts and Optima's own registry values, but never touches user data under
+; %LOCALAPPDATA%\Optima\ (config, profiles, sessions) or the installed driver.
 
 #ifndef AppVersion
   ; Fallback for compiling outside installer.ps1 (e.g. from the Inno IDE) when
@@ -17,6 +21,15 @@
 #endif
 
 #define AppName "Optima"
+
+; A setup that ships without the driver package and the helper that installs it would bring
+; back exactly the bug this script now fixes, so refuse to build one.
+#if !DirExists("publish\drivers")
+  #error publish\drivers is missing: run publish.ps1 first, or use installer.ps1 -Publish.
+#endif
+#if !FileExists("publish\Optima.Watchdog.exe")
+  #error publish\Optima.Watchdog.exe is missing: the driver install needs the elevated helper.
+#endif
 
 [Setup]
 AppId={{f4474d52-ee70-458e-b99d-5c3eef769b1c}
@@ -52,6 +65,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; Settings toggle manages (AutostartService), so installer and app never
 ; disagree about the mechanism.
 Name: "autostart"; Description: "Start Optima automatically at sign-in (minimized to the tray)"; GroupDescription: "Startup:"
+; A virtual display is a machine-wide device, so this step alone needs Windows to
+; approve an administrator prompt. Checked by default: the Optima Virtualization
+; features only work once the driver is installed.
+Name: "vdddriver"; Description: "Install the Optima virtual display driver (Windows asks once for administrator approval)"; GroupDescription: "Virtual display:"
 
 [Files]
 Source: "publish\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion restartreplace
@@ -68,6 +85,9 @@ const
   RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
   AutostartValueName = 'Optima';
   SingleInstanceMutex = 'Local\Optima.SingleInstance';
+  BundledDriverFolder = 'drivers';
+  ElevatedHelperFileName = 'Optima.Watchdog.exe';
+  DriverTaskName = 'vdddriver';
 
 { True when Optima currently holds its single-instance mutex. }
 function OptimaIsRunning(): Boolean;
@@ -116,10 +136,70 @@ begin
   end;
 end;
 
+{ Installs the bundled virtual display driver.
+
+  Setup runs as the unprivileged user, and creating a display device node is not
+  something a per-user process may do, so the elevated helper does the work: its
+  manifest makes Windows show one administrator prompt. The helper only stages the
+  package when a device with the driver's hardware id is already present, so running
+  a new setup over an existing install never adds a second virtual display. }
+procedure InstallBundledVirtualDisplayDriver();
+var
+  ResultCode: Integer;
+  DriverFolder, HelperPath: String;
+begin
+  DriverFolder := ExpandConstant('{app}\') + BundledDriverFolder;
+  if not DirExists(DriverFolder) then
+  begin
+    Log('No bundled driver folder, skipping the virtual display driver install.');
+    Exit;
+  end;
+
+  HelperPath := ExpandConstant('{app}\') + ElevatedHelperFileName;
+  if not FileExists(HelperPath) then
+  begin
+    Log('No elevated helper next to Optima.exe, skipping the virtual display driver install.');
+    Exit;
+  end;
+
+  Log('Installing the bundled virtual display driver.');
+  if ShellExec('runas', HelperPath, '--install-driver "' + DriverFolder + '"',
+               ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if ResultCode = 0 then
+    begin
+      Log('Virtual display driver installed.');
+      Exit;
+    end;
+    if ResultCode = 2 then
+    begin
+      Log('The bundled folder holds no driver package for this architecture.');
+      Exit;
+    end;
+    Log(Format('The virtual display driver install failed (exit code %d).', [ResultCode]));
+  end
+  else
+    Log('The elevated helper for the virtual display driver could not be started.');
+
+  { Optional by design: Optima runs without the driver, and the Display page installs
+    it later with the same single administrator prompt. }
+  if not WizardSilent() then
+    MsgBox('Optima could not install its virtual display driver automatically.' + #13#10 + #13#10 +
+           'Install it from inside Optima instead: open the DISPLAY page and choose ' +
+           '"Install driver". Everything else in Optima works without it.',
+           mbInformation, MB_OK);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
+    { The task is checked by default, and silent installs keep that default, so a run of the
+      setup always tries to install the driver. Unattended installs that want none of it can
+      pass /MERGETASKS=!vdddriver, and the checkbox does the same in the wizard. }
+    if WizardIsTaskSelected(DriverTaskName) then
+      InstallBundledVirtualDisplayDriver();
+
     if WizardIsTaskSelected('autostart') then
       RegWriteStringValue(HKEY_CURRENT_USER, RunKey, AutostartValueName, AutostartCommandLine())
     else if AutostartPointsAtThisInstall() then

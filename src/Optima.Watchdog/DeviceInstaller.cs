@@ -104,6 +104,48 @@ internal static class DeviceInstaller
         return (true, rebootRequired, string.Empty);
     }
 
+    /// <summary>
+    /// True when a present device already carries this hardware id. Installing the package again
+    /// then only needs to update the staged driver, because creating a second device node would
+    /// put a second virtual display on the desktop.
+    /// </summary>
+    internal static bool RootDeviceExists(string hardwareId)
+    {
+        var classGuid = DisplayClassGuid;
+        var deviceInfoSet = SetupDiGetClassDevs(ref classGuid, IntPtr.Zero, IntPtr.Zero, DIGCF_PRESENT);
+        if (deviceInfoSet == IntPtr.Zero || deviceInfoSet == new IntPtr(-1))
+        {
+            return false;
+        }
+
+        try
+        {
+            for (uint index = 0; ; index++)
+            {
+                var deviceInfoData = new SP_DEVINFO_DATA { cbSize = Marshal.SizeOf<SP_DEVINFO_DATA>() };
+                if (!SetupDiEnumDeviceInfo(deviceInfoSet, index, ref deviceInfoData))
+                {
+                    if (Marshal.GetLastWin32Error() == ERROR_NO_MORE_ITEMS)
+                    {
+                        break;
+                    }
+                    continue;
+                }
+
+                if (MatchesHardwareId(deviceInfoSet, ref deviceInfoData, hardwareId))
+                {
+                    return true;
+                }
+            }
+        }
+        finally
+        {
+            SetupDiDestroyDeviceInfoList(deviceInfoSet);
+        }
+
+        return false;
+    }
+
     internal static (bool Success, int Removed, string Error) RemoveRootDevices(string hardwareId)
     {
         var classGuid = DisplayClassGuid;

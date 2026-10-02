@@ -1,8 +1,9 @@
 # Bundled virtual display driver
 
-This folder ships inside the build. Optima installs the driver from here on demand from
-the Display page: one click, one administrator prompt, no Device Manager, no `devcon`, no
-manual INF right-click.
+This folder ships inside the build, and both installers use it: the Optima setup installs the
+driver from here while it installs the app (one administrator prompt, skippable), and the
+Display page can install or reinstall it later with one click. Either way there is no Device
+Manager, no `devcon` and no manual INF right-click.
 
 ## What is bundled
 
@@ -45,13 +46,20 @@ root-enumerated one wins, since that is the only kind the installer can create.
 
 ## What Optima does on install
 
-All of this runs inside the elevated helper:
+The setup runs exactly this, through `Optima.Watchdog.exe --install-driver <folder>`, and the
+app's Display page runs it later for a user who skipped the step or wants the driver back. All
+of it runs inside the elevated helper:
 
 1. `pnputil /add-driver <inf> /install` stages the package into the Windows DriverStore.
 2. Creates the **root-enumerated device node** via SetupAPI. This is the step people
    normally need `devcon` for: an IddCx display is enumerated by ROOT rather than by a bus,
    so staging the package alone installs a driver that never produces a device.
 3. Writes a default `vdd_settings.xml` if none exists. An existing file is never overwritten.
+
+When the setup runs it, step 3 happens before step 2, so the driver already has modes to
+advertise the first time it loads. Running it against an install that already has the device
+only refreshes the staged package: a second device node would put a second virtual display on
+the desktop, so it is never created.
 
 Uninstall reverses steps 2 and 1, and is available from the Display page once installed.
 

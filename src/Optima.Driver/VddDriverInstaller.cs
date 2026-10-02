@@ -35,66 +35,17 @@ public sealed class VddDriverInstaller : IDriverInstaller
 
     public DriverPackageInfo? FindBundledPackage()
     {
+        // The same selection runs inside the elevated helper's one-shot install mode, so the
+        // package the setup installs is always the package this app would have installed.
         var folder = Path.Combine(AppContext.BaseDirectory, BundledDriverFolder);
-        if (!Directory.Exists(folder))
+        var package = BundledDriverPackage.Find(folder, note => _logger.LogDebug("{Note}", note));
+
+        if (package is not null && Interlocked.Exchange(ref _lastLoggedInfPath, package.InfPath) != package.InfPath)
         {
-            return null;
+            _logger.LogInformation("Bundled driver selected: {Name} {HardwareId} for {Arch} ({Inf})",
+                package.DisplayName, package.HardwareId, RuntimeInformation.OSArchitecture, package.InfPath);
         }
-
-        var osArchitecture = RuntimeInformation.OSArchitecture;
-        DriverPackageInfo? fallback = null;
-
-        foreach (var inf in Directory.EnumerateFiles(folder, "*.inf", SearchOption.AllDirectories).OrderBy(p => p))
-        {
-            try
-            {
-                var parsed = InfFile.Parse(File.ReadAllText(inf));
-                if (string.IsNullOrWhiteSpace(parsed.HardwareId))
-                {
-                    _logger.LogDebug("Skipping {Inf}: no hardware id declared", inf);
-                    continue;
-                }
-
-                // The installer creates a Display-class device node, so anything else in
-                // the folder (an audio driver, for instance) must not be selected.
-                if (!string.Equals(parsed.DeviceClass, "Display", StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger.LogDebug("Skipping {Inf}: class is {Class}, not Display", inf, parsed.DeviceClass);
-                    continue;
-                }
-
-                var package = new DriverPackageInfo
-                {
-                    InfPath = inf,
-                    HardwareId = parsed.HardwareId,
-                    Provider = parsed.Provider ?? string.Empty,
-                    DisplayName = parsed.Description ?? Path.GetFileNameWithoutExtension(inf),
-                    HasCatalog = Directory.EnumerateFiles(Path.GetDirectoryName(inf)!, "*.cat").Any(),
-                };
-
-                if (parsed.TargetsArchitecture(osArchitecture))
-                {
-                    if (Interlocked.Exchange(ref _lastLoggedInfPath, inf) != inf)
-                    {
-                        _logger.LogInformation("Bundled driver selected: {Name} {HardwareId} for {Arch} ({Inf})",
-                            package.DisplayName, package.HardwareId, osArchitecture, inf);
-                    }
-                    return package;
-                }
-
-                fallback ??= package;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                _logger.LogWarning(ex, "Could not read driver package {Inf}", inf);
-            }
-        }
-
-        if (fallback is not null)
-        {
-            _logger.LogWarning("A bundled driver was found but none targets {Arch}", osArchitecture);
-        }
-        return null;
+        return package;
     }
 
     public async Task<DriverState> GetStateAsync(CancellationToken ct = default)
@@ -235,7 +186,7 @@ public sealed class VddDriverInstaller : IDriverInstaller
     {
         var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
         var path = string.IsNullOrWhiteSpace(settings.VddSettingsPath)
-            ? MttVddProvider.DefaultSettingsPath
+            ? VddSettingsDefaults.DefaultPath
             : settings.VddSettingsPath;
 
         if (File.Exists(path))
@@ -246,7 +197,7 @@ public sealed class VddDriverInstaller : IDriverInstaller
         var response = await _elevation.SendAsync(new IpcRequest
         {
             Command = IpcCommand.EnsureVddSettings,
-            Args = { ["path"] = path, ["content"] = DefaultSettingsXml },
+            Args = { ["path"] = path, ["content"] = VddSettingsDefaults.DefaultXml },
         }, ct).ConfigureAwait(false);
 
         if (response.Success)
@@ -258,40 +209,4 @@ public sealed class VddDriverInstaller : IDriverInstaller
             _logger.LogWarning("Could not create the driver settings file at {Path}: {Error}", path, response.Error);
         }
     }
-
-    internal const string DefaultSettingsXml = """
-        <?xml version='1.0' encoding='utf-8'?>
-        <vdd_settings>
-            <monitors>
-                <count>1</count>
-            </monitors>
-            <gpu>
-                <friendlyname>default</friendlyname>
-            </gpu>
-            <global>
-                <g_refresh_rate>60</g_refresh_rate>
-                <g_refresh_rate>90</g_refresh_rate>
-                <g_refresh_rate>120</g_refresh_rate>
-                <g_refresh_rate>144</g_refresh_rate>
-                <g_refresh_rate>165</g_refresh_rate>
-                <g_refresh_rate>240</g_refresh_rate>
-            </global>
-            <resolutions>
-                <resolution><width>1280</width><height>720</height><refresh_rate>60</refresh_rate></resolution>
-                <resolution><width>1920</width><height>1080</height><refresh_rate>60</refresh_rate></resolution>
-                <resolution><width>2560</width><height>1440</height><refresh_rate>60</refresh_rate></resolution>
-                <resolution><width>3840</width><height>2160</height><refresh_rate>60</refresh_rate></resolution>
-            </resolutions>
-            <options>
-                <CustomEdid>false</CustomEdid>
-                <PreventSpoof>false</PreventSpoof>
-                <EdidCeaOverride>false</EdidCeaOverride>
-                <HardwareCursor>true</HardwareCursor>
-                <SDR10bit>false</SDR10bit>
-                <HDRPlus>false</HDRPlus>
-                <logging>false</logging>
-                <debuglogging>false</debuglogging>
-            </options>
-        </vdd_settings>
-        """;
 }

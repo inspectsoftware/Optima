@@ -17,7 +17,7 @@ namespace Optima.Driver.Providers;
 /// </summary>
 public sealed class MttVddProvider : VirtualDisplayProviderBase
 {
-    public const string DefaultSettingsPath = @"C:\VirtualDisplayDriver\vdd_settings.xml";
+    public const string DefaultSettingsPath = VddSettingsDefaults.DefaultPath;
     public const string PipeName = "MTTVirtualDisplayPipe";
     public const string DeviceNameMarker = "Virtual Display Driver";
     private const string ReloadCommand = "RELOAD_DRIVER";
@@ -87,6 +87,11 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         await RestoreSettingsFromMarkerAsync(ct).ConfigureAwait(false);
 
         var settingsPath = await GetSettingsPathAsync(ct).ConfigureAwait(false);
+        if (!File.Exists(settingsPath))
+        {
+            await EnsureDefaultSettingsFileAsync(settingsPath, ct).ConfigureAwait(false);
+        }
+
         if (File.Exists(settingsPath) && _originalSettingsXml is null)
         {
             _originalSettingsXml = await File.ReadAllTextAsync(settingsPath, ct).ConfigureAwait(false);
@@ -513,6 +518,39 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
             await Task.Delay(500, ct).ConfigureAwait(false);
         }
         return false;
+    }
+
+    /// <summary>
+    /// The driver advertises no modes at all without this file, and it is easy to end up without
+    /// one: the installer writes it when it installs the driver, but a package installed by other
+    /// means (a manual Device Manager install, or a copy restored from a backup) leaves none. So
+    /// the missing file is created here too, through the same elevated helper command the driver
+    /// install uses.
+    /// </summary>
+    private async Task EnsureDefaultSettingsFileAsync(string settingsPath, CancellationToken ct)
+    {
+        if (!await _elevation.EnsureStartedAsync(ct).ConfigureAwait(false))
+        {
+            _logger.LogWarning(
+                "No driver settings file at {Path} and administrator access was declined, so the driver has no modes yet",
+                settingsPath);
+            return;
+        }
+
+        var response = await _elevation.SendAsync(new IpcRequest
+        {
+            Command = IpcCommand.EnsureVddSettings,
+            Args = { ["path"] = settingsPath, ["content"] = VddSettingsDefaults.DefaultXml },
+        }, ct).ConfigureAwait(false);
+
+        if (response.Success)
+        {
+            _logger.LogInformation("Default driver settings written to {Path}", settingsPath);
+        }
+        else
+        {
+            _logger.LogWarning("Could not create the driver settings file at {Path}: {Error}", settingsPath, response.Error);
+        }
     }
 
     private async Task<string> GetSettingsPathAsync(CancellationToken ct)

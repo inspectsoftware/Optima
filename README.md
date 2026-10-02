@@ -19,8 +19,9 @@ pick a profile → PLAY
 ## Features
 
 - **One-click sessions** with Default / Balanced / Competitive profiles or your own.
-- **Optima Virtualization**: a bundled virtual display driver, installed from the Display page
-  with one administrator prompt, for high-refresh modes the monitor cannot offer.
+- **Optima Virtualization**: a bundled virtual display driver, installed by the setup with one
+  administrator prompt (or any time from the Display page) for high-refresh modes the monitor
+  cannot offer.
 - **FPS overlay and session history**: external frametime capture, average / 1% / 0.1% lows,
   per-session network quality, trends and an A-vs-B benchmark that refuses to call noise a gain.
 - **Watch mode**: start the game any way you like and Optima applies the profile from the tray.
@@ -36,9 +37,11 @@ pick a profile → PLAY
 The latest build is on the [releases page](https://github.com/inspectsoftware/Optima/releases).
 Every release carries:
 
-- `Optima-Setup-<version>.exe`, the installer. Per-user, so there is no administrator prompt;
-  it adds the Start Menu shortcut, offers the optional sign-in autostart, and uninstalls
-  cleanly while keeping your data in `%LOCALAPPDATA%\Optima`. This is the one to take.
+- `Optima-Setup-<version>.exe`, the installer. Per-user, so the wizard itself needs no
+  administrator rights; it installs the Optima virtual display driver during setup (one UAC
+  prompt, and you can uncheck that step), adds the Start Menu shortcut, offers the optional
+  sign-in autostart, and uninstalls cleanly while keeping your data in `%LOCALAPPDATA%\Optima`.
+  This is the one to take.
 - `Optima-v<version>-win-x64.zip`, the same build as a portable folder. Unpack it anywhere and
   run `Optima.exe`. The in-app updater downloads this same archive to update an existing copy.
 - Source code (zip / tar.gz), the repository at that tag, for building it yourself.
@@ -60,7 +63,9 @@ Optima first). Add `-Run` to start it.
 
 `.\installer.ps1` packages that build into `artifacts/Optima-Setup-<version>.exe`, a per-user
 installer (Start Menu shortcut, optional sign-in autostart, proper uninstaller; user data is
-kept on uninstall). Add `-Publish` to republish first, `-Run` to launch the setup when done.
+kept on uninstall). Setup also installs the bundled virtual display driver through
+`Optima.Watchdog.exe --install-driver`, the same code path the Display page uses. Add `-Publish`
+to republish first, `-Run` to launch the setup when done.
 
 ```
 src/Optima.Core               logic, models, orchestrator, statistics (no Windows deps)

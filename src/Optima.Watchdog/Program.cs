@@ -6,6 +6,13 @@ using Optima.Watchdog;
 // It connects back to the named pipe hosted by the non-elevated UI, then executes a small,
 // closed set of validated commands. It never shows UI and exits when the pipe closes.
 
+// One-shot installer mode: the setup launches the helper elevated to install the bundled virtual
+// display driver, and this process exits instead of serving the pipe.
+if (args.Length > 0 && args[0] == InstallDriverCommand.SwitchName)
+{
+    return await InstallDriverCommand.RunAsync(args, CancellationToken.None);
+}
+
 var pipeName = ParsePipeName(args);
 if (pipeName is null)
 {
