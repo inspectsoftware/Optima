@@ -10,6 +10,33 @@
     <Style x:Key="HeaderText" TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
       <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
     </Style>
+
+    <!-- Leaderboard table that owns its own scrollbar and realises only the rows in view. The
+         tables used to be an ItemsControl inside a ScrollViewer, which measures every row: a
+         full leaderboard meant a few thousand elements built before the page could paint. -->
+    <Style x:Key="VirtualTable" TargetType="ItemsControl">
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+      <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
+      <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+      <Setter Property="ItemsPanel">
+        <Setter.Value>
+          <ItemsPanelTemplate>
+            <VirtualizingStackPanel />
+          </ItemsPanelTemplate>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ItemsControl">
+            <ScrollViewer Focusable="False" CanContentScroll="True"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <ItemsPresenter />
+            </ScrollViewer>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
   </UserControl.Resources>
 
   <Grid>
@@ -308,17 +335,17 @@
         </StackPanel>
       </ScrollViewer>
 
-      <!-- Leaderboard tables. -->
+      <!-- Leaderboard tables. Both fill the whole area; the header stays put and the rows scroll
+           inside the table's own viewport. -->
       <Grid Margin="22,8,22,12"
             Visibility="{Binding IsClanDetailOpen, Converter={StaticResource InverseBoolToVis}}">
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition />
-        </Grid.RowDefinitions>
 
         <!-- Clan table. -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsClansTab, Converter={StaticResource BoolToVis}}">
-          <StackPanel>
+        <Grid Visibility="{Binding IsClansTab, Converter={StaticResource BoolToVis}}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="52" />
@@ -339,7 +366,7 @@
               <TextBlock Grid.Column="6" Text="WLR" Style="{StaticResource HeaderText}" />
               <TextBlock Grid.Column="7" Text="KILLS" Style="{StaticResource HeaderText}" />
             </Grid>
-            <ItemsControl ItemsSource="{Binding VisibleClanRows}" Margin="0,4,0,0">
+            <ItemsControl Grid.Row="1" ItemsSource="{Binding VisibleClanRows}" Style="{StaticResource VirtualTable}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <Border BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,0,0,1" Padding="0,5"
@@ -378,13 +405,14 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-          </StackPanel>
-        </ScrollViewer>
+        </Grid>
 
         <!-- Player table (elite / ranked / casual). -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                      Visibility="{Binding IsClansTab, Converter={StaticResource InverseBoolToVis}}">
-          <StackPanel>
+        <Grid Visibility="{Binding IsClansTab, Converter={StaticResource InverseBoolToVis}}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="52" />
@@ -401,7 +429,7 @@
               <TextBlock Grid.Column="4" Text="ASSISTS" Style="{StaticResource HeaderText}" />
               <TextBlock Grid.Column="5" Text="K/D" Style="{StaticResource HeaderText}" />
             </Grid>
-            <ItemsControl ItemsSource="{Binding VisiblePlayerRows}" Margin="0,4,0,0">
+            <ItemsControl Grid.Row="1" ItemsSource="{Binding VisiblePlayerRows}" Style="{StaticResource VirtualTable}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <Border BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,0,0,1" Padding="0,5">
@@ -430,8 +458,7 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-          </StackPanel>
-        </ScrollViewer>
+        </Grid>
       </Grid>
       </Grid>
     </Grid>

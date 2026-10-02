@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Media;
 
@@ -9,7 +10,7 @@ public sealed class Sparkline : FrameworkElement
 {
     public static readonly DependencyProperty ValuesProperty = DependencyProperty.Register(
         nameof(Values), typeof(IEnumerable), typeof(Sparkline),
-        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender, OnValuesChanged));
 
     public static readonly DependencyProperty StrokeProperty = DependencyProperty.Register(
         nameof(Stroke), typeof(Brush), typeof(Sparkline),
@@ -28,11 +29,40 @@ public sealed class Sparkline : FrameworkElement
     public double? Minimum { get => (double?)GetValue(MinimumProperty); set => SetValue(MinimumProperty, value); }
     public double? Maximum { get => (double?)GetValue(MaximumProperty); set => SetValue(MaximumProperty, value); }
 
+    // One buffer and two cached drawing resources per control: a live sparkline used to allocate a
+    // list, two geometries, a gradient brush and a pen on every repaint, and it repaints on every
+    // sample the host appends.
+    private readonly List<double> _values = [];
+    private Brush? _fill;
+    private Color _fillAccent;
+    private Pen? _pen;
+    private Brush? _penStroke;
+
     public Sparkline()
     {
         IsHitTestVisible = false;
         SnapsToDevicePixels = false;
     }
+
+    /// <summary>
+    /// The series behind a sparkline is normally an observable collection that the host appends to
+    /// every second. A dependency property only invalidates rendering when its *value* changes, and
+    /// the collection instance never does, so the line would keep showing the first samples.
+    /// </summary>
+    private static void OnValuesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var sparkline = (Sparkline)d;
+        if (e.OldValue is INotifyCollectionChanged previous)
+        {
+            previous.CollectionChanged -= sparkline.OnValuesCollectionChanged;
+        }
+        if (e.NewValue is INotifyCollectionChanged next)
+        {
+            next.CollectionChanged += sparkline.OnValuesCollectionChanged;
+        }
+    }
+
+    private void OnValuesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => InvalidateVisual();
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -42,38 +72,56 @@ public sealed class Sparkline : FrameworkElement
         {
             return;
         }
-        var values = new List<double>();
+
+        _values.Clear();
         foreach (var item in Values)
         {
-            if (item is double d && double.IsFinite(d))
+            switch (item)
             {
-                values.Add(d);
-            }
-            else if (item is float f)
-            {
-                values.Add(f);
-            }
-            else if (item is int i)
-            {
-                values.Add(i);
+                case double d when double.IsFinite(d):
+                    _values.Add(d);
+                    break;
+                case float f:
+                    _values.Add(f);
+                    break;
+                case int i:
+                    _values.Add(i);
+                    break;
             }
         }
-        if (values.Count < 2)
+        if (_values.Count < 2)
         {
             return;
         }
 
-        var min = Minimum ?? values.Min();
-        var max = Maximum ?? values.Max();
+        var min = Minimum ?? double.MaxValue;
+        var max = Maximum ?? double.MinValue;
+        if (Minimum is null || Maximum is null)
+        {
+            foreach (var value in _values)
+            {
+                if (Minimum is null && value < min)
+                {
+                    min = value;
+                }
+                if (Maximum is null && value > max)
+                {
+                    max = value;
+                }
+            }
+        }
         if (max - min < 1e-6)
         {
             max = min + 1;
         }
+
         var pad = 2.0;
-        var stepX = (w - 2 * pad) / (values.Count - 1);
+        var stepX = (w - 2 * pad) / (_values.Count - 1);
+        var span = max - min;
+
         Point At(int index) => new(
             pad + index * stepX,
-            pad + (h - 2 * pad) * (1 - (values[index] - min) / (max - min)));
+            pad + (h - 2 * pad) * (1 - (_values[index] - min) / span));
 
         var line = new StreamGeometry();
         var area = new StreamGeometry();
@@ -83,25 +131,37 @@ public sealed class Sparkline : FrameworkElement
             lc.BeginFigure(At(0), false, false);
             ac.BeginFigure(new Point(pad, h), true, true);
             ac.LineTo(At(0), false, false);
-            for (var i = 1; i < values.Count; i++)
+            for (var i = 1; i < _values.Count; i++)
             {
                 lc.LineTo(At(i), true, true);
                 ac.LineTo(At(i), false, false);
             }
-            ac.LineTo(new Point(pad + (values.Count - 1) * stepX, h), false, false);
+            ac.LineTo(new Point(pad + (_values.Count - 1) * stepX, h), false, false);
         }
         line.Freeze();
         area.Freeze();
 
         var accent = (Stroke as SolidColorBrush)?.Color ?? Colors.Goldenrod;
-        var fill = new LinearGradientBrush(
-            Color.FromArgb(0x4D, accent.R, accent.G, accent.B),
-            Color.FromArgb(0x00, accent.R, accent.G, accent.B),
-            new Point(0, 0), new Point(0, 1));
-        fill.Freeze();
-        dc.DrawGeometry(fill, null, area);
-        dc.DrawGeometry(null, new Pen(Stroke, 1.75) { LineJoin = PenLineJoin.Round, StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, line);
-        var last = At(values.Count - 1);
-        dc.DrawEllipse(Stroke, null, last, 2.5, 2.5);
+        if (_fill is null || _fillAccent != accent)
+        {
+            var fill = new LinearGradientBrush(
+                Color.FromArgb(0x4D, accent.R, accent.G, accent.B),
+                Color.FromArgb(0x00, accent.R, accent.G, accent.B),
+                new Point(0, 0), new Point(0, 1));
+            fill.Freeze();
+            _fill = fill;
+            _fillAccent = accent;
+        }
+        // Deliberately not frozen: a theme brush may be unfrozen, and freezing a pen whose brush is
+        // not frozen throws.
+        if (_pen is null || !ReferenceEquals(_penStroke, Stroke))
+        {
+            _pen = new Pen(Stroke, 1.75) { LineJoin = PenLineJoin.Round, StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            _penStroke = Stroke;
+        }
+
+        dc.DrawGeometry(_fill, null, area);
+        dc.DrawGeometry(null, _pen, line);
+        dc.DrawEllipse(Stroke, null, At(_values.Count - 1), 2.5, 2.5);
     }
 }

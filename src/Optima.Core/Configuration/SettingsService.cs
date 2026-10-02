@@ -9,7 +9,7 @@ public sealed class SettingsService
     private readonly AppPaths _paths;
     private readonly JsonStore _store;
     private readonly ILogger<SettingsService> _logger;
-    private AppSettings? _settings;
+    private volatile AppSettings? _settings;
     private DetectionRules? _rules;
 
     public SettingsService(AppPaths paths, JsonStore store, ILogger<SettingsService> logger)
@@ -21,8 +21,22 @@ public sealed class SettingsService
 
     public event EventHandler<AppSettings>? SettingsChanged;
 
+    /// <summary>
+    /// The last loaded settings, or null before the first load. Synchronous readers (the theme
+    /// before first paint, presence composition, DI factories) use this snapshot instead of
+    /// blocking a thread pool thread on <see cref="GetSettingsAsync"/>.
+    /// </summary>
+    public AppSettings? Current => _settings;
+
     public async Task<AppSettings> GetSettingsAsync(CancellationToken ct = default)
         => _settings ??= await _store.LoadAsync<AppSettings>(_paths.ConfigFile, ct).ConfigureAwait(false) ?? new AppSettings();
+
+    /// <summary>
+    /// Synchronous load for startup work that has to finish before the first paint. Cheaper than
+    /// blocking on <see cref="GetSettingsAsync"/>: one small file read, no thread pool hop.
+    /// </summary>
+    public AppSettings GetSettings()
+        => _settings ??= _store.Load<AppSettings>(_paths.ConfigFile) ?? new AppSettings();
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken ct = default)
     {

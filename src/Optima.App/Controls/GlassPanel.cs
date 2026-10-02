@@ -3,7 +3,9 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Optima.App.Effects;
+using Optima.App.Services;
 
 namespace Optima.App.Controls;
 
@@ -11,6 +13,13 @@ namespace Optima.App.Controls;
 public sealed class GlassPanel : Grid
 {
     private const double Bleed = 24;
+
+    /// <summary>
+    /// How often the pointer may move a panel's specular highlight. Every update re-renders each
+    /// panel through its pixel shader, and a gaming mouse reports far faster than a screen updates,
+    /// so updates are coalesced to this interval: the newest point always wins.
+    /// </summary>
+    private const int PointerIntervalMs = 33;
 
     public static readonly DependencyProperty BackdropProperty = DependencyProperty.RegisterAttached(
         "Backdrop", typeof(Visual), typeof(GlassPanel),
@@ -64,12 +73,19 @@ public sealed class GlassPanel : Grid
         new PropertyMetadata(null, (d, e) => ((GlassPanel)d)._frame.Background = e.NewValue as Brush));
 
     private static readonly List<WeakReference<GlassPanel>> Live = [];
+    private static readonly object PointerGate = new();
+    private static Point _pendingPoint;
+    private static Visual? _pendingRoot;
+    private static bool _pointerScheduled;
+    private static long _lastPointerApply;
+    private static bool _viewboxUpdateScheduled;
 
     private readonly VisualBrush _brush;
     private readonly Rectangle _backdrop;
     private readonly Grid _stack;
     private readonly ChamferBorder _frame;
     private Visual? _lastSource;
+    private bool _viewboxDirty;
 
     public GlassPanel()
     {
@@ -85,15 +101,28 @@ public sealed class GlassPanel : Grid
         Glass = new GlassEffect { Inset = Bleed, Radius = CornerRadius, Chamfer = Chamfer, Tint = Tint, Edge = 20, Refract = 10, Chroma = 0.35, Specular = 0.9 };
         _backdrop = new Rectangle { Fill = _brush };
         RenderOptions.SetBitmapScalingMode(_backdrop, BitmapScalingMode.Linear);
-        _stack = new Grid { Margin = new Thickness(-Bleed), Effect = Glass, IsHitTestVisible = false };
+        _stack = new Grid { Margin = new Thickness(-Bleed), IsHitTestVisible = false };
+        // Without a GPU the refraction shader runs on the CPU for every panel on every frame; the
+        // flat tint under it stays.
+        if (Motion.EffectsAvailable)
+        {
+            _stack.Effect = Glass;
+        }
         _stack.Children.Add(_backdrop);
         _stack.SizeChanged += (_, _) => Glass.Size = new Point(_stack.ActualWidth, _stack.ActualHeight);
         _frame = new ChamferBorder { Chamfer = Chamfer, Padding = Padding };
         Children.Add(_stack);
         Children.Add(_frame);
         OnBlurChanged();
-        LayoutUpdated += (_, _) => UpdateViewbox();
-        Loaded += (_, _) => { Live.Add(new WeakReference<GlassPanel>(this)); _brush.Visual = GetBackdrop(this); };
+
+        // Registered here rather than on Loaded, so the shared viewbox pass below sees every panel.
+        Live.Add(new WeakReference<GlassPanel>(this));
+        LayoutUpdated += (_, _) => ScheduleViewboxUpdate(this);
+        Loaded += (_, _) =>
+        {
+            _viewboxDirty = true;
+            _brush.Visual = GetBackdrop(this);
+        };
         Unloaded += (_, _) => Live.RemoveAll(w => !w.TryGetTarget(out var p) || ReferenceEquals(p, this));
     }
 
@@ -118,25 +147,41 @@ public sealed class GlassPanel : Grid
 
     public static void NotifyPointer(Visual root, Point rootPoint)
     {
-        for (var i = Live.Count - 1; i >= 0; i--)
+        lock (PointerGate)
         {
-            if (!Live[i].TryGetTarget(out var panel) || !panel.IsVisible)
+            _pendingRoot = root;
+            _pendingPoint = rootPoint;
+            if (_pointerScheduled)
             {
-                continue;
+                return;
             }
-            try
-            {
-                var local = root.TransformToDescendant(panel)?.Transform(rootPoint) ?? new Point(-1000, -1000);
-                panel.SetLight(local);
-            }
-            catch (InvalidOperationException)
-            {
-            }
+            _pointerScheduled = true;
         }
+
+        var delay = PointerIntervalMs - (int)(Environment.TickCount64 - Interlocked.Read(ref _lastPointerApply));
+        if (delay <= 0)
+        {
+            ApplyPendingPointer();
+            return;
+        }
+
+        // The reports that arrive inside the interval are dropped, not queued: the newest point
+        // held in _pendingPoint is the one that gets applied.
+        _ = Task.Delay(delay).ContinueWith(
+            _ => root.Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(ApplyPendingPointer)),
+            CancellationToken.None,
+            TaskContinuationOptions.None,
+            TaskScheduler.Default);
     }
 
     public static void ClearLights()
     {
+        lock (PointerGate)
+        {
+            _pendingRoot = null;
+            _pointerScheduled = false;
+        }
+
         foreach (var weak in Live)
         {
             if (weak.TryGetTarget(out var panel))
@@ -146,11 +191,75 @@ public sealed class GlassPanel : Grid
         }
     }
 
+    private static void ApplyPendingPointer()
+    {
+        Visual? root;
+        Point point;
+        lock (PointerGate)
+        {
+            root = _pendingRoot;
+            point = _pendingPoint;
+            _pointerScheduled = false;
+        }
+        Interlocked.Exchange(ref _lastPointerApply, Environment.TickCount64);
+        if (root is null)
+        {
+            return;
+        }
+
+        for (var i = Live.Count - 1; i >= 0; i--)
+        {
+            if (!Live[i].TryGetTarget(out var panel) || !panel.IsVisible)
+            {
+                continue;
+            }
+            try
+            {
+                var local = root.TransformToDescendant(panel)?.Transform(point) ?? new Point(-1000, -1000);
+                panel.SetLight(local);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+    }
+
+    /// <summary>
+    /// Marks the panel for the shared viewbox pass. LayoutUpdated fires for every panel on every
+    /// layout walk, and doing the transform work inside that event means paying for it once per
+    /// panel per walk; the deferred pass walks the panels once, after the layout has settled, and
+    /// only touches the ones whose brush would actually change.
+    /// </summary>
+    private static void ScheduleViewboxUpdate(GlassPanel panel)
+    {
+        panel._viewboxDirty = true;
+        if (_viewboxUpdateScheduled)
+        {
+            return;
+        }
+        _viewboxUpdateScheduled = true;
+        _ = panel.Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(UpdateDirtyViewboxes));
+    }
+
+    private static void UpdateDirtyViewboxes()
+    {
+        _viewboxUpdateScheduled = false;
+        for (var i = Live.Count - 1; i >= 0; i--)
+        {
+            if (Live[i].TryGetTarget(out var panel) && panel._viewboxDirty)
+            {
+                panel._viewboxDirty = false;
+                panel.UpdateViewbox();
+            }
+        }
+    }
+
     private static void OnBackdropChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is GlassPanel panel)
         {
             panel._brush.Visual = e.NewValue as Visual;
+            panel._viewboxDirty = true;
         }
     }
 
@@ -164,8 +273,12 @@ public sealed class GlassPanel : Grid
     private void OnBlurChanged()
     {
         var scale = 1.0 / Math.Max(1.0, Downsample);
-        _backdrop.CacheMode = new BitmapCache { RenderAtScale = scale, EnableClearType = false, SnapsToDevicePixels = false };
-        if (BlurRadius > 0)
+        if (Motion.EffectsAvailable)
+        {
+            _backdrop.CacheMode = new BitmapCache { RenderAtScale = scale, EnableClearType = false, SnapsToDevicePixels = false };
+        }
+
+        if (BlurRadius > 0 && Motion.EffectsAvailable)
         {
             Blur.Radius = BlurRadius * scale;
             _backdrop.Effect = Blur;

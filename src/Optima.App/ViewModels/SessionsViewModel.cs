@@ -196,7 +196,9 @@ public sealed partial class SessionsViewModel : ObservableObject
     [RelayCommand]
     private async Task ReloadAsync(CancellationToken ct = default)
     {
-        var history = await _sessions.GetSessionsAsync(200, ct);
+        // Summaries, not full records: the list shows numbers, and parsing 200 per-second fps
+        // series per visit would be work nobody sees. The drill-down loads the one it needs.
+        var history = await _sessions.GetSessionSummariesAsync(200, ct);
         var trend = SessionTrendBuilder.Build(history, TrendLength);
         var changedByid = trend.Where(p => p.ConfigChanged).Select(p => p.Session.Id).ToHashSet();
 
@@ -403,13 +405,47 @@ public sealed partial class SessionsViewModel : ObservableObject
             ? string.Join(" · ", record.TweakIds)
             : "no tweaks were enabled";
 
-        if (record.FpsSamples.Count > 1)
+        LoadSelectedSamples(value);
+    }
+
+    /// <summary>
+    /// Fills the drill-down sparkline. The history rows carry no fps series, so the one for the row
+    /// the user opened is fetched on demand and the graph appears a moment after the numbers do.
+    /// </summary>
+    private void LoadSelectedSamples(SessionRowViewModel row)
+    {
+        if (row.Record.FpsSamples.Count > 1)
         {
-            DetailValues = record.FpsSamples.Select(s => (double)s).ToList();
-            DetailSparklineLegend =
-                $"fps per second · {record.FpsSamples.Count} samples · " +
-                $"{record.FpsSamples.Min():F0} min · {record.FpsSamples.Average():F0} avg · {record.FpsSamples.Max():F0} max";
+            ApplySamples(row.Record.FpsSamples);
+            return;
         }
+
+        _ = LoadAsync(row);
+
+        async Task LoadAsync(SessionRowViewModel target)
+        {
+            try
+            {
+                var loaded = await _sessions.GetSessionsByIdsAsync([target.Record.Id]);
+                var samples = loaded.Count > 0 ? loaded[0].FpsSamples : [];
+                if (SelectedRow?.Record.Id == target.Record.Id && samples.Count > 1)
+                {
+                    ApplySamples(samples);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Loading the fps series for session #{Id} failed", target.Record.Id);
+            }
+        }
+    }
+
+    private void ApplySamples(IReadOnlyList<double> samples)
+    {
+        DetailValues = samples.Select(s => (double)s).ToList();
+        DetailSparklineLegend =
+            $"fps per second · {samples.Count} samples · " +
+            $"{samples.Min():F0} min · {samples.Average():F0} avg · {samples.Max():F0} max";
     }
 
     [RelayCommand]

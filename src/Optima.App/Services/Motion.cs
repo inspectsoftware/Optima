@@ -17,6 +17,13 @@ public static class Motion
 
     public static event Action? Changed;
 
+    /// <summary>
+    /// False below render tier 2. Everything decorative in the shell is a blur, a pixel shader or a
+    /// continuously animated backdrop; tiers 0 and 1 have no usable pixel shader hardware (tier 1
+    /// runs them in software), where those cost more than the app itself, so the shell drops them.
+    /// </summary>
+    public static bool EffectsAvailable { get; } = (System.Windows.Media.RenderCapability.Tier >> 16) >= 2;
+
     public static bool Enabled => MotionPolicy.IsEnabled(SystemParameters.ClientAreaAnimation, _followWindows) && _foreground;
 
     public static bool Allowed => MotionPolicy.IsEnabled(SystemParameters.ClientAreaAnimation, _followWindows);

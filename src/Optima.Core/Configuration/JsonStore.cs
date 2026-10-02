@@ -41,9 +41,28 @@ public sealed class JsonStore
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Corrupt JSON at {Path}; renaming aside and using defaults", path);
-            TryQuarantine(path);
+            return QuarantineOnCorrupt<T>(path, ex);
+        }
+    }
+
+    /// <summary>
+    /// Synchronous counterpart to <see cref="LoadAsync"/> for startup paths that must complete
+    /// before the first frame is painted.
+    /// </summary>
+    public T? Load<T>(string path) where T : class
+    {
+        if (!File.Exists(path))
+        {
             return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options);
+        }
+        catch (JsonException ex)
+        {
+            return QuarantineOnCorrupt<T>(path, ex);
         }
     }
 
@@ -87,6 +106,13 @@ public sealed class JsonStore
         {
             _logger.LogWarning(ex, "Could not delete {Path}", path);
         }
+    }
+
+    private T? QuarantineOnCorrupt<T>(string path, JsonException ex) where T : class
+    {
+        _logger.LogError(ex, "Corrupt JSON at {Path}; renaming aside and using defaults", path);
+        TryQuarantine(path);
+        return null;
     }
 
     private void TryQuarantine(string path)

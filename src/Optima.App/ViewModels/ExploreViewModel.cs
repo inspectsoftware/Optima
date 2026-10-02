@@ -35,9 +35,6 @@ public sealed partial class ExplorePlayerRow : ObservableObject
     public string DeathsText => Deaths.ToString("N0", CultureInfo.InvariantCulture);
     public string AssistsText => Assists.ToString("N0", CultureInfo.InvariantCulture);
     public string RatioText => Ratio.ToString("F2", CultureInfo.InvariantCulture);
-
-    [ObservableProperty]
-    private bool _isVisible = true;
 }
 
 /// <summary>Sortable, filterable row of the clan leaderboard.</summary>
@@ -61,9 +58,6 @@ public sealed partial class ExploreClanRow : ObservableObject
     public string KillsText => Source.Kills.ToString("N0", CultureInfo.InvariantCulture);
 
     public string RecordText => Source.Wins.ToString(CultureInfo.InvariantCulture) + "W / " + Source.Losses.ToString(CultureInfo.InvariantCulture) + "L";
-
-    [ObservableProperty]
-    private bool _isVisible = true;
 }
 
 /// <summary>One member row of the clan detail pane, enriched from the public profile API.</summary>
@@ -198,15 +192,22 @@ public sealed partial class ExploreViewModel : ObservableObject
     /// <summary>The three mode rows of the opened profile.</summary>
     public ObservableCollection<PlayerModeRow> ProfileModes { get; } = [];
 
+    // The filtered tables are materialised once per filter or data change. They used to be computed
+    // properties, so every read by the bindings re-ran Where/Take/ToList, and every keystroke
+    // re-raised the change notification that made WPF read them again.
+    private IReadOnlyList<ExplorePlayerRow> _visiblePlayers = [];
+    private IReadOnlyList<ExploreClanRow> _visibleClans = [];
+    private int _visiblePlayerCount;
+    private int _visibleClanCount;
+    private string _totalCountText = string.Empty;
+
     /// <summary>Rows currently shown for player tabs (search-filtered slice of PlayerRows).</summary>
-    public IReadOnlyList<ExplorePlayerRow> VisiblePlayerRows => PlayerRows.Where(r => r.IsVisible).Take(MaxVisibleRows).ToList();
+    public IReadOnlyList<ExplorePlayerRow> VisiblePlayerRows => _visiblePlayers;
 
     /// <summary>Rows currently shown for the clan tab.</summary>
-    public IReadOnlyList<ExploreClanRow> VisibleClanRows => ClanRows.Where(r => r.IsVisible).Take(MaxVisibleRows).ToList();
+    public IReadOnlyList<ExploreClanRow> VisibleClanRows => _visibleClans;
 
-    public string TotalCountText => IsClansTab
-        ? $"{ClanRows.Count(r => r.IsVisible)} of {ClanRows.Count} clans"
-        : $"{PlayerRows.Count(r => r.IsVisible)} of {PlayerRows.Count} players";
+    public string TotalCountText => _totalCountText;
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -339,40 +340,64 @@ public sealed partial class ExploreViewModel : ObservableObject
     partial void OnSearchTextChanged(string value) => ApplyFilters();
 
     /// <summary>
-    /// Re-filters and re-raises everything the tables bind to: VisiblePlayerRows / VisibleClanRows are
-    /// computed properties, so without these notifications the tables would show only what was bound
-    /// at page-open (nothing) — the bug where the counter updated but the list never did.
+    /// Rebuilds both tables from the search term and re-raises what they bind to. The data is
+    /// walked once here, not once per row per binding read, and rows are no longer individually
+    /// flagged and notified.
     /// </summary>
     private void ApplyFilters()
     {
-        ApplyPlayerFilter();
-        ApplyClanFilter();
+        var term = SearchText.Trim();
+
+        _visiblePlayerCount = 0;
+        var players = new List<ExplorePlayerRow>(Math.Min(PlayerRows.Count, MaxVisibleRows));
+        foreach (var row in PlayerRows)
+        {
+            if (!MatchesPlayer(row, term))
+            {
+                continue;
+            }
+            _visiblePlayerCount++;
+            if (players.Count < MaxVisibleRows)
+            {
+                players.Add(row);
+            }
+        }
+
+        _visibleClanCount = 0;
+        var clans = new List<ExploreClanRow>(Math.Min(ClanRows.Count, MaxVisibleRows));
+        foreach (var row in ClanRows)
+        {
+            if (!MatchesClan(row, term))
+            {
+                continue;
+            }
+            _visibleClanCount++;
+            if (clans.Count < MaxVisibleRows)
+            {
+                clans.Add(row);
+            }
+        }
+
+        _visiblePlayers = players;
+        _visibleClans = clans;
+        _totalCountText = IsClansTab
+            ? $"{_visibleClanCount} of {ClanRows.Count} clans"
+            : $"{_visiblePlayerCount} of {PlayerRows.Count} players";
+
         OnPropertyChanged(nameof(VisiblePlayerRows));
         OnPropertyChanged(nameof(VisibleClanRows));
         OnPropertyChanged(nameof(TotalCountText));
     }
 
-    private void ApplyPlayerFilter()
-    {
-        var term = SearchText.Trim();
-        foreach (var row in PlayerRows)
-        {
-            row.IsVisible = term.Length == 0
-                || row.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || row.Rank.ToString(CultureInfo.InvariantCulture).StartsWith(term, StringComparison.Ordinal);
-        }
-    }
+    private static bool MatchesPlayer(ExplorePlayerRow row, string term)
+        => term.Length == 0
+            || row.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || row.Rank.ToString(CultureInfo.InvariantCulture).StartsWith(term, StringComparison.Ordinal);
 
-    private void ApplyClanFilter()
-    {
-        var term = SearchText.Trim();
-        foreach (var row in ClanRows)
-        {
-            row.IsVisible = term.Length == 0
-                || row.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || row.Tag.Contains(term, StringComparison.OrdinalIgnoreCase);
-        }
-    }
+    private static bool MatchesClan(ExploreClanRow row, string term)
+        => term.Length == 0
+            || row.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || row.Tag.Contains(term, StringComparison.OrdinalIgnoreCase);
 
     [RelayCommand]
     private void ShowTab(string tab)

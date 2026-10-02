@@ -25,13 +25,24 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
     {
         if (_cached is not null)
         {
-            return _cached with { Displays = await _displayService.GetDisplaysAsync(ct).ConfigureAwait(false) };
+            // Displays and virtualization can change while the app runs (a monitor is plugged in,
+            // a feature is enabled); the WMI-heavy rest of the inventory stays cached.
+            var freshDisplays = await _displayService.GetDisplaysAsync(ct).ConfigureAwait(false);
+            var freshVirtualization = await GetVirtualizationStateAsync(ct).ConfigureAwait(false);
+            return _cached with { Displays = freshDisplays, Virtualization = freshVirtualization };
         }
 
-        var inventory = await Task.Run(BuildInventory, ct).ConfigureAwait(false);
-        var displays = await _displayService.GetDisplaysAsync(ct).ConfigureAwait(false);
-        var virtualization = await GetVirtualizationStateAsync(ct).ConfigureAwait(false);
-        _cached = inventory with { Displays = displays, Virtualization = virtualization };
+        // Three independent probes: a cold inventory costs the sum of them if run in sequence.
+        var inventoryTask = Task.Run(BuildInventory, ct);
+        var displaysTask = _displayService.GetDisplaysAsync(ct);
+        var virtualizationTask = GetVirtualizationStateAsync(ct);
+        await Task.WhenAll(inventoryTask, displaysTask, virtualizationTask).ConfigureAwait(false);
+
+        _cached = inventoryTask.Result with
+        {
+            Displays = displaysTask.Result,
+            Virtualization = virtualizationTask.Result,
+        };
         return _cached;
     }
 
@@ -45,6 +56,7 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
         return pending.WaitAsync(ct);
     }
 
+    /// <summary>Drops the memoized virtualization probe; the next reader re-queries Windows.</summary>
     public void InvalidateCache() => _virtualization = null;
 
     private Task<VirtualizationState> QueryVirtualizationStateAsync()
@@ -76,13 +88,14 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
                 firmware = true;
             }
 
+            var features = QueryOptionalFeatures();
             return new VirtualizationState
             {
                 FirmwareVirtualizationEnabled = firmware,
                 HypervisorPresent = hypervisorPresent,
-                HyperVFeatureEnabled = GetOptionalFeatureEnabled("Microsoft-Hyper-V"),
-                VirtualMachinePlatformEnabled = GetOptionalFeatureEnabled("VirtualMachinePlatform"),
-                WindowsHypervisorPlatformEnabled = GetOptionalFeatureEnabled("HypervisorPlatform"),
+                HyperVFeatureEnabled = features["Microsoft-Hyper-V"],
+                VirtualMachinePlatformEnabled = features["VirtualMachinePlatform"],
+                WindowsHypervisorPlatformEnabled = features["HypervisorPlatform"],
             };
         });
 
@@ -163,22 +176,50 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
         return GpuVendor.Unknown;
     }
 
-    private bool? GetOptionalFeatureEnabled(string featureName)
+    private static readonly string[] OptionalFeatures =
+    [
+        "Microsoft-Hyper-V",
+        "VirtualMachinePlatform",
+        "HypervisorPlatform",
+    ];
+
+    /// <summary>
+    /// One Win32_OptionalFeature sweep for every feature we care about. Three separate queries
+    /// meant three WMI round trips; a cold WMI connection costs hundreds of milliseconds each.
+    /// </summary>
+    private IReadOnlyDictionary<string, bool?> QueryOptionalFeatures()
     {
+        var states = new Dictionary<string, bool?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var feature in OptionalFeatures)
+        {
+            states[feature] = null;
+        }
+
         try
         {
+            var where = string.Join(" OR ", OptionalFeatures.Select(f => $"Name = '{f}'"));
             using var searcher = new ManagementObjectSearcher(
-                $"SELECT InstallState FROM Win32_OptionalFeature WHERE Name = '{featureName}'");
+                $"SELECT Name, InstallState FROM Win32_OptionalFeature WHERE {where}");
             foreach (var feature in searcher.Get())
             {
-                return Convert.ToInt32(feature["InstallState"] ?? 0) == 1;
+                var name = feature["Name"]?.ToString();
+                if (name is not null && states.ContainsKey(name))
+                {
+                    states[name] = Convert.ToInt32(feature["InstallState"] ?? 0) == 1;
+                }
             }
-            return false;
+
+            // The sweep succeeded, so a missing row means the feature does not exist here.
+            foreach (var feature in OptionalFeatures)
+            {
+                states[feature] ??= false;
+            }
         }
         catch (Exception ex) when (ex is ManagementException or System.Runtime.InteropServices.COMException)
         {
-            _logger.LogDebug(ex, "Optional feature query failed for {Feature}", featureName);
-            return null;
+            _logger.LogDebug(ex, "Optional feature query failed; leaving the features unknown");
         }
+
+        return states;
     }
 }

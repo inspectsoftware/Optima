@@ -37,7 +37,34 @@ public static class ProcessSnapshot
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr handle);
 
+    /// <summary>
+    /// How long one sweep answers for. Several loops ask for the process list in the same second
+    /// (presence, game exit, tracking) and none of them needs to see a process the instant it
+    /// starts, so one Toolhelp sweep covers all of them.
+    /// </summary>
+    private static readonly TimeSpan CacheLifetime = TimeSpan.FromMilliseconds(400);
+
+    private static readonly object CacheGate = new();
+    private static IReadOnlyList<(int Id, string Name)>? _cached;
+    private static DateTimeOffset _cachedAt;
+
     public static IReadOnlyList<(int Id, string Name)> GetRunning()
+    {
+        var now = DateTimeOffset.UtcNow;
+        lock (CacheGate)
+        {
+            if (_cached is not null && now - _cachedAt < CacheLifetime)
+            {
+                return _cached;
+            }
+
+            _cached = CaptureRunning();
+            _cachedAt = now;
+            return _cached;
+        }
+    }
+
+    private static IReadOnlyList<(int Id, string Name)> CaptureRunning()
     {
         var snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if (snapshot == InvalidHandleValue || snapshot == IntPtr.Zero)

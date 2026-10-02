@@ -14,9 +14,30 @@ public sealed class SqliteSessionStore : ISessionStore
 {
     private const int SchemaVersion = 2;
 
+    /// <summary>Every column of a session row, spelled out so a query never pulls a series it does not need.</summary>
+    private const string SessionColumns =
+        "id, profile_name, game_package_id, started_at, duration_seconds, sample_count, average_fps, " +
+        "one_percent_low_fps, point_one_percent_low_fps, average_frametime_ms, p95_frametime_ms, " +
+        "p99_frametime_ms, tweak_ids, profile_hash, launch_kind, avg_ping_ms, jitter_ms, packet_loss_pct, " +
+        "stats_delta, game_version, fps_samples";
+
+    /// <summary>The same list without the per-second fps series: the history list shows numbers, not graphs.</summary>
+    private const string SessionSummaryColumns =
+        "id, profile_name, game_package_id, started_at, duration_seconds, sample_count, average_fps, " +
+        "one_percent_low_fps, point_one_percent_low_fps, average_frametime_ms, p95_frametime_ms, " +
+        "p99_frametime_ms, tweak_ids, profile_hash, launch_kind, avg_ping_ms, jitter_ms, packet_loss_pct, " +
+        "stats_delta, game_version";
+
+    private const string MatchColumns =
+        "id, session_id, started_at, mode, result, kills, deaths, assists, map, source, note";
+
     private readonly string _databasePath;
     private readonly string _connectionString;
     private readonly ILogger<SqliteSessionStore> _logger;
+
+    // One gate for the whole "create the schema once" step: two callers racing on _initialized
+    // used to run the migration twice, and a losing ALTER TABLE throws.
+    private readonly SemaphoreSlim _initializeGate = new(1, 1);
     private bool _initialized;
 
     public SqliteSessionStore(AppPaths paths, ILogger<SqliteSessionStore> logger)
@@ -28,6 +49,26 @@ public sealed class SqliteSessionStore : ISessionStore
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
+        await _initializeGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_initialized)
+            {
+                return;
+            }
+            await InitializeCoreAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _initializeGate.Release();
+        }
+    }
+
+    private async Task InitializeCoreAsync(CancellationToken ct)
+    {
+        // Deliberately opened without the journal pragmas: migrations (and the plain-file backup
+        // taken before them) run on the default rollback journal, and the switch to write-ahead
+        // logging happens once the schema is current.
         await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
 
@@ -59,8 +100,64 @@ public sealed class SqliteSessionStore : ISessionStore
         }
 
         await MigrateAsync(connection, ct).ConfigureAwait(false);
+
+        // Write-ahead logging plus relaxed syncing: the store is written once per session and read
+        // from the UI, so readers should never block behind a writer, and a flush per commit buys
+        // nothing for a file this process owns. Set after the migrations, so the pre-migration
+        // backup is a plain single-file copy.
+        await ApplyJournalPragmasAsync(connection, ct).ConfigureAwait(false);
+
         _initialized = true;
         _logger.LogDebug("Session store initialized (schema v{Version})", SchemaVersion);
+    }
+
+    private static async Task ApplyJournalPragmasAsync(SqliteConnection connection, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA busy_timeout = 5000;
+            """;
+        await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Opens a connection with the pragmas every statement relies on: a writer waits rather than failing, and readers take the log path.</summary>
+    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken ct)
+    {
+        var connection = new SqliteConnection(_connectionString);
+        try
+        {
+            await connection.OpenAsync(ct).ConfigureAwait(false);
+            await ApplyJournalPragmasAsync(connection, ct).ConfigureAwait(false);
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Column ordinals for one result set. GetOrdinal walks the column list on every call, and the
+    /// session readers asked for one per column per row; each name is resolved once per query here.
+    /// </summary>
+    private sealed class ColumnOrdinals
+    {
+        private readonly Dictionary<string, int> _ordinals = new(StringComparer.OrdinalIgnoreCase);
+
+        public int Get(SqliteDataReader reader, string column)
+        {
+            if (_ordinals.TryGetValue(column, out var ordinal))
+            {
+                return ordinal;
+            }
+            ordinal = reader.GetOrdinal(column);
+            _ordinals[column] = ordinal;
+            return ordinal;
+        }
     }
 
     private async Task MigrateAsync(SqliteConnection connection, CancellationToken ct)
@@ -150,8 +247,7 @@ public sealed class SqliteSessionStore : ISessionStore
     public async Task<long> SaveSessionAsync(SessionRecord record, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
@@ -193,11 +289,15 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     public Task<IReadOnlyList<SessionRecord>> GetSessionsAsync(int limit = 50, CancellationToken ct = default)
-        => QueryAsync("SELECT * FROM sessions ORDER BY id DESC LIMIT $limit",
+        => QueryAsync($"SELECT {SessionColumns} FROM sessions ORDER BY id DESC LIMIT $limit",
             command => command.Parameters.AddWithValue("$limit", limit), ct);
 
+    public Task<IReadOnlyList<SessionRecord>> GetSessionSummariesAsync(int limit = 50, CancellationToken ct = default)
+        => QueryAsync($"SELECT {SessionSummaryColumns} FROM sessions ORDER BY id DESC LIMIT $limit",
+            command => command.Parameters.AddWithValue("$limit", limit), ct, withSamples: false);
+
     public Task<IReadOnlyList<SessionRecord>> GetSessionsByProfileAsync(string profileName, CancellationToken ct = default)
-        => QueryAsync("SELECT * FROM sessions WHERE profile_name = $profile ORDER BY id DESC",
+        => QueryAsync($"SELECT {SessionColumns} FROM sessions WHERE profile_name = $profile ORDER BY id DESC",
             command => command.Parameters.AddWithValue("$profile", profileName), ct);
 
     public Task<IReadOnlyList<SessionRecord>> GetSessionsByIdsAsync(IReadOnlyList<long> ids, CancellationToken ct = default)
@@ -207,7 +307,7 @@ public sealed class SqliteSessionStore : ISessionStore
             return Task.FromResult<IReadOnlyList<SessionRecord>>([]);
         }
         var placeholders = string.Join(',', ids.Select((_, i) => $"$id{i}"));
-        return QueryAsync($"SELECT * FROM sessions WHERE id IN ({placeholders}) ORDER BY id",
+        return QueryAsync($"SELECT {SessionColumns} FROM sessions WHERE id IN ({placeholders}) ORDER BY id",
             command =>
             {
                 for (var i = 0; i < ids.Count; i++)
@@ -218,67 +318,78 @@ public sealed class SqliteSessionStore : ISessionStore
     }
 
     private async Task<IReadOnlyList<SessionRecord>> QueryAsync(
-        string sql, Action<SqliteCommand> bind, CancellationToken ct)
+        string sql, Action<SqliteCommand> bind, CancellationToken ct, bool withSamples = true)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
         bind(command);
 
+        var columns = new ColumnOrdinals();
         var sessions = new List<SessionRecord>();
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
-            var fpsText = reader.GetString(reader.GetOrdinal("fps_samples"));
-            sessions.Add(new SessionRecord
-            {
-                Id = reader.GetInt64(reader.GetOrdinal("id")),
-                ProfileName = reader.GetString(reader.GetOrdinal("profile_name")),
-                GamePackageId = reader.GetString(reader.GetOrdinal("game_package_id")),
-                StartedAt = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("started_at")), CultureInfo.InvariantCulture),
-                Duration = TimeSpan.FromSeconds(reader.GetDouble(reader.GetOrdinal("duration_seconds"))),
-                Stats = new SessionStats
-                {
-                    SampleCount = reader.GetInt32(reader.GetOrdinal("sample_count")),
-                    AverageFps = reader.GetDouble(reader.GetOrdinal("average_fps")),
-                    OnePercentLowFps = reader.GetDouble(reader.GetOrdinal("one_percent_low_fps")),
-                    PointOnePercentLowFps = reader.GetDouble(reader.GetOrdinal("point_one_percent_low_fps")),
-                    AverageFrametimeMs = reader.GetDouble(reader.GetOrdinal("average_frametime_ms")),
-                    P95FrametimeMs = reader.GetDouble(reader.GetOrdinal("p95_frametime_ms")),
-                    P99FrametimeMs = reader.GetDouble(reader.GetOrdinal("p99_frametime_ms")),
-                },
-                FpsSamples = fpsText.Length == 0
-                    ? []
-                    : fpsText.Split(',')
-                        .Select(s => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0)
-                        .ToList(),
-                TweakIds = ReadTweakIds(reader),
-                ProfileHash = reader.GetString(reader.GetOrdinal("profile_hash")),
-                LaunchKind = ParseLaunchKind(reader.GetString(reader.GetOrdinal("launch_kind"))),
-                Network = ReadNetwork(reader),
-                StatsDelta = ReadStatsDelta(reader),
-                GameVersion = reader.IsDBNull(reader.GetOrdinal("game_version"))
-                    ? null
-                    : reader.GetString(reader.GetOrdinal("game_version")),
-            });
+            sessions.Add(ReadSession(reader, columns, withSamples));
         }
         return sessions;
     }
 
-    private static IReadOnlyList<string> ReadTweakIds(SqliteDataReader reader)
+    private static SessionRecord ReadSession(SqliteDataReader reader, ColumnOrdinals columns, bool withSamples)
     {
-        var text = reader.GetString(reader.GetOrdinal("tweak_ids"));
+        IReadOnlyList<double> samples = [];
+        if (withSamples)
+        {
+            var text = reader.GetString(columns.Get(reader, "fps_samples"));
+            samples = text.Length == 0
+                ? []
+                : text.Split(',')
+                    .Select(s => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0)
+                    .ToList();
+        }
+
+        return new SessionRecord
+        {
+            Id = reader.GetInt64(columns.Get(reader, "id")),
+            ProfileName = reader.GetString(columns.Get(reader, "profile_name")),
+            GamePackageId = reader.GetString(columns.Get(reader, "game_package_id")),
+            StartedAt = DateTimeOffset.Parse(reader.GetString(columns.Get(reader, "started_at")), CultureInfo.InvariantCulture),
+            Duration = TimeSpan.FromSeconds(reader.GetDouble(columns.Get(reader, "duration_seconds"))),
+            Stats = new SessionStats
+            {
+                SampleCount = reader.GetInt32(columns.Get(reader, "sample_count")),
+                AverageFps = reader.GetDouble(columns.Get(reader, "average_fps")),
+                OnePercentLowFps = reader.GetDouble(columns.Get(reader, "one_percent_low_fps")),
+                PointOnePercentLowFps = reader.GetDouble(columns.Get(reader, "point_one_percent_low_fps")),
+                AverageFrametimeMs = reader.GetDouble(columns.Get(reader, "average_frametime_ms")),
+                P95FrametimeMs = reader.GetDouble(columns.Get(reader, "p95_frametime_ms")),
+                P99FrametimeMs = reader.GetDouble(columns.Get(reader, "p99_frametime_ms")),
+            },
+            FpsSamples = samples,
+            TweakIds = ReadTweakIds(reader, columns),
+            ProfileHash = reader.GetString(columns.Get(reader, "profile_hash")),
+            LaunchKind = ParseLaunchKind(reader.GetString(columns.Get(reader, "launch_kind"))),
+            Network = ReadNetwork(reader, columns),
+            StatsDelta = ReadStatsDelta(reader, columns),
+            GameVersion = reader.IsDBNull(columns.Get(reader, "game_version"))
+                ? null
+                : reader.GetString(columns.Get(reader, "game_version")),
+        };
+    }
+
+    private static IReadOnlyList<string> ReadTweakIds(SqliteDataReader reader, ColumnOrdinals columns)
+    {
+        var text = reader.GetString(columns.Get(reader, "tweak_ids"));
         return text.Length == 0 ? [] : text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static LaunchKind ParseLaunchKind(string text)
         => Enum.TryParse<LaunchKind>(text, ignoreCase: true, out var kind) ? kind : LaunchKind.Play;
 
-    private static NetworkQualityStats? ReadNetwork(SqliteDataReader reader)
+    private static NetworkQualityStats? ReadNetwork(SqliteDataReader reader, ColumnOrdinals columns)
     {
-        var pingOrdinal = reader.GetOrdinal("avg_ping_ms");
+        var pingOrdinal = columns.Get(reader, "avg_ping_ms");
         if (reader.IsDBNull(pingOrdinal))
         {
             return null;
@@ -286,15 +397,15 @@ public sealed class SqliteSessionStore : ISessionStore
         return new NetworkQualityStats
         {
             AveragePingMs = reader.GetDouble(pingOrdinal),
-            JitterMs = reader.GetDouble(reader.GetOrdinal("jitter_ms")),
-            PacketLossPct = reader.GetDouble(reader.GetOrdinal("packet_loss_pct")),
+            JitterMs = reader.GetDouble(columns.Get(reader, "jitter_ms")),
+            PacketLossPct = reader.GetDouble(columns.Get(reader, "packet_loss_pct")),
             SampleCount = 1,
         };
     }
 
-    private static CopsProfileDelta? ReadStatsDelta(SqliteDataReader reader)
+    private static CopsProfileDelta? ReadStatsDelta(SqliteDataReader reader, ColumnOrdinals columns)
     {
-        var ordinal = reader.GetOrdinal("stats_delta");
+        var ordinal = columns.Get(reader, "stats_delta");
         if (reader.IsDBNull(ordinal))
         {
             return null;
@@ -312,8 +423,7 @@ public sealed class SqliteSessionStore : ISessionStore
     public async Task<long?> AttachStatsDeltaAsync(CopsProfileDelta delta, DateTimeOffset windowStart, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
 
         long sessionId;
         await using (var find = connection.CreateCommand())
@@ -340,8 +450,7 @@ public sealed class SqliteSessionStore : ISessionStore
     public async Task<long> SaveMatchAsync(MatchRecord match, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
@@ -356,8 +465,7 @@ public sealed class SqliteSessionStore : ISessionStore
     public async Task UpdateMatchAsync(MatchRecord match, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
@@ -373,8 +481,7 @@ public sealed class SqliteSessionStore : ISessionStore
     public async Task DeleteMatchAsync(long matchId, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM matches WHERE id = $id";
         command.Parameters.AddWithValue("$id", matchId);
@@ -384,29 +491,32 @@ public sealed class SqliteSessionStore : ISessionStore
     public async Task<IReadOnlyList<MatchRecord>> GetMatchesAsync(int limit = 100, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT * FROM matches ORDER BY started_at DESC, id DESC LIMIT $limit";
+        command.CommandText = $"SELECT {MatchColumns} FROM matches ORDER BY started_at DESC, id DESC LIMIT $limit";
         command.Parameters.AddWithValue("$limit", limit);
 
+        var columns = new ColumnOrdinals();
         var matches = new List<MatchRecord>();
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
+            var sessionId = columns.Get(reader, "session_id");
+            var map = columns.Get(reader, "map");
+            var note = columns.Get(reader, "note");
             matches.Add(new MatchRecord
             {
-                Id = reader.GetInt64(reader.GetOrdinal("id")),
-                SessionId = reader.IsDBNull(reader.GetOrdinal("session_id")) ? null : reader.GetInt64(reader.GetOrdinal("session_id")),
-                StartedAt = DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal("started_at")), CultureInfo.InvariantCulture),
-                Mode = reader.GetString(reader.GetOrdinal("mode")),
-                Result = reader.GetString(reader.GetOrdinal("result")),
-                Kills = ReadNullableLong(reader, "kills"),
-                Deaths = ReadNullableLong(reader, "deaths"),
-                Assists = ReadNullableLong(reader, "assists"),
-                Map = reader.IsDBNull(reader.GetOrdinal("map")) ? null : reader.GetString(reader.GetOrdinal("map")),
-                Source = reader.GetString(reader.GetOrdinal("source")),
-                Note = reader.IsDBNull(reader.GetOrdinal("note")) ? null : reader.GetString(reader.GetOrdinal("note")),
+                Id = reader.GetInt64(columns.Get(reader, "id")),
+                SessionId = reader.IsDBNull(sessionId) ? null : reader.GetInt64(sessionId),
+                StartedAt = DateTimeOffset.Parse(reader.GetString(columns.Get(reader, "started_at")), CultureInfo.InvariantCulture),
+                Mode = reader.GetString(columns.Get(reader, "mode")),
+                Result = reader.GetString(columns.Get(reader, "result")),
+                Kills = ReadNullableLong(reader, columns, "kills"),
+                Deaths = ReadNullableLong(reader, columns, "deaths"),
+                Assists = ReadNullableLong(reader, columns, "assists"),
+                Map = reader.IsDBNull(map) ? null : reader.GetString(map),
+                Source = reader.GetString(columns.Get(reader, "source")),
+                Note = reader.IsDBNull(note) ? null : reader.GetString(note),
             });
         }
         return matches;
@@ -426,9 +536,9 @@ public sealed class SqliteSessionStore : ISessionStore
         command.Parameters.AddWithValue("$note", (object?)match.Note ?? DBNull.Value);
     }
 
-    private static long? ReadNullableLong(SqliteDataReader reader, string column)
+    private static long? ReadNullableLong(SqliteDataReader reader, ColumnOrdinals columns, string column)
     {
-        var ordinal = reader.GetOrdinal(column);
+        var ordinal = columns.Get(reader, column);
         return reader.IsDBNull(ordinal) ? null : reader.GetInt64(ordinal);
     }
 

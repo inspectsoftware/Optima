@@ -2,7 +2,6 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Optima.App.ViewModels"
-        xmlns:views="clr-namespace:Optima.App.Views"
         xmlns:ctl="clr-namespace:Optima.App.Controls"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Optima"
@@ -34,22 +33,9 @@
     <KeyBinding Modifiers="Alt" Key="B" Command="{Binding ToggleRailCommand}" />
   </Window.InputBindings>
 
-  <Window.Resources>
-    <DataTemplate DataType="{x:Type vm:HomeViewModel}"><views:HomeView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:PlayViewModel}"><views:PlayView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:PerformanceViewModel}"><views:PerformanceView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:SessionsViewModel}"><views:SessionsView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:DisplayViewModel}"><views:DisplayView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:CompViewModel}"><views:CompView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:ExploreViewModel}"><views:ExploreView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:LegalViewModel}"><views:LegalView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:DiagnosticsViewModel}"><views:DiagnosticsView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:LogsViewModel}"><views:LogsView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:DeveloperViewModel}"><views:DeveloperView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:NewsViewModel}"><views:NewsView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:UpdateLogViewModel}"><views:UpdateLogView /></DataTemplate>
-  </Window.Resources>
+  <!-- Page views are built and cached by MainWindow.ShowCurrentPage instead of a DataTemplate: a
+       template re-instantiates the whole page visual tree on every navigation, which is the most
+       expensive thing a rail click can do. -->
 
   <Border x:Name="RootBorder" Background="{DynamicResource Brush.WindowGround}"
           TextElement.Foreground="{DynamicResource Brush.Text}"
@@ -220,9 +206,7 @@
             </Grid>
           </Border>
 
-          <ContentControl x:Name="PageHost" Grid.Row="2" Margin="0,4,0,0"
-                          Content="{Binding CurrentPage, NotifyOnTargetUpdated=True}"
-                          Binding.TargetUpdated="OnPageChanged">
+          <ContentControl x:Name="PageHost" Grid.Row="2" Margin="0,4,0,0">
             <ContentControl.RenderTransform>
               <TranslateTransform x:Name="PageShift" />
             </ContentControl.RenderTransform>

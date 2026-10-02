@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Session;
 
@@ -7,12 +8,11 @@ namespace Optima.Watchdog;
 public static class EtwPresentProbe
 {
     private static readonly Guid DxgiProvider = new("CA11C036-0102-4A2D-A6AD-F03CFED5D3C9");
-    private static readonly int[] PresentStartEventIds = [42, 55];
+    private static readonly HashSet<int> PresentStartEventIds = [42, 55];
 
     public static async Task<Dictionary<int, long>> RunAsync(TimeSpan duration, CancellationToken ct)
     {
-        var counts = new Dictionary<int, long>();
-        var gate = new object();
+        var counts = new ConcurrentDictionary<int, long>();
 
         // Distinct session name so a crashed capture session is never clobbered by a probe.
         using var session = new TraceEventSession("Optima-PresentProbe")
@@ -24,7 +24,8 @@ public static class EtwPresentProbe
         session.EnableProvider(DxgiProvider, TraceEventLevel.Informational, ulong.MaxValue,
             new TraceEventProviderOptions { EventIDsToEnable = [.. PresentStartEventIds] });
 
-        session.Source.Dynamic.All += OnManifestEvent;
+        // AllEvents only: Dynamic.All would make the parser construct a payload object for every
+        // present event the machine emits, and the probe only counts them by process id.
         session.Source.AllEvents += OnAnyEvent;
 
         var processing = new Thread(() =>
@@ -53,10 +54,7 @@ public static class EtwPresentProbe
             processing.Join(TimeSpan.FromSeconds(5));
         }
 
-        lock (gate)
-        {
-            return new Dictionary<int, long>(counts);
-        }
+        return new Dictionary<int, long>(counts);
 
         void OnAnyEvent(TraceEvent ev)
         {
@@ -64,14 +62,7 @@ public static class EtwPresentProbe
             {
                 return;
             }
-            lock (gate)
-            {
-                counts[ev.ProcessID] = counts.GetValueOrDefault(ev.ProcessID) + 1;
-            }
-        }
-
-        static void OnManifestEvent(TraceEvent ev)
-        {
+            counts.AddOrUpdate(ev.ProcessID, 1, static (_, current) => current + 1);
         }
     }
 }

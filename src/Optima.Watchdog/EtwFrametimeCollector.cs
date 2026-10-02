@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using Optima.Core.Ipc;
 using Optima.Core.Statistics;
@@ -14,15 +15,31 @@ public sealed class EtwFrametimeCollector : IDisposable
 {
     private static readonly Guid DxgiProvider = new("CA11C036-0102-4A2D-A6AD-F03CFED5D3C9");
 
-    private static readonly int[] PresentStartEventIds = [42, 55];
+    // The DXGI present events this capture counts. A set, not a list: the filter runs once per
+    // event of the whole provider, tens of thousands of times a second in a game.
+    private static readonly HashSet<int> PresentStartEventIds = [42, 55];
 
     private const int MaxFilteredPids = 8;
+
+    /// <summary>
+    /// Cap on events waiting to be aggregated. A dxgi present stream is a few hundred to a few
+    /// thousand events per second, so this is only reachable if a producer misbehaves; the point
+    /// is that a flood costs a bounded amount of memory instead of the capture growing without one.
+    /// </summary>
+    private const int MaxPendingEvents = 100_000;
 
     private readonly HashSet<int> _candidatePids;
     private readonly int _intervalMs;
     private readonly Func<IpcEvent, Task> _publish;
     private readonly object _lock = new();
     private readonly PresentWindowAggregator _aggregator;
+
+    // Present events arrive on the ETW processing thread at the display's refresh rate, or
+    // several times that in a game. The callback therefore only enqueues; the sample timer owns
+    // the aggregator, so no frame of the game ever waits on a lock held by Optima.
+    private readonly ConcurrentQueue<(int ProcessId, double TimestampMs)> _pending = new();
+    private int _pendingCount;
+    private int _droppedEvents;
 
     private TraceEventSession? _session;
     private Thread? _processingThread;
@@ -52,7 +69,9 @@ public sealed class EtwFrametimeCollector : IDisposable
         HelperLog.Write("ETW present trace enabled, pid filter: "
             + (options.ProcessIDFilter is null ? "none (too many candidates)" : string.Join(',', options.ProcessIDFilter)));
 
-        _session.Source.Dynamic.All += OnEvent;
+        // AllEvents only: subscribing to Dynamic.All as well made the TraceEvent parser build a
+        // dynamic payload object for every single present event, which is pure overhead here
+        // because only the process id, the event id and the timestamp are used.
         _session.Source.AllEvents += OnAnyEvent;
 
         _processingThread = new Thread(() =>
@@ -85,14 +104,26 @@ public sealed class EtwFrametimeCollector : IDisposable
         {
             return;
         }
-        lock (_lock)
+
+        if (Interlocked.Increment(ref _pendingCount) > MaxPendingEvents)
         {
-            _aggregator.RecordPresent(ev.ProcessID, ev.TimeStampRelativeMSec);
+            Interlocked.Decrement(ref _pendingCount);
+            if (Interlocked.Increment(ref _droppedEvents) == 1)
+            {
+                HelperLog.Write($"More than {MaxPendingEvents} present events are waiting; dropping events until the next sample");
+            }
+            return;
         }
+        _pending.Enqueue((ev.ProcessID, ev.TimeStampRelativeMSec));
     }
 
-    private void OnEvent(TraceEvent ev)
+    private void DrainPendingEvents()
     {
+        while (_pending.TryDequeue(out var present))
+        {
+            Interlocked.Decrement(ref _pendingCount);
+            _aggregator.RecordPresent(present.ProcessId, present.TimestampMs);
+        }
     }
 
     private void PublishSample(object? state)
@@ -100,6 +131,7 @@ public sealed class EtwFrametimeCollector : IDisposable
         PresentWindowSample? sample;
         lock (_lock)
         {
+            DrainPendingEvents();
             sample = _aggregator.CompleteWindow();
         }
         if (sample is null)
@@ -131,6 +163,9 @@ public sealed class EtwFrametimeCollector : IDisposable
         PresentCaptureResult result;
         lock (_lock)
         {
+            // The tail of the capture still sits in the queue: the last sample window never got
+            // to drain it because the session stopped first.
+            DrainPendingEvents();
             result = _aggregator.Complete();
         }
 

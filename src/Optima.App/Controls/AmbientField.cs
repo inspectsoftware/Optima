@@ -43,6 +43,19 @@ public sealed class AmbientField : FrameworkElement
         nameof(GridColor), typeof(Color), typeof(AmbientField),
         new FrameworkPropertyMetadata(Color.FromArgb(0x09, 0xFF, 0xFF, 0xFF), FrameworkPropertyMetadataOptions.AffectsRender));
 
+    /// <summary>
+    /// The field is re-rendered whenever the drift moves, and every glass panel above it re-renders
+    /// with it, so its brushes are built once per colour and reused: allocating three gradient
+    /// brushes per frame was pure garbage in the middle of the render pass.
+    /// </summary>
+    private RadialGradientBrush? _bandBrush;
+    private Color _bandBrushColor;
+    private double _bandBrushAlpha = -1;
+    private RadialGradientBrush? _coolBrush;
+    private Color _coolBrushColor;
+    private RadialGradientBrush? _washBrush;
+    private double _washBrushAlarm = -1;
+
     private AnimationClock? _drift;
     private AmbientState _state;
 
@@ -80,12 +93,16 @@ public sealed class AmbientField : FrameworkElement
 
     private void OnMotionChanged()
     {
-        if (Motion.Enabled)
+        // Software rendering has no business animating a full-window backdrop: the field keeps its
+        // first frame and the glass panels above it stay still.
+        if (Motion.Enabled && Motion.EffectsAvailable)
         {
             if (_drift is null)
             {
                 var animation = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(10)) { RepeatBehavior = RepeatBehavior.Forever };
-                Timeline.SetDesiredFrameRate(animation, 15);
+                // The band drifts across a ten-second arc; eight frames a second reads as smooth for
+                // something this slow, at a little over half the cost of the old fifteen.
+                Timeline.SetDesiredFrameRate(animation, 8);
                 _drift = animation.CreateClock();
                 ApplyAnimationClock(PhaseProperty, _drift);
             }
@@ -122,31 +139,15 @@ public sealed class AmbientField : FrameworkElement
 
         var bandAlpha = 0.20 + 0.14 * warmth;
         var bandY = h * (0.32 - 0.10 * warmth) + cy * 18;
-        var band = new RadialGradientBrush(
-            Color.FromArgb((byte)(bandAlpha * 255), Accent.R, Accent.G, Accent.B),
-            Color.FromArgb(0, Accent.R, Accent.G, Accent.B))
-        {
-            RadiusX = 0.5,
-            RadiusY = 0.5,
-        };
-        band.Freeze();
         dc.PushTransform(new RotateTransform(-14, w * 0.5, bandY));
-        dc.DrawEllipse(band, null, new Point(w * 0.5 + sx * 60, bandY), w * 0.75, 150 + 30 * warmth);
+        dc.DrawEllipse(BandBrush(bandAlpha), null, new Point(w * 0.5 + sx * 60, bandY), w * 0.75, 150 + 30 * warmth);
         dc.Pop();
 
-        var cool = new RadialGradientBrush(
-            Color.FromArgb(0x24, Cool.R, Cool.G, Cool.B),
-            Color.FromArgb(0, Cool.R, Cool.G, Cool.B));
-        cool.Freeze();
-        dc.DrawEllipse(cool, null, new Point(w * 0.92 - sx * 40, h * 0.98 + cy * 24), 360, 260);
+        dc.DrawEllipse(CoolBrush(), null, new Point(w * 0.92 - sx * 40, h * 0.98 + cy * 24), 360, 260);
 
         if (alarm > 0.005)
         {
-            var wash = new RadialGradientBrush(
-                Color.FromArgb((byte)(0x3C * alarm), 0xE0, 0x5A, 0x5A),
-                Color.FromArgb(0, 0xE0, 0x5A, 0x5A));
-            wash.Freeze();
-            dc.DrawEllipse(wash, null, new Point(w * 0.5, h * 0.5), w * 0.7, h * 0.7);
+            dc.DrawEllipse(WashBrush(alarm), null, new Point(w * 0.5, h * 0.5), w * 0.7, h * 0.7);
         }
 
         if (DrawGrid)
@@ -164,6 +165,56 @@ public sealed class AmbientField : FrameworkElement
             dc.DrawRectangle(grid, null, new Rect(0, 0, w, h));
             dc.Pop();
         }
+    }
+
+    private RadialGradientBrush BandBrush(double alpha)
+    {
+        // Quantized so a running warmth fade reuses brushes instead of building one per frame.
+        var quantized = Math.Round(alpha, 2);
+        if (_bandBrush is null || _bandBrushColor != Accent || _bandBrushAlpha != quantized)
+        {
+            var brush = new RadialGradientBrush(
+                Color.FromArgb((byte)(quantized * 255), Accent.R, Accent.G, Accent.B),
+                Color.FromArgb(0, Accent.R, Accent.G, Accent.B))
+            {
+                RadiusX = 0.5,
+                RadiusY = 0.5,
+            };
+            brush.Freeze();
+            _bandBrush = brush;
+            _bandBrushColor = Accent;
+            _bandBrushAlpha = quantized;
+        }
+        return _bandBrush;
+    }
+
+    private RadialGradientBrush CoolBrush()
+    {
+        if (_coolBrush is null || _coolBrushColor != Cool)
+        {
+            var brush = new RadialGradientBrush(
+                Color.FromArgb(0x24, Cool.R, Cool.G, Cool.B),
+                Color.FromArgb(0, Cool.R, Cool.G, Cool.B));
+            brush.Freeze();
+            _coolBrush = brush;
+            _coolBrushColor = Cool;
+        }
+        return _coolBrush;
+    }
+
+    private RadialGradientBrush WashBrush(double alarm)
+    {
+        var quantized = Math.Round(alarm, 2);
+        if (_washBrush is null || _washBrushAlarm != quantized)
+        {
+            var brush = new RadialGradientBrush(
+                Color.FromArgb((byte)(0x3C * quantized), 0xE0, 0x5A, 0x5A),
+                Color.FromArgb(0, 0xE0, 0x5A, 0x5A));
+            brush.Freeze();
+            _washBrush = brush;
+            _washBrushAlarm = quantized;
+        }
+        return _washBrush;
     }
 
     public static readonly DependencyProperty DrawGridProperty = DependencyProperty.Register(

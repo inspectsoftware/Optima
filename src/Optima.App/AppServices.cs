@@ -107,8 +107,10 @@ public static class AppServices
         services.AddSingleton<EtwMetricsProviderClient>();
         services.AddSingleton<HardwareStreamClient>();
         services.AddSingleton(_ => new MockMetricsProvider());
+        // The cached snapshot is available long before anything resolves a metrics provider; the
+        // factory must not block a thread on settings just to read one flag.
         services.AddSingleton<IPerformanceMetricsProvider>(sp =>
-            sp.GetRequiredService<SettingsService>().GetSettingsAsync().GetAwaiter().GetResult().UseMockMetricsProvider
+            sp.GetRequiredService<SettingsService>().Current?.UseMockMetricsProvider == true
                 ? sp.GetRequiredService<MockMetricsProvider>()
                 : sp.GetRequiredService<EtwMetricsProviderClient>());
         services.AddSingleton<ISessionStore, SqliteSessionStore>();

@@ -94,8 +94,9 @@ public partial class App : Application
 
         var settingsService = _host.Services.GetRequiredService<SettingsService>();
         _theme = new ThemeService(settingsService);
-        // Theme must be on the wall before the first window paints.
-        var initialSettings = settingsService.GetSettingsAsync().GetAwaiter().GetResult();
+        // Theme must be on the wall before the first window paints. The synchronous read keeps
+        // startup on this thread instead of blocking it on a thread pool hop.
+        var initialSettings = settingsService.GetSettings();
         _theme.Initialize(initialSettings);
         Motion.SetFollowWindows(initialSettings.FollowWindowsMotion);
         settingsService.SettingsChanged += (_, s) => Dispatcher.BeginInvoke(() => Motion.SetFollowWindows(s.FollowWindowsMotion));
@@ -296,10 +297,20 @@ public partial class App : Application
             {
                 return;
             }
-            var pending = recovery.GetPendingAsync().GetAwaiter().GetResult();
-            if (pending is not null)
+            // Off the dispatcher: this often runs because the UI thread is already unhappy, and
+            // the restore's continuations must never need it. Bounded so a wedged device call
+            // cannot hang exit.
+            var restore = Task.Run(async () =>
             {
-                recovery.RestoreAsync(pending).GetAwaiter().GetResult();
+                var pending = await recovery.GetPendingAsync().ConfigureAwait(false);
+                if (pending is not null)
+                {
+                    await recovery.RestoreAsync(pending).ConfigureAwait(false);
+                }
+            });
+            if (!restore.Wait(TimeSpan.FromSeconds(10)))
+            {
+                Log.Warning("Emergency restore timed out; the recovery prompt will appear on next start");
             }
         }
         catch (Exception ex)

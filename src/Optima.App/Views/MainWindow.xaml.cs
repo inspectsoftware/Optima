@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
@@ -15,6 +14,13 @@ public partial class MainWindow : Window
 {
     private const double RailWidth = 200;
     private const double RailCollapsedWidth = 56;
+
+    /// <summary>
+    /// One view per page view-model, kept for the life of the window. The view-models are
+    /// singletons, so a page that has been visited once keeps its visual tree (and its scroll
+    /// position and focus) instead of being rebuilt from a DataTemplate on every rail click.
+    /// </summary>
+    private readonly Dictionary<object, System.Windows.Controls.UserControl> _pageViews = [];
 
     private bool _backdropActive;
 
@@ -60,6 +66,7 @@ public partial class MainWindow : Window
             if (args.NewValue is MainViewModel vm)
             {
                 ApplyRail(vm.RailCollapsed);
+                ShowPage(vm.CurrentPage);
             }
         };
     }
@@ -68,11 +75,63 @@ public partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.RailCollapsed) && sender is MainViewModel vm)
+        if (sender is not MainViewModel vm)
+        {
+            return;
+        }
+        if (e.PropertyName == nameof(MainViewModel.RailCollapsed))
         {
             ApplyRail(vm.RailCollapsed);
         }
+        else if (e.PropertyName == nameof(MainViewModel.CurrentPage))
+        {
+            ShowPage(vm.CurrentPage);
+        }
     }
+
+    private void ShowPage(object page)
+    {
+        if (!_pageViews.TryGetValue(page, out var view))
+        {
+            view = CreatePageView(page);
+            if (view is null)
+            {
+                return;
+            }
+
+            // A DataTemplate used to hand each page its view-model as DataContext; a view instance
+            // hosted directly by the ContentControl would inherit the window's instead, so the
+            // page binds to the wrong object and renders empty.
+            view.DataContext = page;
+            _pageViews[page] = view;
+        }
+
+        if (ReferenceEquals(PageHost.Content, view))
+        {
+            return;
+        }
+        PageHost.Content = view;
+        AnimatePageIn();
+    }
+
+    private static System.Windows.Controls.UserControl? CreatePageView(object page) => page switch
+    {
+        HomeViewModel => new HomeView(),
+        PlayViewModel => new PlayView(),
+        PerformanceViewModel => new PerformanceView(),
+        SessionsViewModel => new SessionsView(),
+        DisplayViewModel => new DisplayView(),
+        CompViewModel => new CompView(),
+        ExploreViewModel => new ExploreView(),
+        LegalViewModel => new LegalView(),
+        DiagnosticsViewModel => new DiagnosticsView(),
+        LogsViewModel => new LogsView(),
+        SettingsViewModel => new SettingsView(),
+        DeveloperViewModel => new DeveloperView(),
+        NewsViewModel => new NewsView(),
+        UpdateLogViewModel => new UpdateLogView(),
+        _ => null,
+    };
 
     private void ApplyRail(bool collapsed)
     {
@@ -113,7 +172,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnPageChanged(object sender, DataTransferEventArgs e)
+    private void AnimatePageIn()
     {
         if (!Motion.Enabled)
         {
@@ -121,10 +180,13 @@ public partial class MainWindow : Window
             PageShift.Y = 0;
             return;
         }
+
+        // Short and cheap: the fade used to run for 220 ms over the whole page area, which kept the
+        // compositor busy for a fifth of a second after every rail click.
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var duration = TimeSpan.FromMilliseconds(220);
+        var duration = TimeSpan.FromMilliseconds(140);
         PageHost.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
-        PageShift.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, new DoubleAnimation(8, 0, duration) { EasingFunction = ease });
+        PageShift.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, new DoubleAnimation(6, 0, duration) { EasingFunction = ease });
     }
 
     private void ApplyWindowDressing(string theme)

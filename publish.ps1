@@ -21,7 +21,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$out = Join-Path $root $Output
+# The output may be an absolute path: the local dev pipeline publishes straight to the
+# Desktop\Optima Dev folder.
+$out = if ([System.IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path $root $Output }
 
 # A running instance locks the assemblies it loaded; publishing over them fails.
 $stopped = @()
@@ -43,10 +45,19 @@ foreach ($process in $stopped) {
 # Retried: Windows can hold file locks for a moment after the process exits.
 if ((Test-Path $out) -and (Test-Path (Join-Path $out "Optima.exe"))) {
     Write-Host "cleaning $out"
+    # Setups built from this folder (the local dev pipeline keeps them next to the app) are the one
+    # thing that survives: a rebuild must not erase the installers made from earlier runs.
+    $keep = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($setup in Get-ChildItem -Path $out -File -Filter "Optima-Setup-*.exe" -ErrorAction SilentlyContinue) {
+        [void]$keep.Add($setup.Name)
+    }
     $attempts = 0
     while ($true) {
         try {
-            Remove-Item -Recurse -Force $out -ErrorAction Stop
+            foreach ($child in Get-ChildItem -Path $out -Force) {
+                if (-not $child.PSIsContainer -and $keep.Contains($child.Name)) { continue }
+                Remove-Item -Recurse -Force $child.FullName -ErrorAction Stop
+            }
             break
         } catch {
             $attempts++
@@ -56,14 +67,16 @@ if ((Test-Path $out) -and (Test-Path (Join-Path $out "Optima.exe"))) {
     }
 }
 
+# ReadyToRun precompiles the assemblies, trading a little disk for a colder, faster first
+# paint: the launcher and its helper both start from a jitted-nothing state today.
 Write-Host "publishing Optima.Watchdog ($Configuration $Runtime)"
-dotnet publish (Join-Path $root "src\Optima.Watchdog") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet
+dotnet publish (Join-Path $root "src\Optima.Watchdog") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet -p:PublishReadyToRun=true
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.Watchdog failed (exit $LASTEXITCODE)" }
 
 Write-Host "publishing Optima.App ($Configuration $Runtime)"
 $devProps = @()
 if ($DevEdition) { $devProps += "-p:DevEdition=true" }
-dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet @devProps
+dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet -p:PublishReadyToRun=true @devProps
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.App failed (exit $LASTEXITCODE)" }
 
 $exe = Join-Path $out "Optima.exe"

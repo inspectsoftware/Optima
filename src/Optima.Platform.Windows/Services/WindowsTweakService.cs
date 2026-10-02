@@ -18,6 +18,14 @@ public sealed class WindowsTweakService : ITweakService
     private readonly ILogger<WindowsTweakService> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
+    // The PERFORMANCE page re-reads the whole catalog on every navigation. The states are plain
+    // registry reads, so a short-lived snapshot is enough: changes made through Optima
+    // invalidate it, and the lifetime keeps Regedit-side edits honest.
+    private static readonly TimeSpan StateCacheLifetime = TimeSpan.FromSeconds(10);
+    private readonly object _statesGate = new();
+    private IReadOnlyList<TweakState>? _states;
+    private DateTimeOffset _statesAt;
+
     public WindowsTweakService(
         IElevationBroker elevation,
         AppPaths paths,
@@ -32,7 +40,24 @@ public sealed class WindowsTweakService : ITweakService
 
     public Task<IReadOnlyList<TweakState>> GetStatesAsync(CancellationToken ct = default)
         => Task.Run<IReadOnlyList<TweakState>>(
-            () => TweakCatalog.All.Select(t => new TweakState(t, Evaluate(t))).ToList(), ct);
+            () =>
+            {
+                lock (_statesGate)
+                {
+                    if (_states is { } cached && DateTimeOffset.UtcNow - _statesAt < StateCacheLifetime)
+                    {
+                        return cached;
+                    }
+                }
+
+                var states = TweakCatalog.All.Select(t => new TweakState(t, Evaluate(t))).ToList();
+                lock (_statesGate)
+                {
+                    _states = states;
+                    _statesAt = DateTimeOffset.UtcNow;
+                }
+                return states;
+            }, ct);
 
     public async Task<TweakState> SetEnabledAsync(string tweakId, bool enable, CancellationToken ct = default)
     {
@@ -77,6 +102,10 @@ public sealed class WindowsTweakService : ITweakService
             }
 
             _logger.LogInformation("Tweak '{Tweak}' {Action}", tweakId, enable ? "enabled" : "disabled");
+            lock (_statesGate)
+            {
+                _states = null;
+            }
             return new TweakState(definition, Evaluate(definition));
         }
         finally

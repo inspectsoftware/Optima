@@ -86,9 +86,9 @@ public sealed partial class PerformanceViewModel : ObservableObject
     }
 
     // ── Live system load (1 s ticks from the hardware monitor) ──
-    public ObservableCollection<double> CpuHistory { get; } = [];
-    public ObservableCollection<double> GpuHistory { get; } = [];
-    public ObservableCollection<double> RamHistory { get; } = [];
+    public HistorySeries CpuHistory { get; } = new(HistoryLength);
+    public HistorySeries GpuHistory { get; } = new(HistoryLength);
+    public HistorySeries RamHistory { get; } = new(HistoryLength);
 
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private string _cpuText = "---";
@@ -431,9 +431,9 @@ public sealed partial class PerformanceViewModel : ObservableObject
             RamText = $"{metrics.RamUsedBytes / (1024.0 * 1024 * 1024):F1} / {metrics.RamTotalBytes / (1024.0 * 1024 * 1024):F0} GB";
             GpuTempText = metrics.GpuTemperatureCelsius is { } temp ? $"{temp:F0}°C" : string.Empty;
 
-            Append(CpuHistory, CpuPercent);
-            Append(GpuHistory, GpuPercent);
-            Append(RamHistory, RamPercent);
+            CpuHistory.Append(CpuPercent);
+            GpuHistory.Append(GpuPercent);
+            RamHistory.Append(RamPercent);
 
             var parts = new List<string>();
             if (metrics.GameCpuPercent > 0)
@@ -450,15 +450,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
             }
             GameLoadText = string.Join(" · ", parts);
         });
-    }
-
-    private static void Append(ObservableCollection<double> series, double value)
-    {
-        series.Add(value);
-        while (series.Count > HistoryLength)
-        {
-            series.RemoveAt(0);
-        }
     }
 
     private static string Tri(bool? value) => value switch

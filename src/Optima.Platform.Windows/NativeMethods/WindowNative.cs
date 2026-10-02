@@ -22,7 +22,34 @@ internal static class WindowNative
 
     internal sealed record TopLevelWindow(IntPtr Handle, int ProcessId, string Title);
 
+    /// <summary>
+    /// How long one enumeration answers for. Enumerating is the expensive half of a presence poll
+    /// (a GetWindowText call for every visible window on the desktop), and the callers in the same
+    /// second all ask the same question.
+    /// </summary>
+    private static readonly TimeSpan CacheLifetime = TimeSpan.FromMilliseconds(400);
+
+    private static readonly object CacheGate = new();
+    private static IReadOnlyList<TopLevelWindow>? _cached;
+    private static DateTimeOffset _cachedAt;
+
     internal static IReadOnlyList<TopLevelWindow> GetVisibleWindows()
+    {
+        var now = DateTimeOffset.UtcNow;
+        lock (CacheGate)
+        {
+            if (_cached is not null && now - _cachedAt < CacheLifetime)
+            {
+                return _cached;
+            }
+
+            _cached = CaptureVisibleWindows();
+            _cachedAt = now;
+            return _cached;
+        }
+    }
+
+    private static IReadOnlyList<TopLevelWindow> CaptureVisibleWindows()
     {
         var windows = new List<TopLevelWindow>();
         var buffer = new StringBuilder(512);

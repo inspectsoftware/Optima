@@ -48,6 +48,11 @@ public sealed class DiscordPresenceService : IDisposable
     private string _applicationId = "";
     private bool _subscribed;
 
+    // Cached from the last ApplySettings call so composition never blocks on settings I/O.
+    private string _playerIgn = "";
+    private long? _playerAccountId;
+    private string _profileName = "";
+
     private PlayerSeasonBadge? _badge;
     private DateTimeOffset _badgeAt = DateTimeOffset.MinValue;
     private DateTimeOffset _lastPush = DateTimeOffset.MinValue;
@@ -108,6 +113,9 @@ public sealed class DiscordPresenceService : IDisposable
 
     private void ApplySettings(AppSettings settings)
     {
+        _playerIgn = settings.PlayerIgn;
+        _playerAccountId = settings.PlayerAccountId;
+        _profileName = settings.SelectedProfileName;
         _enabled = settings.DiscordPresenceEnabled;
         _inLauncherEnabled = settings.DiscordPresenceInLauncher;
         var newId = settings.DiscordApplicationId.Trim();
@@ -190,16 +198,15 @@ public sealed class DiscordPresenceService : IDisposable
 
     private PresenceText ComposeCurrent(GamePresence state)
     {
-        var settings = _settings.GetSettingsAsync().GetAwaiter().GetResult();
         var fps = state == GamePresence.InGame ? _monitor.Latest?.CurrentFps : null;
 
         if (DateTimeOffset.Now - _badgeAt > BadgeLifetime)
         {
             _badgeAt = DateTimeOffset.Now;
-            _ = RefreshBadgeAsync(settings.PlayerIgn, settings.PlayerAccountId);
+            _ = RefreshBadgeAsync(_playerIgn, _playerAccountId);
         }
 
-        return PresenceComposer.Compose(state, fps, _badge, settings.SelectedProfileName);
+        return PresenceComposer.Compose(state, fps, _badge, _profileName);
     }
 
     private void SetComposed(PresenceText text, DateTimeOffset? since)
