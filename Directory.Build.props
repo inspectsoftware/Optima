@@ -8,6 +8,10 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <InvariantGlobalization>false</InvariantGlobalization>
     <NeutralLanguage>en</NeutralLanguage>
+    <!-- Optima is English-only, so the publish must not carry .NET's localized framework messages:
+         without this, every self-contained publish ships the same resource assemblies again in
+         cs, de, es, fr, it, ja, ko, pl, pt-BR, ru, tr, zh-Hans and zh-Hant. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <Company>Inspect Software</Company>
     <Product>Optima</Product>
     <Version>0.7.5</Version>

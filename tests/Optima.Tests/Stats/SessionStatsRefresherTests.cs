@@ -244,7 +244,7 @@ public sealed class SessionStatsRefresherTests : IDisposable
 
         // The delta and its row were already right, so it asks once and says so.
         Assert.Equal(SessionStatsRefreshStatus.NoMovement, result.Status);
-        Assert.Equal(1, _queries.Count);
+        Assert.Single(_queries);
         Assert.Empty(_store.UpdatedDeltas);
     }
 

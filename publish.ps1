@@ -21,6 +21,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Assembly file version, or null when the file has none (native libraries mostly).
+function Get-AssemblyVersion([string]$path) {
+    try { return [version](Get-Item $path).VersionInfo.FileVersion } catch { return $null }
+}
 # The output may be an absolute path: the local dev pipeline publishes straight to the
 # Desktop\Optima Dev folder.
 $out = if ([System.IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path $root $Output }
@@ -73,8 +78,18 @@ if ((Test-Path $out) -and (Test-Path (Join-Path $out "Optima.exe"))) {
 
 # ReadyToRun precompiles the assemblies, trading a little disk for a colder, faster first
 # paint: the launcher and its helper both start from a jitted-nothing state today.
+#
+# The helper is published into a folder of its own and merged in *after* the app, because the two
+# share dependencies at different versions (TraceEvent drags 6.x Microsoft.Extensions.* into the
+# helper) and MSBuild skips a copy whose destination is newer than its source. The helper's freshly
+# compiled copies are always newer than the app's package files, so publishing both into one folder
+# let the older assembly win and the launcher died on startup with "could not load file or assembly".
+# Publishing apart, app first and helper merged in without overwriting anything, removes the race
+# rather than trying to win it.
+$helperOut = Join-Path $root "artifacts\helper-publish"
+if (Test-Path $helperOut) { Remove-Item -Recurse -Force $helperOut }
 Write-Host "publishing Optima.Watchdog ($Configuration $Runtime)"
-dotnet publish (Join-Path $root "src\Optima.Watchdog") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet -p:PublishReadyToRun=true
+dotnet publish (Join-Path $root "src\Optima.Watchdog") -c $Configuration -r $Runtime --self-contained -o $helperOut --nologo -v quiet -p:PublishReadyToRun=true
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.Watchdog failed (exit $LASTEXITCODE)" }
 
 Write-Host "publishing Optima.App ($Configuration $Runtime)"
@@ -82,6 +97,41 @@ $devProps = @()
 if ($DevEdition) { $devProps += "-p:DevEdition=true" }
 dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet -p:PublishReadyToRun=true @devProps
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.App failed (exit $LASTEXITCODE)" }
+
+# The helper's own files always travel; everything else only fills gaps the app left, so a shared
+# dependency stays at the app's version whichever of the two was compiled last.
+Write-Host "merging the elevated helper into the payload"
+$merged = 0
+foreach ($file in Get-ChildItem $helperOut -File -Recurse) {
+    $relative = $file.FullName.Substring($helperOut.Length + 1)
+    $destination = Join-Path $out $relative
+    if ($relative -notlike "Optima.Watchdog.*" -and (Test-Path $destination)) { continue }
+    $folder = Split-Path $destination -Parent
+    if (-not (Test-Path $folder)) { New-Item -ItemType Directory -Force $folder | Out-Null }
+    Copy-Item $file.FullName $destination -Force
+    $merged++
+}
+Remove-Item -Recurse -Force $helperOut
+Write-Host "helper files added: $merged"
+
+# The payload has to be the app's own assemblies: a shared dependency left at an older version is
+# not a cosmetic problem, it is a launcher that cannot start. Compared by version rather than by
+# timestamp, since a timestamp comparison is what caused the problem in the first place.
+$appBin = Join-Path $root "src\Optima.App\bin\$Configuration\net10.0-windows"
+$stale = @()
+foreach ($source in Get-ChildItem $appBin -File -Filter *.dll) {
+    if ($source.Name -like "Optima.Watchdog*") { continue }
+    $published = Join-Path $out $source.Name
+    if (-not (Test-Path $published)) { continue }
+    $expected = Get-AssemblyVersion $source.FullName
+    $actual = Get-AssemblyVersion $published
+    if ($expected -and $actual -and $actual -lt $expected) {
+        $stale += "$($source.Name): payload $actual, app $expected"
+    }
+}
+if ($stale.Count -gt 0) {
+    throw ("the payload carries older assemblies than the app builds:`n  " + ($stale -join "`n  "))
+}
 
 $exe = Join-Path $out "Optima.exe"
 $stamp = (Get-Item $exe).LastWriteTime
