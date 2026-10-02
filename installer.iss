@@ -2,8 +2,12 @@
 ;
 ;   tools\InnoSetup\ISCC.exe /DAppVersion=<version> installer.iss
 ;
-; The script packs whatever publish\ currently holds, so run publish.ps1 first
-; (installer.ps1 does both steps). Produces artifacts\Optima-Setup-<version>.exe.
+;   tools\InnoSetup\ISCC.exe /DSourceDir=<payload> /DOutDir=<folder> /DLabel=<suffix> installer.iss
+;
+; The script packs whatever the payload folder currently holds (publish\ by default), so run
+; publish.ps1 first (installer.ps1 does both steps). Produces
+; <OutDir>\Optima-Setup-<version><Label>.exe. The local dev pipeline points both at the
+; Desktop\Optima Dev folder and stamps Label with the build time.
 ;
 ; Install model: per-user, so the wizard itself never asks for administrator rights:
 ; files go to %LOCALAPPDATA%\Programs\Optima and registry writes are HKCU only. The
@@ -22,13 +26,27 @@
 
 #define AppName "Optima"
 
+; Payload and output are redirectable; the defaults are the repo's own folders. The local dev
+; pipeline passes the Desktop\Optima Dev folder for both so a dev build and the setup made from
+; it sit together.
+#ifndef SourceDir
+  #define SourceDir "publish"
+#endif
+#ifndef OutDir
+  #define OutDir "artifacts"
+#endif
+#ifndef Label
+  ; Filename suffix that tells one local build from the next, e.g. "-dev-20261002-2312".
+  #define Label ""
+#endif
+
 ; A setup that ships without the driver package and the helper that installs it would bring
 ; back exactly the bug this script now fixes, so refuse to build one.
-#if !DirExists("publish\drivers")
-  #error publish\drivers is missing: run publish.ps1 first, or use installer.ps1 -Publish.
+#if !DirExists(AddBackslash(SourceDir) + "drivers")
+  #error The payload has no drivers folder: run publish.ps1 first, or use installer.ps1 -Publish.
 #endif
-#if !FileExists("publish\Optima.Watchdog.exe")
-  #error publish\Optima.Watchdog.exe is missing: the driver install needs the elevated helper.
+#if !FileExists(AddBackslash(SourceDir) + "Optima.Watchdog.exe")
+  #error The payload has no Optima.Watchdog.exe: the driver install needs the elevated helper.
 #endif
 
 [Setup]
@@ -45,15 +63,16 @@ DisableDirPage=yes
 UsePreviousAppDir=yes
 UsePreviousTasks=yes
 LicenseFile=LICENSE
-OutputDir=artifacts
-OutputBaseFilename=Optima-Setup-{#AppVersion}
+OutputDir={#OutDir}
+OutputBaseFilename=Optima-Setup-{#AppVersion}{#Label}
 SetupIconFile=src\Optima.App\Assets\optima.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-UninstallDisplayName={#AppName}
+; Names the build in Add/Remove Programs, so a machine carrying a local dev build says which one.
+UninstallDisplayName={#AppName} {#AppVersion}{#Label}
 ; Let Setup ask Windows to close Optima when its files are being replaced
 ; (upgrade in place) and relaunch it afterwards if it was running.
 CloseApplicationsFilter=*.exe,*.dll
@@ -71,7 +90,9 @@ Name: "autostart"; Description: "Start Optima automatically at sign-in (minimize
 Name: "vdddriver"; Description: "Install the Optima virtual display driver (Windows asks once for administrator approval)"; GroupDescription: "Virtual display:"
 
 [Files]
-Source: "publish\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion restartreplace
+; Setups built earlier from this same folder are excluded: the local dev pipeline writes them next
+; to the payload, and without this each setup would embed a copy of the previous one.
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "Optima-Setup-*.exe"; Flags: recursesubdirs createallsubdirs ignoreversion restartreplace
 
 [Icons]
 Name: "{userprograms}\{#AppName}"; Filename: "{app}\Optima.exe"; WorkingDir: "{app}"

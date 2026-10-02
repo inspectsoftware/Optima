@@ -4,7 +4,12 @@
 #   .\installer.ps1 -Publish        republish first, then build the installer
 #   .\installer.ps1 -Run            ... and start the finished installer
 #
-# Produces artifacts\Optima-Setup-<version>.exe. The setup is per-user: it
+# The payload and the output folder are redirectable, which is how the local dev pipeline
+# (devbuild.ps1) packages the Desktop\Optima Dev folder instead of publish\:
+#
+#   .\installer.ps1 -Publish -DevEdition -Source "C:\...\Optima Dev" -OutDir "C:\...\Optima Dev" -Label "-dev-20261002-2312"
+#
+# Produces <OutDir>\Optima-Setup-<version><Label>.exe. The setup is per-user: it
 # installs to %LOCALAPPDATA%\Programs\Optima without an administrator prompt,
 # adds Start Menu shortcuts and an optional sign-in autostart, and registers a
 # proper uninstaller in Add/Remove Programs.
@@ -13,10 +18,19 @@
 # nothing installed machine-wide); its presence is verified before use.
 
 param(
-    # Refresh publish\ from source before packaging it.
+    # Refresh the payload from source before packaging it.
     [switch]$Publish,
     # Start the produced installer after a successful build.
     [switch]$Run,
+    # Payload to package: publish\ by default, or any folder (the dev pipeline passes the
+    # Desktop\Optima Dev folder).
+    [string]$Source = "publish",
+    # Where the setup lands: artifacts\ by default.
+    [string]$OutDir = "artifacts",
+    # Filename suffix carried by this build, so local builds never collide.
+    [string]$Label = "",
+    # Dev edition: compiles in the DEVELOPER EMULATOR settings section (used only with -Publish).
+    [switch]$DevEdition,
     # Publish configuration (used only with -Publish).
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64"
@@ -25,15 +39,26 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# Absolute paths are taken as given; relative ones are resolved against the repo root.
+function Resolve-FromRoot([string]$path) {
+    if ([System.IO.Path]::IsPathRooted($path)) { return $path }
+    return Join-Path $root $path
+}
+
+$sourceDir = Resolve-FromRoot $Source
+$outDir = Resolve-FromRoot $OutDir
+
 # --- The publish payload -----------------------------------------------------
 
 if ($Publish) {
-    & (Join-Path $root "publish.ps1") -Configuration $Configuration -Runtime $Runtime
+    $publishArgs = @{ Configuration = $Configuration; Runtime = $Runtime; Output = $sourceDir }
+    if ($DevEdition) { $publishArgs.DevEdition = $true }
+    & (Join-Path $root "publish.ps1") @publishArgs
     if ($LASTEXITCODE -ne 0) { throw "publish.ps1 failed (exit $LASTEXITCODE)" }
 }
 
-if (-not (Test-Path (Join-Path $root "publish\Optima.exe"))) {
-    throw "publish\Optima.exe not found. Run .\installer.ps1 -Publish first (or publish.ps1, then installer.ps1)."
+if (-not (Test-Path (Join-Path $sourceDir "Optima.exe"))) {
+    throw "$sourceDir\Optima.exe not found. Run .\installer.ps1 -Publish first (or publish.ps1, then installer.ps1)."
 }
 
 # Version for the setup filename and Add/Remove Programs entry; the app's own
@@ -66,18 +91,18 @@ if (-not (Test-Path $iscc)) {
 
 # --- Compile -----------------------------------------------------------------
 
-Write-Host "compiling the installer"
-# Compile from the repo root so the script's relative paths (publish\, LICENSE,
-# the icon) resolve regardless of the caller's working directory.
+Write-Host "compiling the installer from $sourceDir"
+# Compile from the repo root so the script's relative paths (the LICENSE, the icon)
+# resolve regardless of the caller's working directory.
 Push-Location $root
 try {
-    & $iscc /DAppVersion=$version "installer.iss"
+    & $iscc "/DAppVersion=$version" "/DSourceDir=$sourceDir" "/DOutDir=$outDir" "/DLabel=$Label" "installer.iss"
     if ($LASTEXITCODE -ne 0) { throw "ISCC failed (exit $LASTEXITCODE)" }
 } finally {
     Pop-Location
 }
 
-$setup = Join-Path $root "artifacts\Optima-Setup-$version.exe"
+$setup = Join-Path $outDir "Optima-Setup-$version$Label.exe"
 Write-Host "done: $setup"
 
 if ($Run) {
