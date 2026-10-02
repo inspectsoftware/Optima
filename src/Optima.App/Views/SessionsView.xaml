@@ -57,7 +57,14 @@
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="HISTORY">
         <HeaderedContentControl.Tag>
-          <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding ReloadCommand}" Padding="6,0" />
+          <StackPanel Orientation="Horizontal">
+            <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding ReloadCommand}" Padding="6,0"
+                    ToolTip="Re-read the history from the local database" />
+            <Button Style="{StaticResource GhostButton}" Content="refresh stats" Padding="6,0" Margin="6,0,0,0"
+                    Command="{Binding RefreshStatsCommand}"
+                    IsEnabled="{Binding IsRefreshingStats, Converter={StaticResource InverseBool}}"
+                    ToolTip="Re-query the stats API for the selected session, until it reports the match" />
+          </StackPanel>
         </HeaderedContentControl.Tag>
         <StackPanel>
           <Grid Margin="0,0,0,2">
@@ -103,6 +110,21 @@
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
+          <TextBlock Text="{Binding StatsRefreshStatus}" Margin="0,8,0,0" TextWrapping="Wrap" MaxWidth="760"
+                     HorizontalAlignment="Left"
+                     Visibility="{Binding StatsRefreshStatus, Converter={StaticResource EmptyToCollapsed}}">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Warn}" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding StatsRefreshOk}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+
           <TextBlock Text="no sessions recorded yet · play a round first" Margin="0,8,0,0">
             <TextBlock.Style>
               <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">

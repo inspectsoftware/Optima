@@ -100,18 +100,25 @@ public sealed class SessionStatsEnricher : IDisposable
             await Task.Delay(SettleDelay).ConfigureAwait(false);
             var after = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, CancellationToken.None).ConfigureAwait(false);
             var delta = CopsProfileDelta.Between(start.Value.Profile, after);
-            if (delta is null || delta.IsZero)
+            var moved = delta is { IsZero: false };
+
+            var windowStart = start.Value.At - TimeSpan.FromMinutes(2);
+            // The start-of-run snapshot is stored even when nothing moved yet: the settle delay is
+            // short and the public API often publishes a finished match a little later, so the
+            // Sessions page needs the baseline to re-ask and fill the gap in.
+            var sessionId = await _store.AttachStatsAsync(
+                moved ? delta : null, start.Value.Profile.CurrentSeason, windowStart).ConfigureAwait(false);
+            if (!moved)
             {
-                _logger.LogDebug("No stat movement during this run");
+                _logger.LogDebug("No stat movement during this run (session: {Session})",
+                    sessionId?.ToString() ?? "none");
                 return;
             }
 
-            var windowStart = start.Value.At - TimeSpan.FromMinutes(2);
-            var sessionId = await _store.AttachStatsDeltaAsync(delta, windowStart).ConfigureAwait(false);
             _logger.LogInformation(
                 "Session stats delta recorded (session: {Session}): ranked {RK}/{RD}/{RA} {RW}W-{RL}L",
                 sessionId?.ToString() ?? "none",
-                delta.Ranked.Kills, delta.Ranked.Deaths, delta.Ranked.Assists, delta.Ranked.Wins, delta.Ranked.Losses);
+                delta!.Ranked.Kills, delta.Ranked.Deaths, delta.Ranked.Assists, delta.Ranked.Wins, delta.Ranked.Losses);
 
             foreach (var match in ExtractAutoMatches(delta, start.Value.At, sessionId))
             {

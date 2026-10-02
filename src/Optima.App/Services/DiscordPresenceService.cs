@@ -27,8 +27,14 @@ public sealed class DiscordPresenceService : IDisposable
 
     private readonly object _gate = new();
 
-    private const string LargeImageUrl =
-        "https://raw.githubusercontent.com/inspectsoftware/Optima/master/src/Optima.App/Assets/optima-presence.png";
+    /// <summary>
+    /// The large-image art, named after the file it comes from. Discord resolves this against the
+    /// assets uploaded to the application, so upload <c>Assets/optima-presence.png</c> in the
+    /// Discord Developer Portal (Rich Presence -&gt; Art Assets) keeping that filename: the key is
+    /// derived from it. A raw URL would only ever show what the published repo serves, and the
+    /// presence art has to change without a push.
+    /// </summary>
+    private const string PresenceArtKey = "optima-presence";
 
     private static readonly Button[] PresenceButtons =
     [
@@ -227,7 +233,7 @@ public sealed class DiscordPresenceService : IDisposable
             Timestamps = since is { } at ? new Timestamps(at.UtcDateTime) : null,
             Assets = new Assets
             {
-                LargeImageKey = LargeImageUrl,
+                LargeImageKey = PresenceArtKey,
                 LargeImageText = text.LargeImageText,
             },
             Buttons = PresenceButtons,

@@ -46,6 +46,15 @@ public sealed record SessionRecord
 
     public Stats.CopsProfileDelta? StatsDelta { get; init; }
 
+    /// <summary>
+    /// The player's season totals as they stood when this session started, when that snapshot was
+    /// captured. It is what <see cref="Stats.CopsProfileDelta"/> was measured from, and keeping it
+    /// is what lets the Sessions page re-query the stats API later: the public API often publishes a
+    /// finished match a few seconds late, so the delta taken right after quitting can be empty or
+    /// short until it catches up.
+    /// </summary>
+    public Stats.CopsSeasonStats? StatsBaseline { get; init; }
+
     public string? GameVersion { get; init; }
 }
 

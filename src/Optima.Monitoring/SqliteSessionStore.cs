@@ -12,21 +12,21 @@ namespace Optima.Monitoring;
 /// <summary>Session history in SQLite (%LOCALAPPDATA%\Optima\sessions.db, §13/§21).</summary>
 public sealed class SqliteSessionStore : ISessionStore
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
 
     /// <summary>Every column of a session row, spelled out so a query never pulls a series it does not need.</summary>
     private const string SessionColumns =
         "id, profile_name, game_package_id, started_at, duration_seconds, sample_count, average_fps, " +
         "one_percent_low_fps, point_one_percent_low_fps, average_frametime_ms, p95_frametime_ms, " +
         "p99_frametime_ms, tweak_ids, profile_hash, launch_kind, avg_ping_ms, jitter_ms, packet_loss_pct, " +
-        "stats_delta, game_version, fps_samples";
+        "stats_delta, game_version, stats_baseline, fps_samples";
 
     /// <summary>The same list without the per-second fps series: the history list shows numbers, not graphs.</summary>
     private const string SessionSummaryColumns =
         "id, profile_name, game_package_id, started_at, duration_seconds, sample_count, average_fps, " +
         "one_percent_low_fps, point_one_percent_low_fps, average_frametime_ms, p95_frametime_ms, " +
         "p99_frametime_ms, tweak_ids, profile_hash, launch_kind, avg_ping_ms, jitter_ms, packet_loss_pct, " +
-        "stats_delta, game_version";
+        "stats_delta, game_version, stats_baseline";
 
     private const string MatchColumns =
         "id, session_id, started_at, mode, result, kills, deaths, assists, map, source, note";
@@ -220,6 +220,21 @@ public sealed class SqliteSessionStore : ISessionStore
             await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
             await transaction.CommitAsync(ct).ConfigureAwait(false);
         }
+
+        if (version < 3)
+        {
+            _logger.LogInformation("Migrating session store schema v{From} -> v3", Math.Max(version, 2));
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText =
+                """
+                ALTER TABLE sessions ADD COLUMN stats_baseline TEXT NULL;
+                PRAGMA user_version = 3;
+                """;
+            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
     }
 
     private void TryBackupDatabase()
@@ -255,9 +270,9 @@ public sealed class SqliteSessionStore : ISessionStore
                 sample_count, average_fps, one_percent_low_fps, point_one_percent_low_fps,
                 average_frametime_ms, p95_frametime_ms, p99_frametime_ms, fps_samples,
                 tweak_ids, profile_hash, launch_kind, avg_ping_ms, jitter_ms, packet_loss_pct,
-                stats_delta, game_version)
+                stats_delta, game_version, stats_baseline)
             VALUES ($profile, $package, $started, $duration, $samples, $avg, $low1, $low01, $avgFt, $p95, $p99, $fps,
-                $tweaks, $hash, $kind, $ping, $jitter, $loss, $delta, $gameVersion);
+                $tweaks, $hash, $kind, $ping, $jitter, $loss, $delta, $gameVersion, $baseline);
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$profile", record.ProfileName);
@@ -282,6 +297,8 @@ public sealed class SqliteSessionStore : ISessionStore
         command.Parameters.AddWithValue("$delta",
             record.StatsDelta is { } delta ? JsonSerializer.Serialize(delta) : DBNull.Value);
         command.Parameters.AddWithValue("$gameVersion", (object?)record.GameVersion ?? DBNull.Value);
+        command.Parameters.AddWithValue("$baseline",
+            record.StatsBaseline is { } baseline ? JsonSerializer.Serialize(baseline) : DBNull.Value);
 
         var id = Convert.ToInt64(await command.ExecuteScalarAsync(ct).ConfigureAwait(false), CultureInfo.InvariantCulture);
         _logger.LogInformation("Session #{Id} saved ({Profile}, {Duration})", id, record.ProfileName, record.Duration);
@@ -372,6 +389,7 @@ public sealed class SqliteSessionStore : ISessionStore
             LaunchKind = ParseLaunchKind(reader.GetString(columns.Get(reader, "launch_kind"))),
             Network = ReadNetwork(reader, columns),
             StatsDelta = ReadStatsDelta(reader, columns),
+            StatsBaseline = ReadStatsBaseline(reader, columns),
             GameVersion = reader.IsDBNull(columns.Get(reader, "game_version"))
                 ? null
                 : reader.GetString(columns.Get(reader, "game_version")),
@@ -420,7 +438,25 @@ public sealed class SqliteSessionStore : ISessionStore
         }
     }
 
-    public async Task<long?> AttachStatsDeltaAsync(CopsProfileDelta delta, DateTimeOffset windowStart, CancellationToken ct = default)
+    private static CopsSeasonStats? ReadStatsBaseline(SqliteDataReader reader, ColumnOrdinals columns)
+    {
+        var ordinal = columns.Get(reader, "stats_baseline");
+        if (reader.IsDBNull(ordinal))
+        {
+            return null;
+        }
+        try
+        {
+            return JsonSerializer.Deserialize<CopsSeasonStats>(reader.GetString(ordinal));
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<long?> AttachStatsAsync(CopsProfileDelta? delta, CopsSeasonStats? baseline,
+        DateTimeOffset windowStart, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
@@ -438,13 +474,34 @@ public sealed class SqliteSessionStore : ISessionStore
             sessionId = Convert.ToInt64(found, CultureInfo.InvariantCulture);
         }
 
+        // COALESCE everywhere: an empty delta (the API had not published the match yet) never erases a
+        // delta the row already carries, and a baseline never replaces one already on file. The second
+        // rule is what keeps the window's fallback row - the previous session, when a run never saved
+        // its own - from losing the snapshot it needs to be refreshable itself.
         await using var update = connection.CreateCommand();
-        update.CommandText = "UPDATE sessions SET stats_delta = $delta WHERE id = $id";
-        update.Parameters.AddWithValue("$delta", JsonSerializer.Serialize(delta));
+        update.CommandText =
+            "UPDATE sessions SET stats_delta = COALESCE($delta, stats_delta), " +
+            "stats_baseline = COALESCE(stats_baseline, $baseline) WHERE id = $id";
+        update.Parameters.AddWithValue("$delta", delta is null ? DBNull.Value : JsonSerializer.Serialize(delta));
+        update.Parameters.AddWithValue("$baseline", baseline is null ? DBNull.Value : JsonSerializer.Serialize(baseline));
         update.Parameters.AddWithValue("$id", sessionId);
         await update.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-        _logger.LogInformation("Stats delta attached to session #{Id} (season {Season})", sessionId, delta.Season);
+        _logger.LogInformation("Stats attached to session #{Id} (season {Season}, delta: {Delta})",
+            sessionId, baseline?.Season ?? delta?.Season ?? 0, delta is null ? "none yet" : "recorded");
         return sessionId;
+    }
+
+    public async Task<bool> UpdateStatsDeltaAsync(long sessionId, CopsProfileDelta delta, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE sessions SET stats_delta = $delta WHERE id = $id";
+        command.Parameters.AddWithValue("$delta", JsonSerializer.Serialize(delta));
+        command.Parameters.AddWithValue("$id", sessionId);
+        var updated = await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        _logger.LogInformation("Stats delta for session #{Id} refreshed from the API (rows: {Rows})", sessionId, updated);
+        return updated > 0;
     }
 
     public async Task<long> SaveMatchAsync(MatchRecord match, CancellationToken ct = default)

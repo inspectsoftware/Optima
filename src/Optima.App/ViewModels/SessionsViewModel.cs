@@ -67,17 +67,20 @@ public sealed partial class SessionsViewModel : ObservableObject
 
     private readonly ISessionStore _sessions;
     private readonly ProfileService _profiles;
+    private readonly SessionStatsRefresher _statsRefresher;
     private readonly ILogger<SessionsViewModel> _logger;
 
     public SessionsViewModel(
         ISessionStore sessions,
         ProfileService profiles,
         GuidedBenchmarkViewModel guided,
+        SessionStatsRefresher statsRefresher,
         ILogger<SessionsViewModel> logger)
     {
         _sessions = sessions;
         _profiles = profiles;
         Guided = guided;
+        _statsRefresher = statsRefresher;
         _logger = logger;
     }
 
@@ -191,6 +194,62 @@ public sealed partial class SessionsViewModel : ObservableObject
 
         await File.WriteAllBytesAsync(dialog.FileName, Optima.Core.Exports.SimplePdf.Render(lines, "Optima sessions"));
         StatusMessage = $"Exported to {dialog.FileName}.";
+    }
+
+    [ObservableProperty] private bool _isRefreshingStats;
+    [ObservableProperty] private string _statsRefreshStatus = string.Empty;
+    [ObservableProperty] private bool _statsRefreshOk;
+
+    /// <summary>
+    /// Re-asks the stats API about one session - the selected row, or the newest one when nothing is
+    /// selected - and writes what it reports back onto the session. The automatic pass reads the API
+    /// seconds after quitting, which is sometimes too early for the match to be published; every press
+    /// here asks again until the numbers move, and says so plainly when they do not.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshStatsAsync(CancellationToken ct = default)
+    {
+        if (IsRefreshingStats)
+        {
+            return;
+        }
+
+        var target = SelectedRow ?? Rows.FirstOrDefault();
+        if (target is null)
+        {
+            StatsRefreshOk = false;
+            StatsRefreshStatus = "No session to refresh yet - play one first.";
+            return;
+        }
+
+        var targetId = target.Record.Id;
+        IsRefreshingStats = true;
+        StatsRefreshOk = false;
+        StatsRefreshStatus = $"asking the stats API about {target.StartedText}...";
+        try
+        {
+            var result = await _statsRefresher.RefreshAsync(targetId, ct: ct);
+            StatsRefreshOk = result.Updated;
+            StatsRefreshStatus = result.Message;
+            if (result.Updated)
+            {
+                // The row now carries a different delta, so the list is rebuilt and the same session
+                // is re-selected: its detail pane would otherwise still show the stale numbers.
+                await ReloadAsync(ct);
+                SelectedRow = null;
+                SelectedRow = Rows.FirstOrDefault(r => r.Record.Id == targetId) ?? Rows.FirstOrDefault();
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Refreshing the stats for session #{Id} failed", targetId);
+            StatsRefreshOk = false;
+            StatsRefreshStatus = "the stats refresh failed - see the log for details.";
+        }
+        finally
+        {
+            IsRefreshingStats = false;
+        }
     }
 
     [RelayCommand]
@@ -380,6 +439,11 @@ public sealed partial class SessionsViewModel : ObservableObject
         {
             DetailRows.Add(new InfoRow("Network", value.NetworkText));
         }
+        // Says whether the stats refresh has anything to work with for this session, which is not
+        // something the numbers themselves can show.
+        DetailRows.Add(record.StatsBaseline is { } baseline
+            ? new InfoRow("API snapshot", $"season {baseline.Season} totals kept · refresh stats can re-query it")
+            : new InfoRow("API snapshot", "none stored · this session cannot be re-queried"));
         if (record.StatsDelta is { } delta)
         {
             AddModeDelta("Ranked (this session)", delta.Ranked);

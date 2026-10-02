@@ -23,7 +23,20 @@ public interface ISessionStore
 
     Task<IReadOnlyList<SessionRecord>> GetSessionsByIdsAsync(IReadOnlyList<long> ids, CancellationToken ct = default);
 
-    Task<long?> AttachStatsDeltaAsync(Stats.CopsProfileDelta delta, DateTimeOffset windowStart, CancellationToken ct = default);
+    /// <summary>
+    /// Writes a run's stats onto the newest session that started at or after <paramref name="windowStart"/>:
+    /// the delta between the run's start and end snapshots, and the start snapshot itself. The baseline
+    /// is stored even when there is no delta yet, because the refresh button recomputes from it once the
+    /// API catches up. An empty delta leaves any delta already on the row alone.
+    /// </summary>
+    Task<long?> AttachStatsAsync(Stats.CopsProfileDelta? delta, Stats.CopsSeasonStats? baseline,
+        DateTimeOffset windowStart, CancellationToken ct = default);
+
+    /// <summary>
+    /// Replaces one session's stats delta outright. This is the refresh path: it was measured by hand
+    /// against a fresh API reading, so it wins over whatever the automatic pass wrote.
+    /// </summary>
+    Task<bool> UpdateStatsDeltaAsync(long sessionId, Stats.CopsProfileDelta delta, CancellationToken ct = default);
 
     Task<long> SaveMatchAsync(MatchRecord match, CancellationToken ct = default);
 

@@ -92,16 +92,30 @@ public static class AppServices
         services.AddSingleton<Optima.Core.Updates.LauncherUpdateService>();
         services.AddSingleton<Optima.App.Services.FirstRunFixService>();
         services.AddSingleton<Optima.App.Services.RepairService>();
+        // The automatic enrichment and the Sessions page's manual refresh resolve the player the exact
+        // same way; a second copy of this lambda is how the two would quietly drift apart.
+        async Task<Optima.Core.Stats.CopsPlayerProfile?> FetchPlayerProfile(
+            IServiceProvider provider, string? ign, long? accountId, CancellationToken ct)
+        {
+            var lookup = await provider.GetRequiredService<Optima.Core.Stats.CopsApiClient>()
+                .LookupPlayerAsync(ign, accountId, ct).ConfigureAwait(false);
+            return lookup.IsFound ? lookup.Profile : null;
+        }
+
         services.AddSingleton(sp => new Optima.Core.Stats.SessionStatsEnricher(
             sp.GetRequiredService<GamePresenceService>(),
             sp.GetRequiredService<SettingsService>(),
             sp.GetRequiredService<ISessionStore>(),
-            async (ign, accountId, ct) =>
-            {
-                var lookup = await sp.GetRequiredService<Optima.Core.Stats.CopsApiClient>().LookupPlayerAsync(ign, accountId, ct).ConfigureAwait(false);
-                return lookup.IsFound ? lookup.Profile : null;
-            },
+            (ign, accountId, ct) => FetchPlayerProfile(sp, ign, accountId, ct),
             sp.GetRequiredService<ILogger<Optima.Core.Stats.SessionStatsEnricher>>()));
+
+        // The "refresh stats" button on the Sessions page: re-asks the API for one finished session
+        // until the numbers move.
+        services.AddSingleton(sp => new Optima.Core.Stats.SessionStatsRefresher(
+            sp.GetRequiredService<ISessionStore>(),
+            sp.GetRequiredService<SettingsService>(),
+            (ign, accountId, ct) => FetchPlayerProfile(sp, ign, accountId, ct),
+            sp.GetRequiredService<ILogger<Optima.Core.Stats.SessionStatsRefresher>>()));
 
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();
         services.AddSingleton<EtwMetricsProviderClient>();

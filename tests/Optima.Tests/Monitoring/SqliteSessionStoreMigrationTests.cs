@@ -87,7 +87,7 @@ public sealed class SqliteSessionStoreMigrationTests : IDisposable
         await using (var version = connection.CreateCommand())
         {
             version.CommandText = "PRAGMA user_version";
-            Assert.Equal(2L, (long)(await version.ExecuteScalarAsync())!);
+            Assert.Equal(3L, (long)(await version.ExecuteScalarAsync())!);
         }
         await using var tables = connection.CreateCommand();
         tables.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='matches'";
@@ -125,6 +125,58 @@ public sealed class SqliteSessionStoreMigrationTests : IDisposable
         Assert.Equal("Legacy", legacy.ProfileName);
         Assert.Null(legacy.StatsDelta);
         Assert.Null(legacy.GameVersion);
+        Assert.Null(legacy.StatsBaseline);
+        Assert.Empty(await store.GetMatchesAsync());
+    }
+
+    [Fact]
+    public async Task V2DatabaseGainsTheBaselineColumnAndKeepsRows()
+    {
+        // A database left by the stats-delta release: everything up to v2, user_version 2.
+        CreateV0Database();
+        using (var connection = new SqliteConnection(
+                   new SqliteConnectionStringBuilder { DataSource = _paths.SessionsDatabase }.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                ALTER TABLE sessions ADD COLUMN tweak_ids TEXT NOT NULL DEFAULT '';
+                ALTER TABLE sessions ADD COLUMN profile_hash TEXT NOT NULL DEFAULT '';
+                ALTER TABLE sessions ADD COLUMN launch_kind TEXT NOT NULL DEFAULT 'play';
+                ALTER TABLE sessions ADD COLUMN avg_ping_ms REAL NULL;
+                ALTER TABLE sessions ADD COLUMN jitter_ms REAL NULL;
+                ALTER TABLE sessions ADD COLUMN packet_loss_pct REAL NULL;
+                ALTER TABLE sessions ADD COLUMN stats_delta TEXT NULL;
+                ALTER TABLE sessions ADD COLUMN game_version TEXT NULL;
+                CREATE TABLE IF NOT EXISTS matches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id INTEGER NULL,
+                    started_at TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    result TEXT NOT NULL,
+                    kills INTEGER NULL,
+                    deaths INTEGER NULL,
+                    assists INTEGER NULL,
+                    map TEXT NULL,
+                    source TEXT NOT NULL DEFAULT 'manual',
+                    note TEXT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_matches_session ON matches(session_id);
+                PRAGMA user_version = 2;
+                """;
+            command.ExecuteNonQuery();
+            SqliteConnection.ClearAllPools();
+        }
+
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        // The old row survives, without a baseline: sessions from before this schema cannot be
+        // re-queried against the API, which is what the refresh says instead of inventing numbers.
+        var legacy = Assert.Single(await store.GetSessionsAsync());
+        Assert.Equal("Legacy", legacy.ProfileName);
+        Assert.Null(legacy.StatsBaseline);
         Assert.Empty(await store.GetMatchesAsync());
     }
 
@@ -188,14 +240,32 @@ public sealed class SqliteSessionStoreMigrationTests : IDisposable
             12, new Optima.Core.Stats.CopsModeStats(5, 4, 1, 1, 0),
             Optima.Core.Stats.CopsModeStats.Zero, Optima.Core.Stats.CopsModeStats.Zero);
 
-        var attached = await store.AttachStatsDeltaAsync(delta, recent.AddMinutes(-2));
+        var baseline = new Optima.Core.Stats.CopsSeasonStats(
+            12, new Optima.Core.Stats.CopsModeStats(40, 30, 5, 4, 4),
+            Optima.Core.Stats.CopsModeStats.Zero, Optima.Core.Stats.CopsModeStats.Zero);
+
+        var attached = await store.AttachStatsAsync(delta, baseline, recent.AddMinutes(-2));
         Assert.Equal(target, attached);
 
         var loaded = (await store.GetSessionsByIdsAsync([target])).Single();
         Assert.Equal(5, loaded.StatsDelta!.Ranked.Kills);
+        Assert.Equal(40, loaded.StatsBaseline!.Ranked.Kills);
+
+        // An empty delta (the API had not published the match yet) still stores the baseline, and
+        // leaves the delta it already had alone.
+        var fresher = await store.SaveSessionAsync(MakeRecord("Fresher") with { StartedAt = DateTimeOffset.Now.AddMinutes(-1) });
+        var newest = await store.AttachStatsAsync(null, baseline, DateTimeOffset.Now.AddMinutes(-2));
+        Assert.Equal(fresher, newest);
+        var blank = (await store.GetSessionsByIdsAsync([fresher])).Single();
+        Assert.Null(blank.StatsDelta);
+        Assert.Equal(40, blank.StatsBaseline!.Ranked.Kills);
+
+        Assert.True(await store.UpdateStatsDeltaAsync(fresher, delta));
+        Assert.Equal(5, (await store.GetSessionsByIdsAsync([fresher])).Single().StatsDelta!.Ranked.Kills);
+        Assert.False(await store.UpdateStatsDeltaAsync(9999, delta));
 
         // No session in the window: nothing is touched.
-        Assert.Null(await store.AttachStatsDeltaAsync(delta, DateTimeOffset.Now.AddMinutes(5)));
+        Assert.Null(await store.AttachStatsAsync(delta, baseline, DateTimeOffset.Now.AddMinutes(5)));
     }
 
     [Fact]
