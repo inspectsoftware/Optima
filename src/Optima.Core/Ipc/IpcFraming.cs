@@ -1,5 +1,5 @@
+using System.Buffers;
 using System.Buffers.Binary;
-using System.Text;
 using System.Text.Json;
 
 namespace Optima.Core.Ipc;
@@ -17,11 +17,21 @@ public static class IpcFraming
             throw new InvalidOperationException($"IPC frame too large ({json.Length} bytes).");
         }
 
-        var header = new byte[4];
-        BinaryPrimitives.WriteInt32LittleEndian(header, json.Length);
-        await stream.WriteAsync(header, ct).ConfigureAwait(false);
-        await stream.WriteAsync(json, ct).ConfigureAwait(false);
-        await stream.FlushAsync(ct).ConfigureAwait(false);
+        // Header and payload leave in one rented buffer: one write per frame instead of three, and
+        // nothing for either end to collect afterwards. The pool hands out larger arrays, so the
+        // write is bounded to the frame.
+        var frame = ArrayPool<byte>.Shared.Rent(json.Length + 4);
+        try
+        {
+            BinaryPrimitives.WriteInt32LittleEndian(frame, json.Length);
+            json.CopyTo(frame.AsSpan(4));
+            await stream.WriteAsync(frame.AsMemory(0, json.Length + 4), ct).ConfigureAwait(false);
+            await stream.FlushAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(frame);
+        }
     }
 
     public static async Task<T?> ReadFrameAsync<T>(Stream stream, CancellationToken ct = default) where T : class
@@ -38,22 +48,30 @@ public static class IpcFraming
             throw new InvalidDataException($"Invalid IPC frame length {length}.");
         }
 
-        var payload = new byte[length];
-        if (!await ReadExactlyOrEofAsync(stream, payload, ct).ConfigureAwait(false))
+        var payload = ArrayPool<byte>.Shared.Rent(length);
+        try
         {
-            throw new EndOfStreamException("IPC stream ended mid-frame.");
-        }
+            if (!await ReadExactlyOrEofAsync(stream, payload.AsMemory(0, length), ct).ConfigureAwait(false))
+            {
+                throw new EndOfStreamException("IPC stream ended mid-frame.");
+            }
 
-        return JsonSerializer.Deserialize<T>(payload, IpcJson.Options)
-            ?? throw new InvalidDataException("IPC frame deserialized to null.");
+            // The rented buffer may be larger than the frame; only the frame is deserialized.
+            return JsonSerializer.Deserialize<T>(payload.AsSpan(0, length), IpcJson.Options)
+                ?? throw new InvalidDataException("IPC frame deserialized to null.");
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(payload);
+        }
     }
 
-    private static async Task<bool> ReadExactlyOrEofAsync(Stream stream, byte[] buffer, CancellationToken ct)
+    private static async Task<bool> ReadExactlyOrEofAsync(Stream stream, Memory<byte> buffer, CancellationToken ct)
     {
         var read = 0;
         while (read < buffer.Length)
         {
-            var n = await stream.ReadAsync(buffer.AsMemory(read), ct).ConfigureAwait(false);
+            var n = await stream.ReadAsync(buffer[read..], ct).ConfigureAwait(false);
             if (n == 0)
             {
                 return read == 0 ? false : throw new EndOfStreamException("IPC stream ended mid-frame.");

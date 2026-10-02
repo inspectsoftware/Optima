@@ -126,6 +126,15 @@ public sealed partial class ExploreViewModel : ObservableObject
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(5);
     private const int MaxVisibleRows = 250;
 
+    /// <summary>The API rejects a profile batch larger than this (it also caps the request itself).</summary>
+    private const int MaxBatchTokens = 50;
+
+    /// <summary>
+    /// Ceiling on the discovery cache. Every leaderboard visit enriches up to ten more players, so an
+    /// unbounded map grew for as long as the page was used; the oldest entries fall out instead.
+    /// </summary>
+    private const int MaxCachedProfileKeys = 800;
+
     private readonly CopsApiClient _api;
     private readonly SettingsService _settings;
     private readonly ILogger<ExploreViewModel> _logger;
@@ -137,6 +146,7 @@ public sealed partial class ExploreViewModel : ObservableObject
     /// clan pane can show its members without any pasting when they appear on the leaderboards.
     /// </summary>
     private readonly Dictionary<string, CopsPlayerProfile> _profileCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Queue<string> _profileCacheOrder = new();
 
     public ExploreViewModel(CopsApiClient api, SettingsService settings, ILogger<ExploreViewModel> logger)
     {
@@ -236,8 +246,11 @@ public sealed partial class ExploreViewModel : ObservableObject
 
     public void StopTimer() => _timer?.Dispose();
 
+    /// <summary>The refresh button and the timer go to the network; a tab switch may reuse a fresh page.</summary>
     [RelayCommand]
-    private async Task RefreshAsync(CancellationToken ct = default)
+    private async Task RefreshAsync(CancellationToken ct = default) => await LoadAsync(refresh: true, ct).ConfigureAwait(true);
+
+    private async Task LoadAsync(bool refresh, CancellationToken ct = default)
     {
         if (_loading)
         {
@@ -248,11 +261,11 @@ public sealed partial class ExploreViewModel : ObservableObject
         {
             if (IsClansTab)
             {
-                await LoadClansAsync(ct).ConfigureAwait(true);
+                await LoadClansAsync(refresh, ct).ConfigureAwait(true);
             }
             else
             {
-                await LoadPlayersAsync(ct).ConfigureAwait(true);
+                await LoadPlayersAsync(refresh, ct).ConfigureAwait(true);
             }
         }
         finally
@@ -261,11 +274,11 @@ public sealed partial class ExploreViewModel : ObservableObject
         }
     }
 
-    private async Task LoadPlayersAsync(CancellationToken ct)
+    private async Task LoadPlayersAsync(bool refresh, CancellationToken ct)
     {
         StatusText = "loading leaderboard…";
         var endpoint = IsEliteTab ? "elite" : IsRankedTab ? "ranked" : "kills";
-        var (rows, problem) = await _api.GetLeaderboardAsync(endpoint, CopsLeaderboardParser.ParsePlayers, ct).ConfigureAwait(true);
+        var (rows, problem) = await _api.GetLeaderboardAsync(endpoint, CopsLeaderboardParser.ParsePlayers, ct, refresh).ConfigureAwait(true);
         if (problem is not null)
         {
             StatusText = "the leaderboard API could not be reached (" + problem + ")";
@@ -310,18 +323,37 @@ public sealed partial class ExploreViewModel : ObservableObject
     {
         if (profile.Name.Length > 0)
         {
-            _profileCache[profile.Name] = profile;
+            RememberProfile(profile.Name, profile);
         }
         if (profile.UserId > 0)
         {
-            _profileCache[profile.UserId.ToString(CultureInfo.InvariantCulture)] = profile;
+            RememberProfile(profile.UserId.ToString(CultureInfo.InvariantCulture), profile);
         }
     }
 
-    private async Task LoadClansAsync(CancellationToken ct)
+    /// <summary>
+    /// Caches a profile under one key, dropping the oldest keys once the map is at its ceiling. The
+    /// enrichment is best effort: a profile that falls out is looked up again the next time it is
+    /// needed, which is cheaper than a cache that grows for the whole session.
+    /// </summary>
+    private void RememberProfile(string key, CopsPlayerProfile profile)
+    {
+        if (!_profileCache.ContainsKey(key))
+        {
+            _profileCacheOrder.Enqueue(key);
+        }
+        _profileCache[key] = profile;
+
+        while (_profileCacheOrder.Count > MaxCachedProfileKeys)
+        {
+            _profileCache.Remove(_profileCacheOrder.Dequeue());
+        }
+    }
+
+    private async Task LoadClansAsync(bool refresh, CancellationToken ct)
     {
         StatusText = "loading clans…";
-        var (rows, problem) = await _api.GetLeaderboardAsync("clan", CopsLeaderboardParser.ParseClans, ct).ConfigureAwait(true);
+        var (rows, problem) = await _api.GetLeaderboardAsync("clan", CopsLeaderboardParser.ParseClans, ct, refresh).ConfigureAwait(true);
         if (problem is not null)
         {
             StatusText = "the leaderboard API could not be reached (" + problem + ")";
@@ -407,7 +439,9 @@ public sealed partial class ExploreViewModel : ObservableObject
         IsCasualTab = tab == "casual";
         IsClansTab = tab == "clans";
         SearchText = string.Empty;
-        _ = RefreshAsync();
+        // Not a forced refresh: a page fetched moments ago (or the score of a tab the user is
+        // flipping through) is reused instead of costing a request per click.
+        _ = LoadAsync(refresh: false);
     }
 
     [RelayCommand]
@@ -551,60 +585,76 @@ public sealed partial class ExploreViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Resolves id/name tokens to profiles one batch at a time. The API fails a whole batch (HTTP 500)
-    /// when any token is unknown, so on failure each token is retried alone; unknown ones are dropped.
+    /// Resolves id/name tokens to profiles in batches. Two API quirks shape this: a batch is capped at
+    /// 50 tokens, and a batch containing one unknown token fails whole (HTTP 500). A batch that answers
+    /// short is therefore halved recursively instead of retried token by token — with a few unknown
+    /// lines that is a handful of requests rather than one request per line, and a roster longer than
+    /// the cap is now resolved completely instead of silently truncated.
     /// </summary>
     private async Task<List<CopsPlayerProfile>> ResolveTokensAsync(IReadOnlyList<string> tokens)
     {
-        var ids = tokens.Where(t => long.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && id > 0).Select(long.Parse).ToList();
-        var names = tokens.Where(t => !long.TryParse(t, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)).ToList();
-
-        var results = new List<CopsPlayerProfile>();
-        if (ids.Count > 0)
+        var ids = new List<long>();
+        var names = new List<string>();
+        foreach (var token in tokens)
         {
-            var byIds = await _api.GetProfilesByIdsAsync(ids).ConfigureAwait(true);
-            if (byIds.Count == ids.Count)
+            if (long.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
             {
-                results.AddRange(byIds);
+                if (id > 0)
+                {
+                    ids.Add(id);
+                }
             }
-            else
+            else if (token.Trim().Length > 0)
             {
-                results.AddRange(await ResolveIndividuallyAsync(id => _api.GetProfilesByIdsAsync([id]), ids.Select(i => i.ToString(CultureInfo.InvariantCulture))).ConfigureAwait(true));
+                names.Add(token.Trim());
             }
         }
-        if (names.Count > 0)
+
+        var results = new List<CopsPlayerProfile>();
+        results.AddRange(await ResolveBatchedAsync(
+            ids.Distinct().ToList(),
+            batch => _api.GetProfilesByIdsAsync(batch)).ConfigureAwait(true));
+        results.AddRange(await ResolveBatchedAsync(
+            names.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            batch => _api.GetProfilesByNamesAsync(batch)).ConfigureAwait(true));
+        return results;
+    }
+
+    private static async Task<List<CopsPlayerProfile>> ResolveBatchedAsync<TToken>(
+        List<TToken> tokens, Func<IReadOnlyList<TToken>, Task<IReadOnlyList<CopsPlayerProfile>>> fetch)
+    {
+        var results = new List<CopsPlayerProfile>();
+        for (var offset = 0; offset < tokens.Count; offset += MaxBatchTokens)
         {
-            var byNames = await _api.GetProfilesByNamesAsync(names).ConfigureAwait(true);
-            if (byNames.Count == names.Count)
-            {
-                results.AddRange(byNames);
-            }
-            else
-            {
-                results.AddRange(await ResolveIndividuallyAsync(_ => _api.GetProfilesByNamesAsync(names.Take(1)), names).ConfigureAwait(true));
-            }
+            var batch = tokens.GetRange(offset, Math.Min(MaxBatchTokens, tokens.Count - offset));
+            results.AddRange(await ResolveSplitAsync(batch, fetch).ConfigureAwait(true));
         }
         return results;
     }
 
-    private static async Task<List<CopsPlayerProfile>> ResolveIndividuallyAsync(
-        Func<long, Task<IReadOnlyList<CopsPlayerProfile>>> idFetcher, IEnumerable<string> tokens)
+    /// <summary>Fetches a batch whole; halves it only when the answer came back short.</summary>
+    private static async Task<List<CopsPlayerProfile>> ResolveSplitAsync<TToken>(
+        List<TToken> batch, Func<IReadOnlyList<TToken>, Task<IReadOnlyList<CopsPlayerProfile>>> fetch)
     {
-        var results = new List<CopsPlayerProfile>();
-        foreach (var token in tokens)
+        IReadOnlyList<CopsPlayerProfile> profiles;
+        try
         {
-            try
-            {
-                if (long.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
-                {
-                    results.AddRange(await idFetcher(id).ConfigureAwait(true));
-                }
-            }
-            catch (Exception)
-            {
-                // Unknown token: skip it; the row is marked missing by the caller.
-            }
+            profiles = await fetch(batch).ConfigureAwait(true);
         }
+        catch (Exception)
+        {
+            profiles = [];
+        }
+
+        // Everyone answered, or there is nothing left to split: an unknown token is simply absent.
+        if (profiles.Count >= batch.Count || batch.Count == 1)
+        {
+            return [.. profiles];
+        }
+
+        var half = batch.Count / 2;
+        var results = await ResolveSplitAsync(batch.GetRange(0, half), fetch).ConfigureAwait(true);
+        results.AddRange(await ResolveSplitAsync(batch.GetRange(half, batch.Count - half), fetch).ConfigureAwait(true));
         return results;
     }
 

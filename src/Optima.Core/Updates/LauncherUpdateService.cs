@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net.Http;
 using System.Text.Json;
 using Optima.Core.Configuration;
+using Optima.Core.Net;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.Core.Updates;
@@ -32,7 +33,7 @@ public sealed class LauncherUpdateService : IDisposable
     {
         _paths = paths;
         _logger = logger;
-        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        _http = new HttpClient(HttpPool.Shared, disposeHandler: false) { Timeout = TimeSpan.FromMinutes(5) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("Optima/" + CurrentVersion.ToString(3));
         _http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
     }

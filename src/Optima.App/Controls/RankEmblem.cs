@@ -75,6 +75,37 @@ public sealed class RankEmblem : FrameworkElement
     private const double DesignWidth = 64;
     private const double DesignHeight = 72;
 
+    // Every one of these is fixed in design space, and the emblem is painted per row and repainted
+    // whenever a row changes tier or division. They used to be rebuilt — geometry, brushes, pens —
+    // on every single paint; now the geometry lives once and the paint is cached per tier color.
+    private static readonly Geometry ShieldBody = ShieldGeometry(6, 4, inset: 0);
+    private static readonly Geometry ShieldField = ShieldGeometry(11, 9, inset: 0);
+    private static readonly Geometry GemOuter = Diamond(32, 31, 13);
+    private static readonly Geometry GemInner = Diamond(32, 31, 6);
+    private static readonly Geometry StarMaster = Star(32, 31, 14, 6);
+    private static readonly Geometry StarWinged = Star(32, 30, 11, 4.6);
+    private static readonly Geometry StarLarge = Star(32, 25, 9, 3.8);
+    private static readonly Geometry StarSmallLeft = Star(17, 37, 6, 2.5);
+    private static readonly Geometry StarSmallRight = Star(47, 37, 6, 2.5);
+    private static readonly double[] CalibrationDots = [22.0, 32.0, 42.0];
+
+    private static readonly SolidColorBrush FieldBrush = Frozen(Color.FromArgb(0xB4, 0x0E, 0x10, 0x13));
+    private static readonly Pen FieldRim = FrozenPen(Brushes.Black, 1);
+    private static readonly Pen GemRim = FrozenPen(Frozen(Color.FromArgb(0xFF, 0x0E, 0x10, 0x13)), 2);
+
+    /// <summary>Brush and pen set for one tier color, shared by every emblem wearing that tier.</summary>
+    private sealed record EmblemPaint(
+        LinearGradientBrush Shield,
+        Pen ShieldRim,
+        SolidColorBrush Motif,
+        Pen MotifPen,
+        Pen BarPen,
+        Pen ChevronPen);
+
+    private static readonly Dictionary<uint, EmblemPaint> PaintCache = new();
+    private static readonly object PaintCacheGate = new();
+    private static readonly Dictionary<string, Color> ParsedColors = new(StringComparer.OrdinalIgnoreCase);
+
     protected override Size MeasureOverride(Size availableSize)
         => new(SizeValue, SizeValue * DesignHeight / DesignWidth);
 
@@ -95,30 +126,66 @@ public sealed class RankEmblem : FrameworkElement
             return;
         }
 
-        var tierColor = ParseColor(ColorHex);
-        var bright = Shift(tierColor, 0.38);
-        var dark = Shift(tierColor, -0.45);
-        var motif = Shift(tierColor, 0.55);
+        var paint = GetPaint(ParseColor(ColorHex));
 
         context.PushTransform(new ScaleTransform(width / DesignWidth, height / DesignHeight));
 
         // Shield: tier-colored gradient body with a dark rim.
-        var shield = ShieldGeometry(6, 4, inset: 0);
-        context.DrawGeometry(
-            new LinearGradientBrush(bright, dark, 90),
-            new Pen(new SolidColorBrush(dark), 3),
-            shield);
+        context.DrawGeometry(paint.Shield, paint.ShieldRim, ShieldBody);
 
         // Dark inner field so the motif reads on any tier color.
-        context.DrawGeometry(
-            new SolidColorBrush(Color.FromArgb(0xB4, 0x0E, 0x10, 0x13)),
-            new Pen(Brushes.Black, 1),
-            ShieldGeometry(11, 9, inset: 0));
+        context.DrawGeometry(FieldBrush, FieldRim, ShieldField);
 
-        DrawMotif(context, motif);
-        DrawDivisionChevrons(context, motif);
+        DrawMotif(context, paint);
+        DrawDivisionChevrons(context, paint);
 
         context.Pop();
+    }
+
+    private static EmblemPaint GetPaint(Color tierColor)
+    {
+        var key = ((uint)tierColor.R << 16) | ((uint)tierColor.G << 8) | tierColor.B;
+        lock (PaintCacheGate)
+        {
+            if (PaintCache.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var bright = Shift(tierColor, 0.38);
+            var dark = Shift(tierColor, -0.45);
+            var motif = Shift(tierColor, 0.55);
+            var motifBrush = Frozen(motif);
+            var paint = new EmblemPaint(
+                Frozen(new LinearGradientBrush(bright, dark, 90)),
+                FrozenPen(Frozen(dark), 3),
+                motifBrush,
+                FrozenPen(motifBrush, 4.5, round: true),
+                FrozenPen(motifBrush, 8, round: true),
+                FrozenPen(motifBrush, 3.4, round: true));
+            PaintCache[key] = paint;
+            return paint;
+        }
+    }
+
+    /// <summary>Freezes a freshly built brush or geometry so it can be shared across instances.</summary>
+    private static T Frozen<T>(T freezable) where T : Freezable
+    {
+        freezable.Freeze();
+        return freezable;
+    }
+
+    private static SolidColorBrush Frozen(Color color) => Frozen(new SolidColorBrush(color));
+
+    private static Pen FrozenPen(Brush brush, double thickness, bool round = false)
+    {
+        var pen = new Pen(brush, thickness)
+        {
+            StartLineCap = round ? PenLineCap.Round : PenLineCap.Flat,
+            EndLineCap = round ? PenLineCap.Round : PenLineCap.Flat,
+        };
+        pen.Freeze();
+        return pen;
     }
 
     private static Geometry ShieldGeometry(double x, double y, double inset)
@@ -145,20 +212,20 @@ public sealed class RankEmblem : FrameworkElement
         return geometry;
     }
 
-    private void DrawMotif(DrawingContext context, Color motif)
+    private void DrawMotif(DrawingContext context, EmblemPaint paint)
     {
-        var pen = new Pen(new SolidColorBrush(motif), 4.5) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
-        var fill = new SolidColorBrush(motif);
+        var pen = paint.MotifPen;
+        var fill = paint.Motif;
         switch (Tier)
         {
             case 0: // calibrating: three dots
-                foreach (var x in new[] { 22.0, 32.0, 42.0 })
+                foreach (var x in CalibrationDots)
                 {
                     context.DrawEllipse(fill, null, new Point(x, 31), 3.2, 3.2);
                 }
                 break;
             case 1: // iron: single ingot bar
-                context.DrawLine(new Pen(fill, 8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round }, new Point(21, 31), new Point(43, 31));
+                context.DrawLine(paint.BarPen, new Point(21, 31), new Point(43, 31));
                 break;
             case 2: // bronze: two bars
                 context.DrawLine(pen, new Point(21, 26), new Point(43, 26));
@@ -172,43 +239,38 @@ public sealed class RankEmblem : FrameworkElement
                 context.DrawLine(pen, new Point(22, 43), new Point(42, 43));
                 break;
             case 5: // platinum: diamond
-                context.DrawGeometry(null, pen, Diamond(32, 31, 13));
+                context.DrawGeometry(null, pen, GemOuter);
                 break;
             case 6: // diamond: faceted gem
-                context.DrawGeometry(fill, pen, Diamond(32, 31, 13));
-                context.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(0xFF, 0x0E, 0x10, 0x13)), 2), Diamond(32, 31, 6));
+                context.DrawGeometry(fill, pen, GemOuter);
+                context.DrawGeometry(null, GemRim, GemInner);
                 break;
             case 7: // master: star
-                context.DrawGeometry(fill, null, Star(32, 31, 14, 6));
+                context.DrawGeometry(fill, null, StarMaster);
                 break;
             case 8: // spec ops: star with wings
-                context.DrawGeometry(fill, null, Star(32, 30, 11, 4.6));
+                context.DrawGeometry(fill, null, StarWinged);
                 context.DrawLine(pen, new Point(12, 44), new Point(24, 36));
                 context.DrawLine(pen, new Point(52, 44), new Point(40, 36));
                 break;
             case 9: // elite ops: three stars
-                context.DrawGeometry(fill, null, Star(32, 25, 9, 3.8));
-                context.DrawGeometry(fill, null, Star(17, 37, 6, 2.5));
-                context.DrawGeometry(fill, null, Star(47, 37, 6, 2.5));
+                context.DrawGeometry(fill, null, StarLarge);
+                context.DrawGeometry(fill, null, StarSmallLeft);
+                context.DrawGeometry(fill, null, StarSmallRight);
                 break;
         }
     }
 
-    private void DrawDivisionChevrons(DrawingContext context, Color color)
+    private void DrawDivisionChevrons(DrawingContext context, EmblemPaint paint)
     {
         if (Division is not { } division || division <= 0)
         {
             return;
         }
-        var pen = new Pen(new SolidColorBrush(color), 3.4)
-        {
-            StartLineCap = PenLineCap.Round,
-            EndLineCap = PenLineCap.Round,
-        };
         var drawn = Math.Min(4, division);
         for (var i = 0; i < drawn; i++)
         {
-            DrawChevron(context, pen, 32, 47 + i * 6.5, 13, 4);
+            DrawChevron(context, paint.ChevronPen, 32, 47 + i * 6.5, 13, 4);
         }
     }
 
@@ -312,16 +374,32 @@ public sealed class RankEmblem : FrameworkElement
         return true;
     }
 
+    /// <summary>Hex → color, memoized: the same dozen tiers are parsed on every row of every list.</summary>
     private static Color ParseColor(string hex)
     {
+        lock (ParsedColors)
+        {
+            if (ParsedColors.TryGetValue(hex, out var cached))
+            {
+                return cached;
+            }
+        }
+
+        Color parsed;
         try
         {
-            return (Color)ColorConverter.ConvertFromString(hex);
+            parsed = (Color)ColorConverter.ConvertFromString(hex);
         }
         catch (FormatException)
         {
-            return Color.FromRgb(0x75, 0x7D, 0x88);
+            parsed = Color.FromRgb(0x75, 0x7D, 0x88);
         }
+
+        lock (ParsedColors)
+        {
+            ParsedColors[hex] = parsed;
+        }
+        return parsed;
     }
 
     private static Color Shift(Color color, double amount)

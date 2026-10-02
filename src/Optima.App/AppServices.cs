@@ -127,6 +127,7 @@ public static class AppServices
         services.AddSingleton<IDiagnosticCheck, GpuDriverCheck>();
         services.AddSingleton<IDiagnosticCheck, DiskSpaceCheck>();
         services.AddSingleton<IDiagnosticCheck, AdminPermissionsCheck>();
+        services.AddSingleton<IDiagnosticCheck, OptimaOverheadCheck>();
 
         services.AddSingleton<StatusViewModel>();
         services.AddSingleton<PlayerStatsViewModel>();

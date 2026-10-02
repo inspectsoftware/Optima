@@ -29,9 +29,19 @@ public enum GpuVendor
     Intel,
 }
 
-/// <summary>One tick of live utilization data for the dashboard (§12).</summary>
-public sealed record HardwareMetrics
+/// <summary>
+/// One tick of live utilization data for the dashboard (§12). A value type: a sample is handed to
+/// every listener on the tick and immediately dropped, so allocating an object per tick bought
+/// nothing but garbage.
+/// </summary>
+public readonly record struct HardwareMetrics
 {
+    // Explicit because the timestamp has a field initializer, which a struct may only have alongside
+    // a declared constructor.
+    public HardwareMetrics()
+    {
+    }
+
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
     public double CpuUtilizationPercent { get; init; }
     public double CpuFrequencyMhz { get; init; }

@@ -42,8 +42,22 @@ public sealed partial class HomeViewModel : ObservableObject
         _settings.SettingsChanged += OnSettingsChanged;
     }
 
+    /// <summary>Signature of the tracked list the strip is built from; a save that does not touch it changes nothing.</summary>
+    private string _friendsSignature = string.Empty;
+    private bool _friendsRefreshFailed;
+
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
+        // Every toggle in the app saves settings, and this refresh costs a profile lookup per tracked
+        // player, so it only runs for a change it can actually show — or to retry a failed attempt.
+        var signature = string.Join(
+            '\n',
+            settings.TrackedPlayers.Select(t => t.Key + "|" + t.Ign + "|" + t.AccountId));
+        if (!_friendsRefreshFailed && string.Equals(signature, _friendsSignature, StringComparison.Ordinal))
+        {
+            return;
+        }
+        _friendsSignature = signature;
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => _ = RefreshFriendsCommand.ExecuteAsync(null));
     }
 
@@ -70,11 +84,14 @@ public sealed partial class HomeViewModel : ObservableObject
             {
                 Friends.Add(row);
             }
+            _friendsRefreshFailed = false;
             HasFriends = Friends.Count > 0;
             FriendsStatus = Friends.Count == 0 ? "Add friends or clanmates from the PLAYER panel in Settings." : string.Empty;
         }
         catch (Exception)
         {
+            // Remembered so the next settings save retries instead of leaving the strip empty.
+            _friendsRefreshFailed = true;
             FriendsStatus = "Could not reach the stats API.";
         }
     }

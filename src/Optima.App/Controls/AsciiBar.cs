@@ -64,6 +64,11 @@ public sealed class AsciiBar : Control
     private static void OnVisualInputChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         => ((AsciiBar)d).Rebuild();
 
+    // The last built run, so a value that rounds to the same cell count does not rebuild the string
+    // (and re-raise three properties) — these meters are fed a sample per second for several rows.
+    private int _builtCells = -1;
+    private int _builtFilled = -1;
+
     public AsciiBar() => Rebuild();
 
     private void Rebuild()
@@ -72,13 +77,22 @@ public sealed class AsciiBar : Control
         var max = Maximum <= 0 ? 100 : Maximum;
         var ratio = double.IsFinite(Value) ? Math.Clamp(Value / max, 0, 1) : 0;
         var filled = (int)Math.Round(ratio * cells, MidpointRounding.AwayFromZero);
+        if (cells == _builtCells && filled == _builtFilled)
+        {
+            return;
+        }
+        _builtCells = cells;
+        _builtFilled = filled;
 
-        var filledRun = new string(Filled, filled);
-        var emptyRun = new string(Empty, cells - filled);
+        var run = new char[cells];
+        for (var i = 0; i < cells; i++)
+        {
+            run[i] = i < filled ? Filled : Empty;
+        }
 
-        SetValue(FilledTextPropertyKey, filledRun);
-        SetValue(EmptyTextPropertyKey, emptyRun);
-        SetValue(TextPropertyKey, filledRun + emptyRun);
+        SetValue(FilledTextPropertyKey, new string(Filled, filled));
+        SetValue(EmptyTextPropertyKey, new string(Empty, cells - filled));
+        SetValue(TextPropertyKey, new string(run));
     }
 }
 

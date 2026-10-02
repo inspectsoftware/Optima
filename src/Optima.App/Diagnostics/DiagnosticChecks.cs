@@ -308,3 +308,88 @@ public sealed class AdminPermissionsCheck : IDiagnosticCheck
         });
     }
 }
+
+/// <summary>
+/// Optima's own cost, measured the way a user would see it in Task Manager: this process, plus the
+/// elevated helper when it happens to be running. It is here so a slow machine can be blamed on the
+/// right thing — and so a regression in idle cost surfaces as a warning on this page rather than as
+/// "Optima makes my game stutter" in a bug report.
+/// </summary>
+public sealed class OptimaOverheadCheck : IDiagnosticCheck
+{
+    private static readonly TimeSpan SampleWindow = TimeSpan.FromMilliseconds(400);
+
+    private const double WarningCpuPercent = 5;
+    private const double FailCpuPercent = 20;
+    private const double WarningMemoryMb = 500;
+    private const double FailMemoryMb = 1000;
+
+    public string Name => "Optima Overhead";
+
+    public int Order => 100;
+
+    public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
+    {
+        using var self = System.Diagnostics.Process.GetCurrentProcess();
+        var cpuPercent = await SampleCpuPercentAsync(self, ct).ConfigureAwait(false);
+        var memoryMb = ToMb(self.WorkingSet64);
+
+        var reason = $"Optima: {cpuPercent:F1}% of one core, {memoryMb:F0} MB resident, {self.Threads.Count} threads";
+        var helpers = System.Diagnostics.Process.GetProcessesByName("Optima.Watchdog");
+        try
+        {
+            if (helpers.Length > 0)
+            {
+                var helperMb = helpers.Sum(h => ToMb(h.WorkingSet64));
+                reason += $"; elevated helper: {helperMb:F0} MB";
+            }
+            else
+            {
+                reason += "; elevated helper: not running";
+            }
+        }
+        finally
+        {
+            foreach (var helper in helpers)
+            {
+                helper.Dispose();
+            }
+        }
+
+        var status = cpuPercent >= FailCpuPercent || memoryMb >= FailMemoryMb
+            ? DiagnosticStatus.Fail
+            : cpuPercent >= WarningCpuPercent || memoryMb >= WarningMemoryMb
+                ? DiagnosticStatus.Warning
+                : DiagnosticStatus.Pass;
+
+        return new DiagnosticResult
+        {
+            CheckName = Name,
+            Status = status,
+            Reason = reason,
+            RecommendedFix = status == DiagnosticStatus.Pass
+                ? string.Empty
+                : "Close and reopen Optima; if the numbers stay this high while nothing is running, report " +
+                  "the readings on the Logs page so the cost can be tracked down.",
+        };
+    }
+
+    /// <summary>CPU over a short window, as a share of one core: an instant reading of a mostly idle app says nothing.</summary>
+    private static async Task<double> SampleCpuPercentAsync(System.Diagnostics.Process process, CancellationToken ct)
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+        var cpuStart = process.TotalProcessorTime;
+        await Task.Delay(SampleWindow, ct).ConfigureAwait(false);
+        process.Refresh();
+
+        var elapsedMs = (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds;
+        if (elapsedMs <= 0)
+        {
+            return 0;
+        }
+        var cpuMs = (process.TotalProcessorTime - cpuStart).TotalMilliseconds;
+        return Math.Clamp(cpuMs / elapsedMs * 100, 0, 100);
+    }
+
+    private static double ToMb(long bytes) => bytes / (1024.0 * 1024);
+}

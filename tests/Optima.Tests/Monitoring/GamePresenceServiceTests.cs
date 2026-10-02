@@ -123,16 +123,18 @@ public sealed class GamePresenceServiceTests
     }
 
     [Fact]
-    public void TickedFiresEveryPollWithRawState()
+    public void PresenceEdgesAreTheOnlyChannelConsumersSee()
     {
+        // A repeated poll of the same state raises nothing: consumers act on transitions, and a
+        // second per-poll event would only let one of them re-derive this service's own state machine.
         var svc = Create();
-        var ticks = new List<GameRuntimeState>();
-        svc.Ticked += ticks.Add;
+        var changes = new List<PresenceChange>();
+        svc.PresenceChanged += changes.Add;
 
-        svc.ApplyState(GameRuntimeState.NotRunning, At(0));
+        svc.ApplyState(GameRuntimeState.Running, At(0));
         svc.ApplyState(GameRuntimeState.Running, At(2));
-        svc.ApplyState(GameRuntimeState.Running, At(4));
+        svc.ApplyState(GameRuntimeState.NotRunning, At(4));
 
-        Assert.Equal([GameRuntimeState.NotRunning, GameRuntimeState.Running, GameRuntimeState.Running], ticks);
+        Assert.Equal([GamePresence.InGame, GamePresence.NotRunning], changes.Select(c => c.Current));
     }
 }

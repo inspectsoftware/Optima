@@ -56,7 +56,8 @@ public sealed class GameWatchService : IAsyncDisposable
         }
         _watchEnabled = (await _settings.GetSettingsAsync(ct).ConfigureAwait(false)).EnableWatchMode;
         _cts = new CancellationTokenSource();
-        _presence.Ticked += OnPresenceTick;
+        _presence.PresenceChanged += OnPresenceChanged;
+        _orchestrator.SessionEnded += OnSessionEnded;
         _subscribed = true;
         _logger.LogInformation("Watch mode listening to presence ticks (enabled: {Enabled})", _watchEnabled);
     }
@@ -65,7 +66,8 @@ public sealed class GameWatchService : IAsyncDisposable
     {
         if (_subscribed)
         {
-            _presence.Ticked -= OnPresenceTick;
+            _presence.PresenceChanged -= OnPresenceChanged;
+            _orchestrator.SessionEnded -= OnSessionEnded;
             _subscribed = false;
         }
         _cts?.Cancel();
@@ -74,11 +76,11 @@ public sealed class GameWatchService : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    private void OnPresenceTick(GameRuntimeState state)
+    private void OnPresenceChanged(PresenceChange change)
     {
         try
         {
-            var action = _policy.OnPoll(_watchEnabled, _orchestrator.IsSessionActive, state);
+            var action = _policy.OnPresenceChange(_watchEnabled, _orchestrator.IsSessionActive, change);
             if (action != WatchAction.Attach)
             {
                 return;
@@ -92,7 +94,33 @@ public sealed class GameWatchService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Watch mode tick failed");
+            _logger.LogWarning(ex, "Watch mode presence handling failed");
+        }
+    }
+
+    /// <summary>
+    /// A session finished while the game may still be up: the same run is offered to watch mode, so
+    /// stopping a session in the launcher does not leave the still-running game unwatched.
+    /// </summary>
+    private void OnSessionEnded()
+    {
+        try
+        {
+            var action = _policy.OnSessionEnded(
+                _watchEnabled,
+                _orchestrator.IsSessionActive,
+                _presence.Current == GamePresence.InGame);
+            if (action != WatchAction.Attach)
+            {
+                return;
+            }
+
+            var ct = _cts?.Token ?? CancellationToken.None;
+            _ = Task.Run(() => AttachSafeAsync(ct), CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Watch mode session-end handling failed");
         }
     }
 

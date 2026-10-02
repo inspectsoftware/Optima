@@ -1,95 +1,73 @@
 using Optima.Core.Launch;
-using Optima.Core.Models;
+using Optima.Core.Monitoring;
 using Xunit;
 
 namespace Optima.Tests.Launch;
 
 public sealed class GameWatchPolicyTests
 {
+    private static PresenceChange Edge(GamePresence previous, GamePresence current)
+        => new(previous, current, DateTimeOffset.UnixEpoch);
+
     [Fact]
-    public void AttachesAfterTwoConsecutiveRunningPolls()
+    public void AttachesOnTheInGameEdge()
     {
         var policy = new GameWatchPolicy();
-        Assert.Equal(WatchAction.None, policy.OnPoll(true, false, GameRuntimeState.Running));
-        Assert.Equal(WatchAction.Attach, policy.OnPoll(true, false, GameRuntimeState.Running));
+        Assert.Equal(WatchAction.None, policy.OnPresenceChange(true, false, Edge(GamePresence.NotRunning, GamePresence.Starting)));
+        Assert.Equal(WatchAction.Attach, policy.OnPresenceChange(true, false, Edge(GamePresence.Starting, GamePresence.InGame)));
     }
 
     [Fact]
     public void NeverAttachesWhenDisabled()
     {
         var policy = new GameWatchPolicy();
-        for (var i = 0; i < 5; i++)
-        {
-            Assert.Equal(WatchAction.None, policy.OnPoll(false, false, GameRuntimeState.Running));
-        }
+        Assert.Equal(WatchAction.None, policy.OnPresenceChange(false, false, Edge(GamePresence.Starting, GamePresence.InGame)));
+        Assert.Equal(WatchAction.None, policy.OnSessionEnded(false, false, gameRunning: true));
     }
 
     [Fact]
     public void NeverAttachesWhileASessionIsActive()
     {
         var policy = new GameWatchPolicy();
-        for (var i = 0; i < 5; i++)
-        {
-            Assert.Equal(WatchAction.None, policy.OnPoll(true, true, GameRuntimeState.Running));
-        }
+        Assert.Equal(WatchAction.None, policy.OnPresenceChange(true, true, Edge(GamePresence.Starting, GamePresence.InGame)));
+        Assert.Equal(WatchAction.None, policy.OnSessionEnded(true, true, gameRunning: true));
     }
 
     [Fact]
-    public void AttachesOnceThePlaySessionEndsIfGameStillRuns()
+    public void AttachesWhenASessionEndsWhileTheGameStillRuns()
     {
-        // e.g. the PLAY session was cancelled but the game stayed up.
+        // The run was cancelled from the launcher but the game stayed up.
         var policy = new GameWatchPolicy();
-        policy.OnPoll(true, true, GameRuntimeState.Running);
-        policy.OnPoll(true, true, GameRuntimeState.Running);
-        Assert.Equal(WatchAction.Attach, policy.OnPoll(true, false, GameRuntimeState.Running));
-    }
-
-    [Theory]
-    [InlineData(GameRuntimeState.NotRunning)]
-    [InlineData(GameRuntimeState.Starting)]
-    [InlineData(GameRuntimeState.Exited)]
-    public void NonRunningStatesNeverAttach(GameRuntimeState state)
-    {
-        var policy = new GameWatchPolicy();
-        for (var i = 0; i < 5; i++)
-        {
-            Assert.Equal(WatchAction.None, policy.OnPoll(true, false, state));
-        }
+        Assert.Equal(WatchAction.None, policy.OnPresenceChange(true, true, Edge(GamePresence.Starting, GamePresence.InGame)));
+        Assert.Equal(WatchAction.Attach, policy.OnSessionEnded(true, false, gameRunning: true));
     }
 
     [Fact]
-    public void DebounceResetsWhenRunningIsInterrupted()
+    public void SessionEndedWithNoGameRunningAttachesNothing()
     {
         var policy = new GameWatchPolicy();
-        policy.OnPoll(true, false, GameRuntimeState.Running);
-        policy.OnPoll(true, false, GameRuntimeState.Starting);
-        Assert.Equal(WatchAction.None, policy.OnPoll(true, false, GameRuntimeState.Running));
-        Assert.Equal(WatchAction.Attach, policy.OnPoll(true, false, GameRuntimeState.Running));
+        Assert.Equal(WatchAction.None, policy.OnSessionEnded(true, false, gameRunning: false));
     }
 
     [Fact]
     public void NeverAttachesTwiceForTheSameGameRun()
     {
         var policy = new GameWatchPolicy();
-        policy.OnPoll(true, false, GameRuntimeState.Running);
-        Assert.Equal(WatchAction.Attach, policy.OnPoll(true, false, GameRuntimeState.Running));
-        for (var i = 0; i < 5; i++)
-        {
-            Assert.Equal(WatchAction.None, policy.OnPoll(true, false, GameRuntimeState.Running));
-        }
+        Assert.Equal(WatchAction.Attach, policy.OnPresenceChange(true, false, Edge(GamePresence.Starting, GamePresence.InGame)));
+
+        // A session that ends for the same run must not hand out a second attach.
+        Assert.Equal(WatchAction.None, policy.OnSessionEnded(true, false, gameRunning: true));
     }
 
     [Fact]
     public void AttachesAgainForANewGameRun()
     {
         var policy = new GameWatchPolicy();
-        policy.OnPoll(true, false, GameRuntimeState.Running);
-        Assert.Equal(WatchAction.Attach, policy.OnPoll(true, false, GameRuntimeState.Running));
+        Assert.Equal(WatchAction.Attach, policy.OnPresenceChange(true, false, Edge(GamePresence.Starting, GamePresence.InGame)));
 
         // Game exits, then a new run starts.
-        policy.OnPoll(true, false, GameRuntimeState.NotRunning);
-        policy.OnPoll(true, false, GameRuntimeState.Running);
-        Assert.Equal(WatchAction.Attach, policy.OnPoll(true, false, GameRuntimeState.Running));
+        Assert.Equal(WatchAction.None, policy.OnPresenceChange(true, false, Edge(GamePresence.InGame, GamePresence.NotRunning)));
+        Assert.Equal(WatchAction.Attach, policy.OnPresenceChange(true, false, Edge(GamePresence.Starting, GamePresence.InGame)));
     }
 
     [Fact]
@@ -97,12 +75,11 @@ public sealed class GameWatchPolicyTests
     {
         // Attach was handed out; whatever happened to it, the same game run is not retried.
         var policy = new GameWatchPolicy();
-        policy.OnPoll(true, false, GameRuntimeState.Running);
-        Assert.Equal(WatchAction.Attach, policy.OnPoll(true, false, GameRuntimeState.Running));
-        Assert.Equal(WatchAction.None, policy.OnPoll(true, false, GameRuntimeState.Running));
+        Assert.Equal(WatchAction.Attach, policy.OnPresenceChange(true, false, Edge(GamePresence.Starting, GamePresence.InGame)));
+        Assert.Equal(WatchAction.None, policy.OnSessionEnded(true, false, gameRunning: true));
 
-        policy.OnPoll(true, false, GameRuntimeState.Exited);
-        policy.OnPoll(true, false, GameRuntimeState.Running);
-        Assert.Equal(WatchAction.Attach, policy.OnPoll(true, false, GameRuntimeState.Running));
+        // Only a fresh run re-arms it.
+        policy.OnPresenceChange(true, false, Edge(GamePresence.InGame, GamePresence.NotRunning));
+        Assert.Equal(WatchAction.Attach, policy.OnPresenceChange(true, false, Edge(GamePresence.Starting, GamePresence.InGame)));
     }
 }

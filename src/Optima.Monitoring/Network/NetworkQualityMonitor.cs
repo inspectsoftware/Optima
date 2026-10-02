@@ -16,6 +16,9 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
     private const int PingTimeoutMs = 1000;
     private const int MaxTargets = 3;
 
+    /// <summary>Ceiling on the candidates probed in one discovery sweep, so a long TCP table cannot sweep for seconds.</summary>
+    private const int MaxCandidates = 12;
+
     private readonly IRemoteEndpointSource _endpoints;
     private readonly SettingsService _settings;
     private readonly ILogger<NetworkQualityMonitor> _logger;
@@ -37,6 +40,9 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
     }
 
     public NetworkQualitySample? Latest { get; private set; }
+
+    /// <summary>Last sample handed to subscribers; a ping that has not moved is not worth a repaint.</summary>
+    private NetworkQualitySample? _published;
 
     public event EventHandler<NetworkQualitySample>? SampleArrived;
 
@@ -97,7 +103,7 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
             {
                 if (DateTimeOffset.Now - lastDiscovery > RediscoverInterval)
                 {
-                    (targets, referenceMode) = await DiscoverTargetsAsync(ping, ct).ConfigureAwait(false);
+                    (targets, referenceMode) = await DiscoverTargetsAsync(ct).ConfigureAwait(false);
                     lastDiscovery = DateTimeOffset.Now;
                 }
 
@@ -133,7 +139,13 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
                         };
                     }
                     Latest = sample;
-                    SampleArrived?.Invoke(this, sample);
+
+                    // Subscribers post to the UI thread for every sample, and a steady connection
+                    // reports the same numbers second after second; only a real change is published.
+                    if (HasChanged(sample))
+                    {
+                        SampleArrived?.Invoke(this, sample);
+                    }
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -145,30 +157,29 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
         }
     }
 
-    private async Task<(List<IPAddress> Targets, bool ReferenceMode)> DiscoverTargetsAsync(Ping ping, CancellationToken ct)
+    /// <summary>
+    /// True when a sample differs from the last one in a way worth showing. The rounded values are
+    /// compared, so sub-millisecond noise on a stable connection stays quiet.
+    /// </summary>
+    private bool HasChanged(NetworkQualitySample sample)
+    {
+        var previous = _published;
+        _published = sample;
+        return previous is null
+            || Math.Abs(previous.PingMs - sample.PingMs) >= 1
+            || Math.Abs(previous.JitterMs - sample.JitterMs) >= 1
+            || Math.Abs(previous.PacketLossPct - sample.PacketLossPct) >= 1
+            || previous.IsReferenceHost != sample.IsReferenceHost
+            || !string.Equals(previous.Target, sample.Target, StringComparison.Ordinal);
+    }
+
+    private async Task<(List<IPAddress> Targets, bool ReferenceMode)> DiscoverTargetsAsync(CancellationToken ct)
     {
         var responders = new List<IPAddress>();
         try
         {
             var candidates = await _endpoints.GetRemoteEndpointsAsync(_processIds, ct).ConfigureAwait(false);
-            foreach (var candidate in candidates)
-            {
-                if (responders.Count >= MaxTargets)
-                {
-                    break;
-                }
-                try
-                {
-                    var reply = await ping.SendPingAsync(candidate, PingTimeoutMs).ConfigureAwait(false);
-                    if (reply.Status == IPStatus.Success)
-                    {
-                        responders.Add(candidate);
-                    }
-                }
-                catch (PingException)
-                {
-                }
-            }
+            responders = await ProbeCandidatesAsync(candidates, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -200,6 +211,41 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
             _logger.LogWarning(ex, "Reference host {Host} could not be resolved", host);
         }
         return ([], true);
+    }
+
+    /// <summary>
+    /// Probes the candidates at once and keeps the first responders in candidate order. Sequentially
+    /// this cost the full timeout per silent candidate — a filtered or stale endpoint list meant
+    /// seconds before measurement started. Each probe needs its own Ping instance (one cannot have
+    /// several requests in flight), which is why the probe owns one and disposes it.
+    /// </summary>
+    private static async Task<List<IPAddress>> ProbeCandidatesAsync(IReadOnlyList<IPAddress> candidates, CancellationToken ct)
+    {
+        var probes = candidates
+            .Take(MaxCandidates)
+            .Select(candidate => ProbeAsync(candidate, ct))
+            .ToList();
+
+        var answered = await Task.WhenAll(probes).ConfigureAwait(false);
+        return answered
+            .Where(target => target is not null)
+            .Select(target => target!)
+            .Take(MaxTargets)
+            .ToList();
+    }
+
+    private static async Task<IPAddress?> ProbeAsync(IPAddress candidate, CancellationToken ct)
+    {
+        try
+        {
+            using var ping = new Ping();
+            var reply = await ping.SendPingAsync(candidate, PingTimeoutMs).ConfigureAwait(false);
+            return reply.Status == IPStatus.Success ? candidate : null;
+        }
+        catch (Exception ex) when (ex is PingException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     public async ValueTask DisposeAsync() => await StopAsync().ConfigureAwait(false);

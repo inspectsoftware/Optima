@@ -65,8 +65,16 @@ public sealed partial class PlayerStatsViewModel : ObservableObject
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
-        // The panel should follow a changed name or id immediately, not after the cache expires.
-        _fetchedFor = (settings.PlayerIgn.Trim(), settings.PlayerAccountId);
+        // The panel follows a changed name or id immediately, not after the cache expires. A save
+        // that leaves the identity alone has nothing to show, and forcing a reload there threw away
+        // a good profile (and its cached lookups) for every unrelated toggle in the app.
+        var identity = (settings.PlayerIgn.Trim(), settings.PlayerAccountId);
+        if (_fetchedFor == identity && _fetchedAt != DateTimeOffset.MinValue)
+        {
+            return;
+        }
+
+        _fetchedFor = identity;
         _fetchedAt = DateTimeOffset.MinValue;
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => _ = LoadFromUiAsync());
     }

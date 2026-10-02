@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Optima.Core.Configuration;
+using Optima.Core.Net;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.Core.News;
@@ -100,7 +101,7 @@ public sealed class CopsNewsService : IDisposable
     {
         _paths = paths;
         _logger = logger;
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        _http = new HttpClient(HttpPool.Shared, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(15) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("Optima/" + (typeof(CopsNewsService).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"));
     }
 

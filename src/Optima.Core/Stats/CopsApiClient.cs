@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http;
+using Optima.Core.Net;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.Core.Stats;
@@ -33,19 +34,32 @@ public sealed record CopsLookupResult(
 public sealed class CopsApiClient : IDisposable
 {
     private const string BaseUrl = "https://default.prod.copsapi.criticalforce.fi/api/public/";
+    // A leaderboard page is re-read on every tab switch and the API has no server-side filtering, so
+    // a fresh copy of a page answers the next switch without a request. The refresh button and the
+    // five-minute timer both pass refresh: true.
+    private static readonly TimeSpan LeaderboardCacheLifetime = TimeSpan.FromSeconds(90);
+
     private readonly HttpClient _http;
     private readonly ILogger<CopsApiClient> _logger;
 
+    private readonly Dictionary<string, (DateTimeOffset At, object Rows)> _leaderboardCache = new(StringComparer.Ordinal);
+    private readonly object _leaderboardCacheGate = new();
+
     public CopsApiClient(ILogger<CopsApiClient> logger)
-        : this(logger, new HttpClientHandler())
+        : this(logger, HttpPool.Shared, disposeHandler: false)
     {
     }
 
-    // The handler overload exists for tests; production always uses the parameterless one.
+    // The handler overload exists for tests; production shares the app-wide connection pool.
     public CopsApiClient(ILogger<CopsApiClient> logger, HttpMessageHandler handler)
+        : this(logger, handler, disposeHandler: true)
+    {
+    }
+
+    private CopsApiClient(ILogger<CopsApiClient> logger, HttpMessageHandler handler, bool disposeHandler)
     {
         _logger = logger;
-        _http = new HttpClient(handler)
+        _http = new HttpClient(handler, disposeHandler)
         {
             BaseAddress = new Uri(BaseUrl),
             Timeout = TimeSpan.FromSeconds(10),
@@ -195,9 +209,18 @@ public sealed class CopsApiClient : IDisposable
         return profiles;
     }
 
-    /// <summary>One leaderboard page (elite / ranked / kills / clan). No server-side filtering exists.</summary>
-    public async Task<(IReadOnlyList<T> Rows, string? Problem)> GetLeaderboardAsync<T>(string endpoint, Func<string, IReadOnlyList<T>> parse, CancellationToken ct = default)
+    /// <summary>
+    /// One leaderboard page (elite / ranked / kills / clan). No server-side filtering exists, so
+    /// callers cache the answer briefly and pass <paramref name="refresh"/> to bypass it.
+    /// </summary>
+    public async Task<(IReadOnlyList<T> Rows, string? Problem)> GetLeaderboardAsync<T>(
+        string endpoint, Func<string, IReadOnlyList<T>> parse, CancellationToken ct = default, bool refresh = false)
     {
+        if (!refresh && TryGetCachedPage<T>(endpoint) is { } cached)
+        {
+            return (cached, null);
+        }
+
         try
         {
             using var response = await _http.GetAsync("../leaderboard/" + endpoint, ct).ConfigureAwait(false);
@@ -206,7 +229,9 @@ public sealed class CopsApiClient : IDisposable
                 return ([], "HTTP " + (int)response.StatusCode);
             }
             var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            return (parse(json), null);
+            var rows = parse(json);
+            StorePage(endpoint, rows);
+            return (rows, null);
         }
         catch (HttpRequestException ex)
         {
@@ -287,5 +312,28 @@ public sealed class CopsApiClient : IDisposable
         }
     }
 
+    private IReadOnlyList<T>? TryGetCachedPage<T>(string endpoint)
+    {
+        lock (_leaderboardCacheGate)
+        {
+            if (_leaderboardCache.TryGetValue(endpoint, out var entry)
+                && entry.Rows is IReadOnlyList<T> rows
+                && DateTimeOffset.UtcNow - entry.At < LeaderboardCacheLifetime)
+            {
+                return rows;
+            }
+        }
+        return null;
+    }
+
+    private void StorePage<T>(string endpoint, IReadOnlyList<T> rows)
+    {
+        lock (_leaderboardCacheGate)
+        {
+            _leaderboardCache[endpoint] = (DateTimeOffset.UtcNow, rows);
+        }
+    }
+
+    // Disposing the client is safe with the shared handler: it was created with disposeHandler: false.
     public void Dispose() => _http.Dispose();
 }

@@ -44,8 +44,11 @@ public sealed class GamePresenceService : IAsyncDisposable
         _logger = logger;
     }
 
-    public event Action<GameRuntimeState>? Ticked;
-
+    /// <summary>
+    /// The presence edges. Everything that reacts to a session (Discord, tweaks, stats, watch mode,
+    /// crash capture) listens here; there is deliberately no raw per-poll event, which would be a
+    /// second, slower copy of this state machine for one consumer to re-derive.
+    /// </summary>
     public event Action<PresenceChange>? PresenceChanged;
 
     public event Action<GameExit>? GameExited;
@@ -108,8 +111,6 @@ public sealed class GamePresenceService : IAsyncDisposable
 
     public void ApplyState(GameRuntimeState state, DateTimeOffset now)
     {
-        Ticked?.Invoke(state);
-
         var next = state switch
         {
             GameRuntimeState.Running => GamePresence.InGame,

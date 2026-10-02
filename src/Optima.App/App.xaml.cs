@@ -181,7 +181,13 @@ public partial class App : Application
         sessionTweaks.Start();
         _ = SyncSessionTweaksAsync(sessionTweaks);
         presence.PresenceChanged += change =>
+        {
             SetOwnPriority(gameOnScreen: change.Current == Optima.Core.Monitoring.GamePresence.InGame);
+            // Decoration stops for the whole run: a drifting backdrop behind a game is cost with no
+            // one watching it. Starting counts — the emulator is already up at that point.
+            var running = change.Current != Optima.Core.Monitoring.GamePresence.NotRunning;
+            Dispatcher.BeginInvoke(() => Motion.SetGameRunning(running));
+        };
 
         _ = mainViewModel.InitializeAsync();
     }

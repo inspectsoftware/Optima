@@ -93,6 +93,13 @@ public sealed class LaunchOrchestrator
 
     public event EventHandler<LaunchProgress>? ProgressChanged;
 
+    /// <summary>
+    /// Raised once a session has finished, whatever its outcome. It exists for watch mode: a session
+    /// Optima ran can end while the game is still up (the run was stopped or cancelled and the player
+    /// kept playing), and watch mode has to notice that without polling for it.
+    /// </summary>
+    public event Action? SessionEnded;
+
     public bool IsSessionActive => Volatile.Read(ref _running) == 1;
 
     public Task<LaunchResult> RunSessionAsync(LaunchProfile profile, CancellationToken ct = default)
@@ -240,6 +247,16 @@ public sealed class LaunchOrchestrator
         finally
         {
             Volatile.Write(ref _running, 0);
+            // Raised after the gate closes, so a listener asking IsSessionActive sees the truth, and
+            // guarded, because a listener must never replace the session result with its own failure.
+            try
+            {
+                SessionEnded?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "A session-end listener failed");
+            }
         }
     }
 
