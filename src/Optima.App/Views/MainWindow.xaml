@@ -71,8 +71,16 @@
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition />
                 </Grid.ColumnDefinitions>
-                <Border Width="18" Height="18" BorderThickness="4.5" BorderBrush="{DynamicResource Brush.Accent}"
-                        VerticalAlignment="Center" Margin="1,0,0,0" />
+                <!-- The app's own mark, not a stand-in drawn from four borders: the rail is the first
+                     thing the window shows, and it was still the old ring. It is painted through the
+                     mark's alpha rather than shown as-is, so it takes the accent colour and stays
+                     visible in the light palette, where the artwork's own silver would disappear. -->
+                <Rectangle Width="20" Height="20" VerticalAlignment="Center"
+                           Fill="{DynamicResource Brush.Accent}">
+                  <Rectangle.OpacityMask>
+                    <ImageBrush ImageSource="pack://application:,,,/Assets/optima-mark.png" Stretch="Uniform" />
+                  </Rectangle.OpacityMask>
+                </Rectangle>
                 <TextBlock Grid.Column="1" Text="Optima" FontSize="15" FontWeight="SemiBold"
                            VerticalAlignment="Center" Margin="11,0,0,0"
                            Visibility="{Binding RailCollapsed, Converter={StaticResource InverseBoolToVis}}" />

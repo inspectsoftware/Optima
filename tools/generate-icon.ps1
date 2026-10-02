@@ -2,6 +2,7 @@
 #
 #   design/optima-mark.png  ->  src/Optima.App/Assets/optima.ico
 #                               src/Optima.App/Assets/optima-presence.png
+#                               src/Optima.App/Assets/optima-mark.png
 #
 # Dev-time script, run from anywhere and commit the output:
 #
@@ -346,7 +347,18 @@ try {
 finally {
     $presence.Dispose()
 }
+# The rail's in-app mark is drawn at about 20px, so it gets an asset sized for that rather than a
+# 512px downscale: one 25x reduction is where WPF's filtering starts to look muddy.
+$inAppPath = Join-Path $AssetDir 'optima-mark.png'
+$inApp = [IconForge]::Frame($mark, 64, $Padding)
+try {
+    $inApp.Save($inAppPath, [System.Drawing.Imaging.ImageFormat]::Png)
+}
+finally {
+    $inApp.Dispose()
+}
 $mark.Image.Dispose()
 
 Write-Host ("Wrote {0} ({1} bytes, sizes: {2})" -f $icoPath, (Get-Item $icoPath).Length, ($sizes -join ', '))
 Write-Host ("Wrote {0} ({1} bytes, 512x512)" -f $presencePath, (Get-Item $presencePath).Length)
+Write-Host ("Wrote {0} ({1} bytes, 64x64)" -f $inAppPath, (Get-Item $inAppPath).Length)
