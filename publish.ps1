@@ -45,17 +45,21 @@ foreach ($process in $stopped) {
 # Retried: Windows can hold file locks for a moment after the process exits.
 if ((Test-Path $out) -and (Test-Path (Join-Path $out "Optima.exe"))) {
     Write-Host "cleaning $out"
-    # Setups built from this folder (the local dev pipeline keeps them next to the app) are the one
-    # thing that survives: a rebuild must not erase the installers made from earlier runs.
-    $keep = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    # Setup installers built from this folder (the local dev pipeline keeps them here, in Installers\
+    # and from older runs possibly in the root) are the one thing that survives: a rebuild must not
+    # erase the installers made from earlier runs.
+    $keepFile = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($setup in Get-ChildItem -Path $out -File -Filter "Optima-Setup-*.exe" -ErrorAction SilentlyContinue) {
-        [void]$keep.Add($setup.Name)
+        [void]$keepFile.Add($setup.Name)
     }
+    $keepDir = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($dirName in @("Installers")) { [void]$keepDir.Add($dirName) }
     $attempts = 0
     while ($true) {
         try {
             foreach ($child in Get-ChildItem -Path $out -Force) {
-                if (-not $child.PSIsContainer -and $keep.Contains($child.Name)) { continue }
+                if (-not $child.PSIsContainer -and $keepFile.Contains($child.Name)) { continue }
+                if ($child.PSIsContainer -and $keepDir.Contains($child.Name)) { continue }
                 Remove-Item -Recurse -Force $child.FullName -ErrorAction Stop
             }
             break

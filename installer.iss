@@ -90,9 +90,11 @@ Name: "autostart"; Description: "Start Optima automatically at sign-in (minimize
 Name: "vdddriver"; Description: "Install the Optima virtual display driver (Windows asks once for administrator approval)"; GroupDescription: "Virtual display:"
 
 [Files]
-; Setups built earlier from this same folder are excluded: the local dev pipeline writes them next
-; to the payload, and without this each setup would embed a copy of the previous one.
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "Optima-Setup-*.exe"; Flags: recursesubdirs createallsubdirs ignoreversion restartreplace
+; The local dev pipeline keeps the setups it builds in an Installers subfolder of the payload; they
+; are excluded, together with any setup left in the payload root, so a setup never embeds another
+; setup. (createallsubdirs is deliberately absent: it would recreate that folder, empty, inside the
+; installed app.)
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "Installers\*,Optima-Setup-*.exe"; Flags: recursesubdirs ignoreversion restartreplace
 
 [Icons]
 Name: "{userprograms}\{#AppName}"; Filename: "{app}\Optima.exe"; WorkingDir: "{app}"
