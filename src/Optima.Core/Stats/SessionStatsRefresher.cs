@@ -25,6 +25,12 @@ public enum SessionStatsRefreshStatus
 
     /// <summary>The API answered, but it still shows no movement since the session started.</summary>
     NoMovement,
+
+    /// <summary>
+    /// A newer session exists but carries no start snapshot, so this run has no known end and
+    /// cannot be measured. Only the newest session can be measured without one.
+    /// </summary>
+    NoEndSnapshot,
 }
 
 /// <summary>Outcome of a stats refresh: the verdict plus a line to show the user.</summary>
@@ -34,6 +40,17 @@ public sealed record SessionStatsRefreshResult(
     CopsProfileDelta? Delta)
 {
     public bool Updated => Status == SessionStatsRefreshStatus.Updated;
+}
+
+/// <summary>Outcome of re-deriving the newest sessions' stats and their automatic match rows.</summary>
+public sealed record SessionMatchesRefreshResult(
+    SessionStatsRefreshStatus Status,
+    string Message,
+    int SessionsUpdated,
+    int MatchesAdded,
+    int MatchesCorrected)
+{
+    public bool Updated => SessionsUpdated > 0 || MatchesAdded > 0 || MatchesCorrected > 0;
 }
 
 /// <summary>
@@ -52,6 +69,9 @@ public sealed class SessionStatsRefresher
 
     /// <summary>Gap between those asks: a match usually shows up within a handful of seconds.</summary>
     public static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(5);
+
+    /// <summary>How many recent sessions the matches refresh re-derives in one pass.</summary>
+    public const int DefaultMatchSessions = 16;
 
     private readonly ISessionStore _store;
     private readonly SettingsService _settings;
@@ -96,6 +116,34 @@ public sealed class SessionStatsRefresher
                 null);
         }
 
+        var boundary = await _store.GetSessionEndBoundaryAsync(session.Id, ct).ConfigureAwait(false);
+        if (boundary.HasNextSession && boundary.Baseline is null)
+        {
+            return new SessionStatsRefreshResult(SessionStatsRefreshStatus.NoEndSnapshot,
+                "The session that followed this one carries no start snapshot, so where this run ended is unknown, " +
+                "and measuring it against the profile now would credit it with everything played since.", null);
+        }
+
+        // A finished run ends where the next one begins, and that answer is already on file, so a session
+        // that is no longer the newest is settled without asking the API at all. This is also why measuring
+        // an older session against the live profile would be wrong: it would include later runs.
+        if (boundary.Baseline is { } end)
+        {
+            var settled = DeltaBetween(baseline, end);
+            if (settled is null)
+            {
+                return new SessionStatsRefreshResult(SessionStatsRefreshStatus.NoMovement,
+                    "The next session's snapshot shows no movement during this one, so there is nothing to record.",
+                    null);
+            }
+
+            var written = await RecordAsync(session, settled, ct).ConfigureAwait(false);
+            _logger.LogInformation("Session #{Id} re-measured from the next session's snapshot", session.Id);
+            return new SessionStatsRefreshResult(SessionStatsRefreshStatus.Updated,
+                (written.DeltaChanged ? "Re-measured" : "Already correct") + " from the next session's snapshot: " +
+                Describe(settled) + "." + MatchNote(written.MatchesAdded, written.MatchesCorrected), settled);
+        }
+
         var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(settings.PlayerIgn) && settings.PlayerAccountId is not > 0)
         {
@@ -103,6 +151,7 @@ public sealed class SessionStatsRefresher
                 "Set your in-game name in Settings first: the stats API is queried by player.", null);
         }
 
+        // This is the newest session, so the live profile is its only end and the API may still be behind.
         var delay = retryDelay ?? DefaultRetryDelay;
         var tries = Math.Max(1, attempts);
         var reached = true;
@@ -112,18 +161,15 @@ public sealed class SessionStatsRefresher
 
             var profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, ct).ConfigureAwait(false);
             reached = profile is not null;
-            if (profile is not null)
+            var delta = DeltaBetween(baseline, profile?.CurrentSeason);
+            if (delta is { IsZero: false })
             {
-                var delta = CopsProfileDelta.Between(AsBaseline(baseline), profile);
-                if (delta is { IsZero: false })
-                {
-                    await _store.UpdateStatsDeltaAsync(session.Id, delta, ct).ConfigureAwait(false);
-                    await ReconcileAutoMatchesAsync(session, delta, ct).ConfigureAwait(false);
-                    _logger.LogInformation("Session #{Id} stats refreshed from the API (attempt {Attempt})",
-                        session.Id, attempt);
-                    return new SessionStatsRefreshResult(SessionStatsRefreshStatus.Updated,
-                        "The API caught up: " + Describe(delta) + ".", delta);
-                }
+                var written = await RecordAsync(session, delta, ct).ConfigureAwait(false);
+                _logger.LogInformation("Session #{Id} stats refreshed from the API (attempt {Attempt})",
+                    session.Id, attempt);
+                return new SessionStatsRefreshResult(SessionStatsRefreshStatus.Updated,
+                    "The API caught up: " + Describe(delta) + "." +
+                    MatchNote(written.MatchesAdded, written.MatchesCorrected), delta);
             }
 
             if (attempt < tries)
@@ -141,6 +187,154 @@ public sealed class SessionStatsRefresher
                 "The stats API could not be reached just now. Check the connection and try again.", null);
     }
 
+    /// <summary>
+    /// Re-derives the recent sessions' stats and their automatic match rows from one API reading.
+    ///
+    /// The matches list is built from those deltas, so a match that is missing or wrong is an empty or
+    /// wrong delta on the session it belongs to. This does the same job as <see cref="RefreshAsync"/> but
+    /// for every recent session at once, which is what makes it useful: the row the user is looking at
+    /// usually belongs to a session that is no longer the newest, and those are settled by the stored
+    /// snapshot chain rather than by the API.
+    /// </summary>
+    public async Task<SessionMatchesRefreshResult> RefreshRecentMatchesAsync(
+        int sessions = DefaultMatchSessions,
+        int attempts = DefaultAttempts,
+        TimeSpan? retryDelay = null,
+        CancellationToken ct = default)
+    {
+        var summaries = await _store.GetSessionSummariesAsync(Math.Max(1, sessions), ct).ConfigureAwait(false);
+        if (summaries.Count == 0)
+        {
+            return new SessionMatchesRefreshResult(SessionStatsRefreshStatus.SessionMissing,
+                "No sessions recorded yet, so there are no matches to re-derive.", 0, 0, 0);
+        }
+
+        var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(settings.PlayerIgn) && settings.PlayerAccountId is not > 0)
+        {
+            return new SessionMatchesRefreshResult(SessionStatsRefreshStatus.NoPlayerIdentity,
+                "Set your in-game name in Settings first: the stats API is queried by player.", 0, 0, 0);
+        }
+
+        // Only the newest session depends on the API, and only it can still be behind; retrying is
+        // pointless the moment its run already reads as finished.
+        var delay = retryDelay ?? DefaultRetryDelay;
+        var tries = Math.Max(1, attempts);
+        CopsPlayerProfile? profile = null;
+        for (var attempt = 1; attempt <= tries; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, ct).ConfigureAwait(false);
+            var newest = DeltaFor(summaries, 0, profile?.CurrentSeason);
+            var pending = profile is null || newest is null || newest.IsZero;
+            if (!pending || attempt == tries)
+            {
+                break;
+            }
+            _logger.LogDebug("The newest session still reads as empty; asking the stats API again ({Attempt}/{Tries})",
+                attempt, tries);
+            await Task.Delay(delay, ct).ConfigureAwait(false);
+        }
+
+        if (profile is null)
+        {
+            return new SessionMatchesRefreshResult(SessionStatsRefreshStatus.ApiUnreachable,
+                "The stats API could not be reached just now. Check the connection and try again.", 0, 0, 0);
+        }
+
+        var updated = 0;
+        var added = 0;
+        var corrected = 0;
+        var unmeasurable = 0;
+        for (var index = 0; index < summaries.Count; index++)
+        {
+            var session = summaries[index];
+            var delta = DeltaFor(summaries, index, profile.CurrentSeason);
+            if (delta is null)
+            {
+                // Either this session has no start snapshot, or the run after it has none, which
+                // leaves this one's end unknown. Measuring it against the profile now would credit it
+                // with everything played in between, so it is left alone and counted.
+                unmeasurable++;
+                continue;
+            }
+            if (delta.IsZero)
+            {
+                // Nothing moved during that run, so there is nothing to record and no match to derive.
+                continue;
+            }
+
+            var written = await RecordAsync(session, delta, ct).ConfigureAwait(false);
+            if (written.DeltaChanged)
+            {
+                updated++;
+            }
+            added += written.MatchesAdded;
+            corrected += written.MatchesCorrected;
+        }
+
+        if (updated == 0 && added == 0 && corrected == 0)
+        {
+            return new SessionMatchesRefreshResult(SessionStatsRefreshStatus.NoMovement,
+                $"Checked the last {summaries.Count} session{(summaries.Count == 1 ? string.Empty : "s")}: the API " +
+                "reports nothing the history does not already have." +
+                UnmeasurableNote(unmeasurable), 0, 0, 0);
+        }
+
+        var newestStillEmpty = DeltaFor(summaries, 0, profile.CurrentSeason) is null or { IsZero: true };
+        var message = $"Re-derived {updated} session{(updated == 1 ? string.Empty : "s")} from the API" +
+            (added + corrected > 0
+                ? $": {added} match row{(added == 1 ? string.Empty : "s")} added, {corrected} corrected"
+                : string.Empty) +
+            "." + UnmeasurableNote(unmeasurable);
+        if (newestStillEmpty)
+        {
+            message += " The newest session still shows no movement; the API may not have published it yet - " +
+                "press again in a minute.";
+        }
+        return new SessionMatchesRefreshResult(SessionStatsRefreshStatus.Updated, message, updated, added, corrected);
+    }
+
+    /// <summary>One session's delta: bounded by the next session's snapshot, or by the live reading for the newest.</summary>
+    private static CopsProfileDelta? DeltaFor(IReadOnlyList<SessionRecord> newestFirst, int index, CopsSeasonStats? live)
+    {
+        if (newestFirst[index].StatsBaseline is not { } start)
+        {
+            return null;
+        }
+        var end = index == 0 ? live : newestFirst[index - 1].StatsBaseline;
+        return DeltaBetween(start, end);
+    }
+
+    /// <summary>The delta between two snapshots, or null when the end of the run is unknown.</summary>
+    private static CopsProfileDelta? DeltaBetween(CopsSeasonStats start, CopsSeasonStats? end)
+        => end is null ? null : CopsProfileDelta.Between(AsBaseline(start), AsBaseline(end));
+
+    /// <summary>Writes a measured delta onto its session when it says something new, and lines up its match rows either way.</summary>
+    private async Task<(bool DeltaChanged, int MatchesAdded, int MatchesCorrected)> RecordAsync(
+        SessionRecord session, CopsProfileDelta delta, CancellationToken ct)
+    {
+        var stored = session.StatsDelta is { IsZero: false } ? session.StatsDelta : null;
+        var changed = stored != delta;
+        if (changed)
+        {
+            await _store.UpdateStatsDeltaAsync(session.Id, delta, ct).ConfigureAwait(false);
+        }
+
+        // Reconciled even when the delta was already right: a delta the automatic pass recorded can
+        // still be missing its match row, which is exactly the case this button exists for.
+        var rows = await ReconcileAutoMatchesAsync(session, delta, ct).ConfigureAwait(false);
+        return (changed, rows.Added, rows.Corrected);
+    }
+
+    private static string MatchNote(int added, int corrected)
+        => added + corrected == 0 ? string.Empty : $" ({added} match row{(added == 1 ? string.Empty : "s")} added, {corrected} corrected)";
+
+    private static string UnmeasurableNote(int unmeasurable)
+        => unmeasurable == 0
+            ? string.Empty
+            : $" {unmeasurable} session{(unmeasurable == 1 ? string.Empty : "s")} had no snapshot to measure against.";
+
     /// <summary>The stored snapshot dressed as a profile, which is the shape the delta maths takes.</summary>
     private static CopsPlayerProfile AsBaseline(CopsSeasonStats baseline)
         => new(0, string.Empty, 0, [baseline]);
@@ -150,14 +344,17 @@ public sealed class SessionStatsRefresher
     /// one decided match has its row corrected, and one that only now qualifies gets the row the automatic
     /// pass could not create. Hand-entered and edited rows are never touched.
     /// </summary>
-    private async Task ReconcileAutoMatchesAsync(SessionRecord session, CopsProfileDelta delta, CancellationToken ct)
+    private async Task<(int Added, int Corrected)> ReconcileAutoMatchesAsync(
+        SessionRecord session, CopsProfileDelta delta, CancellationToken ct)
     {
+        var added = 0;
+        var corrected = 0;
         try
         {
             var extracted = SessionStatsEnricher.ExtractAutoMatches(delta, session.StartedAt, session.Id);
             if (extracted.Count == 0)
             {
-                return;
+                return (0, 0);
             }
 
             var existing = await _store.GetMatchesAsync(200, ct).ConfigureAwait(false);
@@ -177,6 +374,7 @@ public sealed class SessionStatsRefresher
                     if (forMode.Count == 0)
                     {
                         await _store.SaveMatchAsync(match, ct).ConfigureAwait(false);
+                        added++;
                     }
                     continue;
                 }
@@ -193,6 +391,7 @@ public sealed class SessionStatsRefresher
                         Deaths = match.Deaths,
                         Assists = match.Assists,
                     }, ct).ConfigureAwait(false);
+                    corrected++;
                 }
             }
         }
@@ -200,6 +399,7 @@ public sealed class SessionStatsRefresher
         {
             _logger.LogWarning(ex, "Reconciling the automatic matches for session #{Id} failed", session.Id);
         }
+        return (added, corrected);
     }
 
     /// <summary>Compact one-line summary of a delta: "ranked 18/11/3 · 1W-0L".</summary>

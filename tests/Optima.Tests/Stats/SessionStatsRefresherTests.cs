@@ -1,3 +1,4 @@
+using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
 using Optima.Core.Stats;
@@ -53,7 +54,8 @@ public sealed class SessionStatsRefresherTests : IDisposable
     private async Task IdentifyPlayerAsync(string ign = "Player")
         => await _settings.SaveSettingsAsync(new AppSettings { PlayerIgn = ign });
 
-    private long SeedSession(CopsSeasonStats? baseline, DateTimeOffset? started = null)
+    private long SeedSession(CopsSeasonStats? baseline, DateTimeOffset? started = null,
+        CopsProfileDelta? delta = null)
     {
         var id = _store.Saved.Count + 1;
         _store.Saved.Add(new SessionRecord
@@ -65,6 +67,7 @@ public sealed class SessionStatsRefresherTests : IDisposable
             Duration = TimeSpan.FromMinutes(20),
             Stats = new SessionStats { AverageFps = 240, SampleCount = 500 },
             StatsBaseline = baseline,
+            StatsDelta = delta,
         });
         return id;
     }
@@ -127,6 +130,138 @@ public sealed class SessionStatsRefresherTests : IDisposable
 
         Assert.Equal(SessionStatsRefreshStatus.ApiUnreachable, result.Status);
         Assert.Empty(_store.UpdatedDeltas);
+    }
+
+    [Fact]
+    public async Task AnOlderSessionIsMeasuredAgainstTheNextRunNotTheProfile()
+    {
+        await IdentifyPlayerAsync();
+        // Newest first: session 2 followed session 1, so session 1's run ended at 120 kills.
+        SeedSession(Baseline(120), DateTimeOffset.Now.AddMinutes(-10));
+        var first = SeedSession(Baseline(100), DateTimeOffset.Now.AddMinutes(-40));
+        _store.EndBoundary = new SessionEndBoundary(true, Baseline(120));
+
+        // The profile has since moved to 140: everything after session 1 would be credited to it.
+        _profile = ProfileAfter(new CopsModeStats(140, 80, 20, 10, 5));
+
+        var result = await CreateRefresher().RefreshAsync(first, attempts: 1, retryDelay: TimeSpan.Zero);
+
+        Assert.Equal(SessionStatsRefreshStatus.Updated, result.Status);
+        Assert.Equal(20, result.Delta!.Ranked.Kills);
+        Assert.Contains("next session's snapshot", result.Message, StringComparison.Ordinal);
+        // Settled from the stored chain: the API is not asked at all.
+        Assert.Empty(_queries);
+        var write = Assert.Single(_store.UpdatedDeltas);
+        Assert.Equal(20, write.Delta.Ranked.Kills);
+    }
+
+    [Fact]
+    public async Task ASessionWithNoEndSnapshotIsLeftAlone()
+    {
+        await IdentifyPlayerAsync();
+        var older = SeedSession(Baseline(100), DateTimeOffset.Now.AddMinutes(-40));
+        SeedSession(baseline: null, started: DateTimeOffset.Now.AddMinutes(-10));
+        _store.EndBoundary = new SessionEndBoundary(true, Baseline: null);
+        _profile = ProfileAfter(new CopsModeStats(140, 80, 20, 10, 5));
+
+        var result = await CreateRefresher().RefreshAsync(older, attempts: 1, retryDelay: TimeSpan.Zero);
+
+        Assert.Equal(SessionStatsRefreshStatus.NoEndSnapshot, result.Status);
+        Assert.Empty(_queries);
+        Assert.Empty(_store.UpdatedDeltas);
+    }
+
+    [Fact]
+    public async Task TheMatchesRefreshRedrawsEveryRecentSessionsRowsFromOneReading()
+    {
+        await IdentifyPlayerAsync();
+        var newest = SeedSession(Baseline(120, 80, 11, 5), DateTimeOffset.Now.AddMinutes(-10));
+        var older = SeedSession(Baseline(100), DateTimeOffset.Now.AddMinutes(-40));
+        _profile = ProfileAfter(new CopsModeStats(138, 91, 23, 12, 5));
+
+        var result = await CreateRefresher().RefreshRecentMatchesAsync(attempts: 1, retryDelay: TimeSpan.Zero);
+
+        Assert.Equal(SessionStatsRefreshStatus.Updated, result.Status);
+        Assert.Equal(2, result.SessionsUpdated);
+        Assert.Equal(2, result.MatchesAdded);
+        Assert.Equal(0, result.MatchesCorrected);
+        // One API reading for the whole pass: the older session is closed by the newer session's snapshot.
+        Assert.Single(_queries);
+
+        var newestWrite = _store.UpdatedDeltas.Single(u => u.SessionId == newest).Delta;
+        Assert.Equal(18, newestWrite.Ranked.Kills);
+        var olderWrite = _store.UpdatedDeltas.Single(u => u.SessionId == older).Delta;
+        Assert.Equal(20, olderWrite.Ranked.Kills);
+        Assert.Equal(2, _store.Matches.Count);
+        Assert.All(_store.Matches, m => Assert.Equal("ranked", m.Mode));
+    }
+
+    [Fact]
+    public async Task TheMatchesRefreshAsksAgainWhileTheNewestSessionIsStillEmpty()
+    {
+        await IdentifyPlayerAsync();
+        SeedSession(Baseline(120), DateTimeOffset.Now.AddMinutes(-10));
+        var readings = new Queue<CopsPlayerProfile?>([
+            ProfileAfter(new CopsModeStats(120, 80, 20, 10, 5)),
+            ProfileAfter(new CopsModeStats(120, 80, 20, 10, 5)),
+            ProfileAfter(new CopsModeStats(138, 91, 23, 11, 5)),
+        ]);
+        var queried = 0;
+        var refresher = new SessionStatsRefresher(_store, _settings,
+            (_, _, _) => { queried++; return Task.FromResult(readings.Dequeue()); },
+            NullLogger<SessionStatsRefresher>.Instance);
+
+        var result = await refresher.RefreshRecentMatchesAsync(attempts: 3, retryDelay: TimeSpan.Zero);
+
+        Assert.Equal(SessionStatsRefreshStatus.Updated, result.Status);
+        Assert.Equal(3, queried);
+        Assert.Equal(18, Assert.Single(_store.UpdatedDeltas).Delta.Ranked.Kills);
+        Assert.Single(_store.Matches);
+    }
+
+    [Fact]
+    public async Task TheMatchesRefreshDoesNotWaitWhenTheNewestSessionAlreadyMoved()
+    {
+        await IdentifyPlayerAsync();
+        var newest = SeedSession(Baseline(120), DateTimeOffset.Now.AddMinutes(-10),
+            delta: new CopsProfileDelta(Season, new CopsModeStats(18, 11, 3, 1, 0), CopsModeStats.Zero, CopsModeStats.Zero));
+        // The row that delta describes is already there too, so there is genuinely nothing to do.
+        _store.Matches.Add(new MatchRecord
+        {
+            Id = 1,
+            SessionId = newest,
+            StartedAt = DateTimeOffset.Now.AddMinutes(-10),
+            Mode = "ranked",
+            Result = "win",
+            Kills = 18,
+            Deaths = 11,
+            Assists = 3,
+            Source = "auto",
+        });
+        _profile = ProfileAfter(new CopsModeStats(138, 91, 23, 11, 5));
+
+        var result = await CreateRefresher().RefreshRecentMatchesAsync(attempts: 3, retryDelay: TimeSpan.Zero);
+
+        // The delta and its row were already right, so it asks once and says so.
+        Assert.Equal(SessionStatsRefreshStatus.NoMovement, result.Status);
+        Assert.Equal(1, _queries.Count);
+        Assert.Empty(_store.UpdatedDeltas);
+    }
+
+    [Fact]
+    public async Task TheMatchesRefreshNeverCreditsASessionWithLaterRuns()
+    {
+        await IdentifyPlayerAsync();
+        // The session after the older one has no snapshot, so the older run has no known end.
+        SeedSession(baseline: null, started: DateTimeOffset.Now.AddMinutes(-10));
+        var older = SeedSession(Baseline(100), DateTimeOffset.Now.AddMinutes(-40));
+        _profile = ProfileAfter(new CopsModeStats(140, 80, 20, 10, 5));
+
+        var result = await CreateRefresher().RefreshRecentMatchesAsync(attempts: 1, retryDelay: TimeSpan.Zero);
+
+        Assert.Equal(SessionStatsRefreshStatus.NoMovement, result.Status);
+        Assert.Contains("no snapshot to measure against", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(_store.UpdatedDeltas, u => u.SessionId == older);
     }
 
     [Fact]

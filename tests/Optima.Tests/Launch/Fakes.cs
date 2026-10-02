@@ -227,6 +227,9 @@ internal sealed class FakeSessionStore : ISessionStore
         UpdatedDeltas.Add((sessionId, delta));
         return Task.FromResult(UpdateResult);
     }
+    public Optima.Core.Abstractions.SessionEndBoundary EndBoundary { get; set; } = new(false, null);
+    public Task<Optima.Core.Abstractions.SessionEndBoundary> GetSessionEndBoundaryAsync(long sessionId, CancellationToken ct = default)
+        => Task.FromResult(EndBoundary);
     public Task<long> SaveMatchAsync(MatchRecord match, CancellationToken ct = default)
     {
         Matches.Add(match);

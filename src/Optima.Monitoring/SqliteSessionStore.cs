@@ -504,6 +504,35 @@ public sealed class SqliteSessionStore : ISessionStore
         return updated > 0;
     }
 
+    public async Task<SessionEndBoundary> GetSessionEndBoundaryAsync(long sessionId, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        // Ids are AUTOINCREMENT, so the next id is the next run in time.
+        command.CommandText = "SELECT stats_baseline FROM sessions WHERE id > $id ORDER BY id ASC LIMIT 1";
+        command.Parameters.AddWithValue("$id", sessionId);
+
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        if (!await reader.ReadAsync(ct).ConfigureAwait(false))
+        {
+            return new SessionEndBoundary(HasNextSession: false, Baseline: null);
+        }
+        var ordinal = reader.GetOrdinal("stats_baseline");
+        if (reader.IsDBNull(ordinal))
+        {
+            return new SessionEndBoundary(HasNextSession: true, Baseline: null);
+        }
+        try
+        {
+            return new SessionEndBoundary(true, JsonSerializer.Deserialize<CopsSeasonStats>(reader.GetString(ordinal)));
+        }
+        catch (JsonException)
+        {
+            return new SessionEndBoundary(HasNextSession: true, Baseline: null);
+        }
+    }
+
     public async Task<long> SaveMatchAsync(MatchRecord match, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(ct).ConfigureAwait(false);

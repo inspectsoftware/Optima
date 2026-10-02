@@ -61,8 +61,7 @@
             <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding ReloadCommand}" Padding="6,0"
                     ToolTip="Re-read the history from the local database" />
             <Button Style="{StaticResource GhostButton}" Content="refresh stats" Padding="6,0" Margin="6,0,0,0"
-                    Command="{Binding RefreshStatsCommand}"
-                    IsEnabled="{Binding IsRefreshingStats, Converter={StaticResource InverseBool}}"
+                    Command="{Binding RefreshStatsCommand}" IsEnabled="{Binding CanRefresh}"
                     ToolTip="Re-query the stats API for the selected session, until it reports the match" />
           </StackPanel>
         </HeaderedContentControl.Tag>
@@ -142,7 +141,12 @@
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="MATCHES">
         <HeaderedContentControl.Tag>
-          <TextBlock Text="{Binding MatchesSummary}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="{Binding MatchesSummary}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+            <Button Style="{StaticResource GhostButton}" Content="refresh matches" Padding="6,0" Margin="10,0,0,0"
+                    Command="{Binding RefreshMatchesCommand}" IsEnabled="{Binding CanRefresh}"
+                    ToolTip="Re-query the stats API for the recent sessions, until it reports their matches" />
+          </StackPanel>
         </HeaderedContentControl.Tag>
         <StackPanel>
           <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="760" HorizontalAlignment="Left" Margin="0,0,0,8"
@@ -191,6 +195,21 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+
+          <TextBlock Text="{Binding MatchesRefreshStatus}" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="760"
+                     HorizontalAlignment="Left"
+                     Visibility="{Binding MatchesRefreshStatus, Converter={StaticResource EmptyToCollapsed}}">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Warn}" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding MatchesRefreshOk}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
 
           <TextBlock Text="no matches recorded yet" Margin="0,4,0,0">
             <TextBlock.Style>

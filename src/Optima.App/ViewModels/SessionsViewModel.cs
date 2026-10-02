@@ -200,6 +200,17 @@ public sealed partial class SessionsViewModel : ObservableObject
     [ObservableProperty] private string _statsRefreshStatus = string.Empty;
     [ObservableProperty] private bool _statsRefreshOk;
 
+    [ObservableProperty] private bool _isRefreshingMatches;
+    [ObservableProperty] private string _matchesRefreshStatus = string.Empty;
+    [ObservableProperty] private bool _matchesRefreshOk;
+
+    /// <summary>Both refreshes write to the same history, so only one may be in flight at a time.</summary>
+    public bool CanRefresh => !IsRefreshingStats && !IsRefreshingMatches;
+
+    partial void OnIsRefreshingStatsChanged(bool value) => OnPropertyChanged(nameof(CanRefresh));
+
+    partial void OnIsRefreshingMatchesChanged(bool value) => OnPropertyChanged(nameof(CanRefresh));
+
     /// <summary>
     /// Re-asks the stats API about one session - the selected row, or the newest one when nothing is
     /// selected - and writes what it reports back onto the session. The automatic pass reads the API
@@ -209,7 +220,7 @@ public sealed partial class SessionsViewModel : ObservableObject
     [RelayCommand]
     private async Task RefreshStatsAsync(CancellationToken ct = default)
     {
-        if (IsRefreshingStats)
+        if (!CanRefresh)
         {
             return;
         }
@@ -249,6 +260,51 @@ public sealed partial class SessionsViewModel : ObservableObject
         finally
         {
             IsRefreshingStats = false;
+        }
+    }
+
+    /// <summary>
+    /// Re-derives the recent sessions' API stats, and with them the automatic match rows, from one
+    /// fresh reading. Matches are not a separate source of truth: each row is a session's stat delta
+    /// that happened to contain exactly one decided match, so a row that is missing or wrong is a
+    /// delta that is missing or wrong on the session it belongs to.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshMatchesAsync(CancellationToken ct = default)
+    {
+        if (!CanRefresh)
+        {
+            return;
+        }
+
+        IsRefreshingMatches = true;
+        MatchesRefreshOk = false;
+        MatchesRefreshStatus = "asking the stats API about the recent sessions...";
+        try
+        {
+            var result = await _statsRefresher.RefreshRecentMatchesAsync(ct: ct);
+            MatchesRefreshOk = result.Updated;
+            MatchesRefreshStatus = result.Message;
+            if (result.Updated)
+            {
+                var keep = SelectedRow?.Record.Id;
+                await ReloadAsync(ct);
+                if (keep is { } id)
+                {
+                    SelectedRow = null;
+                    SelectedRow = Rows.FirstOrDefault(r => r.Record.Id == id) ?? Rows.FirstOrDefault();
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Refreshing the recent matches from the API failed");
+            MatchesRefreshOk = false;
+            MatchesRefreshStatus = "the matches refresh failed - see the log for details.";
+        }
+        finally
+        {
+            IsRefreshingMatches = false;
         }
     }
 

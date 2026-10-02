@@ -313,6 +313,39 @@ public sealed class SqliteSessionStoreMigrationTests : IDisposable
         Assert.Empty(await store.GetSessionsByIdsAsync([]));
     }
 
+    [Fact]
+    public async Task ASessionEndsWhereTheNextOneBegins()
+    {
+        var store = CreateStore();
+        static Optima.Core.Stats.CopsSeasonStats Snapshot(long kills) => new(
+            12, new Optima.Core.Stats.CopsModeStats(kills, 0, 0, 0, 0),
+            Optima.Core.Stats.CopsModeStats.Zero, Optima.Core.Stats.CopsModeStats.Zero);
+
+        var first = await store.SaveSessionAsync(MakeRecord("First") with { StatsBaseline = Snapshot(100) });
+        var second = await store.SaveSessionAsync(MakeRecord("Second") with { StatsBaseline = Snapshot(120) });
+        var third = await store.SaveSessionAsync(MakeRecord("Third") with { StatsBaseline = Snapshot(140) });
+
+        var bounded = await store.GetSessionEndBoundaryAsync(first);
+        Assert.True(bounded.HasNextSession);
+        Assert.Equal(120, bounded.Baseline!.Ranked.Kills);
+
+        var alsoBounded = await store.GetSessionEndBoundaryAsync(second);
+        Assert.True(alsoBounded.HasNextSession);
+        Assert.Equal(140, alsoBounded.Baseline!.Ranked.Kills);
+
+        // The newest session has no next run, so only a live reading can close it.
+        var newest = await store.GetSessionEndBoundaryAsync(third);
+        Assert.False(newest.HasNextSession);
+        Assert.Null(newest.Baseline);
+
+        // A next session with no snapshot leaves the run open: "has a next" and "can be measured"
+        // are different answers, which is why the store reports both.
+        await store.SaveSessionAsync(MakeRecord("Blank"));
+        var open = await store.GetSessionEndBoundaryAsync(third);
+        Assert.True(open.HasNextSession);
+        Assert.Null(open.Baseline);
+    }
+
     private static SessionRecord MakeRecord(string profile) => new()
     {
         ProfileName = profile,

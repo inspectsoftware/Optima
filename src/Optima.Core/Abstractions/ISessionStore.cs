@@ -2,6 +2,16 @@ using Optima.Core.Models;
 
 namespace Optima.Core.Abstractions;
 
+/// <summary>
+/// Where one session's run ends in the stored snapshot chain: a run is over when the next one starts,
+/// so the next session's start snapshot is the only honest upper bound for this session's stats. The
+/// newest session has no such bound (<see cref="HasNextSession"/> false) and has to be measured against
+/// a live API reading instead.
+/// </summary>
+/// <param name="HasNextSession">Whether a newer session exists at all.</param>
+/// <param name="Baseline">That session's start snapshot, or null when it has none on file.</param>
+public sealed record SessionEndBoundary(bool HasNextSession, Stats.CopsSeasonStats? Baseline);
+
 /// <summary>Session history persistence (§13/§14/§21).</summary>
 public interface ISessionStore
 {
@@ -37,6 +47,9 @@ public interface ISessionStore
     /// against a fresh API reading, so it wins over whatever the automatic pass wrote.
     /// </summary>
     Task<bool> UpdateStatsDeltaAsync(long sessionId, Stats.CopsProfileDelta delta, CancellationToken ct = default);
+
+    /// <summary>The start snapshot of the next session after this one, which is where this session ends.</summary>
+    Task<SessionEndBoundary> GetSessionEndBoundaryAsync(long sessionId, CancellationToken ct = default);
 
     Task<long> SaveMatchAsync(MatchRecord match, CancellationToken ct = default);
 
