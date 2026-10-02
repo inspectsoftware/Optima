@@ -23,18 +23,27 @@ public sealed class DiscordPresenceService : IDisposable
     private readonly SettingsService _settings;
     private readonly IPerformanceMonitor _monitor;
     private readonly Optima.Core.Stats.CopsApiClient _cops;
+    private readonly Optima.Core.Discord.DiscordArtCatalog _artCatalog;
     private readonly ILogger<DiscordPresenceService> _logger;
 
     private readonly object _gate = new();
 
     /// <summary>
-    /// The large-image art, named after the file it comes from. Discord resolves this against the
-    /// assets uploaded to the application, so upload <c>Assets/optima-presence.png</c> in the
-    /// Discord Developer Portal (Rich Presence -&gt; Art Assets) keeping that filename: the key is
-    /// derived from it. A raw URL would only ever show what the published repo serves, and the
-    /// presence art has to change without a push.
+    /// The uploaded asset the card prefers, named after the file it comes from: upload
+    /// <c>Assets/optima-presence.png</c> in the Discord Developer Portal (Rich Presence -&gt; Art
+    /// Assets) keeping that filename and the key is derived from it. What the application actually
+    /// has is read from Discord rather than assumed, because a key that does not exist renders as a
+    /// question mark with nothing logged.
     /// </summary>
     private const string PresenceArtKey = "optima-presence";
+
+    /// <summary>
+    /// Where the card points while the application has no asset uploaded. This is the artwork as the
+    /// published repository serves it: an older mark than the one in the app, but a usable image rather
+    /// than a broken one, and it stops being used the moment the upload exists.
+    /// </summary>
+    private const string PresenceArtUrl =
+        "https://raw.githubusercontent.com/inspectsoftware/Optima/master/src/Optima.App/Assets/optima-presence.png";
 
     private static readonly Button[] PresenceButtons =
     [
@@ -59,6 +68,11 @@ public sealed class DiscordPresenceService : IDisposable
     private long? _playerAccountId;
     private string _profileName = "";
 
+    // The presence card's large image: the public artwork until the application's own asset is known
+    // to exist, and the uploaded key forever after.
+    private volatile string _artKey = PresenceArtUrl;
+    private bool _artResolved;
+
     private PlayerSeasonBadge? _badge;
     private DateTimeOffset _badgeAt = DateTimeOffset.MinValue;
     private DateTimeOffset _lastPush = DateTimeOffset.MinValue;
@@ -69,12 +83,14 @@ public sealed class DiscordPresenceService : IDisposable
         SettingsService settings,
         IPerformanceMonitor monitor,
         Optima.Core.Stats.CopsApiClient cops,
+        Optima.Core.Discord.DiscordArtCatalog artCatalog,
         ILogger<DiscordPresenceService> logger)
     {
         _presence = presence;
         _settings = settings;
         _monitor = monitor;
         _cops = cops;
+        _artCatalog = artCatalog;
         _logger = logger;
     }
 
@@ -128,6 +144,9 @@ public sealed class DiscordPresenceService : IDisposable
         if (!string.Equals(newId, _applicationId, StringComparison.Ordinal))
         {
             _applicationId = newId;
+            // A different application has its own assets, so the art is looked up again.
+            _artResolved = false;
+            _artKey = PresenceArtUrl;
             TearDownClient();
         }
         if (!_enabled)
@@ -167,6 +186,14 @@ public sealed class DiscordPresenceService : IDisposable
                 if (!_enabled || !TryEnsureClient())
                 {
                     return;
+                }
+
+                if (!_artResolved)
+                {
+                    // Once per application, and never on this thread: the answer only changes when
+                    // someone uploads to the portal, so there is nothing to poll for.
+                    _artResolved = true;
+                    _ = ResolveArtAsync();
                 }
 
                 switch (_presence.Current)
@@ -217,8 +244,9 @@ public sealed class DiscordPresenceService : IDisposable
 
     private void SetComposed(PresenceText text, DateTimeOffset? since)
     {
-        // Skip identical payloads; the library also dedupes, but the signature is cheaper.
-        var signature = text.Details + "|" + text.State + "|" + since?.ToString("yyyyMMddHHmmss");
+        // Skip identical payloads; the library also dedupes, but the signature is cheaper. The art is
+        // part of the payload: resolving it has to be able to re-push the card on its own.
+        var signature = _artKey + "|" + text.Details + "|" + text.State + "|" + since?.ToString("yyyyMMddHHmmss");
         if (string.Equals(signature, _lastSignature, StringComparison.Ordinal))
         {
             return;
@@ -233,11 +261,43 @@ public sealed class DiscordPresenceService : IDisposable
             Timestamps = since is { } at ? new Timestamps(at.UtcDateTime) : null,
             Assets = new Assets
             {
-                LargeImageKey = PresenceArtKey,
+                LargeImageKey = _artKey,
                 LargeImageText = text.LargeImageText,
             },
             Buttons = PresenceButtons,
         });
+    }
+
+    /// <summary>
+    /// Asks Discord which art this application really has. Nothing uploaded means the card keeps the
+    /// public artwork instead of a question mark, and the answer is logged once so the state of the
+    /// portal upload is visible in the log rather than in the rendered card.
+    /// </summary>
+    private async Task ResolveArtAsync()
+    {
+        try
+        {
+            var key = await _artCatalog.FindKeyAsync(_applicationId, PresenceArtKey).ConfigureAwait(false);
+            if (key is null)
+            {
+                _logger.LogInformation(
+                    "The Discord application has no art assets uploaded, so the presence card uses the " +
+                    "public artwork URL; upload optima-presence.png in the developer portal to use the " +
+                    "app's own mark");
+                return;
+            }
+
+            if (!string.Equals(key, _artKey, StringComparison.Ordinal))
+            {
+                _logger.LogInformation("Discord presence art resolved to the uploaded asset '{Key}'", key);
+                _artKey = key;
+                UpdatePresence();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Resolving the Discord presence art failed");
+        }
     }
 
     private async Task RefreshBadgeAsync(string ign, long? accountId)

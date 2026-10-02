@@ -82,6 +82,7 @@ public static class AppServices
         services.AddSingleton<CrashSentinel>();
         services.AddSingleton<Optima.Core.Stats.CopsApiClient>();
         services.AddSingleton<Optima.App.Services.PlayerSwitcherService>();
+        services.AddSingleton<Optima.Core.Discord.DiscordArtCatalog>();
         services.AddSingleton<Optima.App.Services.DiscordPresenceService>();
         services.AddSingleton(sp => new Optima.Core.Launch.CrashAutoRelaunchService(
             sp.GetRequiredService<SettingsService>(),
