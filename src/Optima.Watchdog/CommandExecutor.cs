@@ -483,6 +483,15 @@ public sealed partial class CommandExecutor : IAsyncDisposable
 
         var (created, reboot, createError) = DeviceInstaller.CreateRootDevice(hardwareId, infPath);
         HelperLog.Write($"CreateRootDevice created={created} reboot={reboot} error={createError}");
+
+        // A new device node comes up enabled, which puts a virtual monitor on the desktop the moment
+        // the driver is installed, with no session asking for one. Installed means available, not
+        // on: a session (or the Display page) enables the device when it wants the display.
+        if (created && SafeInstanceIdPattern().IsMatch(hardwareId))
+        {
+            var (disableCode, disableOutput) = await RunProcessAsync("pnputil.exe", $"/disable-device /deviceid \"{hardwareId}\"", ct);
+            HelperLog.Write($"pnputil /disable-device after create exit={disableCode}: {Truncate(disableOutput)}");
+        }
         return created
             ? (true, reboot, false, string.Empty)
             : (false, false, false, createError);

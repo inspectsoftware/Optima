@@ -4,6 +4,11 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-06 - Indev: installing the driver no longer switches a display on
+
+- Fixed: installing the virtual display driver put a virtual monitor on the desktop straight away, at setup and from the DISPLAY page alike, before any session asked for one. A newly created driver device comes up enabled and nothing switched it off. It is now left off after the install: a session with a virtual display profile, or enable on the DISPLAY page, switches it on as before.
+- An install over a driver that is already present does not touch its state.
+
 ## 2026-10-06 - Indev: Optima goes further by itself, and says what it does
 
 - Changed: repair by itself now starts on "everything it can". Optima still tries the safe repairs first; where they did not help, it goes on to the ones that interrupt something or need administrator rights. "safe repairs only" and "off" are one click away on ISSUES, and a choice you already made there is kept.
