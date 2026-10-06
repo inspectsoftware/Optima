@@ -32,6 +32,9 @@ public enum RepairTrigger
 {
     Background,
     User,
+
+    /// <summary>Run inside a launch the player started, to give a failed step its second try.</summary>
+    Launch,
 }
 
 /// <summary>How far Optima goes on its own.</summary>

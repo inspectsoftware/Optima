@@ -25,7 +25,7 @@ public sealed class PowerPlanCheck : IDiagnosticCheck
 
     public string Name => "Power Plan";
     public int Order => 45;
-    public CheckScope Scope => CheckScope.Startup;
+    public CheckScope Scope => CheckScope.Startup | CheckScope.Preflight;
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {

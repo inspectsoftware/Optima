@@ -4,6 +4,13 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-06 - Indev: a launch that repairs its own display step
+
+- New: when the virtual display does not appear at launch, Optima reloads the display driver and tries once more before giving up. It is the fix the error guide has always given for this fault, the driver's output parked with its device enabled, now done for you. If the second try fails too, the launch fails with the same error as before.
+- New: the quick checks run again at the start of every launch, before anything is changed, so a problem the session is about to run into is on ISSUES before the session finds it. They never hold a launch up for more than three seconds, and never stop one.
+- A declined administrator prompt is remembered for the run: nothing Optima does by itself raises the prompt again until you ask for it.
+- A repair a launch ran is written into the repair history like any other.
+
 ## 2026-10-06 - Indev: Optima repairs what it safely can
 
 - New on ISSUES: repairs. An issue Optima can do something about has buttons on its card, each saying what it changes before it changes it. What was done is written on the card, and a repaired issue stays on the list, marked REPAIRED, until it is dismissed.

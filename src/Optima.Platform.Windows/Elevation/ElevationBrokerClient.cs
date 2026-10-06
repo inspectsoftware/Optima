@@ -31,6 +31,8 @@ public sealed class ElevationBrokerClient : IElevationBroker
 
     public bool IsConnected => _pipe?.IsConnected == true;
 
+    public ElevationStartFailure LastStartFailure { get; private set; }
+
     public bool CurrentProcessIsElevated
     {
         get
@@ -73,6 +75,7 @@ public sealed class ElevationBrokerClient : IElevationBroker
             if (!File.Exists(helperPath))
             {
                 _logger.LogError("Elevated helper not found at {Path}", helperPath);
+                LastStartFailure = ElevationStartFailure.HelperMissing;
                 CleanupConnection();
                 return false;
             }
@@ -89,6 +92,7 @@ public sealed class ElevationBrokerClient : IElevationBroker
             catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
                 _logger.LogInformation("User declined the UAC prompt for the elevated helper");
+                LastStartFailure = ElevationStartFailure.Declined;
                 CleanupConnection();
                 return false;
             }
@@ -102,6 +106,7 @@ public sealed class ElevationBrokerClient : IElevationBroker
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 _logger.LogError("Elevated helper did not connect within 30 seconds");
+                LastStartFailure = ElevationStartFailure.Timeout;
                 CleanupConnection();
                 return false;
             }
@@ -109,6 +114,7 @@ public sealed class ElevationBrokerClient : IElevationBroker
             _readLoopCts = new CancellationTokenSource();
             _ = Task.Run(() => ReadLoopAsync(_pipe, _readLoopCts.Token), CancellationToken.None);
             _logger.LogInformation("Elevated helper connected");
+            LastStartFailure = ElevationStartFailure.None;
             return true;
         }
         finally

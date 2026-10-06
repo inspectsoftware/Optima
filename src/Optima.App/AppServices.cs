@@ -70,6 +70,11 @@ public static class AppServices
         services.AddSingleton<IDriverInstaller, VddDriverInstaller>();
 
         services.AddSingleton<IRecoveryService, RecoveryService>();
+        services.AddSingleton<IVirtualDisplayMaintenance>(sp => sp.GetRequiredService<SelectingVirtualDisplayProvider>());
+        services.AddSingleton<ILaunchSupport>(sp => new Optima.Core.Health.LaunchSupport(
+            sp.GetRequiredService<Optima.Core.Health.IssueEngine>(),
+            sp.GetRequiredService<IVirtualDisplayMaintenance>(),
+            sp.GetRequiredService<ILogger<Optima.Core.Health.LaunchSupport>>()));
 
         services.AddSingleton<IGameLauncher, ProtocolUriLauncher>();
         services.AddSingleton<IGameLauncher, BootstrapperExeLauncher>();
@@ -228,7 +233,7 @@ public static class AppServices
                     || sp.GetRequiredService<GamePresenceService>().Current != GamePresence.NotRunning,
                 WindowVisible: Optima.App.Services.RepairMoment.WindowVisible,
                 HelperConnected: sp.GetRequiredService<IElevationBroker>().IsConnected,
-                ElevationDeclinedThisRun: false),
+                ElevationDeclinedThisRun: sp.GetRequiredService<IElevationBroker>().LastStartFailure == ElevationStartFailure.Declined),
             sp.GetRequiredService<ILogger<Optima.Core.Health.RepairRunner>>()));
 
         services.AddSingleton<IssuesViewModel>();

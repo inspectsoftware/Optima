@@ -300,6 +300,8 @@ public sealed class IssueEngine : IDisposable
             }
             data = Snapshot();
         }
+        // The history is part of what the page shows, so a new entry is a change like any other.
+        Notify();
         return _state.SaveAsync(data);
     }
 

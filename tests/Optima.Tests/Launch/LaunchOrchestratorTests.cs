@@ -36,10 +36,13 @@ public sealed class LaunchOrchestratorTests : IDisposable
         _paths, _store, _displayService, _power, _virtualDisplay, _processOptimizer,
         NullLogger<RecoveryService>.Instance);
 
-    private LaunchOrchestrator CreateOrchestrator(SettingsService? settings = null) => new(
+    private LaunchOrchestrator CreateOrchestrator(SettingsService? settings = null, FakeLaunchSupport? support = null) => new(
         _detector, [_launcher], _virtualDisplay, _displayService, _power,
         _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
-        NullLogger<LaunchOrchestrator>.Instance, settings);
+        NullLogger<LaunchOrchestrator>.Instance, settings, support);
+
+    private static OptimaException NoDisplay() => OptimaException.From(
+        "VDD_NO_DISPLAY", "The virtual display did not appear.", "Windows never attached its display to the desktop.");
 
     private SettingsService SettingsWithPriority(string priority)
     {
@@ -225,6 +228,92 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.Equal("SESSION_NOT_SAVED", Assert.Single(result.Warnings).Code);
         Assert.Single(_power.Log, entry => entry == "restore");
         Assert.Single(_virtualDisplay.Log, entry => entry == "restoreOriginal");
+    }
+
+    [Fact]
+    public async Task RunSession_VirtualDisplayMissing_ReloadsOnceAndContinues()
+    {
+        var support = new FakeLaunchSupport { Repairable = { "VDD_NO_DISPLAY" } };
+        _virtualDisplay.EnableErrors.Enqueue(NoDisplay());
+
+        var result = await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
+
+        // The display did not come up, the driver was reloaded, and the second try brought it up.
+        Assert.True(result.Success);
+        Assert.Equal(["VDD_NO_DISPLAY"], support.Repaired);
+        Assert.Equal(2, _virtualDisplay.Log.Count(entry => entry == "enable"));
+        Assert.Contains("mode:1920x1080 @ 240 Hz", _virtualDisplay.Log);
+        Assert.Equal(1, _launcher.LaunchCalls);
+    }
+
+    [Fact]
+    public async Task RunSession_VirtualDisplayStillMissing_FailsWithTheTypedCode()
+    {
+        var support = new FakeLaunchSupport { Repairable = { "VDD_NO_DISPLAY" } };
+        _virtualDisplay.EnableErrors.Enqueue(NoDisplay());
+        _virtualDisplay.EnableErrors.Enqueue(NoDisplay());
+
+        var result = await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
+
+        // One repair, one more try, and then the failure the step itself gave, not a generic one.
+        Assert.False(result.Success);
+        Assert.Equal("VDD_NO_DISPLAY", result.Error?.Code);
+        Assert.Single(support.Repaired);
+        Assert.Equal(2, _virtualDisplay.Log.Count(entry => entry == "enable"));
+        Assert.Equal(0, _launcher.LaunchCalls);
+        Assert.Contains("restore", _power.Log);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_AFaultNoRepairIsKnownFor_FailsWithoutASecondTry()
+    {
+        var support = new FakeLaunchSupport();
+        _virtualDisplay.EnableErrors.Enqueue(OptimaException.From(
+            "VDD_NOT_INSTALLED", "No virtual display driver device was found.", "It is not in Device Manager."));
+
+        var result = await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
+
+        Assert.Equal("VDD_NOT_INSTALLED", result.Error?.Code);
+        Assert.Empty(support.Repaired);
+        Assert.Single(_virtualDisplay.Log, entry => entry == "enable");
+    }
+
+    [Fact]
+    public async Task RunSession_ChecksRunBeforeAnythingIsChanged()
+    {
+        var changedByThen = -1;
+        var support = new FakeLaunchSupport();
+        support.OnPreflight = () => changedByThen = _power.Log.Count + _virtualDisplay.Log.Count + _cleanup.Closed.Count;
+
+        var result = await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, support.Preflights);
+        Assert.Equal(0, changedByThen);
+    }
+
+    [Fact]
+    public async Task RunSession_ChecksThatFail_NeverStopALaunch()
+    {
+        var support = new FakeLaunchSupport { PreflightError = new InvalidOperationException("WMI is not answering") };
+
+        var result = await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task RunSession_ThatIsStoppedAtValidation_RunsNoChecks()
+    {
+        var support = new FakeLaunchSupport();
+        _detector.Game = null;
+
+        await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
+
+        // Nothing is about to be changed, so there is nothing to check ahead of.
+        Assert.Equal(0, support.Preflights);
     }
 
     [Fact]

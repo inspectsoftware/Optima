@@ -58,6 +58,7 @@ public sealed class LaunchOrchestrator
     private readonly ISessionStore _sessionStore;
     private readonly ITweakService _tweaks;
     private readonly SettingsService? _settings;
+    private readonly ILaunchSupport? _support;
     private readonly ILogger<LaunchOrchestrator> _logger;
 
     private int _running;
@@ -102,8 +103,10 @@ public sealed class LaunchOrchestrator
         ISessionStore sessionStore,
         ITweakService tweaks,
         ILogger<LaunchOrchestrator> logger,
-        SettingsService? settings = null)
+        SettingsService? settings = null,
+        ILaunchSupport? support = null)
     {
+        _support = support;
         _detector = detector;
         _launchers = launchers.OrderBy(l => l.Order).ToList();
         _virtualDisplay = virtualDisplay;
@@ -157,6 +160,7 @@ public sealed class LaunchOrchestrator
                     "Run detection again from the Checks tab on the Debug page");
             }
 
+            await PreflightAsync(token).ConfigureAwait(false);
             await _recovery.SavePendingAsync(context.Snapshot, token).ConfigureAwait(false);
             await ApplyEnvironmentAsync(profile, context, token).ConfigureAwait(false);
 
@@ -332,7 +336,7 @@ public sealed class LaunchOrchestrator
             var wasActive = await _virtualDisplay.IsDisplayActiveAsync(ct).ConfigureAwait(false);
             if (!wasActive)
             {
-                await _virtualDisplay.EnableDisplayAsync(ct).ConfigureAwait(false);
+                await RunEssentialAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
                 context.Snapshot = context.Snapshot with { VirtualDisplayEnabledByUs = true };
                 await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
             }
@@ -563,6 +567,48 @@ public sealed class LaunchOrchestrator
             _logger.LogWarning(ex, "Could not enumerate tracked processes, capturing the emulator pid only");
         }
         return pids.Distinct().Take(16).ToList();
+    }
+
+    /// <summary>
+    /// The quick checks, before anything is changed. Whatever they find goes on the issue list; a
+    /// launch is never stopped by them and never made to wait for them.
+    /// </summary>
+    private async Task PreflightAsync(CancellationToken ct)
+    {
+        if (_support is null)
+        {
+            return;
+        }
+        try
+        {
+            await _support.PreflightAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "The checks before the launch failed; launching without them");
+        }
+    }
+
+    /// <summary>
+    /// Runs a step the session cannot do without. When it fails with a fault a repair is known
+    /// for, the repair runs and the step gets one more try; a second failure is the session's
+    /// failure, under the error the step itself gave.
+    /// </summary>
+    private async Task RunEssentialAsync(Func<Task> step, CancellationToken ct)
+    {
+        try
+        {
+            await step().ConfigureAwait(false);
+        }
+        catch (OptimaException ex) when (_support is { } support)
+        {
+            if (!await support.TryRepairAsync(ex.Error.Code, ct).ConfigureAwait(false))
+            {
+                throw;
+            }
+            _logger.LogInformation("A repair ran for {Code}; trying the step once more", ex.Error.Code);
+            await step().ConfigureAwait(false);
+        }
     }
 
     /// <summary>

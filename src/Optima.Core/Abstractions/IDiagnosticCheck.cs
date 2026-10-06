@@ -11,6 +11,9 @@ public enum CheckScope
 
     /// <summary>Also once, in the background, shortly after Optima starts.</summary>
     Startup = 1,
+
+    /// <summary>Also at the start of every launch, before anything on the system is changed.</summary>
+    Preflight = 2,
 }
 
 /// <summary>One row of the checks on the Debug page (§15).</summary>

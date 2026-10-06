@@ -29,7 +29,7 @@ public sealed class StaleDisplayRestoreCheck : IDiagnosticCheck
 
     public string Name => "Pending Display Restore";
     public int Order => 55;
-    public CheckScope Scope => CheckScope.Startup;
+    public CheckScope Scope => CheckScope.Startup | CheckScope.Preflight;
 
     public Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {

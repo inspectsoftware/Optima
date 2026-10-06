@@ -10,7 +10,7 @@ namespace Optima.Driver;
 /// Routes IVirtualDisplayProvider calls to the configured provider (§6): "Auto" probes the real driver and falls back
 /// to the mock; "MttVdd" / "Mock" force a specific one.
 /// </summary>
-public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider
+public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider, IVirtualDisplayMaintenance
 {
     private readonly MttVddProvider _real;
     private readonly MockVirtualDisplayProvider _mock;
@@ -62,6 +62,15 @@ public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider
         finally
         {
             _gate.Release();
+        }
+    }
+
+    /// <summary>The real driver reloads; the mock has nothing that can get stuck.</summary>
+    public async Task ReloadDriverAsync(CancellationToken ct = default)
+    {
+        if (await GetActiveProviderAsync(ct).ConfigureAwait(false) is IVirtualDisplayMaintenance maintenance)
+        {
+            await maintenance.ReloadDriverAsync(ct).ConfigureAwait(false);
         }
     }
 

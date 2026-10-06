@@ -15,7 +15,7 @@ namespace Optima.Driver.Providers;
 /// \\.\pipe\MTTVirtualDisplayPipe, - the display device itself is enabled/disabled through the elevated helper
 /// (pnputil), - the Windows-side mode switch goes through IDisplayService (temporary, registry untouched).
 /// </summary>
-public sealed class MttVddProvider : VirtualDisplayProviderBase
+public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplayMaintenance
 {
     public const string DefaultSettingsPath = VddSettingsDefaults.DefaultPath;
     public const string PipeName = "MTTVirtualDisplayPipe";
@@ -424,6 +424,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
     }
 
+    /// <inheritdoc cref="IVirtualDisplayMaintenance.ReloadDriverAsync" />
     public async Task ReloadDriverAsync(CancellationToken ct = default)
     {
         try

@@ -309,6 +309,36 @@ internal sealed class FakeNetworkMonitor : INetworkQualityMonitor
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
+internal sealed class FakeLaunchSupport : Optima.Core.Launch.ILaunchSupport
+{
+    public int Preflights { get; private set; }
+    public Exception? PreflightError { get; set; }
+    public List<string> Repaired { get; } = [];
+
+    /// <summary>The codes a repair is known for.</summary>
+    public HashSet<string> Repairable { get; } = [];
+
+    /// <summary>Run when the checks start, so a test can look at what the launch has done by then.</summary>
+    public Action? OnPreflight { get; set; }
+
+    public Task PreflightAsync(CancellationToken ct = default)
+    {
+        Preflights++;
+        OnPreflight?.Invoke();
+        return PreflightError is null ? Task.CompletedTask : Task.FromException(PreflightError);
+    }
+
+    public Task<bool> TryRepairAsync(string code, CancellationToken ct = default)
+    {
+        if (!Repairable.Contains(code))
+        {
+            return Task.FromResult(false);
+        }
+        Repaired.Add(code);
+        return Task.FromResult(true);
+    }
+}
+
 internal sealed class FakeTweakService : ITweakService
 {
     public List<TweakState> States { get; } = [];
@@ -324,6 +354,9 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
     public List<string> Log { get; } = [];
     public Exception? EnableError { get; set; }
 
+    /// <summary>Thrown by the next enables, one per call, before they start working.</summary>
+    public Queue<Exception> EnableErrors { get; } = new();
+
     public string Name => "FakeVdd";
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(true);
     public Task<DriverCapabilities> GetCapabilitiesAsync(CancellationToken ct = default) => Task.FromResult(new DriverCapabilities());
@@ -336,6 +369,10 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
     public Task EnableDisplayAsync(CancellationToken ct = default)
     {
         Log.Add("enable");
+        if (EnableErrors.TryDequeue(out var once))
+        {
+            return Task.FromException(once);
+        }
         if (EnableError is not null)
         {
             return Task.FromException(EnableError);
