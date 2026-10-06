@@ -13,6 +13,6 @@
           TextElement.Foreground="{DynamicResource Brush.Text}"
           TextElement.FontFamily="{StaticResource Font.Mono}"
           TextElement.FontSize="{StaticResource Type.Body}">
-    <views:LogsView />
+    <views:LogStreamView />
   </Border>
 </Window>

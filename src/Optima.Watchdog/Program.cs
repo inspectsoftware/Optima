@@ -74,10 +74,13 @@ try
         }
         catch (Exception ex)
         {
+            var detail = Optima.Core.Health.ExceptionDetail.Capture(ex);
+            HelperLog.Write($"{request.Command} failed: {detail.Summary}");
             response = new IpcResponse
             {
                 Success = false,
                 Error = ex.Message,
+                ErrorDetail = detail.FullText,
                 RequestId = request.RequestId,
             };
         }

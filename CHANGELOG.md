@@ -4,6 +4,19 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-06 - Indev: every log line opens to its full error
+
+- New on LOGS: click a line to open its detail. It shows what the one-line row leaves out: the whole exception with its stack, the code Windows returned and Windows' own description of it, the message's arguments, and the error guide's entry for the line's code, fix included. A line with more behind it carries a + at its right edge.
+- New: copy report, in the detail. It copies the line as a report that stands on its own: the build and Windows version, the full error, the guide's entry, and the fifteen lines that led up to it. It is what to send when reporting a problem.
+- The export now writes dates, full source names and whole exceptions. Before, it wrote the time of day and the one-line form only.
+- Reports, the export and the error text in the detail are redacted more thoroughly: the Windows user name, the machine name and user profile paths are masked along with tokens. A stack trace is full of profile paths, so the token mask alone was no longer enough. Crash zips and the support archive use the same redactor.
+- The filter also searches exceptions, stack traces included, and the footer says how many lines the filter is showing.
+- Following new lines pauses while a detail is open, so the list does not walk away from the line being read.
+- In a flood of log lines, warnings and errors are now kept ahead of ordinary lines instead of being dropped with them.
+- New: Optima notes how its last run ended. If it crashed, the fatal error is written down on the way out and repeated at the top of the next run's log, where it can be opened and copied. If it was ended from outside or the PC lost power, the next run says so.
+- An error inside the elevated helper now reaches the log whole, instead of as one line of it.
+- The floating console (Alt+F9) shows the live log alone, without the error guide above it.
+
 ## 2026-10-06 - Indev: a launch that says what went wrong
 
 - Fixed: PLAY failed with "Unexpected error" on PCs that do not offer the High performance power plan. A PC with Modern Standby (most recent laptops, some desktops) only lists Balanced and its vendor's own plans, and three of the four built-in profiles ask for High performance. Optima asked Windows for a plan it had just failed to find, Windows refused, and the launch stopped.

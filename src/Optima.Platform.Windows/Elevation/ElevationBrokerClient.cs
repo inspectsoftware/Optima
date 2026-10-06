@@ -137,7 +137,15 @@ public sealed class ElevationBrokerClient : IElevationBroker
         {
             await IpcFraming.WriteFrameAsync(pipe, stamped, ct).ConfigureAwait(false);
             await using var registration = ct.Register(() => tcs.TrySetCanceled(ct));
-            return await tcs.Task.ConfigureAwait(false);
+            var response = await tcs.Task.ConfigureAwait(false);
+            if (!response.Success && response.ErrorDetail.Length > 0)
+            {
+                // Callers get the one-line error to show; the helper's own stack goes to the log here,
+                // once, instead of being lost at the process boundary.
+                _logger.LogWarning("Elevated helper command {Command} threw: {Error}\n{Detail}",
+                    request.Command, response.Error, response.ErrorDetail);
+            }
+            return response;
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {

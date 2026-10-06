@@ -2,9 +2,9 @@ using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Threading;
+using Microsoft.Extensions.Logging;
 using Optima.Core.Health;
 using Serilog.Core;
 using Serilog.Events;
@@ -12,9 +12,24 @@ using Serilog.Formatting.Display;
 
 namespace Optima.App.Logging;
 
-public sealed record LogEntry(DateTimeOffset Timestamp, string Level, string Source, string Message)
+/// <summary>
+/// One row of the log list. The row shows a line; the record behind it keeps the whole exception,
+/// the code Windows returned and the message's arguments for the detail pane and a copied report.
+/// </summary>
+public sealed record LogEntry(LogRecord Record)
 {
+    public DateTimeOffset Timestamp => Record.Timestamp;
+
+    public string Level => Record.LevelText;
+
+    public string Source => Record.ShortSource;
+
+    public string Message => Record.Line;
+
     public string TimeText => Timestamp.ToLocalTime().ToString("HH:mm:ss.fff");
+
+    /// <summary>The row has more behind it than its line shows: an exception or an error code.</summary>
+    public bool HasDetail => Record.Exception is not null || Record.ErrorCode.Length > 0;
 }
 
 /// <summary>
@@ -67,7 +82,11 @@ public sealed class InAppLogSink : ILogEventSink
     /// </summary>
     private const int FlushIntervalMs = 150;
 
-    /// <summary>Ceiling on lines waiting for the view, so a flood behind a busy UI thread stays bounded.</summary>
+    /// <summary>
+    /// Ceiling on ordinary lines waiting for the view, so a flood behind a busy UI thread stays
+    /// bounded. Warnings and errors get twice that before they are dropped too: a flood is made of
+    /// trace lines, and the one error in the middle of it is the line that must arrive.
+    /// </summary>
     private const int MaxQueued = 8000;
 
     /// <summary>
@@ -87,23 +106,20 @@ public sealed class InAppLogSink : ILogEventSink
 
     public LogEntryCollection Entries { get; } = [];
 
+    /// <summary>
+    /// Runs on whatever thread logged, the UI thread and the launch pipeline included, so it only
+    /// maps and queues. A line written while no dispatcher exists (before the first window, during
+    /// shutdown) waits in the queue instead of being thrown away.
+    /// </summary>
     public void Emit(LogEvent logEvent)
     {
-        if (Application.Current is null)
+        var queued = _incoming.Count;
+        if (queued >= MaxQueued && (logEvent.Level < LogEventLevel.Warning || queued >= MaxQueued * 2))
         {
             return;
         }
 
-        if (_incoming.Count >= MaxQueued)
-        {
-            return;
-        }
-
-        _incoming.Enqueue(new LogEntry(
-            logEvent.Timestamp,
-            ShortLevel(logEvent.Level),
-            SourceName(logEvent),
-            Render(logEvent) + (logEvent.Exception is { } ex ? $" ({ExceptionDetail.Capture(ex).Summary})" : string.Empty)));
+        _incoming.Enqueue(new LogEntry(ToRecord(logEvent)));
 
         // One timer per burst: whoever arrives first arms it, the rest just join the queue.
         if (Interlocked.Exchange(ref _flushScheduled, 1) == 0)
@@ -155,6 +171,23 @@ public sealed class InAppLogSink : ILogEventSink
         }
     }
 
+    private static LogRecord ToRecord(LogEvent logEvent)
+    {
+        var exception = logEvent.Exception is { } thrown ? ExceptionDetail.Capture(thrown) : null;
+        return new LogRecord
+        {
+            Timestamp = logEvent.Timestamp,
+            Level = ToLevel(logEvent.Level),
+            Source = SourceContext(logEvent),
+            Message = Render(logEvent),
+            Template = logEvent.MessageTemplate.Text,
+            Exception = exception,
+            Properties = exception is not null || logEvent.Level >= LogEventLevel.Warning
+                ? CopyProperties(logEvent)
+                : LogRecord.NoProperties,
+        };
+    }
+
     private static string Render(LogEvent logEvent)
     {
         using var writer = new System.IO.StringWriter();
@@ -162,33 +195,33 @@ public sealed class InAppLogSink : ILogEventSink
         return writer.ToString();
     }
 
-    private static string ShortLevel(LogEventLevel level) => level switch
+    private static LogLevel ToLevel(LogEventLevel level) => level switch
     {
-        LogEventLevel.Verbose => "TRACE",
-        LogEventLevel.Debug => "DEBUG",
-        LogEventLevel.Information => "INFO",
-        LogEventLevel.Warning => "WARN",
-        LogEventLevel.Error => "ERROR",
-        LogEventLevel.Fatal => "CRITICAL",
-        _ => level.ToString().ToUpperInvariant(),
+        LogEventLevel.Verbose => LogLevel.Trace,
+        LogEventLevel.Debug => LogLevel.Debug,
+        LogEventLevel.Information => LogLevel.Information,
+        LogEventLevel.Warning => LogLevel.Warning,
+        LogEventLevel.Error => LogLevel.Error,
+        _ => LogLevel.Critical,
     };
 
-    private static string SourceName(LogEvent logEvent)
+    private static string SourceContext(LogEvent logEvent)
+        => logEvent.Properties.TryGetValue("SourceContext", out var value) && value is ScalarValue { Value: string context }
+            ? context
+            : string.Empty;
+
+    private static IReadOnlyDictionary<string, string> CopyProperties(LogEvent logEvent)
     {
-        if (logEvent.Properties.TryGetValue("SourceContext", out var value) && value is ScalarValue { Value: string context })
+        var copy = new Dictionary<string, string>(logEvent.Properties.Count);
+        foreach (var (name, value) in logEvent.Properties)
         {
-            var lastDot = context.LastIndexOf('.');
-            return lastDot >= 0 ? context[(lastDot + 1)..] : context;
+            if (name == "SourceContext")
+            {
+                continue;
+            }
+            // A string keeps its own text; anything else is written the way Serilog would write it.
+            copy[name] = value is ScalarValue { Value: string text } ? text : value.ToString();
         }
-        return string.Empty;
+        return copy.Count == 0 ? LogRecord.NoProperties : copy;
     }
-}
-
-/// <summary>Masks anything token-shaped before logs leave the machine (§17).</summary>
-public static partial class LogRedactor
-{
-    [GeneratedRegex(@"(?i)(token|bearer|password|secret|api[_-]?key)\s*[=:]\s*\S+")]
-    private static partial Regex SecretPattern();
-
-    public static string Redact(string text) => SecretPattern().Replace(text, "$1=[REDACTED]");
 }

@@ -25,6 +25,7 @@ public partial class App : Application
     private OverlayController? _overlay;
     private ThemeService? _theme;
     private Services.SplashHost? _splash;
+    private Core.Health.CrashMarker? _crashMarker;
 
     // One instance at a time: a second launch must never stack a second Optima, it should
     // bring the running one back instead (the exit path can stall, so users relaunch).
@@ -82,20 +83,31 @@ public partial class App : Application
             .WriteTo.Debug()
             .CreateLogger();
 
-        _splash?.SetStatus("building services", 0.3);
-        _host = Host.CreateDefaultBuilder()
-            .UseSerilog()
-            .ConfigureServices(services => AppServices.Register(services, paths))
-            .Build();
-
+        // Before the host is built: a service that cannot be constructed is a failure too, and it
+        // used to happen before anything was listening.
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-            Log.Fatal(args.ExceptionObject as Exception, "Unhandled AppDomain exception");
+        {
+            var exception = args.ExceptionObject as Exception;
+            if (exception is not null)
+            {
+                _crashMarker?.RecordFatal("a background thread", exception, DateTimeOffset.Now);
+            }
+            Log.Fatal(exception, "Unhandled AppDomain exception");
+        };
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
             Log.Error(args.Exception, "Unobserved task exception");
             args.SetObserved();
         };
+
+        ReportPreviousRun(paths);
+
+        _splash?.SetStatus("building services", 0.3);
+        _host = Host.CreateDefaultBuilder()
+            .UseSerilog()
+            .ConfigureServices(services => AppServices.Register(services, paths))
+            .Build();
 
         _splash?.SetStatus("starting services", 0.5);
         _host.Start();
@@ -221,6 +233,29 @@ public partial class App : Application
         _ = mainViewModel.InitializeAsync();
     }
 
+    /// <summary>
+    /// Marks this run as started and says how the one before it ended. A process that dies takes
+    /// its last log lines with it, so the previous run's fatal error is written into this run's
+    /// log, where it can be read and copied.
+    /// </summary>
+    private void ReportPreviousRun(AppPaths paths)
+    {
+        _crashMarker = new Core.Health.CrashMarker(paths.HealthDirectory);
+        var previous = _crashMarker.Begin(
+            typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0", DateTimeOffset.Now);
+        if (previous.Fatal is { } fatal)
+        {
+            Log.Error("The previous run of Optima ended on a fatal error at {At}, on {Origin}: {Summary}\n{Detail}",
+                fatal.At.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"), fatal.Origin, fatal.Summary, fatal.FullText);
+        }
+        else if (previous.EndedUncleanly)
+        {
+            Log.Warning("The previous run of Optima ({Version}, started {StartedAt}) did not shut down normally: "
+                + "it was ended from outside, or the PC lost power",
+                previous.Version, previous.StartedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));
+        }
+    }
+
     /// <summary>The "follow Windows' animation setting" preference, read before anything else is loaded. True, the default, when it cannot be read.</summary>
     private static bool ReadFollowWindowsMotion(string configFile)
     {
@@ -312,7 +347,7 @@ public partial class App : Application
             return;
         }
         // Ownerless on purpose: the console must be able to sit on top of the game, not the app.
-        _console ??= new ConsoleWindow { DataContext = _host!.Services.GetRequiredService<LogsViewModel>() };
+        _console ??= new ConsoleWindow { DataContext = _host!.Services.GetRequiredService<LogStreamViewModel>() };
         _console.Show();
     }
 
@@ -324,6 +359,7 @@ public partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        _crashMarker?.RecordFatal("the UI thread", e.Exception, DateTimeOffset.Now);
         Log.Fatal(e.Exception, "Unhandled UI exception");
         // Never leave temporary system changes behind, even on a UI crash (§18).
         TryEmergencyRestore();
@@ -479,6 +515,7 @@ public partial class App : Application
             Log.Error("Host shutdown stalled past 5 seconds; forcing exit");
         }
         ReleaseSingleInstance();
+        _crashMarker?.End();
         Log.Information("Optima exited");
         Log.CloseAndFlush();
         if (!hostStopped)

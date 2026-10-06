@@ -38,6 +38,14 @@ public sealed record IpcResponse
 {
     public required bool Success { get; init; }
     public string Error { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The whole error behind <see cref="Error"/> when a command threw: type, stack, and the code
+    /// Windows returned. The helper runs elevated in another process, so this is the only way its
+    /// side of a failure reaches the log.
+    /// </summary>
+    public string ErrorDetail { get; init; } = string.Empty;
+
     public Dictionary<string, string> Data { get; init; } = [];
     public int RequestId { get; init; }
 }

@@ -1,35 +1,16 @@
 using System.IO;
 using System.IO.Compression;
-using System.Text.RegularExpressions;
-using Optima.App.Logging;
+using Optima.Core.Health;
 
 namespace Optima.App.Services;
 
 /// <summary>
-/// Turns a raw crash bundle into a shareable zip: every text file passes the secret redactor plus a personal-identifier
-/// scrub (Windows user name, machine name, user profile paths) so the archive is safe to hand to developers.
+/// Turns a raw crash bundle into a shareable zip: every text file passes the redactor (secrets, Windows user name,
+/// machine name, user profile paths) so the archive is safe to hand to developers.
 /// </summary>
-public static partial class CrashExporter
+public static class CrashExporter
 {
-    [GeneratedRegex(@"(?i)[A-Z]:\\Users\\[^\\/\r\n""]+")]
-    private static partial Regex UserProfilePath();
-
-    public static string RedactText(string text)
-    {
-        var redacted = LogRedactor.Redact(text);
-        redacted = UserProfilePath().Replace(redacted, m => m.Value[..(m.Value.IndexOf("Users", StringComparison.OrdinalIgnoreCase) + 5)] + @"\[user]");
-        var userName = Environment.UserName;
-        if (!string.IsNullOrWhiteSpace(userName) && userName.Length > 1)
-        {
-            redacted = redacted.Replace(userName, "[user]", StringComparison.OrdinalIgnoreCase);
-        }
-        var machine = Environment.MachineName;
-        if (!string.IsNullOrWhiteSpace(machine) && machine.Length > 1)
-        {
-            redacted = redacted.Replace(machine, "[machine]", StringComparison.OrdinalIgnoreCase);
-        }
-        return redacted;
-    }
+    public static string RedactText(string text) => Redactor.Redact(text);
 
     public static string ExportRedactedZip(string bundleDirectory)
     {

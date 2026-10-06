@@ -21,6 +21,7 @@ public sealed class AppPaths
         BackupsDirectory = Path.Combine(root, "backups");
         TweaksBackupFile = Path.Combine(BackupsDirectory, "tweaks-original-values.json");
         CrashesDirectory = Path.Combine(root, "crashes");
+        HealthDirectory = Path.Combine(root, "health");
     }
 
     public string Root { get; }
@@ -37,6 +38,9 @@ public sealed class AppPaths
 
     public string CrashesDirectory { get; }
 
+    /// <summary>What Optima keeps about its own health: how the last run ended, and what went wrong in it.</summary>
+    public string HealthDirectory { get; }
+
     public void EnsureCreated()
     {
         Directory.CreateDirectory(Root);
@@ -44,5 +48,6 @@ public sealed class AppPaths
         Directory.CreateDirectory(RecoveryDirectory);
         Directory.CreateDirectory(BackupsDirectory);
         Directory.CreateDirectory(CrashesDirectory);
+        Directory.CreateDirectory(HealthDirectory);
     }
 }
