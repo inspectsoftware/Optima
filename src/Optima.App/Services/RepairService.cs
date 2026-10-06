@@ -17,6 +17,7 @@ namespace Optima.App.Services;
 public sealed class RepairService
 {
     private readonly IGameDetector _detector;
+    private readonly IPlatformControl _platform;
     private readonly SettingsService _settings;
     private readonly GpgLogReader _gpgLogs;
     private readonly AppPaths _paths;
@@ -24,12 +25,14 @@ public sealed class RepairService
 
     public RepairService(
         IGameDetector detector,
+        IPlatformControl platform,
         SettingsService settings,
         GpgLogReader gpgLogs,
         AppPaths paths,
         ILogger<RepairService> logger)
     {
         _detector = detector;
+        _platform = platform;
         _settings = settings;
         _gpgLogs = gpgLogs;
         _paths = paths;
@@ -38,8 +41,7 @@ public sealed class RepairService
 
     public async Task<string> HeartbeatAsync(CancellationToken ct = default)
     {
-        var rules = await _settings.GetDetectionRulesAsync(ct);
-        var alive = CountPlatformProcesses(rules, await PlatformRootsAsync(rules, ct));
+        var alive = await _platform.CountRunningAsync(ct);
         var logAge = _gpgLogs.ServiceLogAgeMinutes();
         var logText = logAge is { } age
             ? age < 10 ? $"service log written {age:F0} min ago" : $"service log stale ({age:F0} min)"
@@ -51,42 +53,13 @@ public sealed class RepairService
 
     public async Task<string> RestartPlatformAsync(CancellationToken ct = default)
     {
-        var rules = await _settings.GetDetectionRulesAsync(ct);
-        var killed = 0;
-        var roots = await PlatformRootsAsync(rules, ct);
-
-        foreach (var process in Process.GetProcesses())
-        {
-            try
-            {
-                if (!IsPlatformProcess(process, rules, roots))
-                {
-                    continue;
-                }
-                process.Kill(entireProcessTree: true);
-                killed++;
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException)
-            {
-                _logger.LogDebug(ex, "Could not kill a platform process");
-            }
-            finally
-            {
-                process.Dispose();
-            }
-        }
-
+        var killed = await _platform.StopAsync(ct);
         await Task.Delay(1500, ct);
-
-        var platform = await _detector.DetectPlatformAsync(ct);
-        if (platform is null || platform.BootstrapperPath.Length == 0)
-        {
-            return $"stopped {killed} process(es); Google Play Games was not found to relaunch";
-        }
         try
         {
-            Process.Start(new ProcessStartInfo(platform.BootstrapperPath) { UseShellExecute = true });
-            return $"stopped {killed} process(es) and relaunched Google Play Games";
+            return await _platform.StartAsync(ct)
+                ? $"stopped {killed} process(es) and relaunched Google Play Games"
+                : $"stopped {killed} process(es); Google Play Games was not found to relaunch";
         }
         catch (Exception ex)
         {
@@ -225,61 +198,5 @@ public sealed class RepairService
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
-    }
-
-    private static int CountPlatformProcesses(DetectionRules rules, IReadOnlyList<string> roots)
-    {
-        var count = 0;
-        foreach (var process in Process.GetProcesses())
-        {
-            using (process)
-            {
-                if (IsPlatformProcess(process, rules, roots))
-                {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
-    /// <summary>The folders Google Play Games can run from: the known ones, the manual one, the detected one.</summary>
-    private async Task<IReadOnlyList<string>> PlatformRootsAsync(DetectionRules rules, CancellationToken ct)
-    {
-        var roots = rules.KnownInstallFolders.Select(Environment.ExpandEnvironmentVariables).ToList();
-        if (!string.IsNullOrWhiteSpace(rules.ManualInstallPath))
-        {
-            roots.Add(Environment.ExpandEnvironmentVariables(rules.ManualInstallPath));
-        }
-        var platform = await _detector.DetectPlatformAsync(ct);
-        if (platform is { BootstrapperPath.Length: > 0 } && Path.GetDirectoryName(platform.BootstrapperPath) is { Length: > 0 } detected)
-        {
-            roots.Add(detected);
-        }
-        return roots;
-    }
-
-    /// <summary>
-    /// The patterns include names as common as "client" and "Service", so a name match alone is not
-    /// enough: the executable also has to live under a Google Play Games folder. A process whose
-    /// path cannot be read is left alone.
-    /// </summary>
-    private static bool IsPlatformProcess(Process process, DetectionRules rules, IReadOnlyList<string> roots)
-    {
-        try
-        {
-            if (!GameDetectionEngine.MatchesAny(process.ProcessName, rules.PlatformProcessPatterns)
-                && !GameDetectionEngine.MatchesAny(process.ProcessName, rules.EmulatorProcessPatterns))
-            {
-                return false;
-            }
-            var path = process.MainModule?.FileName;
-            return path is not null && roots.Any(root =>
-                path.StartsWith(root.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            return false;
-        }
     }
 }

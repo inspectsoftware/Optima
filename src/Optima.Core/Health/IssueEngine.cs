@@ -37,6 +37,10 @@ public sealed class IssueEngine : IDisposable
     private readonly object _gate = new();
     private readonly Dictionary<string, Issue> _issues = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IgnoredIssue> _ignored = new(StringComparer.Ordinal);
+    private readonly List<RepairAttempt> _attempts = [];
+
+    /// <summary>How many repair attempts are remembered. The policy looks a day back; the page shows the latest.</summary>
+    private const int MaxAttempts = 200;
     private readonly Queue<LogRecord> _recent = new();
     private readonly Timer _notifyTimer;
     private int _notifyScheduled;
@@ -103,6 +107,7 @@ public sealed class IssueEngine : IDisposable
             {
                 _ignored[ignored.Key] = ignored;
             }
+            _attempts.AddRange(saved.Attempts);
         }
 
         _cts = new CancellationTokenSource();
@@ -166,7 +171,11 @@ public sealed class IssueEngine : IDisposable
         {
             if (result.Status == DiagnosticStatus.Pass)
             {
-                changed = _issues.Remove(code);
+                // A repair in progress, or one that just finished, keeps its card: the runner decides
+                // what the pass means, and a repaired issue stays visible until it is dismissed.
+                changed = _issues.TryGetValue(code, out var passing)
+                    && passing.State is IssueState.Open or IssueState.NeedsUser
+                    && _issues.Remove(code);
             }
             else if (!_ignored.ContainsKey(code))
             {
@@ -176,7 +185,13 @@ public sealed class IssueEngine : IDisposable
                 if (_issues.TryGetValue(code, out var open))
                 {
                     // A check that still fails is the same occurrence seen again, not another one.
-                    _issues[code] = open with { LastSeen = now, Detail = detail };
+                    // One that fails again after a repair is the issue back.
+                    _issues[code] = open with
+                    {
+                        LastSeen = now,
+                        Detail = detail,
+                        State = open.State == IssueState.Repaired ? IssueState.Open : open.State,
+                    };
                 }
                 else
                 {
@@ -220,6 +235,72 @@ public sealed class IssueEngine : IDisposable
                 _logger.LogWarning(ex, "Check {Check} could not run", check.Name);
             }
         }
+    }
+
+    /// <summary>Runs one check by name and reports its result. Null when there is no such check or it could not run.</summary>
+    public async Task<DiagnosticResult?> RunCheckAsync(string name, CancellationToken ct = default)
+    {
+        var check = _checks.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (check is null)
+        {
+            return null;
+        }
+        try
+        {
+            var result = await check.RunAsync(ct).ConfigureAwait(false);
+            Report(result);
+            return result;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Check {Check} could not run", check.Name);
+            return null;
+        }
+    }
+
+    /// <summary>Where an issue stands with its repairs, and the sentence that says so on its card.</summary>
+    public void SetState(string key, IssueState state, string note)
+    {
+        var changed = false;
+        lock (_gate)
+        {
+            if (_issues.TryGetValue(key, out var issue) && (issue.State != state || issue.RepairNote != note))
+            {
+                _issues[key] = issue with { State = state, RepairNote = note };
+                changed = true;
+            }
+        }
+        if (changed)
+        {
+            Notify();
+        }
+    }
+
+    /// <summary>Every remembered repair attempt, oldest first.</summary>
+    public IReadOnlyList<RepairAttempt> Attempts
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _attempts];
+            }
+        }
+    }
+
+    public Task RecordAttemptAsync(RepairAttempt attempt)
+    {
+        IssueStateData data;
+        lock (_gate)
+        {
+            _attempts.Add(attempt);
+            if (_attempts.Count > MaxAttempts)
+            {
+                _attempts.RemoveRange(0, _attempts.Count - MaxAttempts);
+            }
+            data = Snapshot();
+        }
+        return _state.SaveAsync(data);
     }
 
     /// <summary>Takes an issue off the list for now. It comes back if it happens again.</summary>
@@ -274,7 +355,7 @@ public sealed class IssueEngine : IDisposable
         _notifyTimer.Dispose();
     }
 
-    private IssueStateData Snapshot() => new() { Ignored = [.. _ignored.Values] };
+    private IssueStateData Snapshot() => new() { Ignored = [.. _ignored.Values], Attempts = [.. _attempts] };
 
     /// <summary>
     /// Says in the log that an issue was raised, then tells the listeners. Never called with the
@@ -311,6 +392,8 @@ public sealed class IssueEngine : IDisposable
                 LastSeen = record.Timestamp,
                 Detail = match.Detail,
                 Evidence = [.. open.Evidence.Take(1), .. later],
+                // It happened again after it was repaired: it is open again, and the next rung is due.
+                State = open.State == IssueState.Repaired ? IssueState.Open : open.State,
             };
             return null;
         }

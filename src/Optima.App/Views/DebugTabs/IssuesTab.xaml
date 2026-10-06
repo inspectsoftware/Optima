@@ -19,6 +19,20 @@
 
         <StackPanel>
           <TextBlock Text="{Binding Headline}" Style="{StaticResource Text.Value}" Margin="0,0,0,10" />
+
+          <!-- How far Optima goes on its own, next to the list it governs. -->
+          <Grid Margin="0,0,0,12" MaxWidth="760" HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="repair by itself" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding ModeOptions}" SelectedItem="{Binding SelectedMode}"
+                      Width="170" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{Binding ModeText}" Style="{StaticResource Text.Micro}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource Brush.TextMuted}" VerticalAlignment="Center" Margin="12,0,0,0" />
+          </Grid>
           <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="720" HorizontalAlignment="Left"
                      Text="Optima reads its own log as it is written and runs quick checks in the background. Anything that goes wrong is listed here once, however often it happens, with what it means and how to put it right."
                      Visibility="{Binding HasIssues, Converter={StaticResource InverseBoolToVis}}" />
@@ -26,8 +40,17 @@
           <ItemsControl ItemsSource="{Binding Issues}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Border Style="{StaticResource Callout}" Margin="0,0,0,8"
-                        BorderBrush="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}">
+                <Border Margin="0,0,0,8">
+                  <Border.Style>
+                    <Style TargetType="Border" BasedOn="{StaticResource Callout}">
+                      <Setter Property="BorderBrush" Value="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsRepaired}" Value="True">
+                          <Setter Property="BorderBrush" Value="{DynamicResource Brush.Ok}" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Border.Style>
                   <StackPanel>
                     <Grid>
                       <Grid.ColumnDefinitions>
@@ -35,10 +58,21 @@
                         <ColumnDefinition />
                         <ColumnDefinition Width="Auto" />
                       </Grid.ColumnDefinitions>
-                      <Border Style="{StaticResource Badge}" Margin="0,0,10,0" VerticalAlignment="Top"
-                              BorderBrush="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}">
-                        <TextBlock Text="{Binding SeverityTag}" Style="{StaticResource Text.Badge}"
-                                   Foreground="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}" />
+                      <Border Margin="0,0,10,0" VerticalAlignment="Top">
+                        <Border.Style>
+                          <Style TargetType="Border" BasedOn="{StaticResource Badge}">
+                            <Setter Property="BorderBrush" Value="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}" />
+                            <Setter Property="TextElement.Foreground" Value="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}" />
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding IsRepaired}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Ok}" />
+                                <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.Ok}" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding SeverityTag}" FontFamily="{StaticResource Font.Mono}"
+                                   FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center" />
                       </Border>
                       <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="{StaticResource Type.Title}"
                                  Foreground="{DynamicResource Brush.Text}" TextWrapping="Wrap" />
@@ -67,6 +101,43 @@
 
                     <TextBox Text="{Binding Detail, Mode=OneWay}" Style="{StaticResource SelectableText}" Margin="0,8,0,0"
                              Visibility="{Binding Detail, Converter={StaticResource EmptyToCollapsed}}" />
+
+                    <!-- What was done about it, or what it is waiting for. -->
+                    <Border BorderThickness="2,0,0,0" Padding="10,2" Margin="0,8,0,0" HorizontalAlignment="Left"
+                            Visibility="{Binding RepairNote, Converter={StaticResource EmptyToCollapsed}}">
+                      <Border.Style>
+                        <Style TargetType="Border">
+                          <Setter Property="BorderBrush" Value="{DynamicResource Brush.TextMuted}" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRepaired}" Value="True">
+                              <Setter Property="BorderBrush" Value="{DynamicResource Brush.Ok}" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Border.Style>
+                      <StackPanel Orientation="Horizontal">
+                        <ctl:AsciiSpinner Cells="6" Margin="0,0,8,0" VerticalAlignment="Center"
+                                          Visibility="{Binding IsRepairing, Converter={StaticResource BoolToVis}}" />
+                        <TextBlock Text="{Binding RepairNote}" Style="{StaticResource Text.Prose}" MaxWidth="720" />
+                      </StackPanel>
+                    </Border>
+
+                    <!-- What can be done about it from here. Each button says what it changes before it does. -->
+                    <ItemsControl ItemsSource="{Binding Repairs}" Margin="0,8,0,0"
+                                  Visibility="{Binding HasRepairs, Converter={StaticResource BoolToVis}}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Button Style="{StaticResource SecondaryButton}" Content="{Binding Title}" Margin="0,0,8,4" Padding="10,3"
+                                  Command="{Binding DataContext.RunRepairCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  CommandParameter="{Binding}" ToolTip="{Binding ToolTip}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
                     <!-- What the error guide says about it: the part that turns a failure into a next step. -->
                     <StackPanel Margin="0,10,0,0" Visibility="{Binding Guide, Converter={StaticResource NullToCollapsed}}">

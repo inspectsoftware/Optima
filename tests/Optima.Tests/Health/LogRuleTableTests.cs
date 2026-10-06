@@ -145,6 +145,7 @@ public sealed class LogRuleTableTests
     [InlineData(LogLevel.Error, "Failed restoring {What}, continuing with remaining restore steps", "RESTORE_STEP_FAILED", IssueSeverity.Error)]
     [InlineData(LogLevel.Warning, "Emergency restore timed out; the recovery prompt will appear on next start", "RESTORE_STEP_FAILED", IssueSeverity.Error)]
     [InlineData(LogLevel.Error, "Corrupt JSON at {Path}; renaming aside and using defaults", "SETTINGS_CORRUPT", IssueSeverity.Error)]
+    [InlineData(LogLevel.Warning, "Corrupt JSON at {Path}; recovered from the backup of the previous save", "SETTINGS_RECOVERED", IssueSeverity.Note)]
     [InlineData(LogLevel.Error, "Elevated helper not found at {Path}", "HELPER_MISSING", IssueSeverity.Error)]
     public void ALineFromAKnownPlaceIsTheCodeThatPlaceStandsFor(LogLevel level, string template, string code, IssueSeverity severity)
     {

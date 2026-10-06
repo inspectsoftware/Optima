@@ -24,7 +24,9 @@ public sealed class RecoveryServiceTests : IDisposable
 
     private RecoveryService CreateService() => new(
         _paths, _store, _displayService, _power, _virtualDisplay, _processOptimizer,
-        NullLogger<RecoveryService>.Instance);
+        NullLogger<RecoveryService>.Instance, retryDelay: TimeSpan.Zero);
+
+    private static Exception Refused() => new InvalidOperationException("SetDisplayConfig was refused");
 
     [Fact]
     public async Task Pending_RoundTripsThroughDisk()
@@ -81,6 +83,83 @@ public sealed class RecoveryServiceTests : IDisposable
         Assert.Null(_power.Restored);
         Assert.Empty(_displayService.Log);
         Assert.Empty(_virtualDisplay.Log);
+        Assert.Null(await service.GetPendingAsync());
+    }
+
+    [Fact]
+    public async Task Restore_AStepThatFailsOnce_IsTriedAgainAndCountsAsRestored()
+    {
+        var service = CreateService();
+        var snapshot = new SystemStateSnapshot { DisplayTopology = "v1:xyz" };
+        await service.SavePendingAsync(snapshot);
+        _displayService.RestoreTopologyErrors.Enqueue(Refused());
+
+        var report = await service.RestoreAsync(snapshot);
+
+        // Windows refuses a display change while another settles; a moment later it goes through.
+        Assert.True(report.AllRestored);
+        Assert.Equal("v1:xyz", _displayService.RestoredTopology);
+        Assert.Equal(2, _displayService.Log.Count(entry => entry == "restoreTopology"));
+        Assert.Null(await service.GetPendingAsync());
+    }
+
+    [Fact]
+    public async Task Restore_AFailedStep_StaysPendingAndOnlyThatStep()
+    {
+        var service = CreateService();
+        var snapshot = new SystemStateSnapshot
+        {
+            ProfileName = "Test",
+            PreviousPowerScheme = Guid.NewGuid(),
+            DisplayTopology = "v1:xyz",
+            ProcessStates = [new ProcessStateSnapshot { ProcessId = 99, ProcessName = "crosvm" }],
+        };
+        await service.SavePendingAsync(snapshot);
+        _displayService.RestoreTopologyErrors.Enqueue(Refused());
+        _displayService.RestoreTopologyErrors.Enqueue(Refused());
+
+        var report = await service.RestoreAsync(snapshot);
+
+        Assert.Equal(["display topology"], report.Failed);
+        // The power plan did go back, and is not owed any more; the layout still is.
+        Assert.Equal(snapshot.PreviousPowerScheme, _power.Restored);
+        var left = await service.GetPendingAsync();
+        Assert.NotNull(left);
+        Assert.Equal("v1:xyz", left.DisplayTopology);
+        Assert.Null(left.PreviousPowerScheme);
+        Assert.Empty(left.ProcessStates);
+    }
+
+    [Fact]
+    public async Task Restore_FinishedLater_PutsBackOnlyWhatWasLeft()
+    {
+        var service = CreateService();
+        var snapshot = new SystemStateSnapshot { PreviousPowerScheme = Guid.NewGuid(), DisplayTopology = "v1:xyz" };
+        await service.SavePendingAsync(snapshot);
+        _displayService.RestoreTopologyErrors.Enqueue(Refused());
+        _displayService.RestoreTopologyErrors.Enqueue(Refused());
+        await service.RestoreAsync(snapshot);
+
+        var report = await service.RestoreAsync((await service.GetPendingAsync())!);
+
+        Assert.True(report.AllRestored);
+        Assert.Equal("v1:xyz", _displayService.RestoredTopology);
+        // Once: switching the power plan a second time would undo whatever was chosen since.
+        Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.Null(await service.GetPendingAsync());
+    }
+
+    [Fact]
+    public async Task Restore_AProcessThatIsGone_NeverKeepsTheRestorePending()
+    {
+        var service = CreateService();
+        var snapshot = new SystemStateSnapshot { ProcessStates = [new ProcessStateSnapshot { ProcessId = 99, ProcessName = "crosvm" }] };
+        await service.SavePendingAsync(snapshot);
+        _processOptimizer.RestoreError = new InvalidOperationException("the process has exited");
+
+        var report = await service.RestoreAsync(snapshot);
+
+        Assert.True(report.AllRestored);
         Assert.Null(await service.GetPendingAsync());
     }
 

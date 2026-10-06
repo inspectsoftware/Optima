@@ -9,6 +9,20 @@ public enum IssueSeverity
     Critical,
 }
 
+public enum IssueState
+{
+    Open,
+
+    /// <summary>A repair is running for it right now.</summary>
+    Repairing,
+
+    /// <summary>A repair ran and, where there is a check to prove it, the check passes. Kept on the list so what was done can be seen.</summary>
+    Repaired,
+
+    /// <summary>The next step is the player's: a repair that waits for a click, a restart, a prompt that was declined.</summary>
+    NeedsUser,
+}
+
 /// <summary>
 /// One thing that is wrong, however often it happened. A failing call that is retried every ten
 /// seconds writes a hundred log lines and is still one problem; the issue is that one problem,
@@ -42,6 +56,11 @@ public sealed record Issue
     /// <summary>What the log said just before the first occurrence.</summary>
     public IReadOnlyList<LogRecord> LeadUp { get; init; } = [];
 
-    /// <summary>Counted on the rail: more than a note.</summary>
-    public bool NeedsAttention => Severity >= IssueSeverity.Warning;
+    public IssueState State { get; init; } = IssueState.Open;
+
+    /// <summary>What was last done about it or what it is waiting for, in a sentence.</summary>
+    public string RepairNote { get; init; } = string.Empty;
+
+    /// <summary>Counted on the rail: more than a note, and not already repaired.</summary>
+    public bool NeedsAttention => Severity >= IssueSeverity.Warning && State != IssueState.Repaired;
 }

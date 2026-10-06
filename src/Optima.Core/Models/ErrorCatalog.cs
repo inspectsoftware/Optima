@@ -312,10 +312,19 @@ public static class ErrorCatalog
         new(
             "SETTINGS_CORRUPT",
             "A settings file was damaged and set aside",
-            "One of Optima's own files could not be read. It was renamed with a .corrupt suffix so nothing is lost, and Optima carried on with defaults in its place.",
+            "One of Optima's own files could not be read and there was no earlier saved generation to fall back on. It was renamed with a .corrupt suffix so nothing is lost, and Optima carried on with defaults in its place.",
             "The file was cut off while being written (a crash, a power loss, a full disk), or edited by hand into something that is not valid JSON.",
             [
-                "Use restore settings backups on the Checks tab of the Debug page to put back the previous saved generation",
+                "Set up again what the file held: Optima has started it afresh",
+                "The damaged file sits next to the original, named .corrupt and a number; a text editor may still get values out of it",
+            ]),
+        new(
+            "SETTINGS_RECOVERED",
+            "A damaged settings file was recovered from its backup",
+            "One of Optima's own files could not be read. Its previous saved generation was put in its place, and the damaged file was set aside with a .corrupt suffix.",
+            "The file was cut off while being written: a crash, a power loss, a full disk. Whatever was changed in that last save is lost; everything before it is back.",
+            [
+                "Nothing needs doing; check that the last change you made to settings or profiles is still there, and make it again if not",
                 "The damaged file sits next to the original, named .corrupt and a number, if it needs to be looked at",
             ]),
         new(

@@ -4,20 +4,49 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Optima.Core.Configuration;
 using Optima.Core.Health;
 using Optima.Core.Models;
 
 namespace Optima.App.ViewModels;
 
+/// <summary>A repair as a button on an issue's card.</summary>
+public sealed record RepairButton(string IssueKey, string RepairId, string Title, string Changes, RepairTier Tier)
+{
+    /// <summary>What pressing it costs, said before it is pressed.</summary>
+    public string ToolTip => Tier switch
+    {
+        RepairTier.Elevated => Changes + " Needs administrator rights.",
+        RepairTier.Disruptive => Changes + " Interrupts what is running.",
+        _ => Changes,
+    };
+}
+
 /// <summary>One issue as a card. The card outlives a refresh, so an open evidence expander stays open while the count climbs.</summary>
 public sealed partial class IssueCard : ObservableObject
 {
-    public IssueCard(Issue issue)
+    public IssueCard(Issue issue, IReadOnlyList<RepairButton>? repairs = null)
     {
         _issue = issue;
+        Repairs = repairs ?? [];
     }
 
+    /// <summary>What can be done about it from here. Empty for the many issues only the player can fix.</summary>
+    public IReadOnlyList<RepairButton> Repairs { get; }
+
+    public bool HasRepairs => Repairs.Count > 0;
+
+    /// <summary>What was last done about it, or what it is waiting for.</summary>
+    public string RepairNote => Issue.RepairNote;
+
+    public bool IsRepaired => Issue.State == IssueState.Repaired;
+
+    public bool IsRepairing => Issue.State == IssueState.Repairing;
+
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RepairNote))]
+    [NotifyPropertyChangedFor(nameof(IsRepaired))]
+    [NotifyPropertyChangedFor(nameof(IsRepairing))]
     [NotifyPropertyChangedFor(nameof(Title))]
     [NotifyPropertyChangedFor(nameof(Detail))]
     [NotifyPropertyChangedFor(nameof(SeverityTag))]
@@ -36,7 +65,7 @@ public sealed partial class IssueCard : ObservableObject
     /// <summary>Redacted on screen for the same reason the log detail is: a screenshot is how it travels.</summary>
     public string Detail => Redactor.Redact(Issue.Detail);
 
-    public string SeverityTag => Issue.Severity switch
+    public string SeverityTag => IsRepaired ? "REPAIRED" : Issue.Severity switch
     {
         IssueSeverity.Critical => "CRITICAL",
         IssueSeverity.Error => "ERROR",
@@ -114,15 +143,23 @@ public sealed partial class IssueCard : ObservableObject
 /// </summary>
 public sealed partial class IssuesViewModel : ObservableObject
 {
+    private static readonly string[] Modes = ["off", "safe repairs only", "everything it can"];
+
     private readonly IssueEngine _engine;
+    private readonly RepairRunner _repairs;
     private readonly ChecksViewModel _checks;
+    private readonly SettingsService _settings;
     private readonly ILogger<IssuesViewModel> _logger;
 
-    public IssuesViewModel(IssueEngine engine, ChecksViewModel checks, ILogger<IssuesViewModel> logger)
+    public IssuesViewModel(
+        IssueEngine engine, RepairRunner repairs, ChecksViewModel checks, SettingsService settings, ILogger<IssuesViewModel> logger)
     {
         _engine = engine;
+        _repairs = repairs;
         _checks = checks;
+        _settings = settings;
         _logger = logger;
+        _selectedMode = Modes[(int)(settings.Current?.AutoRepair ?? AutoRepairMode.SafeOnly)];
         // Raised on whatever thread logged; the collections belong to the UI thread.
         _engine.Changed += () => Application.Current?.Dispatcher.BeginInvoke(Refresh);
         Refresh();
@@ -142,6 +179,38 @@ public sealed partial class IssuesViewModel : ObservableObject
     [ObservableProperty] private bool _hasIssues;
     [ObservableProperty] private bool _hasIgnored;
 
+    public IReadOnlyList<string> ModeOptions { get; } = Modes;
+
+    /// <summary>How far Optima goes on its own; saved the moment it is changed.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ModeText))]
+    private string _selectedMode;
+
+    public string ModeText => Array.IndexOf(Modes, SelectedMode) switch
+    {
+        0 => "Optima lists what it finds and repairs nothing until you press a button.",
+        2 => "Safe repairs first. Where they do not help, Optima goes on by itself to the ones that interrupt or need administrator rights. Never while a game is running, and never a prompt over a hidden window.",
+        _ => "Repairs that are reversible, need no administrator rights and interrupt nothing run by themselves. Anything more waits for you.",
+    };
+
+    partial void OnSelectedModeChanged(string value) => _ = SaveModeAsync((AutoRepairMode)Math.Max(0, Array.IndexOf(Modes, value)));
+
+    private async Task SaveModeAsync(AutoRepairMode mode)
+    {
+        try
+        {
+            if (_settings.Current?.AutoRepair != mode)
+            {
+                // The runner listens for settings changes and looks again by itself.
+                await _settings.UpdateSettingsAsync(s => s with { AutoRepair = mode });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Saving the automatic repair mode failed");
+        }
+    }
+
     /// <summary>The tab's chip: the count of what needs attention rides on it.</summary>
     public string TabLabel => AttentionCount > 0 ? $"ISSUES {AttentionCount}" : "ISSUES";
 
@@ -157,7 +226,9 @@ public sealed partial class IssuesViewModel : ObservableObject
             var at = IndexOf(issue.Key);
             if (at < 0)
             {
-                Issues.Insert(i, new IssueCard(issue));
+                Issues.Insert(i, new IssueCard(issue, _repairs.ActionsFor(issue)
+                    .Select(a => new RepairButton(issue.Key, a.Id, a.Title, a.Changes, a.Tier))
+                    .ToList()));
                 continue;
             }
             if (at != i)
@@ -227,6 +298,30 @@ public sealed partial class IssuesViewModel : ObservableObject
         finally
         {
             IsScanning = false;
+        }
+    }
+
+    /// <summary>Runs a repair because the player pressed its button. The click is the permission.</summary>
+    [RelayCommand]
+    private async Task RunRepairAsync(RepairButton repair)
+    {
+        try
+        {
+            StatusMessage = repair.Title + "…";
+            // Off the UI thread: a repair counts processes, waits on the helper, writes files.
+            var result = await Task.Run(() => _repairs.RunAsync(repair.IssueKey, repair.RepairId));
+            StatusMessage = result.Outcome switch
+            {
+                RepairOutcome.Fixed => "done: " + repair.Title,
+                RepairOutcome.NotNeeded => "nothing needed doing",
+                RepairOutcome.NeedsUser => "the rest is yours; see the card",
+                _ => "it did not work; see the card",
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Repair {Repair} could not be run", repair.RepairId);
+            StatusMessage = "the repair could not be run; its error is on the Log tab";
         }
     }
 

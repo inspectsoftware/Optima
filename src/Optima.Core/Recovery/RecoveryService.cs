@@ -19,7 +19,9 @@ public sealed class RecoveryService : IRecoveryService
     private readonly IVirtualDisplayProvider _virtualDisplay;
     private readonly IProcessOptimizer _processOptimizer;
     private readonly ILogger<RecoveryService> _logger;
+    private readonly TimeSpan _retryDelay;
 
+    /// <param name="retryDelay">How long a failed step waits before its one second try.</param>
     public RecoveryService(
         AppPaths paths,
         JsonStore store,
@@ -27,8 +29,10 @@ public sealed class RecoveryService : IRecoveryService
         IPowerProfileService power,
         IVirtualDisplayProvider virtualDisplay,
         IProcessOptimizer processOptimizer,
-        ILogger<RecoveryService> logger)
+        ILogger<RecoveryService> logger,
+        TimeSpan? retryDelay = null)
     {
+        _retryDelay = retryDelay ?? TimeSpan.FromMilliseconds(400);
         _paths = paths;
         _store = store;
         _display = display;
@@ -50,9 +54,14 @@ public sealed class RecoveryService : IRecoveryService
     public Task<SystemStateSnapshot?> GetPendingAsync(CancellationToken ct = default)
         => _store.LoadAsync<SystemStateSnapshot>(_paths.PendingSnapshotFile, ct);
 
-    public async Task RestoreAsync(SystemStateSnapshot snapshot, CancellationToken ct = default)
+    public async Task<RestoreReport> RestoreAsync(SystemStateSnapshot snapshot, CancellationToken ct = default)
     {
         _logger.LogInformation("Restoring system state from snapshot created {CreatedAt:u}", snapshot.CreatedAt);
+
+        var failed = new List<string>();
+        // What is still owed if something fails: the snapshot with every step that went through
+        // struck out. A process that has exited has nothing left to restore, so those never stay.
+        var left = snapshot with { ProcessStates = [] };
 
         // Order matters: undo process tweaks first (cheap), then power, then display mode,
         // then topology, then take the virtual display down last so the desktop never ends
@@ -60,38 +69,80 @@ public sealed class RecoveryService : IRecoveryService
         foreach (var proc in snapshot.ProcessStates)
         {
             await Attempt($"process settings for {proc.ProcessName} ({proc.ProcessId})",
-                () => _processOptimizer.RestoreAsync(proc, ct)).ConfigureAwait(false);
+                () => _processOptimizer.RestoreAsync(proc, ct), retry: false).ConfigureAwait(false);
         }
 
         if (snapshot.PreviousPowerScheme is { } scheme)
         {
-            await Attempt("power plan", () => _power.RestoreAsync(scheme, ct)).ConfigureAwait(false);
+            if (await Attempt("power plan", () => _power.RestoreAsync(scheme, ct)).ConfigureAwait(false))
+            {
+                left = left with { PreviousPowerScheme = null };
+            }
+            else
+            {
+                failed.Add("power plan");
+            }
         }
 
         if (snapshot.ChangedDisplayDevice is { } device && snapshot.OriginalDisplayMode is { } mode)
         {
-            await Attempt($"display mode on {device}", () => _display.ApplyModeAsync(device, mode, ct)).ConfigureAwait(false);
+            if (await Attempt($"display mode on {device}", () => _display.ApplyModeAsync(device, mode, ct)).ConfigureAwait(false))
+            {
+                left = left with { ChangedDisplayDevice = null, OriginalDisplayMode = null };
+            }
+            else
+            {
+                failed.Add("display mode");
+            }
         }
 
         if (snapshot.DisplayTopology is { } topology)
         {
-            await Attempt("display topology", () => _display.RestoreTopologyAsync(topology, ct)).ConfigureAwait(false);
+            if (await Attempt("display topology", () => _display.RestoreTopologyAsync(topology, ct)).ConfigureAwait(false))
+            {
+                left = left with { DisplayTopology = null };
+            }
+            else
+            {
+                failed.Add("display topology");
+            }
         }
 
+        var virtualDisplayRestored = true;
         if (snapshot.VirtualDisplayEnabledByUs || snapshot.VirtualDisplayConfigured)
         {
-            await Attempt("virtual display", () => _virtualDisplay.RestoreOriginalStateAsync(ct)).ConfigureAwait(false);
+            virtualDisplayRestored &= await Attempt("virtual display", () => _virtualDisplay.RestoreOriginalStateAsync(ct)).ConfigureAwait(false);
         }
 
         // The provider only switches the device off when it remembers enabling it, and after a crash
         // it is a new instance that remembers nothing. The snapshot does. A no-op when already off.
         if (snapshot.VirtualDisplayEnabledByUs)
         {
-            await Attempt("virtual display device", () => _virtualDisplay.DisableDisplayAsync(ct)).ConfigureAwait(false);
+            virtualDisplayRestored &= await Attempt("virtual display device", () => _virtualDisplay.DisableDisplayAsync(ct)).ConfigureAwait(false);
+        }
+        if (virtualDisplayRestored)
+        {
+            left = left with { VirtualDisplayEnabledByUs = false, VirtualDisplayConfigured = false };
+        }
+        else
+        {
+            failed.Add("virtual display");
         }
 
-        await ClearPendingAsync(ct).ConfigureAwait(false);
-        _logger.LogInformation("Settings restored");
+        if (failed.Count == 0)
+        {
+            await ClearPendingAsync(ct).ConfigureAwait(false);
+            _logger.LogInformation("Settings restored");
+        }
+        else
+        {
+            // "Settings restored" used to be logged here whatever had happened, and the snapshot
+            // deleted with it, so a failed step could never be finished later.
+            await _store.SaveAsync(_paths.PendingSnapshotFile, left, CancellationToken.None).ConfigureAwait(false);
+            _logger.LogWarning("Settings restored except {Failed}; that part stays pending so it can be finished",
+                string.Join(", ", failed));
+        }
+        return new RestoreReport(failed);
     }
 
     public Task ClearPendingAsync(CancellationToken ct = default)
@@ -100,16 +151,31 @@ public sealed class RecoveryService : IRecoveryService
         return Task.CompletedTask;
     }
 
-    private async Task Attempt(string what, Func<Task> action)
+    /// <summary>
+    /// One restore step, tried twice. Windows refuses a display or power change while another one
+    /// is still settling, and the same call a moment later usually goes through.
+    /// </summary>
+    private async Task<bool> Attempt(string what, Func<Task> action, bool retry = true)
     {
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            await action().ConfigureAwait(false);
-            _logger.LogInformation("Restored {What}", what);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(ex, "Failed restoring {What}, continuing with remaining restore steps", what);
+            try
+            {
+                await action().ConfigureAwait(false);
+                _logger.LogInformation("Restored {What}", what);
+                return true;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                if (retry && attempt == 1)
+                {
+                    _logger.LogDebug(ex, "Restoring {What} failed, trying once more", what);
+                    await Task.Delay(_retryDelay).ConfigureAwait(false);
+                    continue;
+                }
+                _logger.LogError(ex, "Failed restoring {What}, continuing with remaining restore steps", what);
+                return false;
+            }
         }
     }
 }

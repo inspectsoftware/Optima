@@ -4,6 +4,16 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-06 - Indev: Optima repairs what it safely can
+
+- New on ISSUES: repairs. An issue Optima can do something about has buttons on its card, each saying what it changes before it changes it. What was done is written on the card, and a repaired issue stays on the list, marked REPAIRED, until it is dismissed.
+- New: repair by itself, at the top of ISSUES. It starts on "safe repairs only": repairs that are reversible, need no administrator rights and interrupt nothing run on their own, and anything more waits for a click. "off" repairs nothing unasked. "everything it can" goes on from the safe repairs to the ones that interrupt or need administrator rights, where the safe ones did not help.
+- What bounds it: nothing is repaired while a game is running. A repair that interrupts is not run with the window hidden. An administrator prompt appears at most once per issue per day and never over a hidden window. No more than six repairs an hour. A repair is tried once (a safe one twice, a minute apart), and what was tried is remembered across restarts.
+- A repair is proved by the check that raised the issue, not by its own word. If the check still fails, the issue stays open and says so.
+- The first repairs: after a failed launch Google Play Games is started if it is not running, and can be restarted from the card. Restarting closes a running game, so on a start timeout, where the platform is usually waiting on a sign-in, it is never run by itself. The Windows hypervisor features can be enabled from the card. A restore that did not finish can be tried again. A stale virtual display restore can be discarded, which keeps the settings file as it is; Optima never makes that choice for you.
+- Fixed: a damaged settings file used to be replaced by defaults, and the next save but one then overwrote its only backup. A damaged file is now recovered from the backup of the previous save as it is read: one save is lost instead of the file.
+- Fixed: after a session, "Settings restored" was logged and the restore snapshot deleted even when a step had failed. Each step is now tried twice, and whatever still fails stays pending, so the restore prompt at the next start, or the button on the issue, can finish it. Only what failed is kept; what was already put back is not put back a second time.
+
 ## 2026-10-06 - Indev: Optima notices what goes wrong
 
 - New on DEBUG: ISSUES, the tab the page now opens on. Optima reads its own log as it is written and runs quick checks in the background shortly after it starts, and lists whatever is wrong: once per problem, however many log lines it wrote.

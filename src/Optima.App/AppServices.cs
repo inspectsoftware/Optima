@@ -59,6 +59,7 @@ public static class AppServices
         services.AddSingleton<IGameTerminator, WindowsGameTerminator>();
         services.AddSingleton<ITweakService, WindowsTweakService>();
         services.AddSingleton<IBackgroundCleanupService, WindowsBackgroundCleanupService>();
+        services.AddSingleton<IPlatformControl, WindowsPlatformControl>();
         services.AddSingleton<PnpDeviceLocator>();
         services.AddSingleton<IElevationBroker, ElevationBrokerClient>();
 
@@ -210,6 +211,26 @@ public static class AppServices
         services.AddSingleton<CompViewModel>();
         services.AddSingleton<BoostViewModel>();
         services.AddSingleton<LegalViewModel>();
+        // What Optima can do about an issue, and the runner that decides when it may do it unasked.
+        services.AddSingleton<Optima.Core.Health.IRepairAction, Optima.Core.Health.Repairs.StartPlatformRepair>();
+        services.AddSingleton<Optima.Core.Health.IRepairAction>(sp =>
+            new Optima.Core.Health.Repairs.RestartPlatformRepair(sp.GetRequiredService<IPlatformControl>()));
+        services.AddSingleton<Optima.Core.Health.IRepairAction, Optima.Core.Health.Repairs.RetryRestoreRepair>();
+        services.AddSingleton<Optima.Core.Health.IRepairAction, Optima.Core.Health.Repairs.DiscardDisplayRestoreRepair>();
+        services.AddSingleton<Optima.Core.Health.IRepairAction, Optima.App.Services.EnableHypervisorRepair>();
+        services.AddSingleton(sp => new Optima.Core.Health.RepairRunner(
+            sp.GetRequiredService<Optima.Core.Health.IssueEngine>(),
+            sp.GetServices<Optima.Core.Health.IRepairAction>(),
+            // Asked for at every decision: a repair must see the moment it runs in, not the one it was queued in.
+            () => new Optima.Core.Health.RepairEnvironment(
+                sp.GetRequiredService<SettingsService>().Current?.AutoRepair ?? Optima.Core.Health.AutoRepairMode.SafeOnly,
+                GameRunning: sp.GetRequiredService<LaunchOrchestrator>().IsSessionActive
+                    || sp.GetRequiredService<GamePresenceService>().Current != GamePresence.NotRunning,
+                WindowVisible: Optima.App.Services.RepairMoment.WindowVisible,
+                HelperConnected: sp.GetRequiredService<IElevationBroker>().IsConnected,
+                ElevationDeclinedThisRun: false),
+            sp.GetRequiredService<ILogger<Optima.Core.Health.RepairRunner>>()));
+
         services.AddSingleton<IssuesViewModel>();
         services.AddSingleton<ChecksViewModel>();
         services.AddSingleton<LogStreamViewModel>();

@@ -37,6 +37,7 @@ public static class LogRuleTable
         new("Unobserved task exception", "BACKGROUND_TASK_FAILED", IssueSeverity.Error, PerCallSite: true),
         new("Failed restoring {What}", "RESTORE_STEP_FAILED", IssueSeverity.Error),
         new("Emergency restore ", "RESTORE_STEP_FAILED", IssueSeverity.Error),
+        new("Corrupt JSON at {Path}; recovered", "SETTINGS_RECOVERED", IssueSeverity.Note),
         new("Corrupt JSON at {Path}", "SETTINGS_CORRUPT", IssueSeverity.Error),
         new("Elevated helper not found", "HELPER_MISSING", IssueSeverity.Error),
         new("Unexpected session failure", "UNEXPECTED", IssueSeverity.Error, PerCallSite: true),

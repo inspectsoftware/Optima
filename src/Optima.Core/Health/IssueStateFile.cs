@@ -10,6 +10,12 @@ public sealed record IgnoredIssue(string Key, string Title, DateTimeOffset At);
 public sealed record IssueStateData
 {
     public IReadOnlyList<IgnoredIssue> Ignored { get; init; } = [];
+
+    /// <summary>
+    /// The repairs that were run. They outlive the run because the policy counts them: a repair
+    /// that did not help yesterday evening is not tried again this morning as if it were new.
+    /// </summary>
+    public IReadOnlyList<RepairAttempt> Attempts { get; init; } = [];
 }
 
 /// <summary>

@@ -226,8 +226,28 @@ public partial class App : Application
         _host.Services.GetRequiredService<Optima.Core.Launch.TimerResolutionService>().Start();
         _host.Services.GetRequiredService<Optima.Core.Launch.BackgroundDemotionService>().Start();
         _host.Services.GetRequiredService<Optima.Core.Launch.GameExtrasService>().Start();
+        // Repairs are decided on the moment: whether the window is on screen, whether a game runs.
+        // Each time one of those changes, what was waiting for it is looked at again.
+        var repairs = _host.Services.GetRequiredService<Core.Health.RepairRunner>();
+        void LookForRepairs() => _ = Task.Run(() => repairs.EvaluateAsync());
+        void SyncRepairMoment()
+        {
+            Services.RepairMoment.WindowVisible = window.IsVisible && window.WindowState != WindowState.Minimized;
+            LookForRepairs();
+        }
+        window.IsVisibleChanged += (_, _) => SyncRepairMoment();
+        window.StateChanged += (_, _) => SyncRepairMoment();
+        orchestrator.SessionEnded += LookForRepairs;
+        settingsService.SettingsChanged += (_, _) => LookForRepairs();
+        repairs.Start();
+        SyncRepairMoment();
+
         presence.PresenceChanged += change =>
         {
+            if (change.Current == Optima.Core.Monitoring.GamePresence.NotRunning)
+            {
+                LookForRepairs();
+            }
             SetOwnPriority(gameOnScreen: change.Current == Optima.Core.Monitoring.GamePresence.InGame);
             // Decoration stops for the whole run: a drifting backdrop behind a game is cost with no
             // one watching it. Starting counts — the emulator is already up at that point.

@@ -40,6 +40,9 @@ internal sealed class FakeDisplayService : IDisplayService
     public List<string> Log { get; } = [];
     public string? RestoredTopology { get; private set; }
 
+    /// <summary>Thrown by the next topology restores, one per call, before they start working again.</summary>
+    public Queue<Exception> RestoreTopologyErrors { get; } = new();
+
     public Task<IReadOnlyList<DisplayInfo>> GetDisplaysAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<DisplayInfo>>([]);
     public Task<IReadOnlyList<DisplayMode>> GetSupportedModesAsync(string deviceName, CancellationToken ct = default)
@@ -62,6 +65,10 @@ internal sealed class FakeDisplayService : IDisplayService
     public Task RestoreTopologyAsync(string topology, CancellationToken ct = default)
     {
         Log.Add("restoreTopology");
+        if (RestoreTopologyErrors.TryDequeue(out var error))
+        {
+            return Task.FromException(error);
+        }
         RestoredTopology = topology;
         return Task.CompletedTask;
     }
@@ -176,10 +183,12 @@ internal sealed class FakeProcessOptimizer : IProcessOptimizer
         await Gate.Task.WaitAsync(ct).ConfigureAwait(false);
         return false;
     }
+    public Exception? RestoreError { get; set; }
+
     public Task RestoreAsync(ProcessStateSnapshot snapshot, CancellationToken ct = default)
     {
         Restored.Add(snapshot.ProcessId);
-        return Task.CompletedTask;
+        return RestoreError is null ? Task.CompletedTask : Task.FromException(RestoreError);
     }
 }
 

@@ -131,11 +131,46 @@ public sealed class JsonStore
         }
     }
 
+    /// <summary>
+    /// A file that does not parse is set aside, and its previous saved generation takes its place
+    /// when there is one. It has to happen here, at the read: every save rotates the backup, so the
+    /// second save after a silent fall back to defaults would overwrite the last good copy with
+    /// those defaults, and by the time anyone looked there would be nothing left to restore.
+    /// </summary>
     private T? QuarantineOnCorrupt<T>(string path, JsonException ex) where T : class
     {
-        _logger.LogError(ex, "Corrupt JSON at {Path}; renaming aside and using defaults", path);
+        var backup = path + ".bak";
+        var recovered = ReadBackup<T>(backup);
         TryQuarantine(path);
-        return null;
+        if (recovered is null)
+        {
+            _logger.LogError(ex, "Corrupt JSON at {Path}; renaming aside and using defaults", path);
+            return null;
+        }
+
+        try
+        {
+            File.Copy(backup, path, overwrite: true);
+        }
+        catch (Exception copy) when (copy is IOException or UnauthorizedAccessException)
+        {
+            // The values are in memory and the next save writes them; only the file is late.
+            _logger.LogDebug(copy, "Could not put the backup back in place at {Path}", path);
+        }
+        _logger.LogWarning(ex, "Corrupt JSON at {Path}; recovered from the backup of the previous save", path);
+        return recovered;
+    }
+
+    private static T? ReadBackup<T>(string backup) where T : class
+    {
+        try
+        {
+            return File.Exists(backup) ? JsonSerializer.Deserialize<T>(File.ReadAllText(backup), Options) : null;
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private void TryQuarantine(string path)

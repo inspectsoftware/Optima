@@ -32,7 +32,8 @@ pick a profile → PLAY
 - **Kill switch** (Ctrl+Alt+K), floating log console (Alt+F9), overlay toggle (Alt+F10).
 - **Debug page**: one place for what went wrong. Optima reads its own log as it is written and
   runs quick checks in the background, and lists every problem once as an issue, with what it
-  means, how to put it right and its evidence; no error goes by unlisted. Under that: environment
+  means, how to put it right and its evidence; no error goes by unlisted. What it can repair it
+  offers as a button, and the safe repairs it runs by itself. Under that: environment
   checks with their fixes
   (virtualization, platform, driver, refresh rate), a log where any line opens to its full error
   (the whole exception, the code Windows returned, the error guide's fix) and copies as a redacted
@@ -115,6 +116,12 @@ app contacts, exhaustively: the game's own endpoints or a reference host (ICMP),
 `criticalopsgame.com` (news), `discord.com` (which presence artwork exists, only with presence on),
 OptimaBot, the community Discord bot (account linking), and the local Discord client over IPC.
 Updates arrive as installers; the app does not check for them.
+
+Optima repairs some problems by itself. Out of the box that means only repairs that are reversible,
+need no administrator rights and interrupt nothing; everything else waits for a click on the Debug
+page, where the setting is. Whatever the setting, nothing is repaired while a game is running, an
+administrator prompt is never raised over a hidden window, and a repair that would make a choice for
+you (such as overwriting a settings file with an old backup) is never run unasked.
 Everything that leaves the app as text is redacted: the log export, a copied report, crash zips
 and the support archive mask tokens, the Windows user name, the machine name and user profile
 paths, and so does the log's detail pane on the Debug page. The log files on disk are the raw

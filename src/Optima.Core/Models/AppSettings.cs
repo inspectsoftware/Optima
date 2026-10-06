@@ -176,6 +176,12 @@ public sealed record AppSettings
     public bool DeveloperMode { get; init; }
     public string MinimumLogLevel { get; init; } = "Information";
 
+    /// <summary>
+    /// How far the Debug page goes on its own with what it finds. Safe repairs only, until the
+    /// player says otherwise: nothing that interrupts or asks for administrator rights runs unasked.
+    /// </summary>
+    public Optima.Core.Health.AutoRepairMode AutoRepair { get; init; } = Optima.Core.Health.AutoRepairMode.SafeOnly;
+
     public string VirtualDisplayProvider { get; init; } = "Auto";
 
     public bool EnableFrametimeCapture { get; init; } = true;
