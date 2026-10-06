@@ -22,6 +22,9 @@ public sealed record RepairButton(string IssueKey, string RepairId, string Title
     };
 }
 
+/// <summary>One repair that ran, as a row of the history.</summary>
+public sealed record RepairHistoryRow(string When, string Who, string What, string About, string Outcome, string Summary, bool Worked);
+
 /// <summary>One issue as a card. The card outlives a refresh, so an open evidence expander stays open while the count climbs.</summary>
 public sealed partial class IssueCard : ObservableObject
 {
@@ -159,7 +162,7 @@ public sealed partial class IssuesViewModel : ObservableObject
         _checks = checks;
         _settings = settings;
         _logger = logger;
-        _selectedMode = Modes[(int)(settings.Current?.AutoRepair ?? AutoRepairMode.SafeOnly)];
+        _selectedMode = Modes[(int)(settings.Current?.AutoRepair ?? AutoRepairMode.Escalate)];
         // Raised on whatever thread logged; the collections belong to the UI thread.
         _engine.Changed += () => Application.Current?.Dispatcher.BeginInvoke(Refresh);
         Refresh();
@@ -168,6 +171,14 @@ public sealed partial class IssuesViewModel : ObservableObject
     public ObservableCollection<IssueCard> Issues { get; } = [];
 
     public ObservableCollection<IgnoredIssue> Ignored { get; } = [];
+
+    /// <summary>The latest repairs, newest first: what was run, by whom, and how it went.</summary>
+    public ObservableCollection<RepairHistoryRow> History { get; } = [];
+
+    [ObservableProperty] private bool _hasHistory;
+
+    /// <summary>How many repairs the history shows. The file keeps more; the page shows the recent ones.</summary>
+    private const int HistoryRows = 15;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TabLabel))]
@@ -247,6 +258,31 @@ public sealed partial class IssuesViewModel : ObservableObject
         {
             Ignored.Add(ignored);
         }
+
+        History.Clear();
+        foreach (var attempt in _engine.Attempts.Reverse().Take(HistoryRows))
+        {
+            History.Add(new RepairHistoryRow(
+                attempt.At.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
+                attempt.Trigger switch
+                {
+                    RepairTrigger.User => "you",
+                    RepairTrigger.Launch => "Optima, in a launch",
+                    _ => "Optima",
+                },
+                attempt.RepairId == LaunchSupport.ReloadDriverRepair ? "reload the display driver" : _repairs.TitleFor(attempt.RepairId),
+                Services.RepairNotice.About(attempt),
+                attempt.Outcome switch
+                {
+                    RepairOutcome.Fixed => "done",
+                    RepairOutcome.NotNeeded => "nothing needed",
+                    RepairOutcome.NeedsUser => "left to you",
+                    _ => "did not work",
+                },
+                Redactor.Redact(attempt.Summary),
+                attempt.Outcome is RepairOutcome.Fixed or RepairOutcome.NotNeeded));
+        }
+        HasHistory = History.Count > 0;
 
         var notes = current.Count(i => !i.NeedsAttention);
         AttentionCount = current.Count - notes;

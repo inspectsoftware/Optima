@@ -48,6 +48,10 @@ public sealed class RepairRunnerTests : IDisposable
             => Task.FromResult(new DiagnosticResult { CheckName = name, Status = Status, Reason = "says the fake", IssueCode = code });
     }
 
+    /// <summary>What the player answers when a repair announces itself; null when nothing announces.</summary>
+    private bool? _answer;
+    private readonly List<string> _announced = [];
+
     private (IssueEngine Engine, RepairRunner Runner) NewRun()
     {
         var engine = new IssueEngine(
@@ -57,7 +61,12 @@ public sealed class RepairRunnerTests : IDisposable
             clock: () => _now,
             notifyDelay: TimeSpan.Zero);
         var runner = new RepairRunner(engine, [_start, _restart, _enable, _discard], () => _environment,
-            NullLogger<RepairRunner>.Instance, () => _now);
+            NullLogger<RepairRunner>.Instance, () => _now,
+            announce: (_, action, _) =>
+            {
+                _announced.Add(action.Id);
+                return Task.FromResult(_answer ?? true);
+            });
         return (engine, runner);
     }
 
@@ -263,6 +272,92 @@ public sealed class RepairRunnerTests : IDisposable
         Assert.Equal(2, _start.Runs);
         Assert.Equal(IssueState.NeedsUser, Assert.Single(nextEngine.Issues).State);
         nextEngine.Dispose();
+    }
+
+    private async Task<(IssueEngine Engine, RepairRunner Runner)> UpToTheInterruptingRung()
+    {
+        _environment = _environment with { Mode = AutoRepairMode.Escalate };
+        var (engine, runner) = NewRun();
+        foreach (var _ in Enumerable.Range(0, 2))
+        {
+            engine.Report(Failing("LAUNCH_FAILED"));
+            await runner.EvaluateAsync();
+            _now = _now.AddMinutes(2);
+        }
+        engine.Report(Failing("LAUNCH_FAILED"));
+        return (engine, runner);
+    }
+
+    [Fact]
+    public async Task ASafeRepairNeedsNoAnnouncementAndAnInterruptingOneSaysSoFirst()
+    {
+        var (_, runner) = await UpToTheInterruptingRung();
+        Assert.Empty(_announced);
+
+        await runner.EvaluateAsync();
+
+        Assert.Equal(["restart-platform"], _announced);
+        Assert.Equal(1, _restart.Runs);
+    }
+
+    [Fact]
+    public async Task ARepairThePlayerStopsDoesNotRunAndIsNotOfferedAgainUnasked()
+    {
+        var (engine, runner) = await UpToTheInterruptingRung();
+        _answer = false;
+
+        await runner.EvaluateAsync();
+
+        Assert.Equal(0, _restart.Runs);
+        var issue = Assert.Single(engine.Issues);
+        Assert.Equal(IssueState.NeedsUser, issue.State);
+        Assert.StartsWith("You stopped \"restart platform\"", issue.RepairNote);
+
+        // The answer was no. Asking again a few minutes later would be nagging.
+        _answer = true;
+        _now = _now.AddMinutes(30);
+        engine.Report(Failing("LAUNCH_FAILED"));
+        await runner.EvaluateAsync();
+        Assert.Equal(0, _restart.Runs);
+        Assert.Single(_announced);
+
+        // The button still works.
+        await runner.RunAsync("LAUNCH_FAILED", "restart-platform");
+        Assert.Equal(1, _restart.Runs);
+    }
+
+    [Fact]
+    public async Task AGameThatStartsDuringTheAnnouncementStopsTheRepair()
+    {
+        var (engine, runner) = await UpToTheInterruptingRung();
+        _environment = _environment with { GameRunning = false };
+        var announced = false;
+        var watching = new RepairRunner(engine, [_start, _restart], () => _environment with { GameRunning = announced },
+            NullLogger<RepairRunner>.Instance, () => _now,
+            announce: (_, _, _) =>
+            {
+                announced = true;
+                return Task.FromResult(true);
+            });
+
+        await watching.EvaluateAsync();
+
+        Assert.True(announced);
+        Assert.Equal(0, _restart.Runs);
+        Assert.Contains("game", Assert.Single(engine.Issues).RepairNote);
+        _ = runner;
+    }
+
+    [Fact]
+    public async Task ARepairThePlayerAsksForIsNotAnnouncedToThem()
+    {
+        var (engine, runner) = NewRun();
+        engine.Report(Failing("LAUNCH_FAILED"));
+
+        await runner.RunAsync("LAUNCH_FAILED", "restart-platform");
+
+        Assert.Empty(_announced);
+        Assert.Equal(1, _restart.Runs);
     }
 
     [Fact]

@@ -21,10 +21,13 @@ public sealed class TrayService : IDisposable
     private const uint TrayIconId = 1;
 
     private const uint NimAdd = 0;
+    private const uint NimModify = 1;
     private const uint NimDelete = 2;
     private const uint NifMessage = 0x1;
     private const uint NifIcon = 0x2;
     private const uint NifTip = 0x4;
+    private const uint NifInfo = 0x10;
+    private const uint NiifInfo = 0x1;
 
     // Explorer broadcasts this when the taskbar is (re)created; the icon must be re-added.
     private static readonly int WmTaskbarCreated = RegisterWindowMessage("TaskbarCreated");
@@ -263,6 +266,25 @@ public sealed class TrayService : IDisposable
         if (!Shell_NotifyIconW(NimAdd, ref data))
         {
             Log.Warning("Could not add the tray icon");
+        }
+    }
+
+    /// <summary>
+    /// A balloon from the tray icon, for when the window is hidden and there is nowhere else to say
+    /// that Optima did something. The caller keeps it for moments worth interrupting for and never
+    /// uses it while a game is on screen.
+    /// </summary>
+    public void ShowBalloon(string title, string text)
+    {
+        var data = NewIconData();
+        data.uFlags = NifInfo;
+        data.dwInfoFlags = NiifInfo;
+        // The fields are fixed-size and the last character is the terminator.
+        data.szInfoTitle = title.Length > 63 ? title[..63] : title;
+        data.szInfo = text.Length > 255 ? text[..255] : text;
+        if (!Shell_NotifyIconW(NimModify, ref data))
+        {
+            Log.Debug("The tray balloon could not be shown");
         }
     }
 

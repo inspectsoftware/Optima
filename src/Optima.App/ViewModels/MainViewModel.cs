@@ -76,6 +76,7 @@ public sealed partial class MainViewModel : ObservableObject
         UpdateLogViewModel updateLog,
         LegalViewModel legal,
         StatusViewModel status,
+        Services.ToastService toasts,
         IRecoveryService recovery,
         SettingsService settings,
         Services.PlayerSwitcherService players,
@@ -101,6 +102,7 @@ public sealed partial class MainViewModel : ObservableObject
         News = news;
         UpdateLog = updateLog;
         Status = status;
+        Toasts = toasts;
         _recovery = recovery;
         _settings = settings;
         _players = players;
@@ -140,6 +142,9 @@ public sealed partial class MainViewModel : ObservableObject
     public NewsViewModel News { get; }
     public UpdateLogViewModel UpdateLog { get; }
     public StatusViewModel Status { get; }
+
+    /// <summary>The notices shown over the page area, whatever page is open.</summary>
+    public Services.ToastService Toasts { get; }
 
     /// <summary>Saved identities for the title-bar account switcher.</summary>
     public ObservableCollection<PlayerAccount> SavedAccounts { get; } = [];

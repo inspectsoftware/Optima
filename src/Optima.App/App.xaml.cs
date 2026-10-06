@@ -239,6 +239,27 @@ public partial class App : Application
         window.StateChanged += (_, _) => SyncRepairMoment();
         orchestrator.SessionEnded += LookForRepairs;
         settingsService.SettingsChanged += (_, _) => LookForRepairs();
+
+        // Whatever Optima repaired without being asked, it says: in the window when the window is
+        // there, from the tray when it is not, and not at all over a game.
+        var toasts = _host.Services.GetRequiredService<Services.ToastService>();
+        issues.AttemptRecorded += attempt =>
+        {
+            if (attempt.Trigger == Core.Health.RepairTrigger.User)
+            {
+                return;
+            }
+            var (title, text, kind) = Services.RepairNotice.Describe(attempt);
+            if (Services.RepairMoment.WindowVisible)
+            {
+                toasts.Show(title, text, kind, "details", () => _ = mainViewModel.NavigateCommand.ExecuteAsync("DEBUG"));
+            }
+            else if (!orchestrator.IsSessionActive && presence.Current == Optima.Core.Monitoring.GamePresence.NotRunning)
+            {
+                Dispatcher.BeginInvoke(() => _tray?.ShowBalloon(title, text));
+            }
+        };
+
         repairs.Start();
         SyncRepairMoment();
 

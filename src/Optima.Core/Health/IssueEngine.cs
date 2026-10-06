@@ -71,6 +71,9 @@ public sealed class IssueEngine : IDisposable
     /// </summary>
     public event Action? Changed;
 
+    /// <summary>Raised for every repair that is written down, whoever ran it, on the thread that ran it.</summary>
+    public event Action<RepairAttempt>? AttemptRecorded;
+
     /// <summary>The open issues, the most serious first and the most recent first among equals.</summary>
     public IReadOnlyList<Issue> Issues
     {
@@ -302,6 +305,14 @@ public sealed class IssueEngine : IDisposable
         }
         // The history is part of what the page shows, so a new entry is a change like any other.
         Notify();
+        try
+        {
+            AttemptRecorded?.Invoke(attempt);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "A repair listener failed");
+        }
         return _state.SaveAsync(data);
     }
 

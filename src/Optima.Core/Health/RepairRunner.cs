@@ -18,6 +18,7 @@ public sealed class RepairRunner : IDisposable
     private readonly Dictionary<string, IRepairAction> _actions;
     private readonly Func<RepairEnvironment> _environment;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly Func<Issue, IRepairAction, CancellationToken, Task<bool>>? _announce;
     private readonly ILogger<RepairRunner> _logger;
     private readonly SemaphoreSlim _one = new(1, 1);
     private int _evaluating;
@@ -29,8 +30,10 @@ public sealed class RepairRunner : IDisposable
         IEnumerable<IRepairAction> actions,
         Func<RepairEnvironment> environment,
         ILogger<RepairRunner> logger,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        Func<Issue, IRepairAction, CancellationToken, Task<bool>>? announce = null)
     {
+        _announce = announce;
         _issues = issues;
         _actions = actions.ToDictionary(a => a.Id, StringComparer.OrdinalIgnoreCase);
         _environment = environment;
@@ -40,6 +43,9 @@ public sealed class RepairRunner : IDisposable
 
     /// <summary>Raised after every repair that ran, asked for or not, on whatever thread ran it.</summary>
     public event Action<RepairAttempt>? Attempted;
+
+    /// <summary>What a repair is called on its button; the id itself for one that is not registered here.</summary>
+    public string TitleFor(string repairId) => _actions.TryGetValue(repairId, out var action) ? action.Title : repairId;
 
     /// <summary>The repairs an issue offers as buttons: its ladder, then the ones that are only ever run by hand.</summary>
     public IReadOnlyList<IRepairAction> ActionsFor(Issue issue)
@@ -135,7 +141,12 @@ public sealed class RepairRunner : IDisposable
         switch (decision.Verdict)
         {
             case RepairVerdict.Run when decision.Step is { } step:
-                await RunCoreAsync(issue, _actions[step.Id], RepairTrigger.Background, ct).ConfigureAwait(false);
+                var action = _actions[step.Id];
+                if (action.Tier != RepairTier.Safe && !await AnnounceAsync(issue, action, ct).ConfigureAwait(false))
+                {
+                    break;
+                }
+                await RunCoreAsync(issue, action, RepairTrigger.Background, ct).ConfigureAwait(false);
                 break;
             case RepairVerdict.AskUser:
                 _issues.SetState(issue.Key, IssueState.NeedsUser, decision.Reason);
@@ -144,6 +155,35 @@ public sealed class RepairRunner : IDisposable
                 _issues.SetState(issue.Key, IssueState.Open, decision.Reason);
                 break;
         }
+    }
+
+    /// <summary>
+    /// A repair that interrupts or asks for administrator rights says so before it runs, and the
+    /// player gets a few seconds to stop it. Stopping it is an answer, and it is kept: the attempt
+    /// is written down as left to the player, which ends the ladder until they press the button.
+    /// </summary>
+    /// <returns>True when the repair should go ahead.</returns>
+    private async Task<bool> AnnounceAsync(Issue issue, IRepairAction action, CancellationToken ct)
+    {
+        if (_announce is null)
+        {
+            return true;
+        }
+        if (!await _announce(issue, action, ct).ConfigureAwait(false))
+        {
+            await _issues.RecordAttemptAsync(new RepairAttempt(
+                issue.Key, action.Id, action.Tier, RepairTrigger.Background, _clock(), RepairOutcome.NeedsUser,
+                "You stopped it before it ran.")).ConfigureAwait(false);
+            _issues.SetState(issue.Key, IssueState.NeedsUser, $"You stopped \"{action.Title}\". It is on the card when you want it.");
+            return false;
+        }
+        // A few seconds passed. If a game started in them, the repair waits like any other.
+        if (_environment().GameRunning)
+        {
+            _issues.SetState(issue.Key, IssueState.Open, "waiting for the game to close: nothing is repaired while it runs");
+            return false;
+        }
+        return true;
     }
 
     /// <summary>Runs a repair the player asked for. No policy: the click is the permission.</summary>

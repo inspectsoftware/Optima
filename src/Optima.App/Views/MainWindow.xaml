@@ -159,10 +159,23 @@
                         </Button>
                         <!-- How many things on the page want looking at. Over the row, not in it, so
                              it stays where it is when the rail is collapsed to icons. -->
-                        <Border HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"
-                                MinWidth="17" Height="16" Padding="4,0" CornerRadius="8"
+                        <Border HorizontalAlignment="Right" MinWidth="17" Height="16" Padding="4,0" CornerRadius="8"
                                 Background="{DynamicResource Brush.Fail}" IsHitTestVisible="False"
                                 Visibility="{Binding HasBadge, Converter={StaticResource BoolToVis}}">
+                          <Border.Style>
+                            <Style TargetType="Border">
+                              <Setter Property="VerticalAlignment" Value="Center" />
+                              <Setter Property="Margin" Value="0,0,8,0" />
+                              <Style.Triggers>
+                                <!-- Collapsed, the row is barely wider than its icon: the count moves up
+                                     into the corner instead of sitting on top of it. -->
+                                <DataTrigger Binding="{Binding DataContext.RailCollapsed, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Value="True">
+                                  <Setter Property="VerticalAlignment" Value="Top" />
+                                  <Setter Property="Margin" Value="0,2,5,0" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Border.Style>
                           <TextBlock Text="{Binding BadgeCount}" FontSize="{StaticResource Type.Micro}" FontWeight="SemiBold"
                                      Foreground="{DynamicResource Brush.Background}"
                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -231,6 +244,45 @@
               <TranslateTransform x:Name="PageShift" />
             </ContentControl.RenderTransform>
           </ContentControl>
+
+          <!-- What Optima did by itself, and what it is about to do, said over whatever page is open. -->
+          <ItemsControl Grid.Row="2" ItemsSource="{Binding Toasts.Toasts}" Focusable="False"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,14" Width="400">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Margin="0,8,0,0" Background="{DynamicResource Brush.Deep}"
+                        BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="1">
+                  <Border Padding="12,10" BorderThickness="2,0,0,0">
+                    <Border.Style>
+                      <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Info}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Kind}" Value="Ok">
+                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Ok}" />
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding Kind}" Value="Warn">
+                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Warn}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Border.Style>
+                    <StackPanel>
+                      <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Value}" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Text}" Style="{StaticResource Text.Micro}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                 Foreground="{DynamicResource Brush.TextSecondary}" />
+                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                        <Button Style="{StaticResource GhostButton}" Content="{Binding ActionLabel}" Padding="6,0"
+                                Command="{Binding ActionCommand}"
+                                Visibility="{Binding ActionLabel, Converter={StaticResource EmptyToCollapsed}}" />
+                        <Button Style="{StaticResource GhostButton}" Content="dismiss" Padding="6,0"
+                                Command="{Binding DismissCommand}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </Grid>
       </Grid>
     </Grid>

@@ -177,10 +177,11 @@ public sealed record AppSettings
     public string MinimumLogLevel { get; init; } = "Information";
 
     /// <summary>
-    /// How far the Debug page goes on its own with what it finds. Safe repairs only, until the
-    /// player says otherwise: nothing that interrupts or asks for administrator rights runs unasked.
+    /// How far the Debug page goes on its own with what it finds. Out of the box it climbs the
+    /// whole ladder: safe repairs first, and where they do not help, the ones that interrupt or
+    /// ask for administrator rights, each announced before it runs and under the policy's limits.
     /// </summary>
-    public Optima.Core.Health.AutoRepairMode AutoRepair { get; init; } = Optima.Core.Health.AutoRepairMode.SafeOnly;
+    public Optima.Core.Health.AutoRepairMode AutoRepair { get; init; } = Optima.Core.Health.AutoRepairMode.Escalate;
 
     public string VirtualDisplayProvider { get; init; } = "Auto";
 

@@ -4,6 +4,15 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-06 - Indev: Optima goes further by itself, and says what it does
+
+- Changed: repair by itself now starts on "everything it can". Optima still tries the safe repairs first; where they did not help, it goes on to the ones that interrupt something or need administrator rights. "safe repairs only" and "off" are one click away on ISSUES, and a choice you already made there is kept.
+- New: a repair that interrupts says so before it runs. A notice in the corner of the window names what is about to happen and why, and counts down five seconds with a cancel button. Cancelling is remembered: Optima does not offer that repair again by itself, and its button stays on the card.
+- New: notices. Whatever Optima repaired without being asked is said in the corner of the window, on whatever page is open, with a link to the details. With the window hidden in the tray it is said from the tray icon instead, and never while a game is running.
+- New: REPAIR HISTORY on ISSUES. Every repair that was run, by Optima, by you or inside a launch: when, what, for which issue, how it went. It is kept across restarts.
+- The limits are unchanged and apply to all of it: nothing is repaired while a game is running, a repair that interrupts is not run with the window hidden, an administrator prompt appears at most once per issue per day and not again after it was declined, and a repair that would make a choice for you is never run unasked.
+- The Debug item on the rail carries its count in the corner when the rail is collapsed.
+
 ## 2026-10-06 - Indev: a launch that repairs its own display step
 
 - New: when the virtual display does not appear at launch, Optima reloads the display driver and tries once more before giving up. It is the fix the error guide has always given for this fault, the driver's output parked with its device enabled, now done for you. If the second try fails too, the launch fails with the same error as before.

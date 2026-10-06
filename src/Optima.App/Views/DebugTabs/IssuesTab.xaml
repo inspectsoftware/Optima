@@ -171,6 +171,51 @@
         </StackPanel>
       </HeaderedContentControl>
 
+      <!-- Everything that was run, by Optima or by hand: a program that repairs things by itself
+           has to be able to say afterwards exactly what it did. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="REPAIR HISTORY"
+                              Visibility="{Binding HasHistory, Converter={StaticResource BoolToVis}}">
+        <ItemsControl ItemsSource="{Binding History}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource TableRow}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="130" />
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="110" />
+                  </Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                  </Grid.RowDefinitions>
+                  <TextBlock Text="{Binding When}" Style="{StaticResource Text.CellDim}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Who}" Style="{StaticResource Text.CellDim}" />
+                  <TextBlock Grid.Column="2" Style="{StaticResource Text.Cell}" TextTrimming="CharacterEllipsis">
+                    <Run Text="{Binding What, Mode=OneWay}" /><Run Text="  ·  " Foreground="{DynamicResource Brush.TextMuted}" /><Run Text="{Binding About, Mode=OneWay}" Foreground="{DynamicResource Brush.TextMuted}" />
+                  </TextBlock>
+                  <TextBlock Grid.Column="3" Text="{Binding Outcome}" HorizontalAlignment="Right">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Cell}">
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.Warn}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Worked}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                  <TextBlock Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Text="{Binding Summary}" Style="{StaticResource Text.Micro}"
+                             Foreground="{DynamicResource Brush.TextMuted}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </HeaderedContentControl>
+
       <HeaderedContentControl Style="{StaticResource Section}" Header="IGNORED"
                               Visibility="{Binding HasIgnored, Converter={StaticResource BoolToVis}}">
         <StackPanel>

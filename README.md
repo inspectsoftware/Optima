@@ -117,11 +117,16 @@ app contacts, exhaustively: the game's own endpoints or a reference host (ICMP),
 OptimaBot, the community Discord bot (account linking), and the local Discord client over IPC.
 Updates arrive as installers; the app does not check for them.
 
-Optima repairs some problems by itself. Out of the box that means only repairs that are reversible,
-need no administrator rights and interrupt nothing; everything else waits for a click on the Debug
-page, where the setting is. Whatever the setting, nothing is repaired while a game is running, an
-administrator prompt is never raised over a hidden window, and a repair that would make a choice for
-you (such as overwriting a settings file with an old backup) is never run unasked.
+Optima repairs some problems by itself. It tries the safe repairs first: reversible, no
+administrator rights, nothing interrupted. Only where those did not help does it go on to a repair
+that interrupts something or needs administrator rights, and it says so in the window first, with
+five seconds to stop it. The Debug page has the setting, including "safe repairs only" and "off",
+and lists every repair that was ever run. Whatever the setting: nothing is repaired while a game is
+running; a repair that interrupts is not run with the window hidden; an administrator prompt
+appears at most once per issue per day, never over a hidden window, and not again after it was
+declined; and a repair that would make a choice for you (such as overwriting a settings file with
+an old backup) is never run unasked. This is the one place where the helper can be started without
+a click of yours.
 Everything that leaves the app as text is redacted: the log export, a copied report, crash zips
 and the support archive mask tokens, the Windows user name, the machine name and user profile
 paths, and so does the log's detail pane on the Debug page. The log files on disk are the raw

@@ -223,18 +223,24 @@ public static class AppServices
         services.AddSingleton<Optima.Core.Health.IRepairAction, Optima.Core.Health.Repairs.RetryRestoreRepair>();
         services.AddSingleton<Optima.Core.Health.IRepairAction, Optima.Core.Health.Repairs.DiscardDisplayRestoreRepair>();
         services.AddSingleton<Optima.Core.Health.IRepairAction, Optima.App.Services.EnableHypervisorRepair>();
+        services.AddSingleton<Optima.App.Services.ToastService>();
         services.AddSingleton(sp => new Optima.Core.Health.RepairRunner(
             sp.GetRequiredService<Optima.Core.Health.IssueEngine>(),
             sp.GetServices<Optima.Core.Health.IRepairAction>(),
             // Asked for at every decision: a repair must see the moment it runs in, not the one it was queued in.
             () => new Optima.Core.Health.RepairEnvironment(
-                sp.GetRequiredService<SettingsService>().Current?.AutoRepair ?? Optima.Core.Health.AutoRepairMode.SafeOnly,
+                sp.GetRequiredService<SettingsService>().Current?.AutoRepair ?? Optima.Core.Health.AutoRepairMode.Escalate,
                 GameRunning: sp.GetRequiredService<LaunchOrchestrator>().IsSessionActive
                     || sp.GetRequiredService<GamePresenceService>().Current != GamePresence.NotRunning,
                 WindowVisible: Optima.App.Services.RepairMoment.WindowVisible,
                 HelperConnected: sp.GetRequiredService<IElevationBroker>().IsConnected,
                 ElevationDeclinedThisRun: sp.GetRequiredService<IElevationBroker>().LastStartFailure == ElevationStartFailure.Declined),
-            sp.GetRequiredService<ILogger<Optima.Core.Health.RepairRunner>>()));
+            sp.GetRequiredService<ILogger<Optima.Core.Health.RepairRunner>>(),
+            // A repair that interrupts says so first and gives five seconds to stop it.
+            announce: (issue, action, ct) => sp.GetRequiredService<Optima.App.Services.ToastService>().ConfirmCountdownAsync(
+                "About to " + action.Title,
+                $"Because: {issue.Title}. {action.Changes}",
+                TimeSpan.FromSeconds(5), ct)));
 
         services.AddSingleton<IssuesViewModel>();
         services.AddSingleton<ChecksViewModel>();
