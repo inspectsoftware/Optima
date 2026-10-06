@@ -4,6 +4,15 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-06 - Indev: Diagnostics and Logs are one page, Debug
+
+- New: the DEBUG page, in place of DIAGNOSTICS and LOGS. The two answered halves of one question, what went wrong and why, from two rail items. DEBUG has them as tabs: CHECKS, LOG, CRASHES and ERROR GUIDE.
+- CHECKS is the environment checks, with the repair buttons under them as TOOLS. LOG is the live log with its detail. CRASHES is the crash bundle list. ERROR GUIDE is the guide that sat folded above the log, now with room to read.
+- Alt+9 opens DEBUG, and so does the tray menu. The floating console on Alt+F9 is unchanged.
+- HOME's diagnostics widget and the setup wizard show the same checks as before.
+- Every message that sent you to "the Logs page" or "the Diagnostics page" now names the place on DEBUG that holds what it means.
+- The tools on CHECKS can no longer take Optima down: a tool that fails says so on the page and writes its error to the log.
+
 ## 2026-10-06 - Indev: every log line opens to its full error
 
 - New on LOGS: click a line to open its detail. It shows what the one-line row leaves out: the whole exception with its stack, the code Windows returned and Windows' own description of it, the message's arguments, and the error guide's entry for the line's code, fix included. A line with more behind it carries a + at its right edge.

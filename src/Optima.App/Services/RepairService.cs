@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 namespace Optima.App.Services;
 
 /// <summary>
-/// The repair actions behind the DIAGNOSTICS page: platform heartbeat, clean restart, re-detection, settings restore
+/// The by-hand tools on the Checks tab of DEBUG: platform heartbeat, clean restart, re-detection, settings restore
 /// from the rolling backups, and the redacted support archive.
 /// </summary>
 public sealed class RepairService

@@ -1,13 +1,9 @@
-<UserControl x:Class="Optima.App.Views.DiagnosticsView"
+<UserControl x:Class="Optima.App.Views.DebugTabs.ChecksTab"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="clr-namespace:Optima.App.Controls">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Style="{StaticResource PageRoot}">
-      <TextBlock Text="Diagnostics" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="Environment checks · each result carries a reason and a fix"
-                 Style="{StaticResource Text.PageSubtitle}" />
-
+    <StackPanel Margin="24,0,24,24">
       <HeaderedContentControl Style="{StaticResource Section}" Header="CHECKS">
         <HeaderedContentControl.Tag>
           <StackPanel Orientation="Horizontal">
@@ -71,7 +67,8 @@
         </StackPanel>
       </HeaderedContentControl>
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="REPAIR">
+      <!-- The by-hand tools: what used to be a REPAIR section on a page of its own. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="TOOLS">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="run setup wizard again" Padding="6,0"
                   Command="{Binding RerunSetupCommand}" />
@@ -95,7 +92,7 @@
                     ToolTip="Stops the platform's own processes in order and relaunches it" />
             <Button Style="{StaticResource SecondaryButton}" Content="re-detect installation"
                     Command="{Binding RedetectCommand}" Margin="0,0,8,8"
-                    ToolTip="Clears the cached paths and searches again (for moved installs)" />
+                    ToolTip="Searches for Google Play Games and Critical Ops again (for moved installs)" />
             <Button Style="{StaticResource SecondaryButton}" Content="graphics settings"
                     Command="{Binding OpenGraphicsSettingsCommand}" Margin="0,0,8,8" />
             <Button Style="{StaticResource SecondaryButton}" Content="installed apps"
@@ -105,62 +102,11 @@
                     ToolTip="Puts back the previous saved generation of Optima's own settings files" />
             <Button Style="{StaticResource SecondaryButton}" Content="create support archive"
                     Command="{Binding CreateSupportArchiveCommand}" Margin="0,0,8,8"
-                    ToolTip="Redacted zip: logs, diagnostics, newest crash bundle, settings" />
+                    ToolTip="Redacted zip: logs, check results, newest crash bundle, settings" />
           </WrapPanel>
           <TextBlock Text="{Binding RepairStatus}" Style="{StaticResource Text.Value}"
                      Foreground="{DynamicResource Brush.Ok}" Margin="0,4,0,0" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
                      Visibility="{Binding RepairStatus, Converter={StaticResource EmptyToCollapsed}}" />
-        </StackPanel>
-      </HeaderedContentControl>
-
-      <HeaderedContentControl Style="{StaticResource Section}" Header="CRASHES">
-        <HeaderedContentControl.Tag>
-          <StackPanel Orientation="Horizontal">
-            <Button Style="{StaticResource GhostButton}" Content="capture now" Padding="6,0"
-                    Command="{Binding CaptureCrashNowCommand}"
-                    ToolTip="Writes a bundle from the current platform logs even without a crash" />
-            <Button Style="{StaticResource GhostButton}" Content="open folder" Padding="6,0"
-                    Command="{Binding OpenCrashesFolderCommand}" />
-          </StackPanel>
-        </HeaderedContentControl.Tag>
-        <StackPanel>
-          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="720" HorizontalAlignment="Left" Margin="0,0,0,6"
-                     Text="When Critical Ops ends with failure markers in Google Play Games' own logs, the Watchdog saves a bundle here: a plain-text timeline plus the relevant log excerpt. Export makes a redacted zip that is safe to share with developers." />
-          <ItemsControl ItemsSource="{Binding Crashes}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Border Style="{StaticResource TableRow}">
-                  <Grid>
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="260" />
-                      <ColumnDefinition />
-                      <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding Name}" Style="{StaticResource Text.Cell}" />
-                    <TextBlock Grid.Column="1" Text="{Binding CapturedText}" Style="{StaticResource Text.CellDim}" />
-                    <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="export redacted zip" Padding="6,0"
-                            Command="{Binding DataContext.ExportCrashRedactedCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                            CommandParameter="{Binding}" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock Text="no crash bundles captured" Margin="0,4,0,0">
-            <TextBlock.Style>
-              <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
-                <Setter Property="Visibility" Value="Collapsed" />
-                <Style.Triggers>
-                  <DataTrigger Binding="{Binding Crashes.Count}" Value="0">
-                    <Setter Property="Visibility" Value="Visible" />
-                  </DataTrigger>
-                </Style.Triggers>
-              </Style>
-            </TextBlock.Style>
-          </TextBlock>
-          <TextBlock Text="{Binding CrashStatus}" Style="{StaticResource Text.Micro}"
-                     Foreground="{DynamicResource Brush.Ok}" Margin="0,6,0,0"
-                     Visibility="{Binding CrashStatus, Converter={StaticResource EmptyToCollapsed}}" />
         </StackPanel>
       </HeaderedContentControl>
     </StackPanel>

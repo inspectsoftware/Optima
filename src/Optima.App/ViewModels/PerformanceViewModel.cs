@@ -174,7 +174,7 @@ public sealed partial class PerformanceViewModel : ObservableObject
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Reading tweak states failed");
-            TweaksStatus = "Could not read the current tweak states. See Logs.";
+            TweaksStatus = "Could not read the current tweak states. See the log on the Debug page.";
         }
     }
 
@@ -202,7 +202,7 @@ public sealed partial class PerformanceViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Toggling tweak {Tweak} failed", row.Definition.Id);
-            TweaksStatus = "The tweak change failed. See Logs.";
+            TweaksStatus = "The tweak change failed. See the log on the Debug page.";
         }
         finally
         {
@@ -237,7 +237,7 @@ public sealed partial class PerformanceViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Disabling all tweaks failed");
-            TweaksStatus = "Reverting tweaks failed part-way. See Logs.";
+            TweaksStatus = "Reverting tweaks failed part-way. See the log on the Debug page.";
         }
         finally
         {

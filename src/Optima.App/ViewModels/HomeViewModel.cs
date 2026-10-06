@@ -26,7 +26,7 @@ public sealed partial class HomeViewModel : ObservableObject
         DisplayViewModel display,
         CompViewModel comp,
         NewsViewModel newsPage,
-        DiagnosticsViewModel diagnostics,
+        ChecksViewModel checks,
         ISystemInfoService systemInfo,
         IPerformanceMonitor monitor,
         CopsNewsService news,
@@ -40,7 +40,7 @@ public sealed partial class HomeViewModel : ObservableObject
         Display = display;
         Comp = comp;
         NewsPage = newsPage;
-        Diagnostics = diagnostics;
+        Checks = checks;
         _systemInfo = systemInfo;
         _monitor = monitor;
         _news = news;
@@ -246,7 +246,7 @@ public sealed partial class HomeViewModel : ObservableObject
                     _ = QuietlyAsync(NewsPage.InitializeAsync());
                     break;
                 case "diagnostics":
-                    _ = QuietlyAsync(Diagnostics.InitializeAsync());
+                    _ = QuietlyAsync(Checks.InitializeAsync());
                     break;
             }
         }
@@ -305,7 +305,7 @@ public sealed partial class HomeViewModel : ObservableObject
     public DisplayViewModel Display { get; }
     public CompViewModel Comp { get; }
     public NewsViewModel NewsPage { get; }
-    public DiagnosticsViewModel Diagnostics { get; }
+    public ChecksViewModel Checks { get; }
 
     /// <summary>Friends and clanmates tracked alongside the main account.</summary>
     public ObservableCollection<Optima.Core.Stats.TrackedPlayerRow> Friends { get; } = [];

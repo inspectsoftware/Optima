@@ -194,9 +194,10 @@ public static class AppServices
         services.AddSingleton<CompViewModel>();
         services.AddSingleton<BoostViewModel>();
         services.AddSingleton<LegalViewModel>();
-        services.AddSingleton<DiagnosticsViewModel>();
+        services.AddSingleton<ChecksViewModel>();
         services.AddSingleton<LogStreamViewModel>();
-        services.AddSingleton<LogsViewModel>();
+        services.AddSingleton<CrashesViewModel>();
+        services.AddSingleton<DebugViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DeveloperViewModel>();
         services.AddSingleton<NewsViewModel>();

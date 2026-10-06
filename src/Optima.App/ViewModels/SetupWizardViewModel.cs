@@ -20,18 +20,18 @@ public sealed partial class SetupWizardViewModel : ObservableObject
 
     public SetupWizardViewModel(
         StatusViewModel status,
-        DiagnosticsViewModel diagnostics,
+        ChecksViewModel checks,
         SettingsService settings,
         FirstRunFixService fix)
     {
         Status = status;
-        Diagnostics = diagnostics;
+        Checks = checks;
         _settings = settings;
         _fix = fix;
     }
 
     public StatusViewModel Status { get; }
-    public DiagnosticsViewModel Diagnostics { get; }
+    public ChecksViewModel Checks { get; }
 
     public ObservableCollection<string> FixLog { get; } = [];
 
@@ -54,7 +54,7 @@ public sealed partial class SetupWizardViewModel : ObservableObject
     {
         IsDetecting = true;
         await Status.RefreshAsync();
-        await Diagnostics.InitializeAsync();
+        await Checks.InitializeAsync();
 
         var current = await _settings.GetSettingsAsync();
         PlayerIgn = current.PlayerIgn;

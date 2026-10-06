@@ -25,7 +25,7 @@
     <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="BOOST" />
     <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
     <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
-    <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
+    <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DEBUG" />
     <KeyBinding Modifiers="Alt" Key="N" Command="{Binding NavigateCommand}" CommandParameter="NEWS" />
     <KeyBinding Modifiers="Alt" Key="U" Command="{Binding NavigateCommand}" CommandParameter="UPDATES" />
     <KeyBinding Modifiers="Alt" Key="L" Command="{Binding NavigateCommand}" CommandParameter="LEGAL" />

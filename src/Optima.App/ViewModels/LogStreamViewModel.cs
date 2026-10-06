@@ -10,12 +10,13 @@ using Optima.App.Logging;
 using Optima.Core.Configuration;
 using Optima.Core.Health;
 using Optima.Core.Models;
+using Serilog.Events;
 
 namespace Optima.App.ViewModels;
 
 /// <summary>
 /// The live log: the list, its filters, and the detail of one selected line (§17). Shared by the
-/// LOGS page and the floating console, which is why it is a view model of its own.
+/// Log tab of DEBUG and the floating console, which is why it is a view model of its own.
 /// </summary>
 public sealed partial class LogStreamViewModel : ObservableObject
 {
@@ -215,6 +216,17 @@ public sealed partial class LogStreamViewModel : ObservableObject
             StatusMessage = "The export failed.";
         }
     }
+
+    /// <summary>The level names of the Settings page as the levels the logger filters on.</summary>
+    public static LogEventLevel ToSerilogLevel(string name) => name switch
+    {
+        "Trace" or "TRACE" => LogEventLevel.Verbose,
+        "Debug" or "DEBUG" => LogEventLevel.Debug,
+        "Warning" or "WARN" => LogEventLevel.Warning,
+        "Error" or "ERROR" => LogEventLevel.Error,
+        "Critical" or "CRITICAL" => LogEventLevel.Fatal,
+        _ => LogEventLevel.Information,
+    };
 
     [RelayCommand]
     private void OpenLogFolder()

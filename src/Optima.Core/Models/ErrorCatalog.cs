@@ -9,7 +9,7 @@ public sealed record ErrorCatalogEntry(
     IReadOnlyList<string> HowToFix);
 
 /// <summary>
-/// Every known Optima error code with a plain-language explanation, so the LOGS page can show
+/// Every known Optima error code with a plain-language explanation, so the DEBUG page can show
 /// one discrete guide instead of scattered messages. The tests assert this catalog stays in
 /// step with every OptimaException code raised in the app.
 /// </summary>
@@ -44,7 +44,7 @@ public static class ErrorCatalog
             [
                 "Restart the machine once, then press RELOAD DRIVER again",
                 "Reinstall the virtual display driver from the Display page",
-                "Check the Logs page for the underlying pipe error",
+                "Check the log on the Debug page for the underlying pipe error",
             ]),
         new(
             "VDD_PIPE_DENIED",
@@ -135,7 +135,7 @@ public static class ErrorCatalog
             "Driver installs, driver device toggles, HKLM tweaks and ETW capture all need one approval; without it the affected feature skips that step.",
             [
                 "Approve the administrator prompt and try again",
-                "If no prompt appeared, check whether prompts are suppressed by policy and start the helper manually from the Diagnostics page",
+                "If no prompt appeared, check whether administrator prompts are suppressed by policy on this PC",
             ]),
         new(
             "TWEAK_WRITE_FAILED",
@@ -143,7 +143,7 @@ public static class ErrorCatalog
             "The elevated helper tried to write a performance tweak to the registry and Windows refused the write.",
             "Security software can block registry writes, or the value is owned by a policy.",
             [
-                "Check the Logs page for which value was refused",
+                "Check the log on the Debug page for which value was refused",
                 "Apply the tweak by hand if group policy manages it",
             ]),
         new(
@@ -154,7 +154,7 @@ public static class ErrorCatalog
             [
                 "Install Google Play Games for PC from Google's site",
                 "Set the Google Play Games folder under Settings, Path overrides, if it is installed somewhere unusual",
-                "Run detection again from the Diagnostics page",
+                "Run detection again from the Checks tab on the Debug page",
             ]),
         new(
             "POWER_PLAN_UNAVAILABLE",
@@ -183,7 +183,7 @@ public static class ErrorCatalog
             "The power plan, background cleanup and process tuning are improvements, not requirements. A failure in one of them used to stop the whole launch.",
             [
                 "Read the notice on the Play page: it carries the exact error for the step",
-                "Run Diagnostics to verify the environment if the same step is skipped every time",
+                "Run the checks on the Debug page to verify the environment if the same step is skipped every time",
             ]),
         new(
             "SESSION_NOT_SAVED",
@@ -203,7 +203,7 @@ public static class ErrorCatalog
             [
                 "Open developer details on the error card and read the first lines: the phase and the Windows error",
                 "Copy the developer details when reporting the problem; they are what makes it diagnosable",
-                "Run Diagnostics to verify the environment",
+                "Run the checks on the Debug page to verify the environment",
             ]),
         new(
             "GAME_NOT_FOUND",
@@ -212,7 +212,7 @@ public static class ErrorCatalog
             "The game is not installed, Google Play Games was updated and moved its data, or detection rules are stale.",
             [
                 "Open Google Play Games and install Critical Ops",
-                "Run detection again from the Diagnostics page",
+                "Run detection again from the Checks tab on the Debug page",
                 "Set the Google Play Games folder under Settings, Path overrides, if it is installed somewhere unusual",
             ]),
         new(
@@ -222,7 +222,7 @@ public static class ErrorCatalog
             "Google Play Games may be signed out, outdated, or its bootstrapper refuses the launch URI.",
             [
                 "Start Google Play Games manually and check it opens and is signed in",
-                "Re-run detection from the Diagnostics page",
+                "Re-run detection from the Checks tab on the Debug page",
                 "Configure a custom launch command in Settings as the last-resort strategy",
             ]),
         new(
@@ -251,7 +251,7 @@ public static class ErrorCatalog
             [
                 "Confirm the bundled driver package is digitally signed, since Windows refuses unsigned driver packages",
                 "Check that the package targets 64-bit Windows 11",
-                "See the Logs page for the exact installer error",
+                "See the log on the Debug page for the exact installer error",
             ]),
         new(
             "DRIVER_UNINSTALL_FAILED",

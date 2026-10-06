@@ -247,7 +247,7 @@ public sealed partial class BoostViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Changing the system-wide timer switch failed");
-            TimerGlobalSwitchText = "The change failed. See Logs.";
+            TimerGlobalSwitchText = "The change failed. See the log on the Debug page.";
             _loading = true;
             TimerGlobalSwitchOn = _timerInfo.GlobalRequestsEnabled;
             _loading = false;
@@ -459,12 +459,12 @@ public sealed partial class BoostViewModel : ObservableObject
             var freed = await _cleaner.PurgeNowAsync();
             CleanerDetailText = freed is { } mb
                 ? $"Purged now · {mb.ToString("N0", CultureInfo.InvariantCulture)} MB of standby memory released"
-                : "The purge did not run: the helper was not started or refused it. See Logs.";
+                : "The purge did not run: the helper was not started or refused it. See the log on the Debug page.";
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Purge now failed");
-            CleanerDetailText = "The purge failed. See Logs.";
+            CleanerDetailText = "The purge failed. See the log on the Debug page.";
         }
         finally
         {

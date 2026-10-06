@@ -451,12 +451,12 @@
     <DataTemplate x:Key="Widget.diagnostics">
       <HeaderedContentControl Style="{StaticResource Section}" Header="DIAGNOSTICS" DataContext="{Binding Host}">
         <HeaderedContentControl.Tag>
-          <TextBlock Text="run the checks from the DIAGNOSTICS tab" Style="{StaticResource Text.Micro}" />
+          <TextBlock Text="run the checks on the Debug page" Style="{StaticResource Text.Micro}" />
         </HeaderedContentControl.Tag>
         <StackPanel>
-          <TextBlock Text="{Binding Diagnostics.Summary}" Style="{StaticResource Text.Value}" TextWrapping="Wrap"
-                     Visibility="{Binding Diagnostics.Summary, Converter={StaticResource EmptyToCollapsed}}" />
-          <ItemsControl ItemsSource="{Binding Diagnostics.Results}" Margin="0,8,0,0">
+          <TextBlock Text="{Binding Checks.Summary}" Style="{StaticResource Text.Value}" TextWrapping="Wrap"
+                     Visibility="{Binding Checks.Summary, Converter={StaticResource EmptyToCollapsed}}" />
+          <ItemsControl ItemsSource="{Binding Checks.Results}" Margin="0,8,0,0">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <StackPanel Margin="0,3">

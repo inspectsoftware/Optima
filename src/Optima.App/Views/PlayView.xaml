@@ -69,7 +69,7 @@
       </Grid>
 
       <!-- Crash notice: a new crash bundle surfaces here where a crash actually matters,
-           not only on the Diagnostics page. Dismissal is persisted, so it shows once per crash. -->
+           not only on the Debug page. Dismissal is persisted, so it shows once per crash. -->
       <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Fail}" Margin="0,0,0,14"
               Visibility="{Binding CrashBannerVisible, Converter={StaticResource BoolToVis}}">
         <Grid>

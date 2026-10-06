@@ -62,7 +62,7 @@ public sealed class TrayService : IDisposable
         AddMenuItem("SHOW", ShowMainWindow);
         AddMenuItem("TERMINATE PROCESS", () => TerminateGameRequested?.Invoke());
         _watchModeItem = AddMenuItem("WATCHDOG: OFF", () => _ = ToggleWatchModeAsync());
-        AddMenuItem("LOGS", () => NavigateRequested?.Invoke("LOGS"));
+        AddMenuItem("DEBUG", () => NavigateRequested?.Invoke("DEBUG"));
         AddMenuItem("PERFORMANCE", () => NavigateRequested?.Invoke("PERFORMANCE"));
         var separator = new Separator();
         separator.SetResourceReference(FrameworkElement.StyleProperty, typeof(Separator));

@@ -30,10 +30,11 @@ pick a profile → PLAY
 - **Watch mode**: start the game any way you like and Optima applies the profile from the tray.
 - **Windows tweaks** with an on/off toggle each, originals captured and restored.
 - **Kill switch** (Ctrl+Alt+K), floating log console (Alt+F9), overlay toggle (Alt+F10).
-- **A log that explains itself**: any line opens to its full error (the whole exception, the code
-  Windows returned, the error guide's fix), and copies as a redacted report that stands on its own.
-- **Diagnostics and repair**: virtualization, platform, driver and refresh-rate checks with fixes,
-  crash bundles from the platform's own logs, and a redacted support export.
+- **Debug page**: one place for what went wrong. Environment checks with their fixes
+  (virtualization, platform, driver, refresh rate), a log where any line opens to its full error
+  (the whole exception, the code Windows returned, the error guide's fix) and copies as a redacted
+  report that stands on its own, crash bundles from the platform's own logs, the error guide, and a
+  redacted support export.
 - **Discord activity**, ranked session stats from the public Critical Ops profile API, and news.
 - **OptimaBot**, the Discord bot that draws Critical Ops stats cards and links your Discord account
   to the game account Optima already tracks: `/link` here, a code into Settings, and `/searchplayer`
@@ -112,7 +113,7 @@ OptimaBot, the community Discord bot (account linking), and the local Discord cl
 Updates arrive as installers; the app does not check for them.
 Everything that leaves the app as text is redacted: the log export, a copied report, crash zips
 and the support archive mask tokens, the Windows user name, the machine name and user profile
-paths, and so does the detail pane on the Logs page. The log files on disk are the raw
+paths, and so does the log's detail pane on the Debug page. The log files on disk are the raw
 originals and stay on the PC.
 
 Pressing "link account" in Settings sends the link code and the player identity to OptimaBot, once,

@@ -33,7 +33,7 @@ public sealed record LogEntry(LogRecord Record)
 }
 
 /// <summary>
-/// The log lines behind the LOGS page. A subclass only so that the trim can drop a whole chunk of
+/// The log lines behind the Log tab of DEBUG. A subclass only so that the trim can drop a whole chunk of
 /// old lines in a single change notification: removing them one by one raised a removal per line,
 /// and the virtualizing panel had to process each of them.
 /// </summary>

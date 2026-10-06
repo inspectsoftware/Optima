@@ -62,8 +62,7 @@ public sealed partial class MainViewModel : ObservableObject
         DisplayViewModel display,
         CompViewModel comp,
         BoostViewModel boost,
-        DiagnosticsViewModel diagnostics,
-        LogsViewModel logs,
+        DebugViewModel debug,
         SettingsViewModel settingsPage,
         DeveloperViewModel developer,
         NewsViewModel news,
@@ -89,8 +88,7 @@ public sealed partial class MainViewModel : ObservableObject
         Comp = comp;
         Boost = boost;
         Legal = legal;
-        Diagnostics = diagnostics;
-        Logs = logs;
+        Debug = debug;
         SettingsPage = settingsPage;
         Developer = developer;
         News = news;
@@ -118,8 +116,7 @@ public sealed partial class MainViewModel : ObservableObject
     public CompViewModel Comp { get; }
     public BoostViewModel Boost { get; }
     public LegalViewModel Legal { get; }
-    public DiagnosticsViewModel Diagnostics { get; }
-    public LogsViewModel Logs { get; }
+    public DebugViewModel Debug { get; }
     public SettingsViewModel SettingsPage { get; }
     public DeveloperViewModel Developer { get; }
     public NewsViewModel News { get; }
@@ -201,12 +198,11 @@ public sealed partial class MainViewModel : ObservableObject
         new("06", "BOOST"),
         new("07", "DISPLAY"),
         new("08", "SETTINGS", "SUPPORT"),
-        new("09", "DIAGNOSTICS"),
-        new("10", "LOGS"),
-        new("11", "NEWS"),
-        new("12", "UPDATES"),
-        new("13", "LEGAL"),
-        new("14", "DEVELOPER"),
+        new("09", "DEBUG"),
+        new("10", "NEWS"),
+        new("11", "UPDATES"),
+        new("12", "LEGAL"),
+        new("13", "DEVELOPER"),
     ];
 
     [ObservableProperty]
@@ -235,6 +231,13 @@ public sealed partial class MainViewModel : ObservableObject
         {
             return;
         }
+        // DEBUG took over from two pages that are still asked for by name (a HOME widget, an old
+        // shortcut, a link in an error): each of them now means one of its tabs.
+        if (DebugTabFor(page) is { } tab)
+        {
+            Debug.SelectedTab = tab;
+            page = "DEBUG";
+        }
         Breadcrumb = page.ToUpperInvariant();
         foreach (var item in NavItems)
         {
@@ -251,8 +254,7 @@ public sealed partial class MainViewModel : ObservableObject
             "COMP" => Comp,
             "BOOST" => Boost,
             "LEGAL" => Legal,
-            "DIAGNOSTICS" => Diagnostics,
-            "LOGS" => Logs,
+            "DEBUG" => Debug,
             "SETTINGS" => SettingsPage,
             "DEVELOPER" => Developer,
             "NEWS" => News,
@@ -282,8 +284,8 @@ public sealed partial class MainViewModel : ObservableObject
                 case LegalViewModel l:
                     await l.InitializeAsync();
                     break;
-                case DiagnosticsViewModel diag:
-                    await diag.InitializeAsync();
+                case DebugViewModel debug:
+                    await debug.InitializeAsync();
                     break;
                 case SettingsViewModel st:
                     await st.InitializeAsync();
@@ -304,6 +306,13 @@ public sealed partial class MainViewModel : ObservableObject
             _logger.LogError(ex, "Page initialization failed for {Page}", page);
         }
     }
+
+    private static DebugTab? DebugTabFor(string page) => page.ToUpperInvariant() switch
+    {
+        "DIAGNOSTICS" => DebugTab.Checks,
+        "LOGS" => DebugTab.Log,
+        _ => null,
+    };
 
     public async Task InitializeAsync()
     {
@@ -332,7 +341,7 @@ public sealed partial class MainViewModel : ObservableObject
             var settings = await _settings.GetSettingsAsync();
             DeveloperModeVisible = settings.DeveloperMode;
             RailCollapsed = settings.RailCollapsed;
-            App.LogLevelSwitch.MinimumLevel = LogsViewModel.ToSerilogLevel(settings.MinimumLogLevel);
+            App.LogLevelSwitch.MinimumLevel = LogStreamViewModel.ToSerilogLevel(settings.MinimumLogLevel);
             await ReloadSavedAccountsAsync();
             // SettingsChanged can fire from any thread; the collections must be touched on the UI one.
             _settings.SettingsChanged += async (_, _) => await Application.Current.Dispatcher.InvokeAsync(ReloadSavedAccountsAsync);
@@ -340,7 +349,7 @@ public sealed partial class MainViewModel : ObservableObject
             if (!settings.FirstRunCompleted)
             {
                 var wizard = new SetupWizardWindow { Owner = Application.Current.MainWindow };
-                var wizardViewModel = new SetupWizardViewModel(Status, Diagnostics, _settings, _firstRunFix);
+                var wizardViewModel = new SetupWizardViewModel(Status, Debug.Checks, _settings, _firstRunFix);
                 wizard.DataContext = wizardViewModel;
                 _ = wizardViewModel.RunDetectionAsync();
                 wizard.ShowDialog();

@@ -328,7 +328,7 @@ public sealed partial class PlayGuideViewModel : ObservableObject
             var failed = Steps.Count(s => s.State == PlayGuideCheckState.Fail);
             var warned = Steps.Count(s => s.State == PlayGuideCheckState.Warn);
             ScanStatus = scanFailed
-                ? "scan failed — see Logs"
+                ? "scan failed, see the log on the Debug page"
                 : (failed, warned) switch
                 {
                     (0, 0) => "all five steps check out — you are ready to play",

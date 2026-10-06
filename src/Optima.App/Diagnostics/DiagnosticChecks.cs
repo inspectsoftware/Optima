@@ -5,7 +5,7 @@ using Optima.Driver;
 
 namespace Optima.App.Diagnostics;
 
-/// <summary>Diagnostics page checks (§15/§16).</summary>
+/// <summary>The environment checks of DEBUG (§15/§16).</summary>
 public sealed class VirtualizationCheck : IDiagnosticCheck
 {
     private readonly ISystemInfoService _systemInfo;
@@ -370,7 +370,7 @@ public sealed class OptimaOverheadCheck : IDiagnosticCheck
             RecommendedFix = status == DiagnosticStatus.Pass
                 ? string.Empty
                 : "Close and reopen Optima; if the numbers stay this high while nothing is running, report " +
-                  "the readings on the Logs page so the cost can be tracked down.",
+                  "the readings in the log on the Debug page so the cost can be tracked down.",
         };
     }
 

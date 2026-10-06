@@ -154,7 +154,7 @@ public sealed class LaunchOrchestrator
                 return Fail("GAME_NOT_FOUND", "Critical Ops is not installed in Google Play Games.",
                     "Open Google Play Games and install Critical Ops, then try again.",
                     "Open Google Play Games and install Critical Ops",
-                    "Run detection again from the Diagnostics page");
+                    "Run detection again from the Checks tab on the Debug page");
             }
 
             await _recovery.SavePendingAsync(context.Snapshot, token).ConfigureAwait(false);
@@ -184,7 +184,7 @@ public sealed class LaunchOrchestrator
                     "Could not start Critical Ops.",
                     "Every launch strategy failed. Google Play Games may need an update or a repair.",
                     "Start Google Play Games manually and check it opens",
-                    "Re-run detection from the Diagnostics page",
+                    "Re-run detection from the Checks tab on the Debug page",
                     "Configure a custom launch command in Settings").ConfigureAwait(false);
             }
 
@@ -271,8 +271,8 @@ public sealed class LaunchOrchestrator
                     SuggestedFixes =
                     [
                         "Open developer details below: it names the step and what Windows reported",
-                        "Check the Logs page for details",
-                        "Run Diagnostics to verify the environment",
+                        "Check the log on the Debug page for details",
+                        "Run the checks on the Debug page to verify the environment",
                     ],
                     DeveloperDetails = $"phase: {phase}{Environment.NewLine}{ExceptionDetail.Capture(ex).FullText}",
                 },

@@ -141,7 +141,7 @@ public sealed partial class PlayViewModel : ObservableObject
             CrashBundleTimeText = written.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
             CrashBannerText =
                 "Critical Ops ended with failure markers in Google Play Games' logs. A crash bundle was saved with a " +
-                "timeline and the relevant log excerpt — export a redacted zip from Diagnostics to share it.";
+                "timeline and the relevant log excerpt — export a redacted zip from the Crashes tab on the Debug page to share it.";
         }
         catch (Exception ex)
         {
@@ -382,7 +382,7 @@ public sealed partial class PlayViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Kill game failed");
-            KillStatusText = "kill failed. See Logs.";
+            KillStatusText = "kill failed. See the log on the Debug page.";
         }
     }
 

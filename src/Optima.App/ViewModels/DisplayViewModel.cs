@@ -129,7 +129,7 @@ public sealed partial class DisplayViewModel : ObservableObject
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Display refresh failed");
-            StatusMessage = "Could not read display information. See Logs.";
+            StatusMessage = "Could not read display information. See the log on the Debug page.";
         }
     }
 
@@ -391,7 +391,7 @@ public sealed partial class DisplayViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Display operation failed");
-            StatusMessage = "The display operation failed. See Logs for details.";
+            StatusMessage = "The display operation failed. See the log on the Debug page for details.";
         }
         finally
         {

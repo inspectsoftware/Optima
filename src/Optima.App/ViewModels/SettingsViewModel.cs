@@ -596,7 +596,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         var autostartError = ApplyStartWithWindows();
 
-        App.LogLevelSwitch.MinimumLevel = LogsViewModel.ToSerilogLevel(LogLevel);
+        App.LogLevelSwitch.MinimumLevel = LogStreamViewModel.ToSerilogLevel(LogLevel);
 
         if (!accountValid)
         {

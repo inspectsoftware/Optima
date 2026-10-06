@@ -58,7 +58,7 @@ public sealed class WindowsGameTerminator : IGameTerminator
 
             return killed.Count > 0
                 ? new GameKillResult(true, $"killed {string.Join(", ", killed)}")
-                : new GameKillResult(false, failed > 0 ? "kill failed. See Logs." : "game not running");
+                : new GameKillResult(false, failed > 0 ? "kill failed. See the log on the Debug page." : "game not running");
         }, ct).ConfigureAwait(false);
     }
 }

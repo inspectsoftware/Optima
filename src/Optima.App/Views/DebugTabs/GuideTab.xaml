@@ -1,0 +1,67 @@
+<UserControl x:Class="Optima.App.Views.DebugTabs.GuideTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Error guide: one discrete place that explains every error code and its fix. -->
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="24,0,24,24">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="ERROR GUIDE">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding GuideStatus}" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.Ok}" VerticalAlignment="Center" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="filter" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <TextBox Grid.Column="1" Text="{Binding ErrorSearchText, UpdateSourceTrigger=PropertyChanged}"
+                     VerticalAlignment="Center" MaxWidth="360" HorizontalAlignment="Left" MinWidth="220"
+                     ToolTip="Filter by code, title or description" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding ErrorEntries}" Margin="0,10,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Expander Margin="0,0,0,6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                  <Expander.Header>
+                    <StackPanel Orientation="Horizontal">
+                      <Border Background="{DynamicResource Brush.Deep}" BorderBrush="{DynamicResource Brush.Hairline}"
+                              BorderThickness="1" Padding="6,2" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Code}" FontSize="{StaticResource Type.Micro}"
+                                   Foreground="{DynamicResource Brush.Accent}" />
+                      </Border>
+                      <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Label}" Margin="10,0,0,0"
+                                 VerticalAlignment="Center" />
+                      <Button Style="{StaticResource GhostButton}" Content="copy" Padding="6,0" Margin="10,0,0,0"
+                              VerticalAlignment="Center"
+                              Command="{Binding DataContext.CopyErrorCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}"
+                              ToolTip="Copy this entry as text" />
+                    </StackPanel>
+                  </Expander.Header>
+                  <!-- Selectable text: read-only TextBoxes so any part can be highlighted and copied. -->
+                  <StackPanel Margin="12,6,0,2">
+                    <TextBox Text="{Binding WhatHappened, Mode=OneWay}" Style="{StaticResource SelectableText}" />
+                    <TextBox Text="{Binding WhyItHappens, Mode=OneWay, StringFormat='Why: {0}'}" Style="{StaticResource SelectableText}"
+                             Margin="0,4,0,0" />
+                    <TextBlock Text="HOW TO FIX" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.Accent}"
+                               Margin="0,6,0,2" />
+                    <ItemsControl ItemsSource="{Binding HowToFix}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <TextBox Text="{Binding Mode=OneWay, StringFormat='- {0}'}" Style="{StaticResource SelectableText}"
+                                   Margin="0,1,0,1" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Expander>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

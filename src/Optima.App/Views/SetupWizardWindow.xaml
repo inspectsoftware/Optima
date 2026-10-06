@@ -102,7 +102,7 @@
             </Border>
 
             <HeaderedContentControl Style="{StaticResource Section}" Header="ENVIRONMENT CHECKS">
-              <ItemsControl ItemsSource="{Binding Diagnostics.Results}">
+              <ItemsControl ItemsSource="{Binding Checks.Results}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Grid Margin="0,3">

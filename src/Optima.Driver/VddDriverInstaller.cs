@@ -118,7 +118,7 @@ public sealed class VddDriverInstaller : IDriverInstaller
                 [
                     "Confirm the bundled driver package is digitally signed, since Windows refuses unsigned driver packages",
                     "Check that the package targets 64-bit Windows 11",
-                    "See the Logs page for the exact installer error",
+                    "See the log on the Debug page for the exact installer error",
                 ],
                 DeveloperDetails = $"inf: {package.InfPath}\nhardwareId: {package.HardwareId}\ncatalog present: {package.HasCatalog}",
             });
