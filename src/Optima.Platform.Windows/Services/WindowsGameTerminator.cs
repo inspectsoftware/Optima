@@ -45,7 +45,7 @@ public sealed class WindowsGameTerminator : IGameTerminator
                     _logger.LogInformation("Killed game process tree {Process}", label);
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException
-                    or System.ComponentModel.Win32Exception)
+                    or System.ComponentModel.Win32Exception or AggregateException)
                 {
                     failed++;
                     _logger.LogWarning(ex, "Could not kill process {Name}", process.ProcessName);

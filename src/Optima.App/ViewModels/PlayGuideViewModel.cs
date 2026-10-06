@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Optima.App.Diagnostics;
 using Optima.App.Services;
 using Optima.Core.Abstractions;
 using Optima.Core.Models;
@@ -278,6 +277,7 @@ public sealed partial class PlayGuideViewModel : ObservableObject
         }
         IsScanning = true;
         ActionStatus = string.Empty;
+        var scanFailed = false;
         try
         {
             ScanStatus = "scanning…";
@@ -320,19 +320,21 @@ public sealed partial class PlayGuideViewModel : ObservableObject
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Play guide scan failed");
-            ScanStatus = "scan failed — see Logs";
+            scanFailed = true;
         }
         finally
         {
             IsScanning = false;
             var failed = Steps.Count(s => s.State == PlayGuideCheckState.Fail);
             var warned = Steps.Count(s => s.State == PlayGuideCheckState.Warn);
-            ScanStatus = (failed, warned) switch
-            {
-                (0, 0) => "all five steps check out — you are ready to play",
-                (0, _) => "nothing blocking; the flagged step just needs a one-time confirmation",
-                _ => $"{failed} step(s) need attention — work through them in order",
-            };
+            ScanStatus = scanFailed
+                ? "scan failed — see Logs"
+                : (failed, warned) switch
+                {
+                    (0, 0) => "all five steps check out — you are ready to play",
+                    (0, _) => "nothing blocking; the flagged step just needs a one-time confirmation",
+                    _ => $"{failed} step(s) need attention — work through them in order",
+                };
             OnPropertyChanged(nameof(OverallStateText));
             OnPropertyChanged(nameof(GuideProgress));
             OnPropertyChanged(nameof(GuideProgressText));

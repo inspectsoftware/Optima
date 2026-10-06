@@ -344,8 +344,15 @@ public sealed partial class PerformanceViewModel : ObservableObject
         };
         if (dialog.ShowDialog() == true)
         {
-            await _profiles.ExportProfileAsync(SelectedProfile.Name, dialog.FileName);
-            EditorStatus = $"Exported to {dialog.FileName}.";
+            try
+            {
+                await _profiles.ExportProfileAsync(SelectedProfile.Name, dialog.FileName);
+                EditorStatus = $"Exported to {dialog.FileName}.";
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+            {
+                EditorStatus = "Could not write the export: " + ex.Message;
+            }
         }
     }
 
@@ -365,7 +372,8 @@ public sealed partial class PerformanceViewModel : ObservableObject
             SelectedProfile = Profiles.FirstOrDefault(p => p.Name == imported.Name);
             EditorStatus = $"Imported '{imported.Name}'.";
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.Text.Json.JsonException)
+        catch (Exception ex) when (ex is InvalidOperationException or System.Text.Json.JsonException
+            or System.IO.IOException or UnauthorizedAccessException)
         {
             EditorStatus = "That file is not a valid profile.";
             _logger.LogWarning(ex, "Profile import failed");

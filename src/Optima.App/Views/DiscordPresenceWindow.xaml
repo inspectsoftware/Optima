@@ -1,0 +1,94 @@
+<Window x:Class="Optima.App.Views.DiscordPresenceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="clr-namespace:Optima.App.Controls"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Optima"
+        Width="620" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Brush.Background}" UseLayoutRounding="True">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="0"
+                        CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Border Background="{DynamicResource Brush.Background}"
+          TextElement.Foreground="{DynamicResource Brush.Text}"
+          TextElement.FontFamily="{StaticResource Font.Body}"
+          TextElement.FontSize="{StaticResource Type.Body}">
+    <Grid>
+      <ctl:AmbientField x:Name="Ambient" />
+      <Grid Margin="12" ctl:GlassPanel.Backdrop="{Binding ElementName=Ambient}">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="28" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ctl:TitleBar Grid.Row="0" ShowMinimize="False" ShowMaximize="False" Breadcrumb="OPTIMA · DISCORD CARD" />
+
+        <ctl:GlassPanel Grid.Row="1" Chamfer="{StaticResource Chamfer.Strip}" Padding="20,16,20,16"
+                        Tint="{DynamicResource Color.Glass.Tint}"
+                        TopLine="{DynamicResource Brush.Strip.Top}"
+                        BottomLine="{DynamicResource Brush.Strip.Bottom}"
+                        LeadingEdge="{DynamicResource Brush.Strip.Edge}">
+          <ctl:GlassPanel.Child>
+            <StackPanel>
+              <TextBlock Text="What the Discord card shows" FontSize="{StaticResource Type.Title}" FontWeight="SemiBold" />
+              <TextBlock Style="{StaticResource Text.Micro}" Margin="0,6,0,0" TextWrapping="Wrap"
+                         Text="Every friend who sees the activity sees these fields, so this is a privacy choice as much as a cosmetic one. Start from a preset, then tick exactly what you want - a card carrying nothing but the game name is fine too." />
+
+              <WrapPanel Margin="0,12,0,0">
+                <Button Content="Minimal" Padding="12,5" Margin="0,0,8,0" Click="OnPresetMinimal"
+                        ToolTip="The game and your fps only" />
+                <Button Content="Standard (name + rank)" Padding="12,5" Margin="0,0,8,0" Click="OnPresetStandard"
+                        ToolTip="Adds your name, rank, emblem and ranked record" />
+                <Button Content="Full (adds rating)" Padding="12,5" Margin="0,0,8,0" Click="OnPresetFull"
+                        ToolTip="Standard plus your ranked rating" />
+              </WrapPanel>
+
+              <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition />
+                  <ColumnDefinition />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                  <CheckBox x:Name="FpsCheck" Content="live fps while the game runs" Margin="0,4" />
+                  <CheckBox x:Name="NameCheck" Content="your in-game name" Margin="0,4" />
+                  <CheckBox x:Name="RankCheck" Content="rank tier and division" Margin="0,4" />
+                  <CheckBox x:Name="EmblemCheck" Content="rank emblem beside the artwork" Margin="0,4" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                  <CheckBox x:Name="RecordCheck" Content="ranked win-loss record" Margin="0,4" />
+                  <CheckBox x:Name="RatingCheck" Content="ranked rating (MMR)" Margin="0,4" />
+                  <CheckBox x:Name="TimerCheck" Content="session timer" Margin="0,4" />
+                </StackPanel>
+              </Grid>
+
+              <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="150" />
+                  <ColumnDefinition />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="status line" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
+                <ComboBox x:Name="StatusCombo" Grid.Column="1" Width="250" HorizontalAlignment="Left">
+                  <ComboBoxItem Content="the app name only" />
+                  <ComboBoxItem Content="what you are doing" />
+                  <ComboBoxItem Content="the live status" />
+                </ComboBox>
+              </Grid>
+
+              <TextBlock x:Name="SummaryText" Style="{StaticResource Text.Micro}" Margin="0,12,0,0"
+                         TextWrapping="Wrap" Foreground="{DynamicResource Brush.Accent}" />
+
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="Cancel" Style="{StaticResource GhostButton}" MinWidth="90" Margin="0,0,8,0"
+                        IsCancel="True" />
+                <Button Content="Use these fields" Style="{StaticResource PrimaryButton}" MinWidth="170"
+                        IsDefault="True" Click="OnAccept" />
+              </StackPanel>
+            </StackPanel>
+          </ctl:GlassPanel.Child>
+        </ctl:GlassPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

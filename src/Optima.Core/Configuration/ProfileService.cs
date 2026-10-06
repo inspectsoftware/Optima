@@ -122,7 +122,7 @@ public sealed class ProfileService
 
     public async Task<LaunchProfile> ImportProfileAsync(string sourcePath, CancellationToken ct = default)
     {
-        var profile = await _store.LoadAsync<LaunchProfile>(sourcePath, ct).ConfigureAwait(false)
+        var profile = await _store.ReadExternalAsync<LaunchProfile>(sourcePath, ct).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"'{sourcePath}' does not contain a valid profile.");
         var imported = profile with { IsBuiltIn = false };
         await SaveProfileAsync(imported, ct).ConfigureAwait(false);

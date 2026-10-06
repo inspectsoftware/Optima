@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Optima.Core.Abstractions;
 using Microsoft.Win32;
 

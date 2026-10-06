@@ -46,6 +46,29 @@ public sealed class JsonStore
     }
 
     /// <summary>
+    /// Reads a file Optima does not own (one the user picked). Unlike <see cref="LoadAsync"/> a file
+    /// that does not parse is left exactly where it is.
+    /// </summary>
+    public async Task<T?> ReadExternalAsync<T>(string path, CancellationToken ct = default) where T : class
+    {
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            await using var stream = File.OpenRead(path);
+            return await JsonSerializer.DeserializeAsync<T>(stream, Options, ct).ConfigureAwait(false);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "{Path} is not valid JSON for {Type}", path, typeof(T).Name);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Synchronous counterpart to <see cref="LoadAsync"/> for startup paths that must complete
     /// before the first frame is painted.
     /// </summary>

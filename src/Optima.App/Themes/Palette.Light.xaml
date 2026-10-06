@@ -4,7 +4,6 @@
   <Color x:Key="Color.WindowGround">#D9F2F1EE</Color>
   <Color x:Key="Color.Surface">#FFFAF9F7</Color>
   <Color x:Key="Color.SurfaceRaised">#FFFFFFFF</Color>
-  <Color x:Key="Color.SurfaceHover">#FFEDEBE6</Color>
   <Color x:Key="Color.Hairline">#FFDDD9D2</Color>
   <Color x:Key="Color.HairlineStrong">#FFC9C4BA</Color>
   <Color x:Key="Color.Deep">#FFE9E7E2</Color>
@@ -21,7 +20,6 @@
   <SolidColorBrush x:Key="Brush.WindowGround" Color="{DynamicResource Color.WindowGround}" />
   <SolidColorBrush x:Key="Brush.Surface" Color="{DynamicResource Color.Surface}" />
   <SolidColorBrush x:Key="Brush.SurfaceRaised" Color="{DynamicResource Color.SurfaceRaised}" />
-  <SolidColorBrush x:Key="Brush.SurfaceHover" Color="{DynamicResource Color.SurfaceHover}" />
   <SolidColorBrush x:Key="Brush.Hairline" Color="{DynamicResource Color.Hairline}" />
   <SolidColorBrush x:Key="Brush.HairlineStrong" Color="{DynamicResource Color.HairlineStrong}" />
   <SolidColorBrush x:Key="Brush.Deep" Color="{DynamicResource Color.Deep}" />
@@ -52,8 +50,6 @@
   <Color x:Key="Color.ChromaRed">#FFD94A38</Color>
   <Color x:Key="Color.ChromaBlue">#FF3F78D6</Color>
   <Color x:Key="Color.Glass.Tint">#26FFFFFF</Color>
-  <SolidColorBrush x:Key="Brush.ChromaRed" Color="{DynamicResource Color.ChromaRed}" />
-  <SolidColorBrush x:Key="Brush.ChromaBlue" Color="{DynamicResource Color.ChromaBlue}" />
   <SolidColorBrush x:Key="Brush.Strip.Top" Color="#B3FFFFFF" />
   <SolidColorBrush x:Key="Brush.Strip.Bottom" Color="#33000000" />
   <LinearGradientBrush x:Key="Brush.Strip.Edge" StartPoint="0,0" EndPoint="0,1">
@@ -68,7 +64,6 @@
   <SolidColorBrush x:Key="Brush.Field" Color="#14000000" />
   <SolidColorBrush x:Key="Brush.Field.Outline" Color="#22000000" />
   <SolidColorBrush x:Key="Brush.Tile" Color="#0F000000" />
-  <SolidColorBrush x:Key="Brush.Scrim" Color="#26FFFFFF" />
   <DrawingBrush x:Key="Brush.Grid" TileMode="Tile"
                 Viewport="0,0,48,48" ViewportUnits="Absolute"
                 Viewbox="0,0,48,48" ViewboxUnits="Absolute" Stretch="None">
@@ -94,10 +89,6 @@
   <SolidColorBrush x:Key="Brush.AccentPressed" Color="#FF986A19" />
   <SolidColorBrush x:Key="Brush.AccentGlow" Color="#40B07B1E" />
 
-  <SolidColorBrush x:Key="Brush.Border" Color="{DynamicResource Color.Hairline}" />
-  <SolidColorBrush x:Key="Brush.Success" Color="{DynamicResource Color.Ok}" />
-  <SolidColorBrush x:Key="Brush.Warning" Color="{DynamicResource Color.Warn}" />
-  <SolidColorBrush x:Key="Brush.Error" Color="{DynamicResource Color.Fail}" />
 
   <DrawingBrush x:Key="Brush.DotLeader"
                 TileMode="Tile"

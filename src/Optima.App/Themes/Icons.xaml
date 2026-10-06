@@ -4,10 +4,9 @@
   <Geometry x:Key="Icon.Play">M7 4v16l13-8z</Geometry>
   <Geometry x:Key="Icon.Performance">M3 12h4l3-8 4 16 3-8h4</Geometry>
   <Geometry x:Key="Icon.Sessions">M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7v5l3 2</Geometry>
-  <Geometry x:Key="Icon.System">M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3</Geometry>
   <Geometry x:Key="Icon.Comp">M4 20V10M10 20V4M16 20v-7M22 20H2</Geometry>
+  <Geometry x:Key="Icon.Boost">M13 2L4 14h7l-1 8 9-12h-7l1-8z</Geometry>
   <Geometry x:Key="Icon.Display">M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M8 20h8M12 16v4</Geometry>
-  <Geometry x:Key="Icon.Explore">M6 9H4.5a2.5 2.5 0 0 1 0-5H6 M18 9h1.5a2.5 2.5 0 0 0 0-5H18 M4 22h16 M10 14.66V17c0 .55 -.47 .98 -.97 1.21C7.85 18.75 7 20.24 7 22 M14 14.66V17c0 .55 .47 .98 .97 1.21C16.15 18.75 17 20.24 17 22 M18 2H6v7a6 6 0 0 0 12 0V2Z</Geometry>
   <Geometry x:Key="Icon.Settings">M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1</Geometry>
   <Geometry x:Key="Icon.Diagnostics">M12 3l9 16H3z M12 10v4M12 17h.01</Geometry>
   <Geometry x:Key="Icon.Logs">M4 5h16M4 12h10M4 19h13</Geometry>
@@ -22,13 +21,7 @@
   <Geometry x:Key="Icon.Minimize">M5 12h14</Geometry>
   <Geometry x:Key="Icon.Maximize">M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z</Geometry>
   <Geometry x:Key="Icon.Restore">M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2 M6 8h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z</Geometry>
-  <Geometry x:Key="Icon.Refresh">M21 12a9 9 0 1 1-2.6-6.4 M21 4v5h-5</Geometry>
-  <Geometry x:Key="Icon.Kill">M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M9 9l6 6M15 9l-6 6</Geometry>
   <Geometry x:Key="Icon.Rail">M4 6h16M4 12h10M4 18h16</Geometry>
   <Geometry x:Key="Icon.Dot">M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z</Geometry>
   <Geometry x:Key="Icon.Circle">M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z</Geometry>
-  <Geometry x:Key="Icon.Optima">M5 5h14v14H5z M9 9h6v6H9z</Geometry>
-  <Geometry x:Key="Icon.Watchdog">M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z</Geometry>
-  <Geometry x:Key="Icon.VirtualDisplay">M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M8 20h8M12 16v4 M8 8h8M8 12h5</Geometry>
-  <Geometry x:Key="Icon.Session">M4 6h16M4 12h16M4 18h9 M17 16l2 2 4-4</Geometry>
 </ResourceDictionary>

@@ -63,7 +63,7 @@ the desktop, so it is never created.
 
 Uninstall reverses steps 2 and 1, and is available from the Display page once installed.
 
-The helper writes its own log to `%LOCALAPPDATA%\Optima\logs\optima-elevated-<date>.log`.
+The helper writes its own log to `%LOCALAPPDATA%\Optima\logs\optima-watchdog-<date>.log`.
 It runs elevated with no console, so without that log every failure inside it is invisible
 to the caller.
 

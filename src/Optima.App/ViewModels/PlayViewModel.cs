@@ -71,15 +71,6 @@ public sealed partial class ProfileChip : ObservableObject
 /// </summary>
 public sealed partial class PlayViewModel : ObservableObject
 {
-    private static readonly LaunchPhase[] StepPhases =
-    [
-        LaunchPhase.Validating,
-        LaunchPhase.ApplyingPerformanceProfile,
-        LaunchPhase.ConfiguringDisplay,
-        LaunchPhase.StartingPlatform,
-        LaunchPhase.Restoring,
-    ];
-
     private readonly LaunchOrchestrator _orchestrator;
     private readonly ProfileService _profiles;
     private readonly SettingsService _settings;
@@ -90,6 +81,7 @@ public sealed partial class PlayViewModel : ObservableObject
     private readonly CrashSentinel _crashSentinel;
     private readonly AppPaths _paths;
     private readonly ILogger<PlayViewModel> _logger;
+    private readonly Optima.Monitoring.Metrics.StandbyCleanerService _standbyCleaner;
     private CancellationTokenSource? _sessionCts;
     private DispatcherTimer? _elapsedTimer;
 
@@ -103,8 +95,10 @@ public sealed partial class PlayViewModel : ObservableObject
         PlayGuideViewModel playGuide,
         CrashSentinel crashSentinel,
         AppPaths paths,
+        Optima.Monitoring.Metrics.StandbyCleanerService standbyCleaner,
         ILogger<PlayViewModel> logger)
     {
+        _standbyCleaner = standbyCleaner;
         _orchestrator = orchestrator;
         _profiles = profiles;
         _settings = settings;
@@ -215,7 +209,7 @@ public sealed partial class PlayViewModel : ObservableObject
     private TimeSpan _sessionElapsed;
 
     public string SessionTag => IsSessionActive
-        ? $"RUNNING {SessionElapsed:mm\\:ss}"
+        ? $"RUNNING {(int)SessionElapsed.TotalMinutes:00}:{SessionElapsed.Seconds:00}"
         : "IDLE";
 
     public string ElapsedText => $"{SessionElapsed:hh\\:mm\\:ss}";
@@ -305,6 +299,9 @@ public sealed partial class PlayViewModel : ObservableObject
 
         try
         {
+            // BOOST's memory cleaner needs the elevated helper; PLAY is where its one admin prompt
+            // belongs, before the game covers the screen. A no-op with the cleaner off.
+            await _standbyCleaner.SyncAsync(allowPrompt: true);
             _crashRelaunch.NoteSessionStart(profile);
             var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, _sessionCts.Token));
             if (result.Success)
@@ -463,6 +460,12 @@ public sealed partial class PlayViewModel : ObservableObject
 
     private void MarkLiveFailed()
     {
+        // A failure is reported twice (by the phase and by the result); the second report finds no
+        // live step and must not blame the first one.
+        if (Steps.Any(s => s.State == StepState.Failed))
+        {
+            return;
+        }
         var live = Steps.FirstOrDefault(s => s.State == StepState.Live) ?? Steps[0];
         live.State = StepState.Failed;
     }

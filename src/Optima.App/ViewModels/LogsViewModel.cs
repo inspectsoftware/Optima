@@ -41,13 +41,19 @@ public sealed partial class LogsViewModel : ObservableObject
 
     /// <summary>The error guide, filtered by the guide's own search box.</summary>
     public IReadOnlyList<ErrorCatalogEntry> ErrorEntries
-        => ErrorSearchText.Trim().Length == 0
-            ? ErrorCatalog.All
-            : ErrorCatalog.All
-                .Where(e => e.Code.Contains(ErrorSearchText, StringComparison.OrdinalIgnoreCase)
-                    || e.Title.Contains(ErrorSearchText, StringComparison.OrdinalIgnoreCase)
-                    || e.WhatHappened.Contains(ErrorSearchText, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+    {
+        get
+        {
+            var search = ErrorSearchText.Trim();
+            return search.Length == 0
+                ? ErrorCatalog.All
+                : ErrorCatalog.All
+                    .Where(e => e.Code.Contains(search, StringComparison.OrdinalIgnoreCase)
+                        || e.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
+                        || e.WhatHappened.Contains(search, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+        }
+    }
 
     partial void OnErrorSearchTextChanged(string value) => OnPropertyChanged(nameof(ErrorEntries));
 
@@ -107,8 +113,15 @@ public sealed partial class LogsViewModel : ObservableObject
 
         // Tokens or credentials never belong in an exported log (§17).
         var lines = Entries.Select(e => LogRedactor.Redact($"{e.TimeText} [{e.Level,-8}] {e.Source}: {e.Message}"));
-        await File.WriteAllLinesAsync(dialog.FileName, lines);
-        StatusMessage = $"Exported {Entries.Count} entries.";
+        try
+        {
+            await File.WriteAllLinesAsync(dialog.FileName, lines);
+            StatusMessage = $"Exported {Entries.Count} entries.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusMessage = "Could not write the export: " + ex.Message;
+        }
     }
 
     [RelayCommand]

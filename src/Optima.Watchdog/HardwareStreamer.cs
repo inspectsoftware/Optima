@@ -35,7 +35,7 @@ public sealed class HardwareStreamer : IDisposable
     {
         try
         {
-            float? cpuTemp = null, gpuTemp = null, cpuLoad = null, gpuLoad = null;
+            float? cpuTemp = null, cpuPackageTemp = null, gpuTemp = null, cpuLoad = null, gpuLoad = null;
             foreach (var hardware in _computer.Hardware)
             {
                 hardware.Update();
@@ -57,10 +57,11 @@ public sealed class HardwareStreamer : IDisposable
                             if (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase)
                                 || sensor.Name.Contains("Tctl", StringComparison.OrdinalIgnoreCase))
                             {
-                                cpuTemp = value;
+                                cpuPackageTemp = value;
                             }
-                            else
+                            else if (!sensor.Name.Contains("Distance", StringComparison.OrdinalIgnoreCase))
                             {
+                                // "Distance to TjMax" is headroom, not a temperature.
                                 cpuTemp = Math.Max(cpuTemp ?? float.MinValue, value);
                             }
                             break;
@@ -85,7 +86,7 @@ public sealed class HardwareStreamer : IDisposable
                 Kind = "hardwareSample",
                 Data = new Dictionary<string, string>
                 {
-                    ["cpuTempC"] = Format(cpuTemp),
+                    ["cpuTempC"] = Format(cpuPackageTemp ?? cpuTemp),
                     ["gpuTempC"] = Format(gpuTemp),
                     ["cpuLoadPct"] = Format(cpuLoad),
                     ["gpuLoadPct"] = Format(gpuLoad),

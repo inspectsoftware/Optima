@@ -73,22 +73,6 @@ public sealed class DiagnosticStatusToBrushConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-public sealed class DiagnosticStatusToTextConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        => value switch
-        {
-            DiagnosticStatus.Pass => "PASS",
-            DiagnosticStatus.Warning => "WARN",
-            DiagnosticStatus.Fail => "FAIL",
-            DiagnosticStatus.Skipped => "SKIP",
-            _ => "?",
-        };
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        => throw new NotSupportedException();
-}
-
 /// <summary>Bracket tag for a diagnostic row.</summary>
 public sealed class DiagnosticStatusToTagConverter : IValueConverter
 {

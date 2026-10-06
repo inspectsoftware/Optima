@@ -4,6 +4,207 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-05 - Indev: no bot address to look at
+
+- Removed: the bot address row in SETTINGS, and the same line in the link window. Linking goes through Optima's community bot, and nobody linking an account needs to see or type where that is.
+- Running your own bot still works: set discordBotUrl in config.json. An address already saved there is kept.
+
+## 2026-10-05 - Indev: a new splash, and one that actually plays
+
+- New: the launch splash, built around the new mark. A silver square appears, the four blades fly in clockwise and lock around it, a band of light crosses the mark and OPTIMA is set letter by letter. When the app is ready the blades leave the way they came and the centre square opens onto the main window underneath.
+- Fixed: the splash often stood still or stuttered. It ran on the same thread that starts the app, so it could only move in the gaps, and it switched its own animation off whenever Optima was not yet the foreground window, which at launch is always. It now runs on a thread of its own and follows only Windows' animation setting.
+- The intro always plays in full, however fast startup was, and the line under the name fills with the startup stages Optima is really going through.
+- With Windows animations off the splash shows the finished mark and name, still, and closes without motion.
+
+## 2026-10-05 - Indev: the Boost dial
+
+- New on BOOST: the master switch, a round dial at the top of the page. One click arms every feature ticked below, together; a second click switches them all off and puts back everything they changed.
+- Clicking it plays the run: the gold ring comes apart into six segments, the two sets spin against each other while the centre counts the features arming, and they lock back into a violet-to-green ring that reads ENABLED. Switching off drains it back to gold.
+- The run plays only for a click, and not at all while the game is running or with Windows animations off: then the dial simply changes state.
+- Boost now starts switched off. The ticks under the dial are kept as they were and show STANDBY until it is switched on; in particular the priority guard, which used to run on its own, now waits for the dial. A session started with PLAY still applies the chosen priority either way.
+
+## 2026-10-05 - Indev: Boost keeps cores awake and picks the fast graphics adapter
+
+- New on BOOST: keep every processor core awake while the game is on screen. Windows parks idle cores and wakes them on demand, and the wake-up is a small hitch. The switch raises the active power plan's floor for the match and writes the plan's own value back when the game leaves; after a crash, the next start does. It changes nothing on High or Ultimate Performance, which already keep all cores awake.
+- New on BOOST: ask Windows to run the game on the high-performance graphics adapter. It is the same per-app choice as Windows Settings, Display, Graphics, set for you once Optima has seen where the game is installed. It matters on a PC with two graphics adapters and does nothing on a PC with one.
+- Both are off by default. Neither needs administrator rights, and neither touches the game's process.
+
+## 2026-10-05 - Indev: Boost moves background programs out of the way
+
+- New on BOOST: background programs. While Critical Ops is on screen, the programs on your list run at below-normal priority in Windows' efficiency mode, so they get processor time only when the game is not asking for it. Nothing is closed.
+- The list starts with the usual heavy ones (browsers, game launchers, cloud sync) and is yours to edit, one process name per line. Voice and music apps are left out on purpose.
+- Programs that start mid-game are caught within twenty seconds. When the game leaves, the switch is turned off or Optima closes, each program gets back exactly the priority it had; if Optima itself dies mid-game, the next start puts them back.
+- Windows, the game, Google Play Games and Optima itself are never touched, whatever the list says.
+- A process found at below-normal or idle priority is now restored to that, not rounded up to normal. Off by default.
+
+## 2026-10-05 - Indev: Boost holds the timer, and knows which Windows it is on
+
+- New on BOOST: timer resolution. While the game is on screen Optima holds a 1.0 ms or 0.5 ms system timer and lets go the moment the game leaves. The page reports what Windows actually applied, not what was asked for.
+- Windows versions treat this differently, so the page says what yours does. Before Windows 10 version 2004 a request reaches every program, the game included. Windows 10 from 2004 to 22H2 keeps a request inside the program that made it and has no switch for that, so there the page says plainly that Optima's hold cannot reach the game. Windows 11 keeps it inside the program too, and can ignore the request of a program whose window is hidden.
+- On Windows 11, Optima tells Windows to always honour the game's own timer request, and its own while it sits behind the game.
+- New tweak, Windows 11 only: system-wide timer resolution requests. With it on, the timer Optima holds reaches the game. It is a machine-wide setting, needs the administrator prompt and a restart, and is listed on PERFORMANCE and switchable from BOOST.
+- Off by default. A finer timer costs some battery life.
+
+## 2026-10-05 - Indev: the public API only, and EXPLORE is gone
+
+- Removed: the EXPLORE page. Its Elite, Ranked, Casual and Clans boards read /api/leaderboard on Critical Force's server, which is not part of the public API, and asking that side of the API can get an account banned. The public API has no leaderboards, so the page had nothing left to stand on.
+- Every Critical Ops request Optima makes now goes to https://default.prod.copsapi.criticalforce.fi/api/public/ and nowhere else on that host. The client refuses any other address before a request is sent, so a later change cannot reach outside it by accident.
+- Nothing else changes: your own stats, tracked players, session stats and the Discord card were already read from the public profile endpoint.
+- BOOST is now Alt+6 and DISPLAY Alt+7, following the rail.
+
+## 2026-10-05 - Indev: Boost cleans the standby list
+
+- New on BOOST: the memory cleaner, which does what ISLC does. While Critical Ops is on screen it watches Windows' free memory and standby list, and empties the standby list when free memory is below one threshold and the standby list is above another. Both thresholds are yours; they start at ISLC's 1024 MB and 1024 MB.
+- The page shows the live free and standby figures, how often it purged and how much the last purge released, and has a purge now button that works with the cleaner off.
+- It only runs while the game is on screen, and it works on Windows' own file cache: no process has its memory touched, the game least of all.
+- It needs the elevated helper. Switching it on, PLAY and purge now may each show one administrator prompt per Optima run. A game opened without Optima never causes a prompt: the page says the helper is missing and offers to start it.
+- Off by default. A purge cannot be undone and has nothing to undo: Windows refills the cache as files are read again. The Legal page and the README now say so.
+
+## 2026-10-05 - Indev: Boost, and a guard on the game's priority
+
+- New: the BOOST page, in the TUNE group (Alt+O). It gathers what Optima does while the game runs to keep it smooth; this build brings its first part.
+- New: the priority guard. The game keeps the priority you chose for as long as it runs, however it was started: opened straight from Google Play Games, restarted after a crash, or lowered by another program, it is put right within ten seconds. Until now that only held inside a session started with PLAY, and only for the one process that session began with.
+- The guard covers every game process, picks up a changed choice at once, and says on the page what it is holding, since when and how often it had to correct it. It steps aside while an Optima session keeps the priority itself, and puts the original priority back when it is switched off or Optima closes.
+- The game priority choice moved from SETTINGS to BOOST, next to the guard's switch. The stored setting is the same one, so nothing has to be chosen again.
+
+## 2026-10-05 - Indev: updates come as installers
+
+- Removed: the LAUNCHER panel on the Updates page, with its check, download and roll back buttons. New builds are delivered as installers, so the app no longer checks GitHub for releases and no longer contacts api.github.com at all. The page keeps the build line and the update log.
+- The Legal page and the README list of everything Optima talks to no longer name GitHub, and now name the two Discord requests they had missed.
+
+## 2026-10-05 - Indev: the audit pass
+
+- Fixed: every Ultimate Performance apply created one more Windows power plan; Optima now makes one copy and reuses it.
+- Fixed: crash auto-relaunch could relaunch forever, because the relaunch itself reset the once-per-outage count.
+- Fixed: after a crash, recovery left the virtual display device enabled; a driver that would not reload skipped the same step.
+- Fixed: Restart Google Play Games could stop unrelated programs named client or Service; it now only touches processes that run from a Play Games folder.
+- Fixed: the session tweaks (Game Bar off, fullscreen optimizations off) never applied. They do now, for the length of a session.
+- Fixed: batch player lookups kept only the first profile of each answer, so a clan roster cost about twice as many requests as it has members.
+- Fixed: two settings saves at the same moment could drop one of them; importing a file that is not a profile renamed that file.
+- Fixed: the setup guide's Next button always said Finish and closed the guide; a failed scan reported ready to play.
+- Fixed: the first-run finish could crash on HOME; several Settings rows (tracked players, account id, accent, crash relaunch) saved wrongly or not at all.
+- Fixed: Explore drew the mode rows over their header and four clan lines with a broken format; Performance showed the GPU temperature on the CPU tile.
+- Fixed: exporting to a file that is open elsewhere closed the app; the weekly playtime wrapped at 24 hours and the session timer at 60 minutes.
+- Fixed in the build: the Inno Setup download address, the publish check that compared against the wrong folder, and a stale helper in runtime builds.
+- Removed: the last hooks of the developer emulator launcher, two unused packages, unused theme resources and other dead code.
+
+## 2026-10-04 - Indev: OptimaBot, and the stats card it draws
+
+- New: linking is prefilled with Optima's community bot, so a fresh install runs /link, pastes the code into Settings and is done, with no address to type. Installs carrying the old built-in local address are moved to the community bot automatically. Running your own bot means replacing that address, and if a local one does not answer, the message now names the community bot's address.
+- New: OptimaBot, the Discord bot that goes with Optima. `/searchplayer` posts a stats card for any
+  Critical Ops player by name or account id, and `/link` hands you the code that links your Discord
+  account to the game account Optima already tracks. It is a separate program with its own
+  repository, so nothing here depends on it.
+- Linking is a code handshake, not a login: run /link in Discord, the bot answers you privately with a
+  code that works once and expires, and you type it into Settings under DISCORD, link account. Optima
+  then sends the code with the account it already tracks, and the bot checks both halves before it
+  writes a link: the code proves the Discord side, the public stats API proves the game side. The app
+  never holds a Discord credential and the bot never sees a password.
+- The new Settings rows hold the bot's address (prefilled with Optima's community bot, and a self-hosted bot replaces it) and the link
+  itself, which shows as "linked to <player> as <tag>" once the bot confirms it. To undo it, run the
+  bot's unlink command where the bot is hosted.
+- The card is Optima's own, not a copy of anyone else's: a chamfered dark board, the player's rank
+  colour as the whole card's accent (so a Platinum card is ice blue and a Gold card is amber), the
+  app's Space Grotesk for the numbers with Inter for the small text, both shipped inside the bot so a
+  card drawn on a Linux host looks like one drawn here.
+- More than the cards you may have seen elsewhere: the rank emblem and the player's own rank colour,
+  level and XP, the clan and when they joined it, the division inside the rank, the rating left to the
+  next tier, the peak rank and the global position, this season against lifetime, casual and custom
+  together, career totals for every mode, a per-season K/D trend with the best season called out, win
+  rate by season, and the standing line that says whether the account carries a ban. A linked card also
+  says so, which is a fact no typed-in name can offer.
+- Nothing on the card is invented. Every number is derived from the public profile in one place, in
+  the bot, where tests pin it against the numbers a comparable stats card published for the same
+  profile, including the cases that used to be handled badly: a player still being placed is no longer
+  given a division, and a ban object the API returns for accounts in clean standing is no longer read
+  as a ban. The parsing and the rank ladder it reads live here, in Core.
+- The bot is a separate, optional program in its own repository,
+  github.com/inspectsoftware/OptimaBot: one command starts it, its README covers the token, the address
+  the app should use and how to deploy it. Building Optima does not need it, and installing Optima does
+  not install it.
+- Optima Link tracking: paste a Discord channel webhook in Settings under DISCORD and, after linking, the
+  bot posts your new matches (wins, losses and the K/D of those matches) and any rank change to that
+  webhook as one image: the same card /searchplayer draws, with a band under it carrying what changed.
+  The first check after linking only records a baseline, so nothing from before the link is
+  announced, and a relink without a webhook turns tracking off.
+- A send test image button sits beside the tracker webhook row: it asks the bot to draw a sample report
+  and deliver it to the URL as typed, so the channel and the webhook itself can be checked before a
+  match happens.
+- Link codes now live five minutes instead of fifteen.
+- The card carries Optima and its logo in the top middle, with the Discord invite discord.gg/6fzKxA75Nq
+  beside it, on every card the bot draws, tracker posts included.
+- The rank emblems are drawn with cubic sampling, so the 75 px source art no longer looks blocky at the
+  size the card paints it.
+- OptimaBot can be installed to a Discord account as well as to a server: its commands declare user
+  install and the DM and group contexts, and they register globally, so /link and /searchplayer work in
+  DMs and group chats too.
+
+## 2026-10-03 - Indev: HOME is yours, with priority and Discord card choices
+
+- HOME is editable now. The new "edit widgets" button on HOME opens EDIT WIDGETS, which lists every
+  card from every tab grouped under the tab it comes from. Drag a card onto HOME to add it in the
+  position you want, drag a card HOME already owns to reorder it, and drop a card back on the list
+  (or press remove) to take it off. HOME holds at most 10; an eleventh is refused and says why.
+- The layout is remembered as you change it and comes back exactly as you left it, including across
+  restarts. Until you edit it once, HOME shows the six cards it has always shown, and emptying it is
+  a choice it keeps rather than a reset.
+- New setting: game priority for the Google Play Games process that runs Critical Ops. Unchanged
+  lets the selected launch profile decide, as before; Normal, AboveNormal and High pin one priority
+  for every session, including watchdog auto-attach, so a profile that names no priority can still
+  get one from here.
+- That priority is now held for the whole session rather than applied once at the start. While
+  Critical Ops runs, Optima re-checks the Google Play Games process every ten seconds and puts the
+  selected priority, the CPU affinity and the power throttling state back if anything changed them,
+  so another program cannot quietly demote the game mid-match. The same keeper runs for a watchdog
+  auto-attach, and it stops the moment the game exits so nothing is left pinned.
+- A new Discord card fields window (Settings, DISCORD, "choose what is shown") decides exactly what
+  the Discord activity carries. Start from Minimal, Standard (the name and rank card) or Full (adds
+  rating), or tick each fact yourself: name, rank tier, rank emblem, ranked record, rating, live fps
+  and the session timer. The status line is its own choice: the app name only, what you are doing, or
+  the live status. The current selection is summarised next to the button, and the older card detail
+  setting is still read so an existing config keeps the look it had.
+- The Discord card's button now reads Beta instead of Private Beta, and the README carries Optima's
+  Discord invite (https://discord.gg/bGuJ4tvsF7) in a Community section.
+## 2026-10-03 - Indev: the setup replaces an existing install cleanly
+
+- Fixed: the setup could stop with a runtime error ("An attempt was made to expand the app
+  constant before it was initialized") as it opened, before anything was installed. The
+  upgrade check was asking for the install folder on the wizard's first page, where that
+  value does not exist yet. It now reads the previous install from the registry, which is
+  available from the very first moment, so the wizard opens normally.
+
+- Running the setup over an install you already have now replaces it instead of merging into
+  it. The old files are cleared first, so anything a new build renamed or dropped cannot be
+  left behind next to the new one, where a stale file could quietly be loaded instead.
+- This fixes installs that had been upgraded a few times: the folder now ends up holding
+  exactly the new build and nothing else. An install that had collected leftovers from
+  earlier versions was carrying well over a hundred files that no longer belonged to it.
+- The upgrade is stated up front: the first page names the version being replaced and says
+  your settings, profiles and session history are kept. They live outside the install folder
+  and are never touched, and uninstalling still leaves them alone.
+- Add/Remove Programs shows the new version after the replacement, and the uninstaller keeps
+  working, so an upgraded install can still be removed normally.
+
+## 2026-10-03 - Indev: a richer, more modern Discord card
+
+- The Discord activity card is rebuilt around your rank. The app mark stays as the large image and
+  your rank emblem now rides beside it as the small image, so the card shows Gold 2 at a glance
+  instead of a generic logo. The emblem is the same official media-kit art the rest of the app uses,
+  and it follows you through the tiers as your rank moves.
+- Discord's own status line now says what you are doing rather than only naming the app: friends see
+  the game and your rank in the member list without opening your profile.
+- The card is clickable. The game line opens the Critical Ops site and the artwork opens the Optima
+  repository, so the card is a doorway instead of a dead end.
+- A new card detail setting replaces the two on/off boxes: Minimal shows only the game and your fps,
+  Standard adds your name, ranked record and rank emblem, and Full also shows your ranked rating.
+  Presence is visible to every friend, so how much of your own numbers it carries is now one clear
+  choice.
+- The launcher card is no longer an empty shell: it shows your name and rank while you browse, and it
+  no longer waits for a game session before it knows who you are.
+- The card recovers on its own. A rank that could not be read, or artwork that failed to resolve, is
+  retried in the background instead of sticking until the app restarts, and the rank refreshes when
+  you switch accounts rather than showing the previous player's.
+
 ## 2026-10-02 - 0.7.5: the installer installs the virtual display driver
 
 - The setup now installs the Optima virtual display driver as part of installing Optima: one
@@ -35,9 +236,8 @@ under it, plain text, no em dashes.
   icon set had no Explore glyph, so the data-driven lookup came back with nothing; it now
   shows a trophy on the same 24 px stroke grid as its neighbours.
 - The rest of the September work is below, newest first: the account switcher in the title
-  bar, the ranked badge and ladder, clan tags and friends on HOME, the developer emulator
-  path, session tweaks and crash auto-relaunch, the weekly export to CSV or PDF, and a
-  richer Discord card.
+  bar, the ranked badge and ladder, clan tags and friends on HOME, session tweaks and crash
+  auto-relaunch, the weekly export to CSV or PDF, and a richer Discord card.
 
 ## 2026-09-27 - Indev: rank badge and a switching account bar
 
@@ -49,7 +249,7 @@ under it, plain text, no em dashes.
 - The ACCOUNT bar at the top of the window now actually switches: picking an identity
   writes it and the HOME panel retargets immediately, replacing whatever was in Settings.
 
-## 2026-09-27 - Indev: clan tag, friends auto-refresh, identity autosave
+## 2026-09-27 - Indev: clan tag, friends auto-refresh, identity autosave
 
 - The HOME player panel now shows the clan membership read straight from the public
   profile ([DK] Dawning Knights), no input needed. The API exposes the clan of the
@@ -58,7 +258,7 @@ under it, plain text, no em dashes.
 - The player identity (in-game name and account id) is saved as it is typed, debounced,
   so closing Optima never loses it; the Save button remains for everything else.
 
-## 2026-09-27 - Indev: accounts, friends, crash relaunch, session tweaks, weekly export
+## 2026-09-27 - Indev: accounts, friends, crash relaunch, session tweaks, weekly export
 
 - Saved identities: store your main and alternates in Settings, Player ("save as account"),
   then switch between them from the switcher centered in the title bar. Switching updates
@@ -74,7 +274,7 @@ under it, plain text, no em dashes.
 - SESSIONS opens with a THIS WEEK card (sessions, playtime, W-L, average fps) and the
   history exports to CSV, or to a dependency-free PDF digest.
 
-## 2026-09-27 - Indev: a richer Discord card
+## 2026-09-27 - Indev: a richer Discord card
 
 - The Discord activity stopped being a static caption and now shows what Optima actually
   knows. In game: "Critical Ops · 41W-23L" as the line, and "frosty · 141 fps" under it,

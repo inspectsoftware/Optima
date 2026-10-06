@@ -3,7 +3,6 @@ using Optima.Core.Abstractions;
 using Optima.Core.Models;
 using Optima.Platform.Windows.NativeMethods;
 using Microsoft.Extensions.Logging;
-using Microsoft.Win32;
 
 namespace Optima.Platform.Windows.Services;
 
@@ -78,7 +77,7 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
                     hypervisorPresent = cs["HypervisorPresent"] as bool?;
                 }
             }
-            catch (ManagementException ex)
+            catch (Exception ex) when (ex is ManagementException or System.Runtime.InteropServices.COMException)
             {
                 _logger.LogWarning(ex, "WMI virtualization query failed");
             }

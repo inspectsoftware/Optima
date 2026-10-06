@@ -24,11 +24,7 @@
           <UniformGrid Columns="3">
             <Border Style="{StaticResource Tile}" Margin="0,0,10,0">
               <StackPanel>
-                <Grid>
-                  <TextBlock Text="CPU" Style="{StaticResource Text.Label}" />
-                  <TextBlock Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}"
-                             HorizontalAlignment="Right" Visibility="{Binding GpuTempText, Converter={StaticResource EmptyToCollapsed}}" />
-                </Grid>
+                <TextBlock Text="CPU" Style="{StaticResource Text.Label}" />
                 <TextBlock Text="{Binding CpuText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
                 <ctl:AsciiBar Value="{Binding CpuPercent}" Maximum="100" Cells="22" />
                 <ctl:Sparkline Values="{Binding CpuHistory}" Height="44" Margin="0,8,0,0"
@@ -37,7 +33,11 @@
             </Border>
             <Border Style="{StaticResource Tile}" Margin="0,0,10,0">
               <StackPanel>
-                <TextBlock Text="GPU" Style="{StaticResource Text.Label}" />
+                <Grid>
+                  <TextBlock Text="GPU" Style="{StaticResource Text.Label}" />
+                  <TextBlock Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}"
+                             HorizontalAlignment="Right" Visibility="{Binding GpuTempText, Converter={StaticResource EmptyToCollapsed}}" />
+                </Grid>
                 <TextBlock Text="{Binding GpuText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
                 <ctl:AsciiBar Value="{Binding GpuPercent}" Maximum="100" Cells="22" />
                 <ctl:Sparkline Values="{Binding GpuHistory}" Height="44" Margin="0,8,0,0"

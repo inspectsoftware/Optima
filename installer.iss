@@ -17,6 +17,12 @@
 ; Display page offers the same install later. Uninstall removes the files, the
 ; shortcuts and Optima's own registry values, but never touches user data under
 ; %LOCALAPPDATA%\Optima\ (config, profiles, sessions) or the installed driver.
+;
+; Upgrading: a setup run over an existing install keeps the folder it finds
+; (UsePreviousAppDir) and empties it before laying the new payload down, so files the
+; new build no longer ships cannot linger beside it. Only the install folder is
+; cleared; the uninstaller is rewritten in place and the user's data, which lives
+; outside {app}, is never touched.
 
 #ifndef AppVersion
   ; Fallback for compiling outside installer.ps1 (e.g. from the Inno IDE) when
@@ -25,6 +31,12 @@
 #endif
 
 #define AppName "Optima"
+
+; The application's identity, as the uninstall key the script reads to find a previous
+; install. The AppId below must stay exactly as written: it is the value Inno recorded for
+; every install already on disk, and it is what makes a new setup recognize them. Changing
+; its braces or spelling would strand existing installs as unrelated applications.
+#define AppGuid "f4474d52-ee70-458e-b99d-5c3eef769b1c"
 
 ; Payload and output are redirectable; the defaults are the repo's own folders. The local dev
 ; pipeline passes the Desktop\Optima Dev folder for both so a dev build and the setup made from
@@ -70,11 +82,10 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
 ; Names the build in Add/Remove Programs, so a machine carrying a local dev build says which one.
 UninstallDisplayName={#AppName} {#AppVersion}{#Label}
 ; Let Setup ask Windows to close Optima when its files are being replaced
-; (upgrade in place) and relaunch it afterwards if it was running.
+; (upgrade in place). It is not relaunched afterwards.
 CloseApplicationsFilter=*.exe,*.dll
 RestartApplications=no
 
@@ -96,6 +107,20 @@ Name: "vdddriver"; Description: "Install the Optima virtual display driver (Wind
 ; installed app.)
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "Installers\*,Optima-Setup-*.exe"; Flags: recursesubdirs ignoreversion restartreplace
 
+[InstallDelete]
+; Replace, do not merge. Inno's file list only adds and overwrites, so a build that renamed
+; or dropped a file would leave the old copy sitting next to the new one, and a stale
+; assembly beside Optima.exe is how an upgrade ends up running half of the previous version.
+; This runs before [Files] lays the payload down.
+;
+; Clearing {app}\* is safe because the install folder holds the payload and nothing else:
+; settings, profiles, sessions and logs live under %LOCALAPPDATA%\Optima, and the virtual
+; display driver is a machine-wide device rather than a file in here. Inno rewrites its own
+; uninstaller after this point, so the entry in Add/Remove Programs survives with the new
+; version. (No Excludes here on purpose: [InstallDelete] does not support one, and it does
+; not need it - the uninstaller is restored either way.)
+Type: filesandordirs; Name: "{app}\*"
+
 [Icons]
 Name: "{userprograms}\{#AppName}"; Filename: "{app}\Optima.exe"; WorkingDir: "{app}"
 Name: "{userdesktop}\{#AppName}"; Filename: "{app}\Optima.exe"; WorkingDir: "{app}"; Tasks: desktopicon
@@ -116,6 +141,39 @@ const
 function OptimaIsRunning(): Boolean;
 begin
   Result := CheckForMutexes(SingleInstanceMutex);
+end;
+
+{ The uninstall entry Inno records for this application, so a previous install can be
+  found from its own bookkeeping.
+
+  The opening and closing braces are built with Chr(123)/Chr(125) rather than written
+  literally: a literal brace in this script starts a constant as far as the preprocessor
+  is concerned, which is also why the comments in this section use // instead of the
+  brace-delimited comment style used elsewhere in the file. }
+function UninstallKey(): String;
+begin
+  Result := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
+            Chr(123) + '{#AppGuid}' + Chr(125) + '_is1';
+end;
+
+{ Where the previous install lives, or an empty string when there is none.
+
+  Read from the registry rather than from the install folder, because this is asked on
+  the welcome page and the app constant is not initialized that early: expanding it there
+  raises "An attempt was made to expand the app constant before it was initialized" and
+  takes the whole setup down with a runtime error. The registry answers the same question
+  at any point in the run. }
+function PreviousInstallDir(): String;
+begin
+  Result := '';
+  RegQueryStringValue(HKEY_CURRENT_USER, UninstallKey(), 'InstallLocation', Result);
+end;
+
+{ True when a previous Optima install is on this PC, so this run replaces one rather
+  than making a fresh install. Safe to call from the wizard, including the welcome page. }
+function IsUpgrade(): Boolean;
+begin
+  Result := PreviousInstallDir() <> '';
 end;
 
 { The exact command line AutostartService writes, so installer and app never
@@ -156,6 +214,30 @@ begin
         Result := False;
         Exit;
       end;
+  end;
+end;
+
+{ Say up front what an upgrade is about to do, so replacing an existing install is a
+  stated part of the run rather than something noticed afterwards in the folder.
+
+  This only rewrites the welcome text; the replacement itself is [InstallDelete], which
+  runs whether or not a wizard is ever shown (a silent install has no pages). }
+procedure CurPageChanged(CurPageID: Integer);
+var
+  Previous: String;
+begin
+  if (CurPageID = wpWelcome) and IsUpgrade() then
+  begin
+    Previous := '';
+    RegQueryStringValue(HKEY_CURRENT_USER, UninstallKey(), 'DisplayVersion', Previous);
+    if Previous <> '' then
+      Previous := ' ' + Previous;
+
+    WizardForm.WelcomeLabel2.Caption :=
+      'Setup found Optima' + Previous + ' already installed on this PC and will replace it with version {#AppVersion}.' + #13#10 + #13#10 +
+      'The old files are removed first, so nothing from the previous build is left behind. ' +
+      'Your settings, profiles and session history are kept.' + #13#10 + #13#10 +
+      'Click Next to continue, or Cancel to keep the current install.';
   end;
 end;
 
@@ -215,6 +297,14 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssInstall then
+  begin
+    { [InstallDelete] has already run by now, so this records what was replaced. The app
+      constant is initialized by this point, which it is not on the wizard's first page. }
+    if IsUpgrade() then
+      Log('Replacing an existing Optima install in ' + ExpandConstant('{app}') + '.');
+  end;
+
   if CurStep = ssPostInstall then
   begin
     { The task is checked by default, and silent installs keep that default, so a run of the

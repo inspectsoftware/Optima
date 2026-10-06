@@ -7,16 +7,14 @@
 # folders: the app and the elevated helper were published separately, nobody re-ran
 # them after changes, and a running instance silently locked files. This script
 # stops running instances, cleans the folder so no stale binaries survive, and
-# publishes the helper first and the app second so the app's newer shared
-# dependencies always win a collision.
+# publishes the helper apart from the app and merges it in afterwards, so the
+# app's newer shared dependencies always win a collision.
 
 param(
     [switch]$Run,
     [string]$Output = "publish",
     [string]$Runtime = "win-x64",
-    [string]$Configuration = "Release",
-    # Dev edition: compiles in the DEVELOPER EMULATOR settings section.
-    [switch]$DevEdition
+    [string]$Configuration = "Release"
 )
 
 $ErrorActionPreference = "Stop"
@@ -93,9 +91,7 @@ dotnet publish (Join-Path $root "src\Optima.Watchdog") -c $Configuration -r $Run
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.Watchdog failed (exit $LASTEXITCODE)" }
 
 Write-Host "publishing Optima.App ($Configuration $Runtime)"
-$devProps = @()
-if ($DevEdition) { $devProps += "-p:DevEdition=true" }
-dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet -p:PublishReadyToRun=true @devProps
+dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet -p:PublishReadyToRun=true
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.App failed (exit $LASTEXITCODE)" }
 
 # The helper's own files always travel; everything else only fills gaps the app left, so a shared
@@ -117,7 +113,7 @@ Write-Host "helper files added: $merged"
 # The payload has to be the app's own assemblies: a shared dependency left at an older version is
 # not a cosmetic problem, it is a launcher that cannot start. Compared by version rather than by
 # timestamp, since a timestamp comparison is what caused the problem in the first place.
-$appBin = Join-Path $root "src\Optima.App\bin\$Configuration\net10.0-windows"
+$appBin = Join-Path $root "src\Optima.App\bin\$Configuration\net10.0-windows\$Runtime"
 $stale = @()
 foreach ($source in Get-ChildItem $appBin -File -Filter *.dll) {
     if ($source.Name -like "Optima.Watchdog*") { continue }

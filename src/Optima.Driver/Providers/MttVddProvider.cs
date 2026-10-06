@@ -204,6 +204,9 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
 
         var document = VddSettingsDocument.Load(settingsPath);
+        // Taken before EnsureMode adds the mode to the document in memory: the fallback below has to
+        // choose among what the driver really advertises.
+        var advertised = document.GetAdvertisedModes();
         try
         {
             if (document.EnsureMode(mode))
@@ -212,7 +215,16 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
                 {
                     await File.WriteAllLinesAsync(MarkerPath, [_backupPath, settingsPath], ct).ConfigureAwait(false);
                 }
-                document.Save(settingsPath);
+                try
+                {
+                    document.Save(settingsPath);
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+                {
+                    // Nothing was changed, so there is nothing for the marker to restore.
+                    TryDeleteMarker();
+                    throw;
+                }
                 _settingsChanged = true;
                 _logger.LogInformation("Added {Mode} to vdd_settings.xml, reloading driver", mode);
             }
@@ -226,7 +238,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
-            var closest = ClosestAdvertisedMode(document.GetAdvertisedModes(), mode);
+            var closest = ClosestAdvertisedMode(advertised, mode);
             if (closest is null)
             {
                 throw OptimaException.From("VDD_SETTINGS_LOCKED",
@@ -340,12 +352,25 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
                 await File.WriteAllTextAsync(settingsPath, _originalSettingsXml, ct).ConfigureAwait(false);
                 _settingsChanged = false;
                 TryDeleteMarker();
-                await ReloadDriverAsync(ct).ConfigureAwait(false);
                 _logger.LogInformation("vdd_settings.xml restored from backup");
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 _logger.LogError(ex, "Could not restore vdd_settings.xml, backup remains at {Backup}", _backupPath);
+            }
+
+            if (!_settingsChanged)
+            {
+                try
+                {
+                    await ReloadDriverAsync(ct).ConfigureAwait(false);
+                }
+                catch (OptimaException ex)
+                {
+                    // The file is back; a driver that will not reload must not stop the device below
+                    // from being switched off again.
+                    _logger.LogWarning(ex, "The driver did not reload after vdd_settings.xml was restored");
+                }
             }
         }
         else

@@ -48,9 +48,21 @@ public sealed class LaunchOrchestrator
     private readonly INetworkQualityMonitor _network;
     private readonly ISessionStore _sessionStore;
     private readonly ITweakService _tweaks;
+    private readonly SettingsService? _settings;
     private readonly ILogger<LaunchOrchestrator> _logger;
 
     private int _running;
+
+    /// <summary>How often the session re-asserts the applied profile on the game process by default.</summary>
+    public static readonly TimeSpan DefaultPriorityKeeperInterval = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// The keeper's wake-up interval. Anything on Windows can change a process's scheduling class
+    /// or power-throttling state while a game runs (another tool, an update helper, the shell), so
+    /// the session corrects the game process for as long as it lives instead of trusting the one
+    /// application at the start. The property exists so a test can shorten the wait.
+    /// </summary>
+    public TimeSpan PriorityKeeperInterval { get; set; } = DefaultPriorityKeeperInterval;
 
     /// <summary>Mutable per-session state, so the catch paths always restore the latest snapshot.</summary>
     private sealed class SessionContext
@@ -73,7 +85,8 @@ public sealed class LaunchOrchestrator
         INetworkQualityMonitor network,
         ISessionStore sessionStore,
         ITweakService tweaks,
-        ILogger<LaunchOrchestrator> logger)
+        ILogger<LaunchOrchestrator> logger,
+        SettingsService? settings = null)
     {
         _detector = detector;
         _launchers = launchers.OrderBy(l => l.Order).ToList();
@@ -88,6 +101,7 @@ public sealed class LaunchOrchestrator
         _network = network;
         _sessionStore = sessionStore;
         _tweaks = tweaks;
+        _settings = settings;
         _logger = logger;
     }
 
@@ -139,24 +153,11 @@ public sealed class LaunchOrchestrator
                 {
                     continue;
                 }
-                // Opt-in strategies never become silent fallbacks: if the user asked for them and
-                // they cannot launch, the session fails visibly instead of drifting to another one.
-                if (!launcher.IsEnabled)
-                {
-                    continue;
-                }
                 _logger.LogInformation("Trying launch strategy {Strategy}", launcher.Name);
                 if (await launcher.LaunchAsync(game, token).ConfigureAwait(false))
                 {
                     launched = true;
                     _logger.LogInformation("Launch strategy {Strategy} succeeded", launcher.Name);
-                    break;
-                }
-                // An exclusive strategy owns the launch: falling through would start the game in
-                // a way the user did not ask for (e.g. the consumer client while the developer
-                // emulator is already booting), so surface the failure instead.
-                if (launcher.IsExclusive)
-                {
                     break;
                 }
             }
@@ -312,11 +313,26 @@ public sealed class LaunchOrchestrator
         }
     }
 
+    /// <summary>
+    /// The performance profile as it will actually be applied. The Settings page can pin one
+    /// priority for the game process across every profile, so a player does not have to edit a
+    /// profile to get it; Unchanged there leaves the profile's own choice in charge.
+    /// </summary>
+    private PerformanceProfile WithSettingsGamePriority(PerformanceProfile profile)
+    {
+        var configured = _settings?.Current?.GamePriority;
+        return Enum.TryParse<ProcessPriorityLevel>(configured, ignoreCase: true, out var level)
+            && level != ProcessPriorityLevel.Unchanged
+            ? profile with { Priority = level }
+            : profile;
+    }
+
     private async Task<LaunchResult> MonitorAndCompleteAsync(
         LaunchProfile profile, string packageId, int emulatorPid,
         SessionContext context, LaunchKind kind, bool captureAllowed, CancellationToken ct)
     {
-        var procSnapshot = await _processOptimizer.ApplyAsync(emulatorPid, profile.Performance, ct).ConfigureAwait(false);
+        var performance = WithSettingsGamePriority(profile.Performance);
+        var procSnapshot = await _processOptimizer.ApplyAsync(emulatorPid, performance, ct).ConfigureAwait(false);
         if (procSnapshot is not null)
         {
             context.Snapshot = context.Snapshot with { ProcessStates = [.. context.Snapshot.ProcessStates, procSnapshot] };
@@ -350,7 +366,7 @@ public sealed class LaunchOrchestrator
             _logger.LogWarning(ex, "Network quality monitoring unavailable for this session");
         }
 
-        await _processMonitor.WaitForGameExitAsync(ct).ConfigureAwait(false);
+        await MonitorGameAsync(performance, procSnapshot, ct).ConfigureAwait(false);
         stopwatch.Stop();
         _logger.LogInformation("Game exited after {Duration}", stopwatch.Elapsed);
 
@@ -384,6 +400,55 @@ public sealed class LaunchOrchestrator
 
         Report(LaunchPhase.Completed, "Session complete. Settings restored.");
         return new LaunchResult { Success = true, Session = session };
+    }
+
+    /// <summary>
+    /// Waits for the game to exit while the priority keeper holds the applied profile on the
+    /// game process. The monitor call is the primary wait; the keeper only wakes on the same
+    /// interval and is cancelled with the session, so an exit is never delayed by it.
+    /// </summary>
+    private async Task MonitorGameAsync(PerformanceProfile performance, ProcessStateSnapshot? baseline, CancellationToken ct)
+    {
+        var exit = _processMonitor.WaitForGameExitAsync(ct);
+        if (baseline is null)
+        {
+            await exit.ConfigureAwait(false);
+            return;
+        }
+
+        using var keeperCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var keeper = KeepPriorityAsync(baseline, performance, keeperCts.Token);
+        try
+        {
+            await exit.ConfigureAwait(false);
+        }
+        finally
+        {
+            await keeperCts.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                await keeper.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    private async Task KeepPriorityAsync(ProcessStateSnapshot baseline, PerformanceProfile performance, CancellationToken ct)
+    {
+        while (true)
+        {
+            await Task.Delay(PriorityKeeperInterval, ct).ConfigureAwait(false);
+            try
+            {
+                await _processOptimizer.ReassertAsync(baseline, performance, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogDebug(ex, "Priority keeper pass failed for pid {Pid}", baseline.ProcessId);
+            }
+        }
     }
 
     private async Task StopMonitoringAsync(SessionContext context)

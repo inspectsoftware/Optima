@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.IO.Pipes;
 using System.Text;
@@ -25,6 +25,7 @@ public sealed partial class CommandExecutor : IAsyncDisposable
     private readonly Func<IpcEvent, Task> _publishEvent;
     private EtwFrametimeCollector? _etw;
     private HardwareStreamer? _hardware;
+    private StandbyListCleaner? _standbyCleaner;
 
     public CommandExecutor(Func<IpcEvent, Task> publishEvent)
     {
@@ -137,8 +138,19 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail("An ETW session is already running.");
                 }
 
-                _etw = new EtwFrametimeCollector(pids, intervalMs, _publishEvent);
-                _etw.Start();
+                var etw = new EtwFrametimeCollector(pids, intervalMs, _publishEvent);
+                try
+                {
+                    etw.Start();
+                }
+                catch
+                {
+                    // Kept only once it runs: a session that failed to start would otherwise answer
+                    // "already running" to every later start for the life of the helper.
+                    etw.Dispose();
+                    throw;
+                }
+                _etw = etw;
                 return ok(null);
             }
 
@@ -359,6 +371,48 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 _hardware = null;
                 return ok(null);
 
+            case IpcCommand.StartStandbyCleaner:
+            {
+                if (!TryReadInt(request.Args, "freeBelowMb", out var freeBelowMb)
+                    || !TryReadInt(request.Args, "standbyAboveMb", out var standbyAboveMb)
+                    || !TryReadInt(request.Args, "intervalMs", out var cleanerIntervalMs)
+                    || !Optima.Core.Boost.StandbyCleanerPolicy.IsValid(freeBelowMb, standbyAboveMb, cleanerIntervalMs))
+                {
+                    return fail("The memory cleaner thresholds are missing or out of range.");
+                }
+                try
+                {
+                    if (_standbyCleaner is not null)
+                    {
+                        _standbyCleaner.Configure(freeBelowMb, standbyAboveMb, cleanerIntervalMs);
+                    }
+                    else
+                    {
+                        _standbyCleaner = new StandbyListCleaner(_publishEvent, freeBelowMb, standbyAboveMb, cleanerIntervalMs);
+                    }
+                    return ok(null);
+                }
+                catch (Exception ex)
+                {
+                    return fail("The memory cleaner could not start: " + ex.Message);
+                }
+            }
+
+            case IpcCommand.StopStandbyCleaner:
+                _standbyCleaner?.Dispose();
+                _standbyCleaner = null;
+                return ok(null);
+
+            case IpcCommand.PurgeStandbyList:
+                try
+                {
+                    return ok(StandbyListCleaner.PurgeOnce());
+                }
+                catch (Exception ex)
+                {
+                    return fail("The standby list could not be purged: " + ex.Message);
+                }
+
             case IpcCommand.EnableWindowsFeature:
             {
                 if (!request.Args.TryGetValue("feature", out var feature)
@@ -395,63 +449,6 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     ["restartRequired"] = exitCode == 3010
                         || output.Contains("restart", StringComparison.OrdinalIgnoreCase) ? "1" : "0",
                 });
-            }
-
-            case IpcCommand.SetDevEmulatorRefreshRate:
-            {
-                // The community FPS-unlock: Google's Service.exe.config clamps the developer
-                // emulator display to 60 Hz; these two settings carry the real refresh rate.
-                if (!request.Args.TryGetValue("refreshRate", out var rateText)
-                    || !int.TryParse(rateText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rate)
-                    || rate is < 30 or > 240)
-                {
-                    return fail("The refresh rate must be a number between 30 and 240.");
-                }
-
-                var configPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                    "Google", "Play Games Developer Emulator", "current", "service", "Service.exe.config");
-                if (!File.Exists(configPath))
-                {
-                    return fail("Service.exe.config was not found: " + configPath);
-                }
-
-                try
-                {
-                    var doc = new System.Xml.XmlDocument();
-                    doc.Load(configPath);
-                    var settings = doc.SelectSingleNode(
-                        "configuration/applicationSettings/Google.Hpe.Service.Properties.EmulatorSettings");
-                    if (settings is null)
-                    {
-                        return fail("The EmulatorSettings section is missing from Service.exe.config.");
-                    }
-
-                    foreach (var (name, value) in new[]
-                    {
-                        ("EmulatorRefreshRate", rate.ToString(CultureInfo.InvariantCulture)),
-                        ("EmulatorGpuRefreshRate", $"refresh-rate={rate}"),
-                    })
-                    {
-                        var node = settings.SelectSingleNode($"setting[@name='{name}']/value");
-                        if (node is null)
-                        {
-                            return fail($"The {name} setting is missing from Service.exe.config.");
-                        }
-                        node.InnerText = value;
-                    }
-
-                    doc.Save(configPath);
-                    return ok(new Dictionary<string, string>
-                    {
-                        ["configPath"] = configPath,
-                        ["refreshRate"] = rate.ToString(CultureInfo.InvariantCulture),
-                    });
-                }
-                catch (Exception ex)
-                {
-                    return fail("Could not update Service.exe.config: " + ex.Message);
-                }
             }
 
             case IpcCommand.Shutdown:
@@ -713,6 +710,15 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         _etw = null;
         _hardware?.Dispose();
         _hardware = null;
+        _standbyCleaner?.Dispose();
+        _standbyCleaner = null;
         return ValueTask.CompletedTask;
+    }
+
+    private static bool TryReadInt(Dictionary<string, string> args, string name, out int value)
+    {
+        value = 0;
+        return args.TryGetValue(name, out var text)
+            && int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out value);
     }
 }

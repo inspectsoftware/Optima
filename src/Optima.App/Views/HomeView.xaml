@@ -1,8 +1,11 @@
 <UserControl x:Class="Optima.App.Views.HomeView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ctl="clr-namespace:Optima.App.Controls">
+             xmlns:ctl="clr-namespace:Optima.App.Controls"
+             xmlns:views="clr-namespace:Optima.App.Views">
   <UserControl.Resources>
+    <views:HomeWidgetTemplateSelector x:Key="WidgetSelector" />
+
     <DataTemplate x:Key="StatusCell">
       <StackPanel Margin="0,0,12,0">
         <TextBlock Text="{Binding Label}" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
@@ -13,27 +16,12 @@
         </Border>
       </StackPanel>
     </DataTemplate>
-  </UserControl.Resources>
 
-  <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1040" HorizontalAlignment="Left">
-      <Grid Margin="0,0,0,14">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <TextBlock Text="Ready to play" Style="{StaticResource Text.PageTitle}" />
-        <TextBlock Grid.Column="1" Text="CRITICAL OPS · GOOGLE PLAY GAMES" Style="{StaticResource Text.PageSubtitle}"
-                   Margin="0,0,4,0" VerticalAlignment="Bottom" />
-      </Grid>
+    <!--  Each widget template binds through Host, so it is the page's own markup whatever page the
+          widget came from. Ids match HomeWidgetCatalog; a missing template renders as nothing.  -->
 
-      <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,0,0,12"
-              Visibility="{Binding GameUpdateBanner, Converter={StaticResource EmptyToCollapsed}}">
-        <TextBlock Text="{Binding GameUpdateBanner}" Style="{StaticResource Text.Prose}"
-                   Foreground="{DynamicResource Brush.Warn}" MaxWidth="860" HorizontalAlignment="Left" />
-      </Border>
-
-      <HeaderedContentControl Style="{StaticResource Section}" Header="STATUS">
+    <DataTemplate x:Key="Widget.status">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="STATUS" DataContext="{Binding Host}">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="refresh"
                   Command="{Binding Status.RefreshCommand}" Padding="6,0" />
@@ -53,8 +41,10 @@
           <ContentControl Grid.Column="4" Content="{Binding Status.Display}" ContentTemplate="{StaticResource StatusCell}" />
         </Grid>
       </HeaderedContentControl>
+    </DataTemplate>
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="SYSTEM">
+    <DataTemplate x:Key="Widget.system">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="SYSTEM" DataContext="{Binding Host}">
         <UniformGrid Columns="4">
           <StackPanel Margin="0,0,12,0">
             <TextBlock Text="GPU" Style="{StaticResource Text.Label}" Margin="0,0,0,4" />
@@ -74,8 +64,10 @@
           </StackPanel>
         </UniformGrid>
       </HeaderedContentControl>
+    </DataTemplate>
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="PERFORMANCE">
+    <DataTemplate x:Key="Widget.performance">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PERFORMANCE" DataContext="{Binding Host}">
         <HeaderedContentControl.Tag>
           <TextBlock Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}" />
         </HeaderedContentControl.Tag>
@@ -103,8 +95,10 @@
           </Border>
         </UniformGrid>
       </HeaderedContentControl>
+    </DataTemplate>
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="LAUNCH">
+    <DataTemplate x:Key="Widget.launch">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="LAUNCH" DataContext="{Binding Host}">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="kill game · Ctrl+Alt+K" Padding="6,0"
                   Command="{Binding Play.KillGameCommand}"
@@ -158,8 +152,10 @@
           </Grid>
         </StackPanel>
       </HeaderedContentControl>
+    </DataTemplate>
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="PLAYER">
+    <DataTemplate x:Key="Widget.player">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PLAYER" DataContext="{Binding Host}">
         <HeaderedContentControl.Tag>
           <Button Style="{StaticResource GhostButton}" Content="refresh" Padding="6,0"
                   Command="{Binding Player.RefreshCommand}"
@@ -245,46 +241,369 @@
 
           <TextBlock Text="{Binding Player.StatusText}" Style="{StaticResource Text.Micro}" Margin="0,10,0,0"
                      TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" />
+        </StackPanel>
+      </HeaderedContentControl>
+    </DataTemplate>
 
-          <!-- Friends strip: tracked players beside the main account. -->
-          <StackPanel Margin="0,14,0,0" Visibility="{Binding HasFriends, Converter={StaticResource BoolToVis}}">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition Width="70" />
-                <ColumnDefinition Width="90" />
-                <ColumnDefinition Width="90" />
-              </Grid.ColumnDefinitions>
-              <TextBlock Text="TRACKED" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
-              <TextBlock Grid.Column="1" Text="LEVEL" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
-              <TextBlock Grid.Column="2" Text="RECORD" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
-              <TextBlock Grid.Column="3" Text="WIN RATE" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
-            </Grid>
-            <ItemsControl ItemsSource="{Binding Friends}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Grid Margin="0,3">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="150" />
-                      <ColumnDefinition Width="70" />
-                      <ColumnDefinition Width="90" />
-                      <ColumnDefinition Width="90" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Label}" />
-                    <TextBlock Grid.Column="1" Text="{Binding LevelText}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.TextMuted}" />
-                    <TextBlock Grid.Column="2" Text="{Binding RecordText}" Style="{StaticResource Text.Value}" />
-                    <TextBlock Grid.Column="3" Text="{Binding WinRateText}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.Accent}" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-
-          <TextBlock Text="{Binding FriendsStatus}" Style="{StaticResource Text.Micro}" Margin="0,10,0,0"
+    <DataTemplate x:Key="Widget.friends">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="TRACKED PLAYERS" DataContext="{Binding Host}">
+        <StackPanel>
+          <Grid Visibility="{Binding HasFriends, Converter={StaticResource BoolToVis}}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="150" />
+              <ColumnDefinition Width="70" />
+              <ColumnDefinition Width="90" />
+              <ColumnDefinition Width="90" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="TRACKED" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            <TextBlock Grid.Column="1" Text="LEVEL" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            <TextBlock Grid.Column="2" Text="RECORD" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+            <TextBlock Grid.Column="3" Text="WIN RATE" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Friends}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,3">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="70" />
+                    <ColumnDefinition Width="90" />
+                    <ColumnDefinition Width="90" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Label}" />
+                  <TextBlock Grid.Column="1" Text="{Binding LevelText}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.TextMuted}" />
+                  <TextBlock Grid.Column="2" Text="{Binding RecordText}" Style="{StaticResource Text.Value}" />
+                  <TextBlock Grid.Column="3" Text="{Binding WinRateText}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.Accent}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="{Binding FriendsStatus}" Style="{StaticResource Text.Micro}" Margin="0,8,0,0"
                      TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
                      Visibility="{Binding FriendsStatus, Converter={StaticResource EmptyToCollapsed}}" />
         </StackPanel>
       </HeaderedContentControl>
+    </DataTemplate>
+
+    <DataTemplate x:Key="Widget.sessions">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="RECENT SESSIONS" DataContext="{Binding Host}">
+        <StackPanel>
+          <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Sessions.Rows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Style="{StaticResource TableRow}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="84" />
+                        <ColumnDefinition Width="78" />
+                        <ColumnDefinition Width="78" />
+                        <ColumnDefinition Width="86" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding StartedText}" Style="{StaticResource Text.CellDim}" />
+                      <TextBlock Grid.Column="1" Text="{Binding ProfileName}" Style="{StaticResource Text.Cell}" />
+                      <TextBlock Grid.Column="2" Text="{Binding KindTag}" Style="{StaticResource Text.CellDim}" />
+                      <TextBlock Grid.Column="3" Text="{Binding AvgFpsText}" Style="{StaticResource Text.Cell}" />
+                      <TextBlock Grid.Column="4" Text="{Binding OnePercentLowText}" Style="{StaticResource Text.Cell}" />
+                      <TextBlock Grid.Column="5" Text="{Binding DurationText}" Style="{StaticResource Text.CellDim}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" Foreground="{DynamicResource Brush.TextMuted}"
+                     Text="started · profile · kind · average fps · 1% low · duration. The SESSIONS tab holds the full history, the detail pane and the benchmark." />
+        </StackPanel>
+      </HeaderedContentControl>
+    </DataTemplate>
+
+    <DataTemplate x:Key="Widget.trends">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PROFILE TRENDS" DataContext="{Binding Host}">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding Sessions.TrendLegend}" Style="{StaticResource Text.Micro}" />
+        </HeaderedContentControl.Tag>
+        <ItemsControl ItemsSource="{Binding Sessions.ProfileTrends}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Grid Margin="0,3">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="200" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="110" />
+                  <ColumnDefinition Width="110" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding ProfileName}" Style="{StaticResource Text.Label}" />
+                <ctl:AsciiBar Grid.Column="1" Value="{Binding AverageFps}" Maximum="{Binding BarMaximum}" Cells="20"
+                              VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding AverageText}" Style="{StaticResource Text.Value}" Margin="12,0,0,0" />
+                <TextBlock Grid.Column="3" Text="{Binding CountText}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </HeaderedContentControl>
+    </DataTemplate>
+
+    <DataTemplate x:Key="Widget.display">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="DISPLAYS" DataContext="{Binding Host}">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="{Binding Display.ProviderName}" Style="{StaticResource Text.Label}" Margin="0,0,16,0" />
+            <TextBlock Text="{Binding Display.VirtualDisplayModeText}" Style="{StaticResource Text.Label}"
+                       Foreground="{DynamicResource Brush.Accent}" Margin="0,0,16,0" />
+            <TextBlock Text="virtual display active" Style="{StaticResource Text.Micro}"
+                       Foreground="{DynamicResource Brush.Ok}" VerticalAlignment="Center"
+                       Visibility="{Binding Display.VirtualDisplayActive, Converter={StaticResource BoolToVis}}" />
+          </StackPanel>
+          <ItemsControl ItemsSource="{Binding Display.DisplayRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="128" />
+                      <ColumnDefinition />
+                      <ColumnDefinition Width="150" />
+                      <ColumnDefinition Width="92" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="1" Text="{Binding DisplayedName}" ToolTip="{Binding OriginalName}"
+                               Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="3" Text="primary" Style="{StaticResource Text.CellDim}"
+                               Visibility="{Binding IsPrimary, Converter={StaticResource BoolToVis}}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </HeaderedContentControl>
+    </DataTemplate>
+
+    <DataTemplate x:Key="Widget.comp">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="NETWORK AND THERMALS" DataContext="{Binding Host}">
+        <UniformGrid Columns="2">
+          <StackPanel Margin="0,0,16,8">
+            <TextBlock Text="link ping" Style="{StaticResource Text.Label}" />
+            <TextBlock Text="{Binding Comp.PingResult}" Style="{StaticResource Text.Value}" Margin="0,2,0,0"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding Comp.PingResult, Converter={StaticResource EmptyToCollapsed}}" />
+          </StackPanel>
+          <StackPanel Margin="0,0,16,8">
+            <TextBlock Text="wi-fi quality" Style="{StaticResource Text.Label}" />
+            <TextBlock Text="{Binding Comp.WifiResult}" Style="{StaticResource Text.Value}" Margin="0,2,0,0" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Margin="0,0,16,0">
+            <TextBlock Text="CPU temperature" Style="{StaticResource Text.Label}" />
+            <TextBlock Text="{Binding Comp.CpuThermalText}" Style="{StaticResource Text.Value}" Margin="0,2,0,0" />
+          </StackPanel>
+          <StackPanel Margin="0,0,16,0">
+            <TextBlock Text="GPU temperature" Style="{StaticResource Text.Label}" />
+            <TextBlock Text="{Binding Comp.GpuThermalText}" Style="{StaticResource Text.Value}" Margin="0,2,0,0" />
+          </StackPanel>
+        </UniformGrid>
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="full tools on the COMP tab" Style="{StaticResource Text.Micro}" />
+        </HeaderedContentControl.Tag>
+      </HeaderedContentControl>
+    </DataTemplate>
+
+    <DataTemplate x:Key="Widget.news">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="CRITICAL OPS NEWS" DataContext="{Binding Host}">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding NewsPage.NewsStatus}" Style="{StaticResource Text.Micro}" />
+        </HeaderedContentControl.Tag>
+        <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <ItemsControl ItemsSource="{Binding NewsPage.News}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource GlassCard}" Margin="0,0,0,8">
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Value}" />
+                      <TextBlock Text="{Binding StatusTag}" Style="{StaticResource Text.Micro}" Margin="10,0,0,0"
+                                 VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding Headlines}" Margin="0,6,0,0">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <StackPanel Orientation="Horizontal" Margin="0,1">
+                            <Border Width="4" Height="4" CornerRadius="2" Margin="1,0,9,0"
+                                    Background="{DynamicResource Brush.Accent}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding}" Style="{StaticResource Text.Label}" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </HeaderedContentControl>
+    </DataTemplate>
+
+    <DataTemplate x:Key="Widget.diagnostics">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="DIAGNOSTICS" DataContext="{Binding Host}">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="run the checks from the DIAGNOSTICS tab" Style="{StaticResource Text.Micro}" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <TextBlock Text="{Binding Diagnostics.Summary}" Style="{StaticResource Text.Value}" TextWrapping="Wrap"
+                     Visibility="{Binding Diagnostics.Summary, Converter={StaticResource EmptyToCollapsed}}" />
+          <ItemsControl ItemsSource="{Binding Diagnostics.Results}" Margin="0,8,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="0,3">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" MinWidth="16" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource Badge}" MinWidth="52"
+                            BorderBrush="{Binding Status, Converter={StaticResource DiagStatusBrush}}">
+                      <TextBlock Text="{Binding Status, Converter={StaticResource DiagStatusTag}}" Style="{StaticResource Text.Badge}"
+                                 Foreground="{Binding Status, Converter={StaticResource DiagStatusBrush}}" HorizontalAlignment="Center" />
+                    </Border>
+                    <TextBlock Grid.Column="1" Text="{Binding CheckName}" Style="{StaticResource Text.Value}"
+                               Margin="10,0,0,0" />
+                    <Rectangle Grid.Column="2" Style="{StaticResource Leader}" />
+                    <TextBlock Grid.Column="3" Text="{Binding Reason}" Style="{StaticResource Text.Prose}"
+                               Foreground="{DynamicResource Brush.TextMuted}"
+                               FontSize="{StaticResource Type.Micro}"
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="440" />
+                  </Grid>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </HeaderedContentControl>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1040" HorizontalAlignment="Left">
+      <Grid Margin="0,0,0,14">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="Ready to play" Style="{StaticResource Text.PageTitle}" />
+        <TextBlock Grid.Column="1" Text="CRITICAL OPS · GOOGLE PLAY GAMES" Style="{StaticResource Text.PageSubtitle}"
+                   Margin="0,0,12,0" VerticalAlignment="Bottom" />
+        <Button Grid.Column="2" Style="{StaticResource GhostButton}" Padding="12,4" Content="edit widgets"
+                Command="{Binding ToggleEditWidgetsCommand}"
+                ToolTip="Arrange HOME: drag cards from any tab onto it, up to 10" />
+      </Grid>
+
+      <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,0,0,12"
+              Visibility="{Binding GameUpdateBanner, Converter={StaticResource EmptyToCollapsed}}">
+        <TextBlock Text="{Binding GameUpdateBanner}" Style="{StaticResource Text.Prose}"
+                   Foreground="{DynamicResource Brush.Warn}" MaxWidth="860" HorizontalAlignment="Left" />
+      </Border>
+
+      <!-- EDIT WIDGETS: browse every tab's widgets, drag one onto HOME or take one off. -->
+      <Border Style="{StaticResource Callout}" Margin="0,0,0,12"
+              Visibility="{Binding IsEditingWidgets, Converter={StaticResource BoolToVis}}">
+        <StackPanel>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="EDIT WIDGETS" Style="{StaticResource Text.Label}"
+                       Foreground="{DynamicResource Brush.Accent}" />
+            <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="done" Padding="12,2"
+                    Command="{Binding ToggleEditWidgetsCommand}" />
+          </Grid>
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,6,0,0" TextWrapping="Wrap" MaxWidth="860"
+                     Text="Drag any card from the list below onto HOME, in the order you want - drag a card on HOME to reorder it, and drop it back here or press remove to take it off. Cards are grouped by the tab they come from; HOME holds up to 10." />
+          <TextBlock Text="{Binding WidgetMessage}" Style="{StaticResource Text.Micro}" Margin="0,6,0,0" TextWrapping="Wrap"
+                     Foreground="{DynamicResource Brush.Warn}"
+                     Visibility="{Binding WidgetMessage, Converter={StaticResource EmptyToCollapsed}}" />
+
+          <ItemsControl x:Name="WidgetPalette" ItemsSource="{Binding WidgetCatalog}" Margin="0,10,0,0"
+                        AllowDrop="True" DragOver="OnPaletteDragOver" Drop="OnPaletteDrop"
+                        PreviewMouseLeftButtonDown="OnPaletteMouseDown" PreviewMouseMove="OnPaletteMouseMove">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="0,0,0,8">
+                  <TextBlock Text="{Binding Caption}" Style="{StaticResource Text.Micro}"
+                             Foreground="{DynamicResource Brush.TextMuted}" />
+                  <ItemsControl ItemsSource="{Binding Items}" Margin="0,2,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid Margin="0,2">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="210" />
+                            <ColumnDefinition />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Text="{Binding Definition.Title}" Style="{StaticResource Text.Label}"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="1" Text="on HOME" Style="{StaticResource Text.Micro}"
+                                     Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center"
+                                     Visibility="{Binding IsOnHome, Converter={StaticResource BoolToVis}}" />
+                          <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button Style="{StaticResource GhostButton}" Content="add" Padding="8,0" Margin="0,0,6,0"
+                                    Command="{Binding Host.AddWidgetCommand}" CommandParameter="{Binding}"
+                                    IsEnabled="{Binding IsOnHome, Converter={StaticResource InverseBool}}" />
+                            <Button Style="{StaticResource GhostButton}" Content="remove" Padding="8,0"
+                                    Command="{Binding Host.RemoveWidgetCommand}" CommandParameter="{Binding}"
+                                    IsEnabled="{Binding IsOnHome}" />
+                          </StackPanel>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- The board itself. Each card is a widget template selected by id. -->
+      <ItemsControl x:Name="WidgetHost" ItemsSource="{Binding Widgets}" AllowDrop="True"
+                    DragOver="OnWidgetsDragOver" Drop="OnWidgetsDrop"
+                    PreviewMouseLeftButtonDown="OnWidgetsMouseDown" PreviewMouseMove="OnWidgetsMouseMove">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <StackPanel>
+              <Border Margin="0,0,0,4" Padding="8,3" CornerRadius="4" Cursor="SizeAll"
+                      Background="{DynamicResource Brush.Surface}"
+                      BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="1"
+                      Visibility="{Binding Host.IsEditingWidgets, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}"
+                             VerticalAlignment="Center"
+                             Text="{Binding Definition.Title, StringFormat='drag to move · {0}'}" />
+                  <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="remove" Padding="8,0"
+                          Command="{Binding Host.RemoveWidgetCommand}" CommandParameter="{Binding}" />
+                </Grid>
+              </Border>
+              <ContentControl Content="{Binding}" ContentTemplateSelector="{StaticResource WidgetSelector}" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" Foreground="{DynamicResource Brush.TextMuted}"
+                 Text="HOME is yours: edit widgets to move cards in from any tab, or take them off."
+                 Visibility="{Binding IsEditingWidgets, Converter={StaticResource BoolToVis}}" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

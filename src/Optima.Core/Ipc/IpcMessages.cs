@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Optima.Core.Ipc;
@@ -21,7 +21,9 @@ public enum IpcCommand
     StartHardwareStream,
     StopHardwareStream,
     EnableWindowsFeature,
-    SetDevEmulatorRefreshRate,
+    StartStandbyCleaner,
+    StopStandbyCleaner,
+    PurgeStandbyList,
     Shutdown,
 }
 

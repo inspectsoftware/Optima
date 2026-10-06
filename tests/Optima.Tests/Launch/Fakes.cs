@@ -1,4 +1,4 @@
-using Optima.Core.Abstractions;
+﻿using Optima.Core.Abstractions;
 using Optima.Core.Models;
 
 namespace Optima.Tests.Launch;
@@ -27,30 +27,6 @@ internal sealed class FakeLauncher : IGameLauncher
 
     public string Name => "Fake";
     public int Order => 10;
-    // Standard strategies are always allowed once they claim the launch.
-    public bool IsEnabled { get; set; } = true;
-    public Task<bool> CanLaunchAsync(InstalledGame game, CancellationToken ct = default) => Task.FromResult(CanLaunch);
-    public Task<bool> LaunchAsync(InstalledGame game, CancellationToken ct = default)
-    {
-        LaunchCalls++;
-        return Task.FromResult(LaunchSucceeds);
-    }
-}
-
-/// <summary>Opt-in strategy whose IsEnabled reflects what the user asked for. Mirrors the real
-/// DeveloperEmulatorLauncher: enabled strategies are exclusive when they fail.</summary>
-internal sealed class FakeOptInLauncher : IGameLauncher
-{
-    public bool CanLaunch { get; set; } = true;
-    public bool LaunchSucceeds { get; set; } = true;
-    public bool IsEnabled { get; set; }
-
-    public bool IsExclusive => true;
-
-    public int LaunchCalls { get; private set; }
-
-    public string Name => "OptIn";
-    public int Order => 5;
     public Task<bool> CanLaunchAsync(InstalledGame game, CancellationToken ct = default) => Task.FromResult(CanLaunch);
     public Task<bool> LaunchAsync(InstalledGame game, CancellationToken ct = default)
     {
@@ -120,17 +96,31 @@ internal sealed class FakeProcessMonitor : IProcessMonitor
     public int? GameStartPid { get; set; } = 4242;
     public TimeSpan ExitAfter { get; set; } = TimeSpan.Zero;
 
+    /// <summary>Ends the wait before ExitAfter elapses, so a test does not have to wait it out.</summary>
+    public TaskCompletionSource ExitNow { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public void EndGameNow() => ExitNow.TrySetResult();
+
+    public IReadOnlyList<TrackedProcess> Tracked { get; set; } = [];
+
     public Task<IReadOnlyList<TrackedProcess>> GetTrackedProcessesAsync(CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<TrackedProcess>>([]);
+        => Task.FromResult(Tracked);
     public Task<GameRuntimeState> GetGameStateAsync(CancellationToken ct = default)
         => Task.FromResult(GameRuntimeState.NotRunning);
     public Task<int?> WaitForGameStartAsync(TimeSpan timeout, CancellationToken ct = default)
         => Task.FromResult(GameStartPid);
     public async Task WaitForGameExitAsync(CancellationToken ct = default)
     {
-        if (ExitAfter > TimeSpan.Zero)
+        if (ExitAfter <= TimeSpan.Zero)
         {
-            await Task.Delay(ExitAfter, ct);
+            return;
+        }
+
+        var timer = Task.Delay(ExitAfter, ct);
+        var finished = await Task.WhenAny(timer, ExitNow.Task).ConfigureAwait(false);
+        if (finished == timer)
+        {
+            await timer.ConfigureAwait(false);
         }
     }
 }
@@ -138,15 +128,34 @@ internal sealed class FakeProcessMonitor : IProcessMonitor
 internal sealed class FakeProcessOptimizer : IProcessOptimizer
 {
     public List<int> Applied { get; } = [];
+    public List<PerformanceProfile> AppliedProfiles { get; } = [];
+    public List<int> Reasserted { get; } = [];
+    public List<PerformanceProfile> ReassertedProfiles { get; } = [];
     public List<int> Restored { get; } = [];
     public bool ReturnSnapshot { get; set; } = true;
+
+    /// <summary>
+    /// Holds each re-assert pass until the test releases it (or the session is cancelled), so a
+    /// test can wait for a pass that has already been recorded instead of racing the clock.
+    /// </summary>
+    public TaskCompletionSource Gate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public void ReleaseGate() => Gate.TrySetResult();
 
     public Task<ProcessStateSnapshot?> ApplyAsync(int processId, PerformanceProfile profile, CancellationToken ct = default)
     {
         Applied.Add(processId);
+        AppliedProfiles.Add(profile);
         return Task.FromResult<ProcessStateSnapshot?>(ReturnSnapshot
             ? new ProcessStateSnapshot { ProcessId = processId, ProcessName = "crosvm" }
             : null);
+    }
+    public async Task<bool> ReassertAsync(ProcessStateSnapshot baseline, PerformanceProfile profile, CancellationToken ct = default)
+    {
+        Reasserted.Add(baseline.ProcessId);
+        ReassertedProfiles.Add(profile);
+        await Gate.Task.WaitAsync(ct).ConfigureAwait(false);
+        return false;
     }
     public Task RestoreAsync(ProcessStateSnapshot snapshot, CancellationToken ct = default)
     {

@@ -1,4 +1,4 @@
-<UserControl x:Class="Optima.App.Views.SettingsView"
+﻿<UserControl x:Class="Optima.App.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <UserControl.Resources>
@@ -90,7 +90,7 @@
                 <ColumnDefinition />
               </Grid.ColumnDefinitions>
               <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition />
+                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
               </Grid.RowDefinitions>
 
               <TextBlock Text="game activity" Style="{StaticResource RowLabel}" />
@@ -104,11 +104,50 @@
                         VerticalAlignment="Center" Margin="0,5"
                         Content="also show presence while browsing the launcher" />
 
-              <TextBlock Grid.Row="2" Text="application id" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
+              <TextBlock Grid.Row="2" Text="card fields" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
               <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,5">
+                <StackPanel Orientation="Horizontal">
+                  <Button Style="{StaticResource SecondaryButton}" Content="choose what is shown…" Padding="12,6"
+                          Command="{Binding ChooseDiscordPresenceCommand}"
+                          IsEnabled="{Binding DiscordPresenceEnabled}" />
+                  <TextBlock Text="{Binding DiscordOptionsSummary}" Style="{StaticResource Text.Label}"
+                             VerticalAlignment="Center" Margin="12,0,0,0" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Pick exactly which facts the card carries: your name, rank, emblem, ranked record, rating, live fps and the session timer, plus which line Discord shows as your status. Start from a preset or tick each field yourself. Nothing is sent while the game and the launcher card are off." />
+              </StackPanel>
+
+              <TextBlock Grid.Row="3" Text="application id" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
+              <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,5">
                 <TextBox Text="{Binding DiscordApplicationId, UpdateSourceTrigger=PropertyChanged}" Width="240" HorizontalAlignment="Left" />
                 <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Prefilled with Optima's own Discord application. Change it only to use your own; clear it to keep presence off. Presence talks only to your local Discord client." />
+                           Text="Prefilled with Optima's own Discord application. Change it only to use your own; clear it to keep presence off. Presence goes to your local Discord client; the only request over the network asks discord.com which artwork the application has." />
+              </StackPanel>
+
+              <TextBlock Grid.Row="4" Text="bot account link" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
+              <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,5">
+                <StackPanel Orientation="Horizontal">
+                  <Button Style="{StaticResource SecondaryButton}" Content="link account…" Padding="12,6"
+                          Command="{Binding LinkDiscordCommand}" />
+                  <TextBlock Text="{Binding DiscordBotLinkSummary}" Style="{StaticResource Text.Label}"
+                             VerticalAlignment="Center" Margin="12,0,0,0" />
+                </StackPanel>
+                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Run /link with OptimaBot in Discord, then type the code it sends you into the window this button opens. Optima links the account above, so your own card needs no name and carries a linked badge. To undo it, run the bot's unlink command where the bot is hosted." />
+              </StackPanel>
+
+              <TextBlock Grid.Row="6" Text="tracker webhook" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
+              <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,5">
+                <WrapPanel>
+                  <TextBox Text="{Binding DiscordBotWebhookUrl, UpdateSourceTrigger=PropertyChanged}" Width="420"
+                           VerticalAlignment="Center" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="send test image" Padding="12,6" Margin="8,0,0,0"
+                          VerticalAlignment="Center"
+                          Command="{Binding TestTrackerCommand}"
+                          ToolTip="Sends one sample report through the bot to the webhook above, so you can see it arrive before a real match does." />
+                </WrapPanel>
+                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Text="Optional. Paste a Discord channel webhook (channel settings, Integrations, Webhooks) and OptimaBot posts your new matches and rank changes there as a report image. Clear it to link without tracking. The test button sends a sample image through the bot, so the channel and the URL can be checked before a match happens." />
               </StackPanel>
             </Grid>
           </HeaderedContentControl>
@@ -266,129 +305,11 @@
               <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding StartWithWindows}" VerticalAlignment="Center" Margin="0,5"
                         Content="launch the Watchdog minimized to the tray at sign-in" />
 
-              <TextBlock Grid.Row="6" Text="mock fps provider" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="6" Grid.Column="1" IsChecked="{Binding UseMockMetricsProvider}" VerticalAlignment="Center" Margin="0,5"
+              <TextBlock Grid.Row="7" Text="mock fps provider" Style="{StaticResource RowLabel}" />
+              <CheckBox Grid.Row="7" Grid.Column="1" IsChecked="{Binding UseMockMetricsProvider}" VerticalAlignment="Center" Margin="0,5"
                         Content="developer: synthetic fps data (applies after restart)" />
 
-              <TextBlock Grid.Row="7" Text="developer emulator" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="7" Grid.Column="1" IsChecked="{Binding UseDeveloperEmulator}" VerticalAlignment="Center" Margin="0,5"
-                        Content="start Critical Ops in the Google Play Games Developer Emulator (adb localhost:6520)" />
             </Grid>
-          </HeaderedContentControl>
-
-          <HeaderedContentControl Style="{StaticResource Section}" Header="DEVELOPER EMULATOR"
-                                  Visibility="{Binding DevEmulatorSectionVisible, Converter={StaticResource BoolToVis}}">
-            <StackPanel>
-              <TextBlock Style="{StaticResource Text.Micro}" Margin="0,0,0,8" TextWrapping="Wrap"
-                         Text="Switches for the Google Play Games Developer Emulator, the experimental test bed for forcing the game onto the GPU. These write the Windows GPU preference for the emulator and Google's startup flags; the emulator's own Vulkan/DirectX backend and display-ratio toggles stay in its tray menu. Click APPLY to save — GPU changes take effect the next time the emulator starts." />
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="150" />
-                  <ColumnDefinition />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Text="emulator" Style="{StaticResource RowLabel}" />
-                <TextBlock Grid.Column="1" Text="{Binding DevEmulatorStatus}" Style="{StaticResource Text.Label}"
-                           VerticalAlignment="Center" Margin="0,5" TextWrapping="Wrap" />
-
-                <TextBlock Grid.Row="1" Text="graphics adapters" Style="{StaticResource RowLabel}" />
-                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DevGpuSummary}" Style="{StaticResource Text.Label}"
-                           VerticalAlignment="Center" Margin="0,5" TextWrapping="Wrap" />
-
-                <TextBlock Grid.Row="2" Text="gpu preference" Style="{StaticResource RowLabel}" />
-                <Grid Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" Margin="0,5">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition />
-                  </Grid.ColumnDefinitions>
-                  <CheckBox IsChecked="{Binding DevGpuHighPerformance}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="1" Text="pin the emulator to the high-performance GPU (Windows per-app setting)"
-                             TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
-                </Grid>
-
-                <TextBlock Grid.Row="3" Text="gpu prioritization" Style="{StaticResource RowLabel}" />
-                <Grid Grid.Row="3" Grid.Column="1" VerticalAlignment="Center" Margin="0,5"
-                      ToolTip="Google startup flag: enable_idxgi_factory6_gpu_prioritization">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition />
-                  </Grid.ColumnDefinitions>
-                  <CheckBox IsChecked="{Binding DevGpuPrioritization}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="1" Text="IDXGI factory 6 GPU prioritization (startup flag)"
-                             TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
-                </Grid>
-
-                <TextBlock Grid.Row="4" Text="gpu retry" Style="{StaticResource RowLabel}" />
-                <Grid Grid.Row="4" Grid.Column="1" VerticalAlignment="Center" Margin="0,5"
-                      ToolTip="Google startup flag: enable_gpu_retrieval_retry_on_mismatch">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition />
-                  </Grid.ColumnDefinitions>
-                  <CheckBox IsChecked="{Binding DevGpuRetrievalRetry}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="1" Text="retry GPU retrieval on adapter mismatch (startup flag)"
-                             TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
-                </Grid>
-
-                <TextBlock Grid.Row="5" Text="game status" Style="{StaticResource RowLabel}" />
-                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding DevGameStatus}" Style="{StaticResource Text.Label}"
-                           VerticalAlignment="Center" Margin="0,5" TextWrapping="Wrap" />
-
-                <TextBlock Grid.Row="7" Text="guest renderer" Style="{StaticResource RowLabel}" />
-                <Grid Grid.Row="7" Grid.Column="1" VerticalAlignment="Center" Margin="0,5"
-                      ToolTip="forces the game's OpenGL ES through ANGLE onto Vulkan inside the emulator — the scriptable equivalent of the backend toggle">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition />
-                  </Grid.ColumnDefinitions>
-                  <CheckBox IsChecked="{Binding DevForceAngle}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="1" Text="force ANGLE/Vulkan for the game inside the guest (scriptable backend)"
-                             TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
-                </Grid>
-
-                <TextBlock Grid.Row="8" Text="renderer status" Style="{StaticResource RowLabel}" />
-                <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding DevRendererStatus}" Style="{StaticResource Text.Label}"
-                           VerticalAlignment="Center" Margin="0,5" TextWrapping="Wrap"
-                           Foreground="{DynamicResource Brush.TextDim}" />
-
-                <TextBlock Grid.Row="9" Text="fps unlock" Style="{StaticResource RowLabel}" />
-                <StackPanel Grid.Row="9" Grid.Column="1" Margin="0,5">
-                  <StackPanel Orientation="Horizontal">
-                    <TextBox Text="{Binding DevRefreshRateText, UpdateSourceTrigger=PropertyChanged}" Width="70" VerticalContentAlignment="Center"
-                             ToolTip="display refresh rate in Hz (60 = stock clamp)" />
-                    <TextBlock Text="Hz" VerticalAlignment="Center" Margin="6,0,0,0" Style="{StaticResource Text.Label}" />
-                    <Button Padding="14,6" MinWidth="130" Margin="12,0,0,0" Content="Apply refresh rate"
-                            Command="{Binding ApplyDevRefreshRateCommand}" IsEnabled="{Binding DevBusy, Converter={StaticResource InverseBool}}"
-                            ToolTip="writes the guest peak/min refresh rate over adb and updates Service.exe.config through the elevated helper; restart the emulator afterwards" />
-                  </StackPanel>
-                  <TextBlock Text="{Binding DevRefreshStatus}" Style="{StaticResource Text.Micro}"
-                             Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Brush.TextDim}" />
-                </StackPanel>
-
-                <WrapPanel Grid.Row="10" Grid.ColumnSpan="2" Margin="0,5">
-                  <Button Style="{StaticResource PrimaryButton}" Padding="18,8" MinWidth="150" Content="Launch Critical Ops"
-                          Command="{Binding LaunchDevGameCommand}" IsEnabled="{Binding DevBusy, Converter={StaticResource InverseBool}}"
-                          ToolTip="starts the developer emulator if needed, then boots the game inside it over adb" />
-                  <Button Padding="18,8" MinWidth="150" Margin="10,0,0,0" Content="Apply to emulator"
-                          Command="{Binding ApplyDevEmulatorCommand}" />
-                  <Button Padding="18,8" MinWidth="90" Margin="10,0,0,0" Content="Refresh"
-                          Command="{Binding RefreshDevEmulatorCommand}" />
-                  <Button Padding="18,8" MinWidth="100" Margin="10,0,0,0" Content="Game status"
-                          Command="{Binding RefreshDevGameStatusCommand}" />
-                  <Button Padding="18,8" MinWidth="110" Margin="10,0,0,0" Content="Apply renderer"
-                          Command="{Binding ApplyGuestRendererCommand}" IsEnabled="{Binding DevBusy, Converter={StaticResource InverseBool}}"
-                          ToolTip="applies the guest renderer checkbox over adb" />
-                  <Button Padding="18,8" MinWidth="90" Margin="10,0,0,0" Content="Open logs"
-                          Command="{Binding OpenDevEmulatorLogsCommand}" />
-                </WrapPanel>
-                <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="{Binding DevStatusLine}" Style="{StaticResource Text.Micro}"
-                           Margin="0,4,0,5" TextWrapping="Wrap" Foreground="{DynamicResource Brush.TextDim}"
-                           Visibility="{Binding DevStatusLine, Converter={StaticResource EmptyToCollapsed}}" />
-              </Grid>
-            </StackPanel>
           </HeaderedContentControl>
 
           <HeaderedContentControl Style="{StaticResource Section}" Header="PATH OVERRIDES">
@@ -401,7 +322,7 @@
                   <ColumnDefinition />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                  <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                  <RowDefinition /><RowDefinition /><RowDefinition />
                 </Grid.RowDefinitions>
 
                 <TextBlock Text="play games folder" Style="{StaticResource RowLabel}" />
@@ -415,9 +336,6 @@
                 <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CustomLaunchCommand}" Margin="0,5"
                          ToolTip="last launch strategy. placeholders: {uri} and {package}" />
 
-                <TextBlock Grid.Row="3" Text="developer emulator folder" Style="{StaticResource RowLabel}" />
-                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding DeveloperEmulatorInstallPath}" Margin="0,5"
-                         ToolTip="default: C:\Program Files\Google\Play Games Developer Emulator" />
               </Grid>
             </StackPanel>
           </HeaderedContentControl>

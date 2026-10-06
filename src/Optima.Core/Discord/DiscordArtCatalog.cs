@@ -1,4 +1,3 @@
-using System.Net.Http;
 using System.Text.Json;
 using Optima.Core.Net;
 using Microsoft.Extensions.Logging;
@@ -41,14 +40,16 @@ public sealed class DiscordArtCatalog : IDisposable
     }
 
     /// <summary>
-    /// The asset key to use, or null when the application has nothing uploaded, in which case the
-    /// caller shows the public artwork rather than a broken image.
+    /// Every asset the application has uploaded, in one answer. The card needs more than one key
+    /// (the app mark and a rank emblem), and a single request answers both: asking per key would
+    /// multiply the same call and let the two answers disagree.
     /// </summary>
-    public async Task<string?> FindKeyAsync(string applicationId, string preferredKey, CancellationToken ct = default)
+    public async Task<IReadOnlyList<(string Name, ulong Id)>> FindAssetsAsync(
+        string applicationId, CancellationToken ct = default)
     {
         if (applicationId.Length == 0)
         {
-            return null;
+            return [];
         }
 
         try
@@ -57,21 +58,21 @@ public sealed class DiscordArtCatalog : IDisposable
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogDebug("Discord art asset lookup answered {Status}", (int)response.StatusCode);
-                return null;
+                return [];
             }
 
             var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            return Pick(ParseAssets(json), preferredKey);
+            return ParseAssets(json);
         }
         catch (HttpRequestException ex)
         {
             _logger.LogDebug(ex, "Discord art asset lookup failed");
-            return null;
+            return [];
         }
         catch (Exception ex) when (ex is TaskCanceledException or OperationCanceledException or JsonException)
         {
             _logger.LogDebug(ex, "Discord art asset lookup did not answer");
-            return null;
+            return [];
         }
     }
 
@@ -122,6 +123,31 @@ public sealed class DiscordArtCatalog : IDisposable
         var wanted = Normalize(preferredKey);
         var named = assets.FirstOrDefault(a => string.Equals(Normalize(a.Name), wanted, StringComparison.Ordinal));
         return named.Name ?? assets.OrderByDescending(a => a.Id).First().Name;
+    }
+
+    /// <summary>
+    /// The asset uploaded under exactly this name, or null.
+    ///
+    /// Deliberately strict, unlike <see cref="Pick"/>: a missing app mark can fall back to the newest
+    /// upload and still look right, but a missing rank emblem must not. Falling back there would pin
+    /// one player's rank art onto everybody's card, which is worse than showing no emblem at all.
+    /// </summary>
+    public static string? Match(IReadOnlyList<(string Name, ulong Id)> assets, string wantedKey)
+    {
+        var wanted = Normalize(wantedKey);
+        if (wanted.Length == 0)
+        {
+            return null;
+        }
+
+        foreach (var asset in assets)
+        {
+            if (string.Equals(Normalize(asset.Name), wanted, StringComparison.Ordinal))
+            {
+                return asset.Name;
+            }
+        }
+        return null;
     }
 
     private static string Normalize(string value)

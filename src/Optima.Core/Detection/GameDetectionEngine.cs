@@ -127,8 +127,6 @@ public sealed class GameDetectionEngine : IGameDetector
         return game;
     }
 
-    public string? ResolveProtocolHandlerExecutable(DetectionRules rules) => ResolveProtocolHandler(rules);
-
     private (string? Dir, string? Version) FindInstallDirectory(DetectionRules rules)
     {
         if (!string.IsNullOrWhiteSpace(rules.ManualInstallPath))

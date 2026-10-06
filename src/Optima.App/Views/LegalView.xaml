@@ -27,7 +27,7 @@
             </ItemsControl.Items>
           </ItemsControl>
           <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="780" HorizontalAlignment="Left" Margin="0,10,0,0"
-                     Text="What Optima changes, it changes on YOUR system, openly, and puts back: display configuration, power plans, process scheduling, and the Windows tweaks you toggle yourself (originals are captured before the first change). One honest limit: no third-party tool can make promises about another company's decisions, so Optima does not promise anything about account standing. Its design goal is simpler: give the game no reason to notice Optima exists." />
+                     Text="What Optima changes, it changes on YOUR system, openly, and puts back: display configuration, power plans, process scheduling (the game's and, if you ask for it on BOOST, that of the background programs you list), and the Windows tweaks you toggle yourself (originals are captured before the first change). One change cannot be put back because there is nothing to restore: with the BOOST memory cleaner on, Windows' standby file cache is emptied when memory runs short, and Windows refills it by itself. One honest limit: no third-party tool can make promises about another company's decisions, so Optima does not promise anything about account standing. Its design goal is simpler: give the game no reason to notice Optima exists." />
         </StackPanel>
       </HeaderedContentControl>
 
@@ -38,8 +38,9 @@
               <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· ping to the game's own connection (network quality readout during sessions)" />
               <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· default.prod.copsapi.criticalforce.fi (public profile stats, only with your player name set)" />
               <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· criticalopsgame.com (the official updates page, for the news feed)" />
-              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· api.github.com and GitHub downloads (Optima's own updates)" />
-              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· your local Discord client over a named pipe (game activity), never over the network" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· your local Discord client over a named pipe (game activity)" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· discord.com (which artwork the presence application has uploaded, only while presence is on)" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· OptimaBot, Optima's community Discord bot (account linking, only when you link or check a link)" />
             </ItemsControl.Items>
           </ItemsControl>
           <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="760" HorizontalAlignment="Left" TextWrapping="Wrap"

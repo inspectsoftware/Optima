@@ -19,49 +19,6 @@ public partial class TitleBar : UserControl
     public static readonly DependencyProperty ShowMaximizeProperty = DependencyProperty.Register(
         nameof(ShowMaximize), typeof(bool), typeof(TitleBar), new PropertyMetadata(true));
 
-    public static readonly DependencyProperty AccountsProperty = DependencyProperty.Register(
-        nameof(Accounts), typeof(System.Collections.IEnumerable), typeof(TitleBar), new PropertyMetadata(null));
-
-    public static readonly DependencyProperty ActiveAccountProperty = DependencyProperty.Register(
-        nameof(ActiveAccount), typeof(object), typeof(TitleBar),
-        new PropertyMetadata(null, OnActiveAccountChanged));
-
-    public static readonly DependencyProperty HasAccountsProperty = DependencyProperty.Register(
-        nameof(HasAccounts), typeof(bool), typeof(TitleBar), new PropertyMetadata(false));
-
-    /// <summary>The saved identities shown in the caption switcher.</summary>
-    public System.Collections.IEnumerable? Accounts
-    {
-        get => (System.Collections.IEnumerable?)GetValue(AccountsProperty);
-        set => SetValue(AccountsProperty, value);
-    }
-
-    /// <summary>The active identity; selecting another one requests the switch.</summary>
-    public object? ActiveAccount
-    {
-        get => GetValue(ActiveAccountProperty);
-        set => SetValue(ActiveAccountProperty, value);
-    }
-
-    public bool HasAccounts
-    {
-        get => (bool)GetValue(HasAccountsProperty);
-        set => SetValue(HasAccountsProperty, value);
-    }
-
-    /// <summary>Raised with the newly selected account; the shell performs the switch.</summary>
-    public event EventHandler<object>? AccountSwitchRequested;
-
-    private static void OnActiveAccountChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        var bar = (TitleBar)d;
-        bar.HasAccounts = bar.Accounts is System.Collections.IEnumerable list && list.Cast<object>().Any();
-        if (e.OldValue is not null && e.NewValue is not null && !ReferenceEquals(e.OldValue, e.NewValue))
-        {
-            bar.AccountSwitchRequested?.Invoke(bar, e.NewValue);
-        }
-    }
-
     public string Breadcrumb
     {
         get => (string)GetValue(BreadcrumbProperty);

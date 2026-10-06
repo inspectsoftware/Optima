@@ -35,7 +35,6 @@ public static class CrashSignals
         foreach (var line in lines)
         {
             var isGameLine = line.Contains(gamePackageId, StringComparison.OrdinalIgnoreCase);
-            var isLifecycle = line.Contains("ActivityManager", StringComparison.Ordinal);
             var isFatal = FatalMarkers.Any(m => line.Contains(m, StringComparison.OrdinalIgnoreCase));
 
             if (isFatal)
@@ -46,7 +45,7 @@ public static class CrashSignals
             {
                 forceStop = true;
             }
-            if (isGameLine || isFatal || (isLifecycle && isGameLine))
+            if (isGameLine || isFatal)
             {
                 excerpt.Add(line);
             }

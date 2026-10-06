@@ -24,6 +24,14 @@ public partial class PlayGuideWindow : Window
                 oldViewModel.RequestClose -= Close;
             }
         };
+        // The view model outlives the window: without this every closed guide stays referenced by it.
+        Closed += (_, _) =>
+        {
+            if (DataContext is PlayGuideViewModel viewModel)
+            {
+                viewModel.RequestClose -= Close;
+            }
+        };
     }
 
     private void OnStepCardClick(object sender, MouseButtonEventArgs e)

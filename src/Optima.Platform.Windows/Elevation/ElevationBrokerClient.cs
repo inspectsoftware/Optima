@@ -176,7 +176,15 @@ public sealed class ElevationBrokerClient : IElevationBroker
                 }
                 else if (envelope.Event is { } evt)
                 {
-                    EventReceived?.Invoke(this, evt);
+                    try
+                    {
+                        EventReceived?.Invoke(this, evt);
+                    }
+                    catch (Exception ex)
+                    {
+                        // A listener that throws must not take the loop, and every pending request, with it.
+                        _logger.LogWarning(ex, "An IPC event listener failed");
+                    }
                 }
             }
         }
@@ -184,8 +192,14 @@ public sealed class ElevationBrokerClient : IElevationBroker
         {
             _logger.LogDebug(ex, "IPC read loop ended");
         }
-
-        FailAllPending("The elevated helper disconnected.");
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "IPC read loop failed");
+        }
+        finally
+        {
+            FailAllPending("The elevated helper disconnected.");
+        }
     }
 
     private void FailAllPending(string reason)

@@ -1,9 +1,9 @@
-# Builds the local dev edition in one command:
+# Builds the local dev payload and its installer in one command:
 #
 #   .\devbuild.ps1            republish the Desktop "Optima Dev" folder and build its installer
 #   .\devbuild.ps1 -Run       ... and start the app afterwards
 #
-# Publishes the app and its elevated helper (self-contained, ReadyToRun, dev edition) into
+# Publishes the app and its elevated helper (self-contained, ReadyToRun) into
 # %USERPROFILE%\Desktop\Optima Dev, then compiles a matching per-user setup into the Installers
 # subfolder of that same folder, named Optima-Setup-<version>-dev-<timestamp>.exe so every change
 # leaves its own installer behind (earlier setups are kept, not overwritten). The setup excludes
@@ -29,7 +29,7 @@ New-Item -ItemType Directory -Force $installers | Out-Null
 $label = "-dev-" + (Get-Date -Format "yyyyMMdd-HHmm")
 Write-Host "dev build: $Folder"
 
-& (Join-Path $root "installer.ps1") -Publish -DevEdition -Source $Folder -OutDir $installers -Label $label
+& (Join-Path $root "installer.ps1") -Publish -Source $Folder -OutDir $installers -Label $label
 if ($LASTEXITCODE -ne 0) { throw "installer.ps1 failed (exit $LASTEXITCODE)" }
 
 Write-Host "installers: $installers"

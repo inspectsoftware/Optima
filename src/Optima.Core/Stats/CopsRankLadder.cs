@@ -81,7 +81,9 @@ public static class CopsRankLadder
             return null;
         }
         var tier = Resolve(tierIndex, rating);
-        if (tier is null || tier.Name is "Calibrating" or "Iron" && rating < 1100)
+        // Calibrating has no divisions: a provisional rating is not inside a tier, and dividing it by the
+        // 25-point steps produced a confident "Calibrating 4" for a player who has not placed at all.
+        if (tier is null || tier.Name == "Calibrating")
         {
             return null;
         }
@@ -91,6 +93,65 @@ public static class CopsRankLadder
 
     public static CopsRankInfo? Find(int? tier)
         => tier is { } value && value >= 0 && value < Tiers.Count ? Tiers[value] : null;
+
+    /// <summary>The rating band a tier spans, or null for tiers that are open ended (Elite Ops).</summary>
+    public static (long Min, long MaxExclusive)? RatingBand(int? tierIndex, long? mmr)
+    {
+        if (Resolve(tierIndex, mmr) is not { } tier || tier.Name == "Calibrating")
+        {
+            return null;
+        }
+        var range = Ranges.FirstOrDefault(r => r.Name == tier.Name);
+        return range is null || range.MaxMmrExclusive == long.MaxValue
+            ? null
+            : (range.MinMmr, range.MaxMmrExclusive);
+    }
+
+    /// <summary>The tier above the player's current one, or null at the top of the ladder.</summary>
+    public static CopsRankInfo? NextTier(int? tierIndex, long? mmr)
+    {
+        if (Resolve(tierIndex, mmr) is not { } tier || tier.Name == "Calibrating")
+        {
+            // A player who has not placed is not climbing towards Iron: they are being placed, and a
+            // "1,000 rating to Iron" progress bar would be inventing a ladder position they do not hold.
+            return null;
+        }
+        return Tiers.FirstOrDefault(t => t.Tier == tier.Tier + 1);
+    }
+
+    /// <summary>
+    /// How much rating is left before the next tier, and where the player sits inside the current
+    /// band (0..1). Both are null for an unranked player, for Elite Ops and when the API gave no
+    /// rating: the card shows progress only when there is a real band to fill.
+    /// </summary>
+    public static (long Remaining, double Progress)? ProgressToNextTier(int? tierIndex, long? mmr)
+    {
+        if (RatingBand(tierIndex, mmr) is not { } band || NextTier(tierIndex, mmr) is null)
+        {
+            return null;
+        }
+        var rating = mmr!.Value;
+        var span = band.MaxExclusive - band.Min;
+        var progress = span <= 0 ? 0 : Math.Clamp((double)(rating - band.Min) / span, 0, 1);
+        return (Math.Max(0, band.MaxExclusive - rating), progress);
+    }
+
+    /// <summary>
+    /// The rank as the app writes it: "Gold 2" with the division when the rating places one,
+    /// otherwise the bare tier name ("Master"). One definition, so the presence card, the stats
+    /// panel and the profile card cannot drift into three spellings of the same rank.
+    /// </summary>
+    public static string Label(int? tierIndex, long? mmr)
+    {
+        if (Resolve(tierIndex, mmr) is not { } rank)
+        {
+            return string.Empty;
+        }
+
+        return Division(tierIndex, mmr) is { } division
+            ? $"{rank.ShortName} {division}"
+            : rank.Name;
+    }
 
     private static int TierIndexOf(string name)
         => Tiers.First(t => t.Name == name).Tier;

@@ -61,7 +61,7 @@ public sealed partial class MainViewModel : ObservableObject
         SessionsViewModel sessions,
         DisplayViewModel display,
         CompViewModel comp,
-        ExploreViewModel explore,
+        BoostViewModel boost,
         DiagnosticsViewModel diagnostics,
         LogsViewModel logs,
         SettingsViewModel settingsPage,
@@ -87,7 +87,7 @@ public sealed partial class MainViewModel : ObservableObject
         Sessions = sessions;
         Display = display;
         Comp = comp;
-        Explore = explore;
+        Boost = boost;
         Legal = legal;
         Diagnostics = diagnostics;
         Logs = logs;
@@ -116,7 +116,7 @@ public sealed partial class MainViewModel : ObservableObject
     public SessionsViewModel Sessions { get; }
     public DisplayViewModel Display { get; }
     public CompViewModel Comp { get; }
-    public ExploreViewModel Explore { get; }
+    public BoostViewModel Boost { get; }
     public LegalViewModel Legal { get; }
     public DiagnosticsViewModel Diagnostics { get; }
     public LogsViewModel Logs { get; }
@@ -198,8 +198,8 @@ public sealed partial class MainViewModel : ObservableObject
         new("03", "PERFORMANCE"),
         new("04", "SESSIONS"),
         new("05", "COMP", "TUNE"),
-        new("06", "DISPLAY"),
-        new("07", "EXPLORE"),
+        new("06", "BOOST"),
+        new("07", "DISPLAY"),
         new("08", "SETTINGS", "SUPPORT"),
         new("09", "DIAGNOSTICS"),
         new("10", "LOGS"),
@@ -230,6 +230,11 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task NavigateAsync(string page)
     {
+        // The rail hides this page with developer mode off; its shortcut has to respect that too.
+        if (!DeveloperModeVisible && string.Equals(page, "DEVELOPER", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
         Breadcrumb = page.ToUpperInvariant();
         foreach (var item in NavItems)
         {
@@ -244,7 +249,7 @@ public sealed partial class MainViewModel : ObservableObject
             "SESSIONS" => Sessions,
             "DISPLAY" => Display,
             "COMP" => Comp,
-            "EXPLORE" => Explore,
+            "BOOST" => Boost,
             "LEGAL" => Legal,
             "DIAGNOSTICS" => Diagnostics,
             "LOGS" => Logs,
@@ -271,8 +276,8 @@ public sealed partial class MainViewModel : ObservableObject
                 case CompViewModel c:
                     await c.InitializeAsync();
                     break;
-                case ExploreViewModel e:
-                    await e.InitializeAsync();
+                case BoostViewModel b:
+                    await b.InitializeAsync();
                     break;
                 case LegalViewModel l:
                     await l.InitializeAsync();

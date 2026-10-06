@@ -149,6 +149,7 @@ public sealed class RawMouseMeter : IDisposable
     private struct RawMouse
     {
         public ushort Flags;
+        public ushort Padding;
         public ushort ButtonFlags;
         public ushort ButtonData;
         public uint RawButtons;

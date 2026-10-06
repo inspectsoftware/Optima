@@ -10,8 +10,7 @@ publish/
 Optima Indev/
 Optima Indev Dev/
 
-# Installer output and the portable Inno Setup compiler (fetched by installer.ps1).
-artifacts/
+# The portable Inno Setup compiler (fetched by installer.ps1).
 tools/InnoSetup/
 tools/innosetup-*.exe
 *.binlog

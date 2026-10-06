@@ -24,7 +24,7 @@ public partial class App : Application
     private ConsoleWindow? _console;
     private OverlayController? _overlay;
     private ThemeService? _theme;
-    private SplashWindow? _splash;
+    private Services.SplashHost? _splash;
 
     // One instance at a time: a second launch must never stack a second Optima, it should
     // bring the running one back instead (the exit path can stall, so users relaunch).
@@ -58,8 +58,16 @@ public partial class App : Application
         var startInTrayArg = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase));
         if (!startInTrayArg)
         {
-            _splash = new SplashWindow();
-            _splash.Show();
+            // The splash is up long before the settings service exists, so the one preference it
+            // depends on is read straight from the file: without it, a PC with Windows animations
+            // off shows a still splash even though the user told Optima to animate regardless.
+            Motion.SetFollowWindows(ReadFollowWindowsMotion(paths.ConfigFile));
+            // On its own thread, so it animates through everything below. Whether it moves at all
+            // follows the motion preference only: at launch nothing of Optima is in the
+            // foreground yet, and that must not freeze the splash.
+            _splash = Services.SplashHost.Show(
+                Motion.Allowed, "v" + (typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"));
+            _splash?.SetStatus("starting", 0.1);
         }
 
         Log.Logger = new LoggerConfiguration()
@@ -74,6 +82,7 @@ public partial class App : Application
             .WriteTo.Debug()
             .CreateLogger();
 
+        _splash?.SetStatus("building services", 0.3);
         _host = Host.CreateDefaultBuilder()
             .UseSerilog()
             .ConfigureServices(services => AppServices.Register(services, paths))
@@ -88,6 +97,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
+        _splash?.SetStatus("starting services", 0.5);
         _host.Start();
         Log.Information("Optima starting (version {Version})",
             typeof(App).Assembly.GetName().Version);
@@ -96,11 +106,21 @@ public partial class App : Application
         _theme = new ThemeService(settingsService);
         // Theme must be on the wall before the first window paints. The synchronous read keeps
         // startup on this thread instead of blocking it on a thread pool hop.
+        _splash?.SetStatus("reading settings", 0.65);
         var initialSettings = settingsService.GetSettings();
         _theme.Initialize(initialSettings);
+        try
+        {
+            _splash?.SetAccent((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(initialSettings.AccentColor));
+        }
+        catch (FormatException)
+        {
+            // The splash keeps its default accent.
+        }
         Motion.SetFollowWindows(initialSettings.FollowWindowsMotion);
         settingsService.SettingsChanged += (_, s) => Dispatcher.BeginInvoke(() => Motion.SetFollowWindows(s.FollowWindowsMotion));
 
+        _splash?.SetStatus("preparing the window", 0.85);
         var mainViewModel = _host.Services.GetRequiredService<MainViewModel>();
         var window = new MainWindow { DataContext = mainViewModel };
         MainWindow = window;
@@ -110,9 +130,13 @@ public partial class App : Application
         if (!startInTray)
         {
             window.Show();
-            // The splash sits on top and expands into the window's bounds, revealing the
-            // app that was already rendered underneath; no flash of empty desktop.
-            _ = _splash?.ExpandIntoAsync(window, TimeSpan.FromSeconds(1.2));
+            // The splash sits on top; its centre square opens onto the window that is already
+            // rendered underneath, so there is no flash of empty desktop.
+            _splash?.SetStatus("ready", 1);
+            var bounds = window.WindowState == WindowState.Maximized
+                ? new Rect(SystemParameters.WorkArea.Location, SystemParameters.WorkArea.Size)
+                : new Rect(window.Left, window.Top, window.ActualWidth, window.ActualHeight);
+            _ = _splash?.OpenIntoAsync(bounds);
         }
         else
         {
@@ -180,6 +204,11 @@ public partial class App : Application
         var sessionTweaks = _host.Services.GetRequiredService<Optima.Core.Launch.SessionTweakService>();
         sessionTweaks.Start();
         _ = SyncSessionTweaksAsync(sessionTweaks);
+        _host.Services.GetRequiredService<Optima.Core.Launch.PriorityGuardService>().Start(presence);
+        _host.Services.GetRequiredService<Optima.Monitoring.Metrics.StandbyCleanerService>().Start();
+        _host.Services.GetRequiredService<Optima.Core.Launch.TimerResolutionService>().Start();
+        _host.Services.GetRequiredService<Optima.Core.Launch.BackgroundDemotionService>().Start();
+        _host.Services.GetRequiredService<Optima.Core.Launch.GameExtrasService>().Start();
         presence.PresenceChanged += change =>
         {
             SetOwnPriority(gameOnScreen: change.Current == Optima.Core.Monitoring.GamePresence.InGame);
@@ -190,6 +219,25 @@ public partial class App : Application
         };
 
         _ = mainViewModel.InitializeAsync();
+    }
+
+    /// <summary>The "follow Windows' animation setting" preference, read before anything else is loaded. True, the default, when it cannot be read.</summary>
+    private static bool ReadFollowWindowsMotion(string configFile)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(configFile))
+            {
+                return true;
+            }
+            using var document = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(configFile));
+            return !document.RootElement.TryGetProperty("followWindowsMotion", out var value)
+                || value.ValueKind != System.Text.Json.JsonValueKind.False;
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return true;
+        }
     }
 
     private static async Task RunQuietlyAsync(Task task, string what)

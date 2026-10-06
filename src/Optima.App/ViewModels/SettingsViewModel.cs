@@ -1,11 +1,10 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Configuration;
-using Optima.Core.Ipc;
 using Optima.Core.Models;
 using Optima.Core.Theming;
 
@@ -19,24 +18,16 @@ public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly SettingsService _settings;
     private readonly Services.PlayerSwitcherService _players;
-    private readonly Optima.Core.Abstractions.IElevationBroker _broker;
-    private readonly Optima.Platform.Windows.Services.DevEmulatorSettingsService? _devEmulator;
-
-    // What is actually on disk right now, so Apply only touches what changed.
-    private Optima.Platform.Windows.Services.GpuPreferenceKind _devGpuPreferenceOnDisk;
-    private bool _devGpuPrioritizationOnDisk;
-    private bool _devGpuRetrievalOnDisk;
+    private readonly Optima.Core.Linking.BotLinkClient _botLink;
 
     public SettingsViewModel(
         SettingsService settings,
         Services.PlayerSwitcherService players,
-        Optima.Core.Abstractions.IElevationBroker broker,
-        Optima.Platform.Windows.Services.DevEmulatorSettingsService? devEmulator = null)
+        Optima.Core.Linking.BotLinkClient botLink)
     {
         _settings = settings;
         _players = players;
-        _broker = broker;
-        _devEmulator = devEmulator;
+        _botLink = botLink;
     }
 
     public IReadOnlyList<string> ProviderOptions { get; } = ["Auto", "MttVdd", "Mock"];
@@ -44,6 +35,11 @@ public sealed partial class SettingsViewModel : ObservableObject
     public IReadOnlyList<string> CornerOptions { get; } = ["TopLeft", "TopRight", "BottomLeft", "BottomRight"];
     public IReadOnlyList<double> OpacityOptions { get; } = [0.5, 0.65, 0.8, 1.0];
     public IReadOnlyList<string> ThemeOptions { get; } = ["Dark", "Light"];
+
+    /// <summary>
+    /// The priority Optima pins for the Google Play Games process that runs Critical Ops.
+    /// Unchanged defers to the priority stored in the selected launch profile.
+    /// </summary>
 
     public IReadOnlyList<AccentPreset> AccentPresets { get; } =
     [
@@ -98,8 +94,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
         long? accountId = long.TryParse(NewTrackedAccountId.Trim(), out var id) && id > 0 ? id : null;
-        await _players.AddTrackedAsync(new PlayerAccount { Ign = ign, AccountId = accountId });
-        TrackedPlayers.Add(new PlayerAccount { Ign = ign, AccountId = accountId });
+        // One instance for both: the row has to carry the key that was stored, or it cannot be removed.
+        var tracked = new PlayerAccount { Ign = ign, AccountId = accountId };
+        await _players.AddTrackedAsync(tracked);
+        TrackedPlayers.Add(tracked);
         NewTrackedIgn = string.Empty;
         NewTrackedAccountId = string.Empty;
         SaveBarMark = "[ OK ]";
@@ -113,8 +111,214 @@ public sealed partial class SettingsViewModel : ObservableObject
         await _players.RemoveTrackedAsync(account.Key);
         TrackedPlayers.Remove(account);
     }
+
     [ObservableProperty] private bool _discordPresenceEnabled = true;
     [ObservableProperty] private bool _discordPresenceInLauncher = true;
+    /// <summary>The field-by-field Discord card choice, edited in the presence chooser window.</summary>
+    [ObservableProperty] private DiscordPresenceOptions _discordOptions = new();
+
+    [ObservableProperty] private string _discordOptionsSummary = string.Empty;
+
+    /// <summary>
+    /// Where the OptimaBot link API answers. Saved with the rest of the settings and prefilled with
+    /// Optima's community bot, so linking works untouched; a self-hosted bot's address replaces it.
+    /// </summary>
+    [ObservableProperty] private string _discordBotUrl = Optima.Core.Linking.BotLinkClient.DefaultBaseUrl;
+
+    /// <summary>
+    /// The Discord channel webhook the bot posts this account's matches and rank changes to after
+    /// linking. Empty links without tracking, which is the default.
+    /// </summary>
+    [ObservableProperty] private string _discordBotWebhookUrl = string.Empty;
+
+    /// <summary>The link as the bot last confirmed it, in one line for the Settings row.</summary>
+    [ObservableProperty] private string _discordBotLinkSummary = "not linked";
+
+    private string _discordBotLinkTag = string.Empty;
+    private string _discordBotLinkedPlayer = string.Empty;
+    private DateTimeOffset? _discordBotLinkedAt;
+
+    private void UpdateDiscordLinkSummary()
+        => DiscordBotLinkSummary = _discordBotLinkedPlayer.Length switch
+        {
+            0 => "not linked",
+            _ when _discordBotLinkTag.Length > 0 => $"linked to {_discordBotLinkedPlayer} as {_discordBotLinkTag}",
+            _ => $"linked to {_discordBotLinkedPlayer}",
+        };
+
+    /// <summary>
+    /// Opens the link dialog and, when the bot confirms a link, remembers it. The write goes straight to
+    /// the store rather than through the save bar: the link exists on the bot the moment it is written,
+    /// so a local copy still sitting unsaved would be a Settings page that disagrees with reality.
+    /// </summary>
+    [RelayCommand]
+    private async Task LinkDiscordAsync()
+    {
+        var baseUrl = Optima.Core.Linking.BotLinkClient.NormalizeBaseUrl(DiscordBotUrl)
+            ?? Optima.Core.Linking.BotLinkClient.DefaultBaseUrl;
+        long? accountId = long.TryParse(PlayerAccountId.Trim(), out var id) && id > 0 ? id : null;
+
+        // The tracker webhook is optional, but a typo in it would look like a working tracker that
+        // never posts anything, and the bot refuses one it cannot post to anyway: catch it here, where
+        // the field being fixed is on screen.
+        var webhook = Optima.Core.Linking.TrackerWebhook.Normalize(DiscordBotWebhookUrl);
+        if (DiscordBotWebhookUrl.Trim().Length > 0 && webhook is null)
+        {
+            SaveBarMark = "[ ! ]";
+            SaveBarText = "That tracker webhook does not look like a Discord webhook URL. Copy it from the "
+                + "channel's Integrations settings in Discord, or clear the field to link without tracking.";
+            SaveBarVisible = true;
+            return;
+        }
+
+        // What the account is currently linked to, fetched first so the dialog can say what it is about to
+        // replace. A bot that cannot be reached is not an error here: the dialog explains it.
+        Optima.Core.Linking.BotLinkStatusResponse? status = null;
+        if (accountId is { } known)
+        {
+            var lookup = await _botLink.GetStatusAsync(baseUrl, known);
+            if (lookup.Ok)
+            {
+                status = lookup.Value;
+            }
+        }
+
+        var window = new Views.DiscordLinkWindow(_botLink, baseUrl, accountId, PlayerIgn.Trim(), status, webhook)
+        {
+            Owner = System.Windows.Application.Current?.MainWindow,
+        };
+        if (window.ShowDialog() != true || window.Result is not { Ok: true } claim)
+        {
+            return;
+        }
+
+        _discordBotLinkTag = claim.DiscordTag ?? string.Empty;
+        _discordBotLinkedPlayer = claim.PlayerName ?? string.Empty;
+        _discordBotLinkedAt = claim.LinkedAt;
+        DiscordBotUrl = baseUrl;
+        DiscordBotWebhookUrl = webhook ?? string.Empty;
+        UpdateDiscordLinkSummary();
+
+        await _settings.UpdateSettingsAsync(s => s with
+        {
+            DiscordBotUrl = baseUrl,
+            DiscordBotWebhookUrl = webhook ?? string.Empty,
+            DiscordBotLinkTag = _discordBotLinkTag,
+            DiscordBotLinkedPlayer = _discordBotLinkedPlayer,
+            DiscordBotLinkedAt = _discordBotLinkedAt,
+        });
+
+        SaveBarMark = "[ OK ]";
+        SaveBarText = webhook is null
+            ? $"Linked to {_discordBotLinkedPlayer}. Run /searchplayer in Discord to see your own card."
+            : $"Linked to {_discordBotLinkedPlayer}. New matches and rank changes will be posted to your tracker webhook.";
+        SaveBarVisible = true;
+    }
+
+    /// <summary>
+    /// Sends one sample report image to the webhook field through the bot, so the channel and the URL
+    /// can be checked before a real match needs them. The field is used as typed; nothing is saved.
+    /// </summary>
+    [RelayCommand]
+    private async Task TestTrackerAsync()
+    {
+        var typed = DiscordBotWebhookUrl.Trim();
+        if (typed.Length == 0)
+        {
+            SaveBarMark = "[ ! ]";
+            SaveBarText = "Paste the channel's webhook URL first, then press the test button.";
+            SaveBarVisible = true;
+            return;
+        }
+
+        var webhook = Optima.Core.Linking.TrackerWebhook.Normalize(typed);
+        if (webhook is null)
+        {
+            SaveBarMark = "[ ! ]";
+            SaveBarText = "That tracker webhook does not look like a Discord webhook URL. Copy it from the "
+                + "channel's Integrations settings in Discord.";
+            SaveBarVisible = true;
+            return;
+        }
+
+        var baseUrl = Optima.Core.Linking.BotLinkClient.NormalizeBaseUrl(DiscordBotUrl)
+            ?? Optima.Core.Linking.BotLinkClient.DefaultBaseUrl;
+
+        SaveBarMark = "[ … ]";
+        SaveBarText = "Sending a sample report to the webhook...";
+        SaveBarVisible = true;
+
+        var result = await _botLink.TestTrackerAsync(baseUrl, webhook);
+        var answer = result.Value;
+        if (answer is { Ok: true })
+        {
+            SaveBarMark = "[ OK ]";
+            SaveBarText = answer.Message.Length > 0
+                ? answer.Message
+                : "Test image sent. Check the channel for the sample report.";
+        }
+        else
+        {
+            SaveBarMark = "[ ! ]";
+            SaveBarText = answer?.Message is { Length: > 0 } message ? message : result.Message;
+        }
+
+        SaveBarVisible = true;
+    }
+
+    /// <summary>
+    /// Opens the presence chooser. The window edits its own copy, so a cancelled dialog changes
+    /// nothing and only an accepted one can light up the save bar.
+    /// </summary>
+    [RelayCommand]
+    private void ChooseDiscordPresence()
+    {
+        var window = new Views.DiscordPresenceWindow(DiscordOptions)
+        {
+            Owner = System.Windows.Application.Current?.MainWindow,
+        };
+        if (window.ShowDialog() != true || window.Result is null)
+        {
+            return;
+        }
+        DiscordOptions = window.Result;
+        UpdateDiscordOptionsSummary();
+    }
+
+    private void UpdateDiscordOptionsSummary()
+    {
+        var options = DiscordOptions;
+        var parts = new List<string>();
+        if (options.ShowPlayerName)
+        {
+            parts.Add("name");
+        }
+        if (options.ShowRank)
+        {
+            parts.Add("rank");
+        }
+        if (options.ShowRankEmblem)
+        {
+            parts.Add("emblem");
+        }
+        if (options.ShowRankedRecord)
+        {
+            parts.Add("record");
+        }
+        if (options.ShowRankedRating)
+        {
+            parts.Add("rating");
+        }
+        if (options.ShowFps)
+        {
+            parts.Add("fps");
+        }
+        if (options.ShowElapsedTime)
+        {
+            parts.Add("timer");
+        }
+        DiscordOptionsSummary = parts.Count == 0 ? "game name only" : string.Join(" · ", parts);
+    }
     [ObservableProperty] private string _discordApplicationId = string.Empty;
 
     [ObservableProperty] private string _provider = "Auto";
@@ -132,7 +336,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _enableWatchMode;
     [ObservableProperty] private bool _autoRelaunchOnCrash;
     [ObservableProperty] private bool _useMockMetricsProvider;
-    [ObservableProperty] private bool _useDeveloperEmulator;
     [ObservableProperty] private string _vddSettingsPath = string.Empty;
     [ObservableProperty] private string _manualInstallPath = string.Empty;
     [ObservableProperty] private string _customLaunchCommand = string.Empty;
@@ -173,9 +376,12 @@ public sealed partial class SettingsViewModel : ObservableObject
             // Not initialized yet (settings still loading); do not persist half-loaded text.
             return;
         }
-        _identityAutosaveTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+        if (_identityAutosaveTimer is null)
+        {
+            _identityAutosaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+            _identityAutosaveTimer.Tick += OnIdentityAutosaveTick;
+        }
         _identityAutosaveTimer.Stop();
-        _identityAutosaveTimer.Tick += OnIdentityAutosaveTick;
         _identityAutosaveTimer.Start();
     }
 
@@ -185,11 +391,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         timer.Stop();
         try
         {
-            long? accountId = long.TryParse(PlayerAccountId.Trim(), out var id) && id > 0 ? id : null;
+            // An empty box clears the id; text that is not a number yet keeps the stored one.
+            var idText = PlayerAccountId.Trim();
+            var idValid = long.TryParse(idText, out var id) && id > 0;
             await _settings.UpdateSettingsAsync(s => s with
             {
                 PlayerIgn = PlayerIgn.Trim(),
-                PlayerAccountId = accountId,
+                PlayerAccountId = idValid ? id : idText.Length == 0 ? null : s.PlayerAccountId,
             });
         }
         catch
@@ -203,12 +411,16 @@ public sealed partial class SettingsViewModel : ObservableObject
     private Dictionary<string, object?> NormalizedValues() => new()
     {
         [nameof(Theme)] = Theme,
+        [nameof(AutoRelaunchOnCrash)] = AutoRelaunchOnCrash,
         [nameof(AccentColor)] = AccentColor.Trim(),
         [nameof(PlayerIgn)] = PlayerIgn.Trim(),
         [nameof(PlayerAccountId)] = PlayerAccountId.Trim(),
         [nameof(DiscordPresenceEnabled)] = DiscordPresenceEnabled,
         [nameof(DiscordPresenceInLauncher)] = DiscordPresenceInLauncher,
+        [nameof(DiscordOptions)] = DiscordOptions,
         [nameof(DiscordApplicationId)] = DiscordApplicationId.Trim(),
+        [nameof(DiscordBotUrl)] = DiscordBotUrl.Trim(),
+        [nameof(DiscordBotWebhookUrl)] = DiscordBotWebhookUrl.Trim(),
         [nameof(Provider)] = Provider,
         [nameof(EnableFrametimeCapture)] = EnableFrametimeCapture,
         [nameof(LogLevel)] = LogLevel,
@@ -223,7 +435,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         [nameof(NetworkReferenceHost)] = string.IsNullOrWhiteSpace(NetworkReferenceHost) ? "1.1.1.1" : NetworkReferenceHost.Trim(),
         [nameof(EnableWatchMode)] = EnableWatchMode,
         [nameof(UseMockMetricsProvider)] = UseMockMetricsProvider,
-        [nameof(UseDeveloperEmulator)] = UseDeveloperEmulator,
         [nameof(VddSettingsPath)] = VddSettingsPath.Trim(),
         [nameof(ManualInstallPath)] = ManualInstallPath.Trim(),
         [nameof(CustomLaunchCommand)] = CustomLaunchCommand.Trim(),
@@ -280,7 +491,17 @@ public sealed partial class SettingsViewModel : ObservableObject
         PlayerAccountId = settings.PlayerAccountId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
         DiscordPresenceEnabled = settings.DiscordPresenceEnabled;
         DiscordPresenceInLauncher = settings.DiscordPresenceInLauncher;
+        DiscordOptions = settings.EffectivePresenceOptions;
+        UpdateDiscordOptionsSummary();
         DiscordApplicationId = settings.DiscordApplicationId;
+        DiscordBotUrl = string.IsNullOrWhiteSpace(settings.DiscordBotUrl)
+            ? Optima.Core.Linking.BotLinkClient.DefaultBaseUrl
+            : settings.DiscordBotUrl;
+        DiscordBotWebhookUrl = settings.DiscordBotWebhookUrl;
+        _discordBotLinkTag = settings.DiscordBotLinkTag;
+        _discordBotLinkedPlayer = settings.DiscordBotLinkedPlayer;
+        _discordBotLinkedAt = settings.DiscordBotLinkedAt;
+        UpdateDiscordLinkSummary();
         Provider = settings.VirtualDisplayProvider;
         EnableFrametimeCapture = settings.EnableFrametimeCapture;
         LogLevel = settings.MinimumLogLevel;
@@ -296,7 +517,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         EnableWatchMode = settings.EnableWatchMode;
         AutoRelaunchOnCrash = settings.AutoRelaunchOnCrash;
         UseMockMetricsProvider = settings.UseMockMetricsProvider;
-        UseDeveloperEmulator = settings.UseDeveloperEmulator;
         VddSettingsPath = settings.VddSettingsPath ?? string.Empty;
 
         var rules = await _settings.GetDetectionRulesAsync(ct);
@@ -313,12 +533,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         HasUnsavedChanges = false;
         StopConfirmTimer();
         SaveBarVisible = false;
-
-        // Dev edition only: read the emulator state so the section opens already populated.
-        if (IsDevEdition)
-        {
-            await RefreshDevEmulatorAsync();
-        }
     }
 
     [RelayCommand]
@@ -346,10 +560,15 @@ public sealed partial class SettingsViewModel : ObservableObject
             Theme = Theme,
             AccentColor = accentValid ? AccentColor.Trim() : s.AccentColor,
             PlayerIgn = PlayerIgn.Trim(),
-            PlayerAccountId = accountId,
+            PlayerAccountId = accountValid ? accountId : s.PlayerAccountId,
             DiscordPresenceEnabled = DiscordPresenceEnabled,
             DiscordPresenceInLauncher = DiscordPresenceInLauncher,
+            DiscordPresenceOptions = DiscordOptions,
             DiscordApplicationId = DiscordApplicationId.Trim(),
+            DiscordBotUrl = string.IsNullOrWhiteSpace(DiscordBotUrl)
+                ? Optima.Core.Linking.BotLinkClient.DefaultBaseUrl
+                : DiscordBotUrl.Trim(),
+            DiscordBotWebhookUrl = DiscordBotWebhookUrl.Trim(),
             VirtualDisplayProvider = Provider,
             EnableFrametimeCapture = EnableFrametimeCapture,
             MinimumLogLevel = LogLevel,
@@ -365,7 +584,6 @@ public sealed partial class SettingsViewModel : ObservableObject
             EnableWatchMode = EnableWatchMode,
             AutoRelaunchOnCrash = AutoRelaunchOnCrash,
             UseMockMetricsProvider = UseMockMetricsProvider,
-            UseDeveloperEmulator = UseDeveloperEmulator,
             VddSettingsPath = string.IsNullOrWhiteSpace(VddSettingsPath) ? null : VddSettingsPath.Trim(),
         });
 
@@ -384,18 +602,22 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             PlayerAccountId = (await _settings.GetSettingsAsync()).PlayerAccountId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
         }
+        if (!accentValid)
+        {
+            // Put back before the saved values are captured, or the box and the capture disagree
+            // and the save bar never goes away.
+            AccentColor = (await _settings.GetSettingsAsync()).AccentColor;
+        }
 
         CaptureSavedValues();
         HasUnsavedChanges = false;
 
         if (!accentValid && !accountValid)
         {
-            AccentColor = (await _settings.GetSettingsAsync()).AccentColor;
             ShowSaveConfirmation("Settings saved. The accent was not valid hex and the account id was not a number, so both were kept as they were.");
         }
         else if (!accentValid)
         {
-            AccentColor = (await _settings.GetSettingsAsync()).AccentColor;
             ShowSaveConfirmation("Settings saved. Accent color was not a valid hex value, so the previous accent was kept.");
         }
         else if (!accountValid)
@@ -412,284 +634,4 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private string? ApplyStartWithWindows() => Services.AutostartService.Apply(StartWithWindows);
 
-    #region Developer emulator (Dev edition builds only)
-
-    public bool IsDevEdition
-    {
-#if DEVEDITION
-        get => true;
-#else
-        get => false;
-#endif
-    }
-
-    public bool DevEmulatorSectionVisible => IsDevEdition;
-
-    [ObservableProperty] private bool _devEmulatorInstalled;
-    [ObservableProperty] private string _devEmulatorStatus = string.Empty;
-    [ObservableProperty] private string _devGpuSummary = string.Empty;
-
-    [ObservableProperty] private bool _devGpuHighPerformance;
-    [ObservableProperty] private bool _devGpuPrioritization;
-    [ObservableProperty] private bool _devGpuRetrievalRetry;
-
-    [ObservableProperty] private string _devGameStatus = "not checked";
-    [ObservableProperty] private bool _devHasAdb;
-    [ObservableProperty] private string _devRendererStatus = "not checked";
-    [ObservableProperty] private bool _devForceAngle;
-    [ObservableProperty] private bool _devBusy;
-    [ObservableProperty] private string _devStatusLine = string.Empty;
-
-    [ObservableProperty] private string _devRefreshRateText = "60";
-    [ObservableProperty] private string _devRefreshStatus = "not checked";
-
-    private string? _devAdbPath;
-
-    [RelayCommand]
-    private async Task LaunchDevGameAsync()
-    {
-        if (_devEmulator is null)
-        {
-            return;
-        }
-
-        DevBusy = true;
-        try
-        {
-            DevStatusLine = "starting the emulator…";
-            DevStatusLine = await _devEmulator.LaunchGameAsync(await GetDevInstallOverrideAsync());
-        }
-        finally
-        {
-            DevBusy = false;
-        }
-    }
-
-    private async Task<string?> GetDevInstallOverrideAsync()
-    {
-        var rules = await _settings.GetDetectionRulesAsync();
-        return string.IsNullOrWhiteSpace(rules.DeveloperEmulatorInstallPath) ? null : rules.DeveloperEmulatorInstallPath;
-    }
-
-    [RelayCommand]
-    private async Task RefreshDevEmulatorAsync()
-    {
-        if (_devEmulator is null)
-        {
-            return;
-        }
-
-        var snapshot = await _devEmulator.ReadAsync(await GetDevInstallOverrideAsync());
-
-        DevEmulatorInstalled = snapshot.Installed;
-        DevHasAdb = snapshot.AdbPath is not null;
-        _devAdbPath = snapshot.AdbPath;
-
-        if (!snapshot.Installed)
-        {
-            DevEmulatorStatus = "Google Play Games Developer Emulator was not found on this PC.";
-            DevGpuSummary = string.Empty;
-            DevGameStatus = "unavailable";
-            return;
-        }
-
-        DevEmulatorStatus = snapshot.EmulatorRunning
-            ? $"v{snapshot.Version} — emulator is running (quit it from the tray before applying startup flags)"
-            : $"v{snapshot.Version} — not running";
-
-        _devGpuPreferenceOnDisk = snapshot.WindowsGpuPreference;
-        DevGpuHighPerformance = snapshot.WindowsGpuPreference == Optima.Platform.Windows.Services.GpuPreferenceKind.HighPerformance;
-
-        _devGpuPrioritizationOnDisk = snapshot.GpuPrioritization.Present;
-        DevGpuPrioritization = snapshot.GpuPrioritization.Present;
-
-        _devGpuRetrievalOnDisk = snapshot.GpuRetrievalRetry.Present;
-        DevGpuRetrievalRetry = snapshot.GpuRetrievalRetry.Present;
-
-        DevGpuSummary = snapshot.Gpus.Count == 0
-            ? "no GPU information available"
-            : string.Join("  •  ", snapshot.Gpus.Select(g => $"{g.Name} ({g.DriverVersion})"));
-
-        await RefreshDevGameStatusAsync();
-    }
-
-    [RelayCommand]
-    private async Task RefreshDevGameStatusAsync()
-    {
-        if (_devEmulator is null || !DevEmulatorInstalled)
-        {
-            return;
-        }
-
-        if (_devAdbPath is null)
-        {
-            DevGameStatus = "adb.exe not found in the emulator install";
-            return;
-        }
-
-        var (attached, running) = await _devEmulator.CheckGameStatusAsync(_devAdbPath);
-        DevGameStatus = attached
-            ? running
-                ? "emulator attached — Critical Ops is running in it"
-                : "emulator attached — game not started"
-            : "emulator not attached on adb localhost:6520 (start it, or launch via Optima)";
-
-        var (forced, renderer) = await _devEmulator.ReadGuestRendererStatusAsync(_devAdbPath);
-        DevForceAngle = forced;
-        DevRendererStatus = renderer;
-
-        var (peak, _, guestStatus) = await _devEmulator.ReadGuestRefreshRatesAsync(_devAdbPath);
-        var (hostRate, hostGpuRate, _) = _devEmulator.ReadHostRefreshRate();
-        if (peak is not null)
-        {
-            DevRefreshRateText = peak.Value.ToString(CultureInfo.InvariantCulture);
-        }
-        else if (hostRate is not null)
-        {
-            DevRefreshRateText = hostRate.Value.ToString(CultureInfo.InvariantCulture);
-        }
-
-        DevRefreshStatus = hostRate is null
-            ? guestStatus
-            : $"{guestStatus} • host config {hostRate} Hz ({hostGpuRate})";
-    }
-
-    [RelayCommand]
-    private async Task ApplyDevRefreshRateAsync()
-    {
-        if (_devEmulator is null)
-        {
-            return;
-        }
-
-        if (!int.TryParse(DevRefreshRateText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var rate)
-            || rate is < 30 or > 240)
-        {
-            DevRefreshStatus = "enter a refresh rate between 30 and 240";
-            return;
-        }
-
-        DevBusy = true;
-        try
-        {
-            // 1. Guest rates over adb (no elevation needed).
-            var guest = await _devEmulator.ApplyGuestRefreshRateAsync(_devAdbPath, rate);
-
-            // 2. Host config through the elevated helper (Google's Service.exe.config).
-            var host = "host config not updated";
-            if (await _broker.EnsureStartedAsync())
-            {
-                var response = await _broker.SendAsync(new IpcRequest
-                {
-                    Command = IpcCommand.SetDevEmulatorRefreshRate,
-                    Args = { ["refreshRate"] = rate.ToString(CultureInfo.InvariantCulture) },
-                }, CancellationToken.None);
-                host = response.Success
-                    ? $"host config set to {rate} Hz"
-                    : "host config failed: " + response.Error;
-            }
-            else
-            {
-                host = "host config skipped (administrator prompt declined)";
-            }
-
-            DevStatusLine = $"{rate} Hz — {guest}. {host}. Restart the emulator for the host change to take effect.";
-            await RefreshDevGameStatusAsync();
-        }
-        finally
-        {
-            DevBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task ApplyGuestRendererAsync()
-    {
-        if (_devEmulator is null)
-        {
-            return;
-        }
-
-        DevBusy = true;
-        try
-        {
-            DevRendererStatus = "applying…";
-            DevRendererStatus = await _devEmulator.ApplyGuestAngleAsync(_devAdbPath, DevForceAngle);
-        }
-        finally
-        {
-            DevBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task ApplyDevEmulatorAsync()
-    {
-        if (_devEmulator is null)
-        {
-            return;
-        }
-
-        var messages = new List<string>();
-
-        var preferenceNow = DevGpuHighPerformance
-            ? Optima.Platform.Windows.Services.GpuPreferenceKind.HighPerformance
-            : Optima.Platform.Windows.Services.GpuPreferenceKind.Auto;
-        if (preferenceNow != _devGpuPreferenceOnDisk)
-        {
-            var ok = await _devEmulator.SetWindowsGpuPreferenceAsync(preferenceNow, await GetDevInstallOverrideAsync());
-            messages.Add(ok
-                ? preferenceNow == Optima.Platform.Windows.Services.GpuPreferenceKind.HighPerformance
-                    ? "crosvm pinned to the high-performance GPU (takes effect next emulator start)"
-                    : "crosvm GPU pin removed (takes effect next emulator start)"
-                : "could not write the GPU preference");
-            _devGpuPreferenceOnDisk = preferenceNow;
-        }
-
-        try
-        {
-            if (DevGpuPrioritization != _devGpuPrioritizationOnDisk)
-            {
-                await _devEmulator.SetStartupFlagAsync(Optima.Platform.Windows.Services.DevEmulatorSnapshot.GpuPrioritizationFlag, DevGpuPrioritization);
-                messages.Add(DevGpuPrioritization ? "IDXGI GPU prioritization flag enabled" : "IDXGI GPU prioritization flag removed");
-                _devGpuPrioritizationOnDisk = DevGpuPrioritization;
-            }
-
-            if (DevGpuRetrievalRetry != _devGpuRetrievalOnDisk)
-            {
-                await _devEmulator.SetStartupFlagAsync(Optima.Platform.Windows.Services.DevEmulatorSnapshot.GpuRetrievalRetryFlag, DevGpuRetrievalRetry);
-                messages.Add(DevGpuRetrievalRetry ? "GPU retrieval retry flag enabled" : "GPU retrieval retry flag removed");
-                _devGpuRetrievalOnDisk = DevGpuRetrievalRetry;
-            }
-        }
-        catch (InvalidOperationException ex)
-        {
-            SaveBarMark = "[ ! ]";
-            SaveBarText = ex.Message;
-            SaveBarVisible = true;
-            return;
-        }
-
-        SaveBarMark = "[ OK ]";
-        SaveBarText = messages.Count == 0
-            ? "Developer emulator settings already match."
-            : "Applied. " + string.Join(". ", messages) + ".";
-        SaveBarVisible = true;
-
-        await RefreshDevEmulatorAsync();
-    }
-
-    [RelayCommand]
-    private void OpenDevEmulatorLogs()
-    {
-        var path = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Google", "Play Games Developer Emulator", "Logs");
-        if (System.IO.Directory.Exists(path))
-        {
-            _devEmulator?.OpenInExplorer(path);
-        }
-    }
-
-    #endregion
 }

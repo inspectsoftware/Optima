@@ -36,7 +36,7 @@ public sealed record WeeklyDigest(
 {
     public string Headline => SessionCount == 0
         ? "no sessions this week"
-        : $"{SessionCount} session{(SessionCount == 1 ? "" : "s")} · {TotalPlaytime.Hours}h {TotalPlaytime.Minutes}m"
+        : $"{SessionCount} session{(SessionCount == 1 ? "" : "s")} · {(int)TotalPlaytime.TotalHours}h {TotalPlaytime.Minutes}m"
             + (DecidedMatches > 0 ? $" · {Wins}W-{Losses}L" : "")
             + (AverageFps is { } fps ? $" · {fps:F0} fps avg" : "");
     public string WinRateText => DecidedMatches == 0 ? "-" : $"{(double)Wins / DecidedMatches:P0}";

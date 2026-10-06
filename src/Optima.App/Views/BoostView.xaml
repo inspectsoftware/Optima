@@ -1,0 +1,140 @@
+<UserControl x:Class="Optima.App.Views.BoostView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:Optima.App.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="900" HorizontalAlignment="Left">
+      <TextBlock Text="Boost" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="What Optima does while the game runs to keep it smooth · beside the game, never inside it"
+                 Style="{StaticResource Text.PageSubtitle}" />
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="MASTER SWITCH">
+        <WrapPanel Orientation="Horizontal">
+          <ctl:BoostDial Width="190" Height="190" Margin="22,18,34,18" VerticalAlignment="Center"
+                         IsOn="{Binding BoostOn, Mode=OneWay}"
+                         FeatureCount="{Binding BoostFeatureCount, Mode=OneWay}"
+                         Command="{Binding ToggleBoostCommand}"
+                         AutomationProperties.Name="Boost master switch" />
+          <StackPanel VerticalAlignment="Center" MaxWidth="520" Margin="0,8,0,8">
+            <TextBlock Text="Arms every feature ticked below, together" Style="{StaticResource Text.Value}"
+                       FontSize="{StaticResource Type.Title}" TextWrapping="Wrap" />
+            <TextBlock Style="{StaticResource Text.Prose}" Margin="0,8,0,0" TextWrapping="Wrap"
+                       Text="Each feature still starts only when Critical Ops is on screen. Click the dial again to switch them all off and put back everything they changed." />
+            <TextBlock Text="{Binding BoostSummaryText}" Style="{StaticResource Text.Micro}" Margin="0,10,0,0"
+                       Foreground="{DynamicResource Brush.Accent}" TextWrapping="Wrap" />
+          </StackPanel>
+        </WrapPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PRIORITY GUARD">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding GuardStateText}" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.Accent}" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <CheckBox IsChecked="{Binding PriorityGuardEnabled}"
+                    Content="keep the game at the chosen priority whenever it is running" />
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="game priority" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,0,14,0" />
+            <ComboBox ItemsSource="{Binding GamePriorityOptions}" SelectedItem="{Binding GamePriority}"
+                      Width="200" HorizontalAlignment="Left" />
+          </StackPanel>
+          <TextBlock Text="{Binding GuardDetailText}" Style="{StaticResource Text.Value}" Margin="0,12,0,0"
+                     TextWrapping="Wrap" />
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="CPU priority for the Google Play Games process that runs Critical Ops. The guard looks every ten seconds: a game opened without Optima, an emulator that restarted and a priority another program lowered are all put right. Unchanged leaves the choice to the launch profile. The original priority is put back when the guard is switched off or Optima closes. High is the ceiling on purpose; Realtime can starve Windows itself." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="MEMORY CLEANER">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding CleanerStateText}" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.Accent}" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <CheckBox IsChecked="{Binding CleanerEnabled}"
+                    Content="purge the Windows standby list while the game runs, when memory gets short" />
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="when free memory is below" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,0,10,0" />
+            <TextBox Text="{Binding CleanerFreeBelowMb}" Width="80" />
+            <TextBlock Text="MB and the standby list is above" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="10,0,10,0" />
+            <TextBox Text="{Binding CleanerStandbyAboveMb}" Width="80" />
+            <TextBlock Text="MB" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="10,0,0,0" />
+          </StackPanel>
+          <TextBlock Text="{Binding CleanerMemoryText}" Style="{StaticResource Text.Value}" Margin="0,12,0,0"
+                     Visibility="{Binding CleanerMemoryText, Converter={StaticResource EmptyToCollapsed}}" />
+          <TextBlock Text="{Binding CleanerDetailText}" Style="{StaticResource Text.Value}" Margin="0,6,0,0" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Style="{StaticResource SecondaryButton}" Content="purge now" Command="{Binding PurgeNowCommand}"
+                    IsEnabled="{Binding CleanerBusy, Converter={StaticResource InverseBool}}" />
+            <Button Style="{StaticResource SecondaryButton}" Content="start the helper" Command="{Binding StartHelperCommand}" Margin="10,0,0,0"
+                    Visibility="{Binding CleanerNeedsHelper, Converter={StaticResource BoolToVis}}"
+                    IsEnabled="{Binding CleanerBusy, Converter={StaticResource InverseBool}}" />
+          </StackPanel>
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="Windows keeps recently used files in memory (the standby list) and normally hands that memory back on demand. On some systems it does so late, and the game stutters while it waits. The cleaner empties the list only when both conditions hold, which is what ISLC does; 1024 and 1024 are ISLC's defaults. It works on Windows' own cache, never on the game's memory, and a purge cannot be undone: Windows simply refills the cache as files are read again. It needs Optima's elevated helper, so switching it on, PLAY and purge now may each show one administrator prompt per Optima run. A game opened without Optima does not get a prompt; the page says when the helper is missing." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="TIMER RESOLUTION">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding TimerStateText}" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.Accent}" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <CheckBox IsChecked="{Binding TimerEnabled}"
+                    Content="hold a fine system timer while the game is on screen" />
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="resolution" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,0,14,0" />
+            <ComboBox ItemsSource="{Binding TimerChoices}" SelectedItem="{Binding TimerChoice}" Width="100" HorizontalAlignment="Left" />
+            <TextBlock Text="ms" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="10,0,0,0" />
+          </StackPanel>
+          <TextBlock Text="{Binding TimerDetailText}" Style="{StaticResource Text.Value}" Margin="0,12,0,0" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding TimerWindowsText}" Style="{StaticResource Text.Label}" Margin="0,8,0,0"
+                     MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap" />
+          <StackPanel Margin="0,12,0,0" Visibility="{Binding TimerGlobalSwitchAvailable, Converter={StaticResource BoolToVis}}">
+            <CheckBox IsChecked="{Binding TimerGlobalSwitchOn}"
+                      Content="system-wide timer requests (Windows 11 · administrator · needs a restart)" />
+            <TextBlock Text="{Binding TimerGlobalSwitchText}" Style="{StaticResource Text.Micro}" Margin="0,4,0,0"
+                       Visibility="{Binding TimerGlobalSwitchText, Converter={StaticResource EmptyToCollapsed}}" />
+          </StackPanel>
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="Windows wakes sleeping threads on a tick, 15.6 ms apart by default. A finer tick makes frame pacing and input timing more even, at the cost of some battery life, so it is held only while the game is on screen and released when it leaves. The line above reports what Windows applied, not what was asked for. 1.0 ms is the documented step; 0.5 ms uses the same system call other timer tools use. Lower is not always better: if 0.5 ms feels no different, stay on 1.0." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="BACKGROUND PROGRAMS">
+        <HeaderedContentControl.Tag>
+          <TextBlock Text="{Binding DemotionStateText}" Style="{StaticResource Text.Micro}"
+                     Foreground="{DynamicResource Brush.Accent}" />
+        </HeaderedContentControl.Tag>
+        <StackPanel>
+          <CheckBox IsChecked="{Binding DemotionEnabled}"
+                    Content="while the game is on screen, move these programs out of its way (nothing is closed)" />
+          <TextBox Text="{Binding DemotionNames}" AcceptsReturn="True" TextWrapping="NoWrap"
+                   VerticalScrollBarVisibility="Auto" Height="132" Width="320" HorizontalAlignment="Left" Margin="0,12,0,0" />
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <Button Style="{StaticResource GhostButton}" Content="back to the built-in list" Padding="6,0"
+                    Command="{Binding ResetDemotionNamesCommand}" />
+          </StackPanel>
+          <TextBlock Text="{Binding DemotionDetailText}" Style="{StaticResource Text.Value}" Margin="0,10,0,0" TextWrapping="Wrap" />
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="One process name per line, with or without .exe. While Critical Ops is on screen each listed program runs at below-normal priority in Windows' efficiency mode, so it gets processor time only when the game is not asking for it; programs that start mid-game are caught within twenty seconds. When the game leaves, the switch is turned off or Optima closes, each one gets back exactly the priority it had, and if Optima itself dies mid-game the next start puts them back. Windows, the game, Google Play Games and Optima are never touched, whatever the list says. Voice and music apps are left out of the built-in list on purpose: a demoted Discord is a stuttering call." />
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="PROCESSOR AND GRAPHICS">
+        <StackPanel>
+          <CheckBox IsChecked="{Binding KeepCoresAwake}"
+                    Content="keep every processor core awake while the game is on screen" />
+          <TextBlock Text="{Binding CoresDetailText}" Style="{StaticResource Text.Value}" Margin="0,6,0,0" TextWrapping="Wrap" />
+          <CheckBox IsChecked="{Binding GpuHighPerformance}" Margin="0,14,0,0"
+                    Content="ask Windows to run the game on the high-performance graphics adapter" />
+          <TextBlock Text="{Binding GpuDetailText}" Style="{StaticResource Text.Value}" Margin="0,6,0,0" TextWrapping="Wrap" />
+          <TextBlock Style="{StaticResource Text.Micro}" Margin="0,10,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
+                     Text="Core parking puts idle cores to sleep and wakes them on demand; the wake-up is a small hitch at exactly the wrong moment. The first switch sets the active power plan to keep all cores awake for the match and writes the plan's own value back afterwards. It changes nothing on High or Ultimate Performance, which already do this, and it costs battery on a laptop. The second switch is the same per-app choice as Windows Settings, Display, Graphics: it matters on a PC with two graphics adapters (most gaming laptops) and does nothing on a PC with one. It is a standing Windows setting, so it stays until you switch it off here." />
+        </StackPanel>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

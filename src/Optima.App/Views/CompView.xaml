@@ -23,7 +23,7 @@
                      Visibility="{Binding PingResult, Converter={StaticResource EmptyToCollapsed}}" />
           <TextBlock Text="{Binding WifiResult}" Style="{StaticResource Text.Value}" Margin="0,6,0,0" />
           <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" TextWrapping="Wrap"
-                     Text="Ten pings, a quarter second apart. During a real session the SYSTEM page measures the game's own connection instead; this test is for the link in general." />
+                     Text="Ten pings, a quarter second apart. During a real session the PERFORMANCE page measures the game's own connection instead; this test is for the link in general." />
         </StackPanel>
       </HeaderedContentControl>
 

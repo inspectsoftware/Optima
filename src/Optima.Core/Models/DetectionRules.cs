@@ -1,4 +1,4 @@
-namespace Optima.Core.Models;
+﻿namespace Optima.Core.Models;
 
 /// <summary>Config-driven detection rules (§29).</summary>
 public sealed record DetectionRules
@@ -16,10 +16,6 @@ public sealed record DetectionRules
         @"%ProgramFiles%\Google\Play Games",
         @"%ProgramFiles(x86)%\Google\Play Games",
     ];
-
-    /// <summary>Developer emulator install root override. Empty falls back to
-    /// %ProgramFiles%\Google\Play Games Developer Emulator, then the uninstall registry entry.</summary>
-    public string? DeveloperEmulatorInstallPath { get; init; }
 
     public string ProtocolScheme { get; init; } = "googleplaygames";
 

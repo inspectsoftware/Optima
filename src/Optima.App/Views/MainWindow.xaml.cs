@@ -122,7 +122,7 @@ public partial class MainWindow : Window
         SessionsViewModel => new SessionsView(),
         DisplayViewModel => new DisplayView(),
         CompViewModel => new CompView(),
-        ExploreViewModel => new ExploreView(),
+        BoostViewModel => new BoostView(),
         LegalViewModel => new LegalView(),
         DiagnosticsViewModel => new DiagnosticsView(),
         LogsViewModel => new LogsView(),
@@ -151,14 +151,6 @@ public partial class MainWindow : Window
         if (!Motion.Enabled)
         {
             Dispatcher.BeginInvoke(GlassPanel.ClearLights);
-        }
-    }
-
-    private void OnAccountSwitchRequested(object? sender, object e)
-    {
-        if (DataContext is MainViewModel main && e is Optima.Core.Models.PlayerAccount account)
-        {
-            _ = main.SwitchAccountCommand.ExecuteAsync(account);
         }
     }
 

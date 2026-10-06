@@ -21,7 +21,6 @@ public static class SimplePdf
         var pages = Paginate(lines);
         var pdf = new StringBuilder();
         var objects = new List<string>();
-        var pageObjectIds = new List<int>();
 
         // Object 1: catalog. Object 2: pages tree. Objects 3..: font, then one page + content pair each.
         var fontId = 3;
@@ -36,7 +35,6 @@ public static class SimplePdf
         {
             var pageId = firstPageId + i * 2;
             var contentId = pageId + 1;
-            pageObjectIds.Add(pageId);
             objects.Add($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PageWidth.ToString(CultureInfo.InvariantCulture)} {PageHeight.ToString(CultureInfo.InvariantCulture)}] /Resources << /Font << /F1 {fontId} 0 R >> >> /Contents {contentId} 0 R >>");
             objects.Add(BuildContentStream(pages[i], title, i + 1, pages.Count));
         }

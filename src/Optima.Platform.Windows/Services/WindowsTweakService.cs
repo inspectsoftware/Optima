@@ -50,7 +50,11 @@ public sealed class WindowsTweakService : ITweakService
                     }
                 }
 
-                var states = TweakCatalog.All.Select(t => new TweakState(t, Evaluate(t))).ToList();
+                var build = Environment.OSVersion.Version.Build;
+                var states = TweakCatalog.All
+                    .Where(t => build >= t.MinWindowsBuild)
+                    .Select(t => new TweakState(t, Evaluate(t)))
+                    .ToList();
                 lock (_statesGate)
                 {
                     _states = states;
@@ -62,6 +66,7 @@ public sealed class WindowsTweakService : ITweakService
     public async Task<TweakState> SetEnabledAsync(string tweakId, bool enable, CancellationToken ct = default)
     {
         var definition = TweakCatalog.Find(tweakId)
+            ?? SessionTweakCatalog.Find(tweakId)
             ?? throw new ArgumentException($"Unknown tweak id '{tweakId}'.", nameof(tweakId));
 
         await _gate.WaitAsync(ct).ConfigureAwait(false);

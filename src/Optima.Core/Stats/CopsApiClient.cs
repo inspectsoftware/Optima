@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net.Http;
 using Optima.Core.Net;
 using Microsoft.Extensions.Logging;
 
@@ -30,20 +29,18 @@ public sealed record CopsLookupResult(
     public bool IsFound => Status == CopsLookupStatus.Found && Profile is not null;
 }
 
-/// <summary>Read-only client for Critical Force's public profile API.</summary>
+/// <summary>
+/// Read-only client for Critical Force's public profile API. Everything under <see cref="PublicRoot"/>
+/// is the part of the game's API that third parties may read; everything else on that host is the
+/// game's own, and asking it can cost a player their account. So this client cannot: every request
+/// goes through <see cref="GetPublicAsync"/>, which refuses any address outside the public root.
+/// </summary>
 public sealed class CopsApiClient : IDisposable
 {
-    private const string BaseUrl = "https://default.prod.copsapi.criticalforce.fi/api/public/";
-    // A leaderboard page is re-read on every tab switch and the API has no server-side filtering, so
-    // a fresh copy of a page answers the next switch without a request. The refresh button and the
-    // five-minute timer both pass refresh: true.
-    private static readonly TimeSpan LeaderboardCacheLifetime = TimeSpan.FromSeconds(90);
-
+    public const string PublicRoot = "https://default.prod.copsapi.criticalforce.fi/api/public/";
+    private const string BaseUrl = PublicRoot;
     private readonly HttpClient _http;
     private readonly ILogger<CopsApiClient> _logger;
-
-    private readonly Dictionary<string, (DateTimeOffset At, object Rows)> _leaderboardCache = new(StringComparer.Ordinal);
-    private readonly object _leaderboardCacheGate = new();
 
     public CopsApiClient(ILogger<CopsApiClient> logger)
         : this(logger, HttpPool.Shared, disposeHandler: false)
@@ -66,12 +63,6 @@ public sealed class CopsApiClient : IDisposable
         };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("Optima/" + (typeof(CopsApiClient).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"));
     }
-
-    public async Task<CopsPlayerProfile?> GetProfileByNameAsync(string inGameName, CancellationToken ct = default)
-        => (await LookupByNameAsync(inGameName, ct).ConfigureAwait(false)).Profile;
-
-    public async Task<CopsPlayerProfile?> GetProfileByIdAsync(long userId, CancellationToken ct = default)
-        => (await LookupByIdAsync(userId, ct).ConfigureAwait(false)).Profile;
 
     /// <summary>Named lookup that reports why it failed instead of returning a bare null.</summary>
     public async Task<CopsLookupResult> LookupByNameAsync(string inGameName, CancellationToken ct = default)
@@ -183,68 +174,6 @@ public sealed class CopsApiClient : IDisposable
         return CopsLookupResult.NotFoundPlayer;
     }
 
-    /// <summary>Batch profile lookup by exact account ids (the API accepts comma-separated ids).</summary>
-    public async Task<IReadOnlyList<CopsPlayerProfile>> GetProfilesByIdsAsync(IEnumerable<long> ids, CancellationToken ct = default)
-    {
-        var list = ids.Where(id => id > 0).Distinct().Take(50).ToList();
-        if (list.Count == 0)
-        {
-            return [];
-        }
-        var query = "profile?ids=" + string.Join(",", list.Select(i => i.ToString(CultureInfo.InvariantCulture)));
-        var (profiles, _, _) = await FetchRawAsync(query, ct).ConfigureAwait(false);
-        return profiles;
-    }
-
-    /// <summary>Batch profile lookup by exact in-game names (the API accepts comma-separated names).</summary>
-    public async Task<IReadOnlyList<CopsPlayerProfile>> GetProfilesByNamesAsync(IEnumerable<string> names, CancellationToken ct = default)
-    {
-        var list = names.Select(n => n.Trim()).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(50).ToList();
-        if (list.Count == 0)
-        {
-            return [];
-        }
-        var query = "profile?usernames=" + string.Join(",", list.Select(Uri.EscapeDataString));
-        var (profiles, _, _) = await FetchRawAsync(query, ct).ConfigureAwait(false);
-        return profiles;
-    }
-
-    /// <summary>
-    /// One leaderboard page (elite / ranked / kills / clan). No server-side filtering exists, so
-    /// callers cache the answer briefly and pass <paramref name="refresh"/> to bypass it.
-    /// </summary>
-    public async Task<(IReadOnlyList<T> Rows, string? Problem)> GetLeaderboardAsync<T>(
-        string endpoint, Func<string, IReadOnlyList<T>> parse, CancellationToken ct = default, bool refresh = false)
-    {
-        if (!refresh && TryGetCachedPage<T>(endpoint) is { } cached)
-        {
-            return (cached, null);
-        }
-
-        try
-        {
-            using var response = await _http.GetAsync("../leaderboard/" + endpoint, ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                return ([], "HTTP " + (int)response.StatusCode);
-            }
-            var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            var rows = parse(json);
-            StorePage(endpoint, rows);
-            return (rows, null);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogDebug(ex, "Leaderboard {Endpoint} failed", endpoint);
-            return ([], "network error");
-        }
-        catch (Exception ex) when (ex is TaskCanceledException or OperationCanceledException)
-        {
-            _logger.LogDebug(ex, "Leaderboard {Endpoint} timed out", endpoint);
-            return ([], "timed out");
-        }
-    }
-
     /// <summary>
     /// The public API fabricates a scaffold profile (default name derived from the queried id, all
     /// stats zero) for unknown ids. Detect it so a typo'd id never masquerades as real stats.
@@ -254,41 +183,26 @@ public sealed class CopsApiClient : IDisposable
             && string.Equals(profile.Name, "OPS-" + profile.UserId.ToString("D9", CultureInfo.InvariantCulture), StringComparison.Ordinal)
             && profile.Seasons.All(s => s.Ranked.IsZero && s.Casual.IsZero && s.Custom.IsZero);
 
-    /// <summary>Raw fetch that parses the answer as a profile array; empty on any failure.</summary>
-    private async Task<(IReadOnlyList<CopsPlayerProfile> Profiles, CopsLookupStatus Failure, string Problem)> FetchRawAsync(string relativeUrl, CancellationToken ct)
+    /// <summary>Whether an address is inside the public API. "../" segments are resolved before the test.</summary>
+    public static bool IsPublicEndpoint(Uri uri)
+        => uri.IsAbsoluteUri && uri.AbsoluteUri.StartsWith(PublicRoot, StringComparison.Ordinal);
+
+    /// <summary>The only way a request leaves this client.</summary>
+    private Task<HttpResponseMessage> GetPublicAsync(string relativeUrl, CancellationToken ct)
     {
-        try
+        var uri = new Uri(_http.BaseAddress!, relativeUrl);
+        if (!IsPublicEndpoint(uri))
         {
-            using var response = await _http.GetAsync(relativeUrl, ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                return ([], CopsLookupStatus.NotFound, "HTTP " + (int)response.StatusCode);
-            }
-            var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            var profile = CopsProfileParser.Parse(json);
-            if (profile is null)
-            {
-                return ([], CopsLookupStatus.NotFound, "the answer was not a profile");
-            }
-            return ([profile], default(CopsLookupStatus), string.Empty);
+            throw new InvalidOperationException($"Refused: {uri.AbsolutePath} is outside the public Critical Ops API.");
         }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogDebug(ex, "Batch profile lookup failed");
-            return ([], CopsLookupStatus.Error, "network error");
-        }
-        catch (Exception ex) when (ex is TaskCanceledException or OperationCanceledException)
-        {
-            _logger.LogDebug(ex, "Batch profile lookup timed out");
-            return ([], CopsLookupStatus.Error, "timed out");
-        }
+        return _http.GetAsync(uri, ct);
     }
 
     private async Task<(CopsPlayerProfile? Profile, CopsLookupStatus Failure, string Problem)> FetchAsync(string relativeUrl, CancellationToken ct)
     {
         try
         {
-            using var response = await _http.GetAsync(relativeUrl, ct).ConfigureAwait(false);
+            using var response = await GetPublicAsync(relativeUrl, ct).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogDebug("Profile lookup answered {Status}", (int)response.StatusCode);
@@ -309,28 +223,6 @@ public sealed class CopsApiClient : IDisposable
         {
             _logger.LogDebug(ex, "Profile lookup timed out");
             return (null, CopsLookupStatus.Error, "timed out");
-        }
-    }
-
-    private IReadOnlyList<T>? TryGetCachedPage<T>(string endpoint)
-    {
-        lock (_leaderboardCacheGate)
-        {
-            if (_leaderboardCache.TryGetValue(endpoint, out var entry)
-                && entry.Rows is IReadOnlyList<T> rows
-                && DateTimeOffset.UtcNow - entry.At < LeaderboardCacheLifetime)
-            {
-                return rows;
-            }
-        }
-        return null;
-    }
-
-    private void StorePage<T>(string endpoint, IReadOnlyList<T> rows)
-    {
-        lock (_leaderboardCacheGate)
-        {
-            _leaderboardCache[endpoint] = (DateTimeOffset.UtcNow, rows);
         }
     }
 

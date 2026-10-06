@@ -14,6 +14,9 @@ public sealed class WindowsBackgroundCleanupService : IBackgroundCleanupService
         "Optima", "Optima.Watchdog",
     };
 
+    /// <summary>System processes, the game, Google Play Games and Optima: never closed, never demoted.</summary>
+    internal static bool IsProtected(string processName) => NeverTouch.Contains(processName);
+
     private readonly ILogger<WindowsBackgroundCleanupService> _logger;
 
     public WindowsBackgroundCleanupService(ILogger<WindowsBackgroundCleanupService> logger)

@@ -22,8 +22,8 @@
     <KeyBinding Modifiers="Alt" Key="D3" Command="{Binding NavigateCommand}" CommandParameter="PERFORMANCE" />
     <KeyBinding Modifiers="Alt" Key="D4" Command="{Binding NavigateCommand}" CommandParameter="SESSIONS" />
     <KeyBinding Modifiers="Alt" Key="D5" Command="{Binding NavigateCommand}" CommandParameter="COMP" />
-    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
-    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="EXPLORE" />
+    <KeyBinding Modifiers="Alt" Key="D6" Command="{Binding NavigateCommand}" CommandParameter="BOOST" />
+    <KeyBinding Modifiers="Alt" Key="D7" Command="{Binding NavigateCommand}" CommandParameter="DISPLAY" />
     <KeyBinding Modifiers="Alt" Key="D8" Command="{Binding NavigateCommand}" CommandParameter="SETTINGS" />
     <KeyBinding Modifiers="Alt" Key="D9" Command="{Binding NavigateCommand}" CommandParameter="DIAGNOSTICS" />
     <KeyBinding Modifiers="Alt" Key="N" Command="{Binding NavigateCommand}" CommandParameter="NEWS" />

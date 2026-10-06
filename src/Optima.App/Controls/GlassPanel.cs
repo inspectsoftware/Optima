@@ -120,6 +120,11 @@ public sealed class GlassPanel : Grid
         LayoutUpdated += (_, _) => ScheduleViewboxUpdate(this);
         Loaded += (_, _) =>
         {
+            // Pages are cached, so a panel is loaded again without being constructed again.
+            if (!Live.Exists(w => w.TryGetTarget(out var p) && ReferenceEquals(p, this)))
+            {
+                Live.Add(new WeakReference<GlassPanel>(this));
+            }
             _viewboxDirty = true;
             _brush.Visual = GetBackdrop(this);
         };

@@ -35,6 +35,7 @@ public sealed class CrashAutoRelaunchService
 
     private LaunchProfile? _lastProfile;
     private int _relaunchesUsed;
+    private volatile bool _relaunching;
     private bool _subscribed;
 
     public CrashAutoRelaunchService(
@@ -53,7 +54,12 @@ public sealed class CrashAutoRelaunchService
     public void NoteSessionStart(LaunchProfile profile)
     {
         _lastProfile = profile;
-        _relaunchesUsed = 0;
+        // A session this service started is part of the same outage: only a start the user asked
+        // for clears the count, otherwise a game that keeps dying is relaunched forever.
+        if (!_relaunching)
+        {
+            _relaunchesUsed = 0;
+        }
     }
 
     public void Start(GamePresenceService presence)
@@ -104,7 +110,15 @@ public sealed class CrashAutoRelaunchService
                 "Game died after {Duration:mm\\:ss}; relaunching '{Profile}' (attempt {Used} of {Max})",
                 exit.RunDuration, profile.Name, _relaunchesUsed, MaxRelaunchesPerOutage);
             Relaunching?.Invoke(profile.Name);
-            await _relaunch(profile).ConfigureAwait(false);
+            _relaunching = true;
+            try
+            {
+                await _relaunch(profile).ConfigureAwait(false);
+            }
+            finally
+            {
+                _relaunching = false;
+            }
         }
         catch (Exception ex)
         {

@@ -7,9 +7,6 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\optima.ico</ApplicationIcon>
-    <!-- "Dev edition" (publish.ps1 -DevEdition): shows the DEVELOPER EMULATOR settings
-         section. The normal install stays clean. -->
-    <DefineConstants Condition="'$(DevEdition)' == 'true'">$(DefineConstants);DEVEDITION</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets\optima.ico" />
@@ -62,9 +59,15 @@
        assemblies (TraceEvent drags in 6.x Microsoft.Extensions.*) can never overwrite
        the app's own newer copies. -->
   <Target Name="CopyElevatedHelper" AfterTargets="Build">
+    <!-- A build for a runtime (publish, -r win-x64) puts the helper in a runtime subfolder; reading
+         the plain folder there would ship whatever an older plain build left behind. -->
+    <PropertyGroup>
+      <ElevatedBin>..\Optima.Watchdog\bin\$(Configuration)\$(TargetFramework)\</ElevatedBin>
+      <ElevatedBin Condition="'$(RuntimeIdentifier)' != ''">$(ElevatedBin)$(RuntimeIdentifier)\</ElevatedBin>
+    </PropertyGroup>
     <ItemGroup>
-      <ElevatedOwnFiles Include="..\Optima.Watchdog\bin\$(Configuration)\$(TargetFramework)\Optima.Watchdog.*" />
-      <ElevatedDependencies Include="..\Optima.Watchdog\bin\$(Configuration)\$(TargetFramework)\**\*.*" Exclude="..\Optima.Watchdog\bin\$(Configuration)\$(TargetFramework)\Optima.Watchdog.*" />
+      <ElevatedOwnFiles Include="$(ElevatedBin)Optima.Watchdog.*" />
+      <ElevatedDependencies Include="$(ElevatedBin)**\*.*" Exclude="$(ElevatedBin)Optima.Watchdog.*;$(ElevatedBin)win-*\**" />
       <ElevatedDependenciesToCopy Include="@(ElevatedDependencies)" Condition="!Exists('$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" />
     </ItemGroup>
     <Copy SourceFiles="@(ElevatedOwnFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />

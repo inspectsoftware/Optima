@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Optima.Core.Configuration;
@@ -115,7 +114,14 @@ public sealed class CopsNewsService : IDisposable
             var entries = CopsNewsParser.Parse(html);
             if (entries.Count > 0)
             {
-                await File.WriteAllTextAsync(CachePath, JsonSerializer.Serialize(entries), ct).ConfigureAwait(false);
+                try
+                {
+                    await File.WriteAllTextAsync(CachePath, JsonSerializer.Serialize(entries), ct).ConfigureAwait(false);
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogDebug(ex, "News cache could not be written");
+                }
                 return entries;
             }
             _logger.LogWarning("The updates page parsed to zero entries; its shape may have changed");

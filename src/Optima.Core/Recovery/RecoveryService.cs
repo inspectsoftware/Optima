@@ -83,6 +83,13 @@ public sealed class RecoveryService : IRecoveryService
             await Attempt("virtual display", () => _virtualDisplay.RestoreOriginalStateAsync(ct)).ConfigureAwait(false);
         }
 
+        // The provider only switches the device off when it remembers enabling it, and after a crash
+        // it is a new instance that remembers nothing. The snapshot does. A no-op when already off.
+        if (snapshot.VirtualDisplayEnabledByUs)
+        {
+            await Attempt("virtual display device", () => _virtualDisplay.DisableDisplayAsync(ct)).ConfigureAwait(false);
+        }
+
         await ClearPendingAsync(ct).ConfigureAwait(false);
         _logger.LogInformation("Settings restored");
     }

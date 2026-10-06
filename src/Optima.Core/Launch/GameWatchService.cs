@@ -1,6 +1,5 @@
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
-using Optima.Core.Models;
 using Optima.Core.Monitoring;
 using Microsoft.Extensions.Logging;
 

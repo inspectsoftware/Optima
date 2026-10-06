@@ -39,14 +39,25 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
 
             using (process)
             {
-                var snapshot = new ProcessStateSnapshot
+                ProcessStateSnapshot snapshot;
+                try
                 {
-                    ProcessId = processId,
-                    ProcessName = process.ProcessName,
-                    OriginalPriority = FromPriorityClass(process.PriorityClass),
-                    OriginalAffinityMask = (ulong)process.ProcessorAffinity.ToInt64(),
-                    PowerThrottlingWasEnabled = ProcessNative.IsPowerThrottlingEnabled(process.Handle),
-                };
+                    snapshot = new ProcessStateSnapshot
+                    {
+                        ProcessId = processId,
+                        ProcessName = process.ProcessName,
+                        OriginalPriority = FromPriorityClass(process.PriorityClass),
+                        OriginalAffinityMask = (ulong)process.ProcessorAffinity.ToInt64(),
+                        PowerThrottlingWasEnabled = ProcessNative.IsPowerThrottlingEnabled(process.Handle),
+                    };
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    // Reading the current values is refused for a protected process and fails for one
+                    // that just exited. Neither is a reason to fail a session that is already running.
+                    _logger.LogWarning(ex, "Could not read process settings for {Pid}; leaving it untouched", processId);
+                    return null;
+                }
 
                 try
                 {
@@ -58,10 +69,7 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
 
                     if (wantsAffinity)
                     {
-                        var systemMask = (ulong)(Environment.ProcessorCount >= 64
-                            ? ulong.MaxValue
-                            : (1UL << Environment.ProcessorCount) - 1);
-                        var mask = profile.CpuAffinityMask & systemMask;
+                        var mask = profile.CpuAffinityMask & SystemAffinityMask;
                         if (mask != 0)
                         {
                             process.ProcessorAffinity = (nint)mask;
@@ -81,6 +89,65 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
                 }
 
                 return snapshot;
+            }
+        }, ct);
+
+    public Task<bool> ReassertAsync(ProcessStateSnapshot baseline, PerformanceProfile profile, CancellationToken ct = default)
+        => Task.Run(() =>
+        {
+            Process process;
+            try
+            {
+                process = Process.GetProcessById(baseline.ProcessId);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+
+            using (process)
+            {
+                // Guard against PID reuse: only touch the process if the name still matches.
+                if (!string.Equals(process.ProcessName, baseline.ProcessName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                var changed = false;
+                try
+                {
+                    if (profile.Priority != ProcessPriorityLevel.Unchanged
+                        && process.PriorityClass != ToPriorityClass(profile.Priority))
+                    {
+                        process.PriorityClass = ToPriorityClass(profile.Priority);
+                        _logger.LogInformation("Priority {Priority} re-asserted on {Name} ({Pid})",
+                            profile.Priority, process.ProcessName, baseline.ProcessId);
+                        changed = true;
+                    }
+
+                    if (profile.CpuAffinityMask != 0)
+                    {
+                        var mask = profile.CpuAffinityMask & SystemAffinityMask;
+                        if (mask != 0 && (ulong)process.ProcessorAffinity.ToInt64() != mask)
+                        {
+                            process.ProcessorAffinity = (nint)mask;
+                            _logger.LogInformation("CPU affinity 0x{Mask:X} re-asserted on {Name}", mask, process.ProcessName);
+                            changed = true;
+                        }
+                    }
+
+                    if (profile.DisablePowerThrottling && ProcessNative.IsPowerThrottlingEnabled(process.Handle))
+                    {
+                        ProcessNative.SetPowerThrottling(process.Handle, enabled: false);
+                        _logger.LogInformation("Power throttling disabled again for {Name}", process.ProcessName);
+                        changed = true;
+                    }
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    _logger.LogDebug(ex, "Could not re-assert process settings for {Pid}", baseline.ProcessId);
+                }
+                return changed;
             }
         }, ct);
 
@@ -121,17 +188,26 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
             }
         }, ct);
 
-    private static ProcessPriorityClass ToPriorityClass(ProcessPriorityLevel level) => level switch
+    private static ulong SystemAffinityMask => Environment.ProcessorCount >= 64
+        ? ulong.MaxValue
+        : (1UL << Environment.ProcessorCount) - 1;
+
+    internal static ProcessPriorityClass ToPriorityClass(ProcessPriorityLevel level) => level switch
     {
         ProcessPriorityLevel.AboveNormal => ProcessPriorityClass.AboveNormal,
         ProcessPriorityLevel.High => ProcessPriorityClass.High,
+        ProcessPriorityLevel.BelowNormal => ProcessPriorityClass.BelowNormal,
+        ProcessPriorityLevel.Idle => ProcessPriorityClass.Idle,
         _ => ProcessPriorityClass.Normal,
     };
 
-    private static ProcessPriorityLevel FromPriorityClass(ProcessPriorityClass priorityClass) => priorityClass switch
+    internal static ProcessPriorityLevel FromPriorityClass(ProcessPriorityClass priorityClass) => priorityClass switch
     {
         ProcessPriorityClass.AboveNormal => ProcessPriorityLevel.AboveNormal,
-        ProcessPriorityClass.High => ProcessPriorityLevel.High,
+        // Realtime is never handed back: restoring a process to it needs a privilege Optima does not hold.
+        ProcessPriorityClass.High or ProcessPriorityClass.RealTime => ProcessPriorityLevel.High,
+        ProcessPriorityClass.BelowNormal => ProcessPriorityLevel.BelowNormal,
+        ProcessPriorityClass.Idle => ProcessPriorityLevel.Idle,
         _ => ProcessPriorityLevel.Normal,
     };
 }

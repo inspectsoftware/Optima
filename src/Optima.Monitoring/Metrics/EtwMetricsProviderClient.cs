@@ -82,7 +82,20 @@ public sealed class EtwMetricsProviderClient : IPerformanceMetricsProvider
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var response = await _elevation.SendAsync(new IpcRequest { Command = IpcCommand.StopEtw }, cts.Token).ConfigureAwait(false);
+        IpcResponse response;
+        try
+        {
+            response = await _elevation.SendAsync(new IpcRequest { Command = IpcCommand.StopEtw }, cts.Token).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The helper may still be capturing: stay "running" so the next stop asks again.
+            lock (_lock)
+            {
+                _running = true;
+            }
+            throw;
+        }
         if (!response.Success)
         {
             _logger.LogWarning("Frametime capture stop reported: {Error}", response.Error);

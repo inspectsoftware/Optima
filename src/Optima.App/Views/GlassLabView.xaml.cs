@@ -68,8 +68,11 @@ public partial class GlassLabView : UserControl
             _window.Activated += OnWindowActivated;
             _window.Deactivated += OnWindowDeactivated;
         }
-        ChartCanvas.SizeChanged += (_, _) => Redraw();
+        ChartCanvas.SizeChanged -= OnChartSizeChanged;
+        ChartCanvas.SizeChanged += OnChartSizeChanged;
     }
+
+    private void OnChartSizeChanged(object sender, SizeChangedEventArgs e) => Redraw();
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {

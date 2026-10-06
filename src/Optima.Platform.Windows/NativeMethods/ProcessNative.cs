@@ -9,6 +9,7 @@ public static class ProcessNative
 
     internal const uint PROCESS_POWER_THROTTLING_CURRENT_VERSION = 1;
     internal const uint PROCESS_POWER_THROTTLING_EXECUTION_SPEED = 0x1;
+    internal const uint PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION = 0x4;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct PROCESS_POWER_THROTTLING_STATE
@@ -47,6 +48,25 @@ public static class ProcessNative
         if (!SetProcessInformation(processHandle, ProcessPowerThrottling, ref state, Marshal.SizeOf<PROCESS_POWER_THROTTLING_STATE>()))
         {
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "SetProcessInformation(PowerThrottling) failed");
+        }
+    }
+
+    /// <summary>
+    /// Windows 11: tells Windows to always honour the timer resolution requests of a process, also
+    /// while its window is hidden. Touches only that one rule; EcoQoS is left as it is.
+    /// </summary>
+    public static void HonorTimerResolutionRequests(IntPtr processHandle)
+    {
+        var state = new PROCESS_POWER_THROTTLING_STATE
+        {
+            Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+            ControlMask = PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION,
+            StateMask = 0,
+        };
+
+        if (!SetProcessInformation(processHandle, ProcessPowerThrottling, ref state, Marshal.SizeOf<PROCESS_POWER_THROTTLING_STATE>()))
+        {
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "SetProcessInformation(TimerResolution) failed");
         }
     }
 

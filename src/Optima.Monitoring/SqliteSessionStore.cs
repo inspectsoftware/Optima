@@ -66,11 +66,12 @@ public sealed class SqliteSessionStore : ISessionStore
 
     private async Task InitializeCoreAsync(CancellationToken ct)
     {
-        // Deliberately opened without the journal pragmas: migrations (and the plain-file backup
-        // taken before them) run on the default rollback journal, and the switch to write-ahead
-        // logging happens once the schema is current.
+        // Opened without the journal pragmas. A database this app has opened before is already in
+        // write-ahead mode (the setting is stored in the file), so recent commits may live only in
+        // the -wal file: fold them into the main file before anything copies it as a backup.
         await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
+        await ExecuteScalarAsync(connection, "PRAGMA wal_checkpoint(TRUNCATE);", ct).ConfigureAwait(false);
 
         // The base table is deliberately created at its original (v0) shape and brought to the
         // current schema by the same migrations an existing database runs, so there is exactly

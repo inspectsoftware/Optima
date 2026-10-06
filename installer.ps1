@@ -7,7 +7,7 @@
 # The payload and the output folder are redirectable, which is how the local dev pipeline
 # (devbuild.ps1) packages the Desktop\Optima Dev folder instead of publish\:
 #
-#   .\installer.ps1 -Publish -DevEdition -Source "C:\...\Optima Dev" -OutDir "C:\...\Optima Dev" -Label "-dev-20261002-2312"
+#   .\installer.ps1 -Publish -Source "C:\...\Optima Dev" -OutDir "C:\...\Optima Dev" -Label "-dev-20261002-2312"
 #
 # Produces <OutDir>\Optima-Setup-<version><Label>.exe. The setup is per-user: it
 # installs to %LOCALAPPDATA%\Programs\Optima without an administrator prompt,
@@ -29,8 +29,6 @@ param(
     [string]$OutDir = "artifacts",
     # Filename suffix carried by this build, so local builds never collide.
     [string]$Label = "",
-    # Dev edition: compiles in the DEVELOPER EMULATOR settings section (used only with -Publish).
-    [switch]$DevEdition,
     # Publish configuration (used only with -Publish).
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64"
@@ -52,7 +50,6 @@ $outDir = Resolve-FromRoot $OutDir
 
 if ($Publish) {
     $publishArgs = @{ Configuration = $Configuration; Runtime = $Runtime; Output = $sourceDir }
-    if ($DevEdition) { $publishArgs.DevEdition = $true }
     & (Join-Path $root "publish.ps1") @publishArgs
     if ($LASTEXITCODE -ne 0) { throw "publish.ps1 failed (exit $LASTEXITCODE)" }
 }
@@ -78,7 +75,7 @@ $iscc = Join-Path $innoDir "ISCC.exe"
 if (-not (Test-Path $iscc)) {
     Write-Host "fetching the Inno Setup $innoVersion compiler into tools\InnoSetup (portable, one-time)"
     $archive = Join-Path $root "tools\innosetup-$innoVersion-x64.exe"
-    $url = "https://github.com/jrsoftware/issrc/releases/download/is-${innoVersion.replace('.', '_')}/innosetup-$innoVersion-x64.exe"
+    $url = "https://github.com/jrsoftware/issrc/releases/download/is-$($innoVersion.Replace('.', '_'))/innosetup-$innoVersion-x64.exe"
     New-Item -ItemType Directory -Force (Join-Path $root "tools") | Out-Null
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -Uri $url -OutFile $archive

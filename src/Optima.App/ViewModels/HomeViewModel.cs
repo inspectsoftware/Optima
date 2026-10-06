@@ -6,7 +6,6 @@ using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
 using Optima.Core.News;
-using Optima.Core.Stats;
 
 namespace Optima.App.ViewModels;
 
@@ -23,6 +22,11 @@ public sealed partial class HomeViewModel : ObservableObject
         StatusViewModel status,
         PlayViewModel play,
         PlayerStatsViewModel playerStats,
+        SessionsViewModel sessions,
+        DisplayViewModel display,
+        CompViewModel comp,
+        NewsViewModel newsPage,
+        DiagnosticsViewModel diagnostics,
         ISystemInfoService systemInfo,
         IPerformanceMonitor monitor,
         CopsNewsService news,
@@ -32,6 +36,11 @@ public sealed partial class HomeViewModel : ObservableObject
         Status = status;
         Play = play;
         Player = playerStats;
+        Sessions = sessions;
+        Display = display;
+        Comp = comp;
+        NewsPage = newsPage;
+        Diagnostics = diagnostics;
         _systemInfo = systemInfo;
         _monitor = monitor;
         _news = news;
@@ -40,14 +49,238 @@ public sealed partial class HomeViewModel : ObservableObject
         _monitor.MetricsUpdated += OnMetrics;
         // The friends strip must follow Settings edits immediately, not only on next visit.
         _settings.SettingsChanged += OnSettingsChanged;
+        BuildWidgetCatalog();
     }
 
     /// <summary>Signature of the tracked list the strip is built from; a save that does not touch it changes nothing.</summary>
     private string _friendsSignature = string.Empty;
     private bool _friendsRefreshFailed;
 
+    // ---------------------------------------------------------------- HOME widget board
+
+    /// <summary>The widgets on HOME, in order. Every template binds through the item's Host.</summary>
+    public ObservableCollection<HomeWidgetItem> Widgets { get; } = [];
+
+    /// <summary>Every widget the app offers, grouped by tab, for EDIT WIDGETS mode.</summary>
+    public ObservableCollection<HomeWidgetGroup> WidgetCatalog { get; } = [];
+
+    /// <summary>True while the board is being rearranged: chrome appears and drag moves widgets.</summary>
+    [ObservableProperty] private bool _isEditingWidgets;
+
+    /// <summary>Why an edit was refused (the ten-widget limit), shown next to the panel.</summary>
+    [ObservableProperty] private string _widgetMessage = string.Empty;
+
+    private readonly Dictionary<string, HomeWidgetItem> _widgetIndex = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _widgetSourcesStarted = new(StringComparer.OrdinalIgnoreCase);
+
+    [RelayCommand]
+    private void ToggleEditWidgets()
+    {
+        IsEditingWidgets = !IsEditingWidgets;
+        WidgetMessage = string.Empty;
+    }
+
+    [RelayCommand]
+    private void AddWidget(HomeWidgetItem? item) => InsertWidget(item, Widgets.Count);
+
+    [RelayCommand]
+    private void RemoveWidget(HomeWidgetItem? item) => RemoveFromHome(item?.Definition.Id);
+
+    /// <summary>Puts a widget on HOME at a position, or moves it when it is already there.</summary>
+    public bool InsertWidget(HomeWidgetItem? item, int index)
+    {
+        if (item is null)
+        {
+            return false;
+        }
+
+        if (item.IsOnHome)
+        {
+            MoveTo(item, index);
+            return true;
+        }
+
+        if (Widgets.Count >= HomeWidgetCatalog.MaxOnHome)
+        {
+            WidgetMessage = $"HOME holds {HomeWidgetCatalog.MaxOnHome} widgets at most. " +
+                "Take one off HOME first, or drop this onto the position it should replace.";
+            return false;
+        }
+
+        Widgets.Insert(Math.Clamp(index, 0, Widgets.Count), item);
+        item.IsOnHome = true;
+        WidgetMessage = string.Empty;
+        StartWidgetSources();
+        PersistWidgetLayout();
+        return true;
+    }
+
+    /// <summary>Moves an on-HOME widget to a new position (drag to reorder).</summary>
+    public void MoveTo(HomeWidgetItem? item, int index)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var current = Widgets.IndexOf(item);
+        if (current < 0)
+        {
+            return;
+        }
+
+        var target = Math.Clamp(index, 0, Widgets.Count - 1);
+        if (target == current)
+        {
+            return;
+        }
+
+        Widgets.Move(current, target);
+        WidgetMessage = string.Empty;
+        PersistWidgetLayout();
+    }
+
+    /// <summary>Where a drop lands: adds the widget when it comes from the panel, moves it otherwise.</summary>
+    public void MoveOrAdd(string id, int index)
+    {
+        if (_widgetIndex.TryGetValue(id, out var item))
+        {
+            InsertWidget(item, index);
+        }
+    }
+
+    public void RemoveFromHome(string? id)
+    {
+        if (id is null || !_widgetIndex.TryGetValue(id, out var item) || !item.IsOnHome)
+        {
+            return;
+        }
+
+        Widgets.Remove(item);
+        item.IsOnHome = false;
+        WidgetMessage = string.Empty;
+        PersistWidgetLayout();
+    }
+
+    private void BuildWidgetCatalog()
+    {
+        _widgetIndex.Clear();
+        foreach (var definition in HomeWidgetCatalog.All)
+        {
+            _widgetIndex[definition.Id] = new HomeWidgetItem(definition, this);
+        }
+
+        WidgetCatalog.Clear();
+        foreach (var group in HomeWidgetCatalog.All.GroupBy(definition => definition.Tab))
+        {
+            WidgetCatalog.Add(new HomeWidgetGroup(group.Key, group.Select(definition => _widgetIndex[definition.Id])));
+        }
+    }
+
+    /// <summary>The saved layout, or the default one for a profile that has never edited it.</summary>
+    private IReadOnlyList<string> SavedLayout(AppSettings settings)
+        => settings.HomeWidgets is null
+            ? HomeWidgetCatalog.Default
+            : settings.HomeWidgets.Where(id => _widgetIndex.ContainsKey(id)).ToList();
+
+    private bool LayoutMatches(IReadOnlyList<string> layout)
+        => layout.Count == Widgets.Count
+            && layout.SequenceEqual(Widgets.Select(widget => widget.Definition.Id), StringComparer.OrdinalIgnoreCase);
+
+    private void ApplyWidgetLayout(IReadOnlyList<string> layout)
+    {
+        foreach (var item in _widgetIndex.Values)
+        {
+            item.IsOnHome = false;
+        }
+
+        Widgets.Clear();
+        foreach (var id in layout
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(HomeWidgetCatalog.MaxOnHome))
+        {
+            if (_widgetIndex.TryGetValue(id, out var item) && !item.IsOnHome)
+            {
+                item.IsOnHome = true;
+                Widgets.Add(item);
+            }
+        }
+
+        StartWidgetSources();
+    }
+
+    private void PersistWidgetLayout()
+        => _ = _settings.UpdateSettingsAsync(settings => settings with
+        {
+            HomeWidgets = Widgets.Select(widget => widget.Definition.Id).ToList(),
+        });
+
+    /// <summary>
+    /// Wakes the page behind each widget that is actually on HOME, once per widget: a card that
+    /// shows sessions, news or diagnostics has nothing to show until its page has loaded, and the
+    /// pages otherwise only load when they are opened. Quietly, because a widget must never be able
+    /// to take HOME down with it.
+    /// </summary>
+    private void StartWidgetSources()
+    {
+        foreach (var widget in Widgets)
+        {
+            if (!_widgetSourcesStarted.Add(widget.Definition.Id))
+            {
+                continue;
+            }
+
+            switch (widget.Definition.Id)
+            {
+                case "sessions":
+                case "trends":
+                    _ = QuietlyAsync(Sessions.InitializeAsync());
+                    break;
+                case "display":
+                    _ = QuietlyAsync(Display.InitializeAsync());
+                    break;
+                case "comp":
+                    _ = QuietlyAsync(Comp.InitializeAsync());
+                    break;
+                case "news":
+                    _ = QuietlyAsync(NewsPage.InitializeAsync());
+                    break;
+                case "diagnostics":
+                    _ = QuietlyAsync(Diagnostics.InitializeAsync());
+                    break;
+            }
+        }
+    }
+
+    private static async Task QuietlyAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch
+        {
+            // The card shows whatever the page managed to load; a failure is not HOME's problem.
+        }
+    }
+
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
+        // SettingsChanged is raised on whatever thread finished the save; the board is bound to the UI.
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(() => OnSettingsChanged(sender, settings));
+            return;
+        }
+
+        // The layout can also arrive from a save made elsewhere (a second window, a profile switch).
+        var layout = SavedLayout(settings);
+        if (!LayoutMatches(layout))
+        {
+            ApplyWidgetLayout(layout);
+        }
+
         // Every toggle in the app saves settings, and this refresh costs a profile lookup per tracked
         // player, so it only runs for a change it can actually show — or to retry a failed attempt.
         var signature = string.Join(
@@ -66,6 +299,13 @@ public sealed partial class HomeViewModel : ObservableObject
 
     /// <summary>The player panel shown directly below LAUNCH.</summary>
     public PlayerStatsViewModel Player { get; }
+
+    /// <summary>The pages whose content widgets can borrow; a widget binds through its item's Host.</summary>
+    public SessionsViewModel Sessions { get; }
+    public DisplayViewModel Display { get; }
+    public CompViewModel Comp { get; }
+    public NewsViewModel NewsPage { get; }
+    public DiagnosticsViewModel Diagnostics { get; }
 
     /// <summary>Friends and clanmates tracked alongside the main account.</summary>
     public ObservableCollection<Optima.Core.Stats.TrackedPlayerRow> Friends { get; } = [];
@@ -114,6 +354,8 @@ public sealed partial class HomeViewModel : ObservableObject
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
+        ApplyWidgetLayout(SavedLayout(await _settings.GetSettingsAsync(ct)));
+
         _ = Task.Run(() => CheckGameVersionAsync(ct), CancellationToken.None);
         _ = Player.InitializeAsync(ct);
         _ = RefreshFriendsCommand.ExecuteAsync(null);

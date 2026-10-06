@@ -78,9 +78,9 @@ public sealed class SessionStatsEnricher : IDisposable
     }
 
     private void OnGameExited(GameExit exit)
-        => _ = Task.Run(() => EnrichAsync(exit));
+        => _ = Task.Run(EnrichAsync);
 
-    private async Task EnrichAsync(GameExit exit)
+    private async Task EnrichAsync()
     {
         try
         {

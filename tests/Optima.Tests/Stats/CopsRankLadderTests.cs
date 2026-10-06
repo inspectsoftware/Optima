@@ -58,4 +58,60 @@ public sealed class CopsRankLadderTests
         Assert.Equal("Gold", CopsRankLadder.Resolve(null, 1450)!.Name);
         Assert.Null(CopsRankLadder.Resolve(null, null));
     }
+
+    [Theory]
+    [InlineData(1570, 3)]   // a hard case for the step arithmetic: 70 past the band, not a multiple of 25
+    [InlineData(1599, 4)]   // the top of the band a step short of promotion
+    [InlineData(1600, 1)]   // and the bottom of the next one
+    public void DivisionsKeepCountingToTheTopOfTheBand(long mmr, int division)
+        => Assert.Equal(division, CopsRankLadder.Division(5, mmr));
+
+    [Fact]
+    public void APlayerStillCalibratingHasNoDivision()
+    {
+        // The provisional rating is not inside a tier, so it cannot have a division: reading one out of it
+        // produced a confident "Calibrating 4" for a player who has not placed at all. Neither does a
+        // rating above Master, and a profile with no rating has nowhere to stand.
+        Assert.Null(CopsRankLadder.Division(0, 1180));
+        Assert.Null(CopsRankLadder.Division(9, 2013));
+        Assert.Null(CopsRankLadder.Division(null, null));
+    }
+
+    [Fact]
+    public void TheNextTierIsTheOneAbove()
+    {
+        Assert.Equal("Diamond", CopsRankLadder.NextTier(5, 1570)!.Name);
+        Assert.Equal("Master", CopsRankLadder.NextTier(6, 1650)!.Name);
+
+        // Nothing is above Elite Ops, and a player who has not placed is not climbing towards Iron.
+        Assert.Null(CopsRankLadder.NextTier(9, 2013));
+        Assert.Null(CopsRankLadder.NextTier(0, 1180));
+    }
+
+    [Fact]
+    public void ProgressIsTheRatingLeftInTheBand()
+    {
+        var (remaining, progress) = CopsRankLadder.ProgressToNextTier(5, 1570)!.Value;
+
+        Assert.Equal(30, remaining);
+        Assert.Equal(0.7, progress, 3);
+
+        // The bottom of the band is empty progress; the top is full.
+        Assert.Equal(100, CopsRankLadder.ProgressToNextTier(5, 1500)!.Value.Remaining);
+        Assert.Equal(0.0, CopsRankLadder.ProgressToNextTier(5, 1500)!.Value.Progress, 3);
+        Assert.Equal(1, CopsRankLadder.ProgressToNextTier(5, 1599)!.Value.Remaining);
+
+        // Open ended or unplaced: there is no band to fill, so the card shows no bar rather than a made-up
+        // one.
+        Assert.Null(CopsRankLadder.ProgressToNextTier(9, 2013));
+        Assert.Null(CopsRankLadder.ProgressToNextTier(0, 1180));
+    }
+
+    [Theory]
+    [InlineData(5, 1570, "Platinum 3")]
+    [InlineData(6, 1650, "Diamond 3")]
+    [InlineData(0, 1180, "Calibrating")]
+    [InlineData(9, 2013, "Elite Ops")]
+    public void LabelSpellsTheRankTheWayTheAppShowsIt(int tier, long mmr, string expected)
+        => Assert.Equal(expected, CopsRankLadder.Label(tier, mmr));
 }

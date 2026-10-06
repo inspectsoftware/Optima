@@ -28,7 +28,6 @@
   <conv:StatusKindToBrushConverter x:Key="StatusKindBrush" />
   <conv:DiagnosticStatusToBrushConverter x:Key="DiagStatusBrush" />
   <conv:PlayGuideCheckStateToBrushConverter x:Key="GuideStateBrush" />
-  <conv:DiagnosticStatusToTextConverter x:Key="DiagStatusText" />
   <conv:DiagnosticStatusToTagConverter x:Key="DiagStatusTag" />
   <conv:DiagnosticStatusIsProblemConverter x:Key="DiagStatusIsProblem" />
   <conv:LogLevelToBrushConverter x:Key="LogLevelBrush" />

@@ -9,7 +9,6 @@ using Optima.Core.Configuration;
 using Optima.Core.Models;
 using Optima.Core.Statistics;
 using Optima.Core.Stats;
-using Optima.Core.Exports;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
@@ -63,7 +62,6 @@ public sealed record ProfileTrendRow(string ProfileName, double AverageFps, doub
 public sealed partial class SessionsViewModel : ObservableObject
 {
     private const int TrendLength = 20;
-    private const int DetailWrapWidth = 100;
 
     private readonly ISessionStore _sessions;
     private readonly ProfileService _profiles;
@@ -160,8 +158,15 @@ public sealed partial class SessionsViewModel : ObservableObject
             return;
         }
         var history = await _sessions.GetSessionsAsync(500);
-        await File.WriteAllTextAsync(dialog.FileName, TrackedPlayerDigest.ToCsv(history));
-        StatusMessage = $"Exported {history.Count} sessions to {dialog.FileName}.";
+        try
+        {
+            await File.WriteAllTextAsync(dialog.FileName, TrackedPlayerDigest.ToCsv(history));
+            StatusMessage = $"Exported {history.Count} sessions to {dialog.FileName}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusMessage = "Could not write the export: " + ex.Message;
+        }
     }
 
     [RelayCommand]
@@ -192,8 +197,15 @@ public sealed partial class SessionsViewModel : ObservableObject
             lines.Add($"{row.StartedText}  {row.ProfileName,-18} {row.KindTag,-6} {row.DurationText}  {row.AvgFpsText,6} fps  {row.NetworkText}");
         }
 
-        await File.WriteAllBytesAsync(dialog.FileName, Optima.Core.Exports.SimplePdf.Render(lines, "Optima sessions"));
-        StatusMessage = $"Exported to {dialog.FileName}.";
+        try
+        {
+            await File.WriteAllBytesAsync(dialog.FileName, Optima.Core.Exports.SimplePdf.Render(lines, "Optima sessions"));
+            StatusMessage = $"Exported to {dialog.FileName}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusMessage = "Could not write the export: " + ex.Message;
+        }
     }
 
     [ObservableProperty] private bool _isRefreshingStats;
@@ -491,7 +503,7 @@ public sealed partial class SessionsViewModel : ObservableObject
         {
             DetailRows.Add(new InfoRow("FPS data", "not captured for this session"));
         }
-        if (record.Network is { } network)
+        if (record.Network is not null)
         {
             DetailRows.Add(new InfoRow("Network", value.NetworkText));
         }

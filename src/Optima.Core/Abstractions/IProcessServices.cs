@@ -46,5 +46,13 @@ public interface IProcessOptimizer
 {
     Task<ProcessStateSnapshot?> ApplyAsync(int processId, PerformanceProfile profile, CancellationToken ct = default);
 
+    /// <summary>
+    /// Puts the profile's wanted settings back on a process that was already tuned, without
+    /// capturing a new baseline. A session keeper calls this while the game runs so a setting
+    /// something else changed is corrected; it writes nothing when the process is already right.
+    /// True when something had drifted and was put back.
+    /// </summary>
+    Task<bool> ReassertAsync(ProcessStateSnapshot baseline, PerformanceProfile profile, CancellationToken ct = default);
+
     Task RestoreAsync(ProcessStateSnapshot snapshot, CancellationToken ct = default);
 }

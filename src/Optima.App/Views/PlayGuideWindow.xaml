@@ -171,10 +171,10 @@
                   <StackPanel Orientation="Horizontal" Margin="0,14,0,0"
                               Visibility="{Binding HasAction, Converter={StaticResource BoolToVis}}">
                     <Button Padding="16,8"
-                            Command="{Binding DataContext.RunStepActionCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            Content="{Binding DataContext.CurrentStep.ActionLabel, RelativeSource={RelativeSource AncestorType=Window}}">
+                            Command="{Binding DataContext.RunStepActionCommand, RelativeSource={RelativeSource AncestorType=Window}}">
                       <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                          <Setter Property="Content" Value="{Binding DataContext.CurrentStep.ActionLabel, RelativeSource={RelativeSource AncestorType=Window}}" />
                           <Setter Property="IsEnabled" Value="True" />
                           <Style.Triggers>
                             <DataTrigger Binding="{Binding DataContext.IsScanning, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
@@ -239,8 +239,7 @@
               </StackPanel>
               <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Back" MinWidth="110"
                       Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack, Mode=OneWay}" Margin="0,0,10,0" />
-              <Button Grid.Column="3" MinWidth="110" Content="Finish"
-                      Command="{Binding FinishCommand}">
+              <Button Grid.Column="3" MinWidth="110">
                 <Button.Style>
                   <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
                     <Setter Property="Content" Value="Next" />

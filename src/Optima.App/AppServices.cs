@@ -1,4 +1,4 @@
-using Optima.App.Diagnostics;
+﻿using Optima.App.Diagnostics;
 using Optima.App.ViewModels;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
@@ -34,8 +34,6 @@ public static class AppServices
 
         services.AddSingleton<Func<CancellationToken, Task<DetectionRules>>>(sp =>
             ct => sp.GetRequiredService<SettingsService>().GetDetectionRulesAsync(ct));
-        services.AddSingleton<Func<CancellationToken, Task<AppSettings>>>(sp =>
-            ct => sp.GetRequiredService<SettingsService>().GetSettingsAsync(ct));
 
         services.AddSingleton<IRegistryProbe, WindowsRegistryProbe>();
         services.AddSingleton<IFileSystemProbe, WindowsFileSystemProbe>();
@@ -55,10 +53,12 @@ public static class AppServices
         services.AddSingleton<IPowerProfileService, WindowsPowerProfileService>();
         services.AddSingleton<IProcessMonitor, WindowsProcessMonitor>();
         services.AddSingleton<IProcessOptimizer, WindowsProcessOptimizer>();
+        services.AddSingleton<ITimerResolution, WindowsTimerResolution>();
+        services.AddSingleton<IBackgroundDemoter, WindowsBackgroundDemoter>();
+        services.AddSingleton<IGameExtras, WindowsGameExtras>();
         services.AddSingleton<IGameTerminator, WindowsGameTerminator>();
         services.AddSingleton<ITweakService, WindowsTweakService>();
         services.AddSingleton<IBackgroundCleanupService, WindowsBackgroundCleanupService>();
-        services.AddSingleton<Optima.Platform.Windows.Services.DevEmulatorSettingsService>();
         services.AddSingleton<PnpDeviceLocator>();
         services.AddSingleton<IElevationBroker, ElevationBrokerClient>();
 
@@ -71,7 +71,6 @@ public static class AppServices
         services.AddSingleton<IRecoveryService, RecoveryService>();
 
         services.AddSingleton<IGameLauncher, ProtocolUriLauncher>();
-        services.AddSingleton<IGameLauncher, DeveloperEmulatorLauncher>();
         services.AddSingleton<IGameLauncher, BootstrapperExeLauncher>();
         services.AddSingleton<IGameLauncher, ShortcutLauncher>();
         services.AddSingleton<IGameLauncher, CustomCommandLauncher>();
@@ -84,13 +83,46 @@ public static class AppServices
         services.AddSingleton<Optima.App.Services.PlayerSwitcherService>();
         services.AddSingleton<Optima.Core.Discord.DiscordArtCatalog>();
         services.AddSingleton<Optima.App.Services.DiscordPresenceService>();
+        // The desktop side of the OptimaBot link handshake: the app redeems the code the user typed with
+        // the Critical Ops account it already has, and the bot is the only party that sees both halves.
+        services.AddSingleton<Optima.Core.Linking.BotLinkClient>();
         services.AddSingleton(sp => new Optima.Core.Launch.CrashAutoRelaunchService(
             sp.GetRequiredService<SettingsService>(),
             profile => sp.GetRequiredService<PlayViewModel>().RelaunchAfterCrashAsync(profile),
             sp.GetRequiredService<ILogger<Optima.Core.Launch.CrashAutoRelaunchService>>()));
         services.AddSingleton<Optima.Core.Launch.SessionTweakService>();
+        // BOOST: holds the chosen priority on the game outside Optima's own sessions; it reads the
+        // settings on every pass, so a change on the page takes effect without a restart.
+        services.AddSingleton(sp => new Optima.Core.Launch.PriorityGuardService(
+            sp.GetRequiredService<IProcessMonitor>(),
+            sp.GetRequiredService<IProcessOptimizer>(),
+            () => sp.GetRequiredService<SettingsService>().Current?.BoostEffective(),
+            () => sp.GetRequiredService<LaunchOrchestrator>().IsSessionActive,
+            sp.GetRequiredService<ILogger<Optima.Core.Launch.PriorityGuardService>>()));
+        services.AddSingleton(sp => new Optima.Core.Launch.TimerResolutionService(
+            sp.GetRequiredService<ITimerResolution>(),
+            sp.GetRequiredService<IProcessMonitor>(),
+            sp.GetRequiredService<GamePresenceService>(),
+            () => sp.GetRequiredService<SettingsService>().Current?.BoostEffective(),
+            sp.GetRequiredService<ILogger<Optima.Core.Launch.TimerResolutionService>>()));
+        services.AddSingleton(sp => new Optima.Core.Launch.BackgroundDemotionService(
+            sp.GetRequiredService<IBackgroundDemoter>(),
+            sp.GetRequiredService<IProcessOptimizer>(),
+            sp.GetRequiredService<GamePresenceService>(),
+            () => sp.GetRequiredService<SettingsService>().Current?.BoostEffective(),
+            sp.GetRequiredService<JsonStore>(),
+            System.IO.Path.Combine(paths.Root, "boost-demoted.json"),
+            sp.GetRequiredService<ILogger<Optima.Core.Launch.BackgroundDemotionService>>()));
+        services.AddSingleton(sp => new Optima.Core.Launch.GameExtrasService(
+            sp.GetRequiredService<IGameExtras>(),
+            sp.GetRequiredService<IProcessMonitor>(),
+            sp.GetRequiredService<GamePresenceService>(),
+            () => sp.GetRequiredService<SettingsService>().Current?.BoostEffective(),
+            path => sp.GetRequiredService<SettingsService>().UpdateSettingsAsync(s => s with { BoostGamePath = path }),
+            sp.GetRequiredService<JsonStore>(),
+            System.IO.Path.Combine(paths.Root, "boost-coreparking.json"),
+            sp.GetRequiredService<ILogger<Optima.Core.Launch.GameExtrasService>>()));
         services.AddSingleton<Optima.Core.News.CopsNewsService>();
-        services.AddSingleton<Optima.Core.Updates.LauncherUpdateService>();
         services.AddSingleton<Optima.App.Services.FirstRunFixService>();
         services.AddSingleton<Optima.App.Services.RepairService>();
         // The automatic enrichment and the Sessions page's manual refresh resolve the player the exact
@@ -121,6 +153,11 @@ public static class AppServices
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();
         services.AddSingleton<EtwMetricsProviderClient>();
         services.AddSingleton<HardwareStreamClient>();
+        services.AddSingleton(sp => new StandbyCleanerService(
+            sp.GetRequiredService<IElevationBroker>(),
+            sp.GetRequiredService<GamePresenceService>(),
+            () => sp.GetRequiredService<SettingsService>().Current?.BoostEffective(),
+            sp.GetRequiredService<ILogger<StandbyCleanerService>>()));
         services.AddSingleton(_ => new MockMetricsProvider());
         // The cached snapshot is available long before anything resolves a metrics provider; the
         // factory must not block a thread on settings just to read one flag.
@@ -155,7 +192,7 @@ public static class AppServices
         services.AddSingleton<GuidedBenchmarkViewModel>();
         services.AddSingleton<DisplayViewModel>();
         services.AddSingleton<CompViewModel>();
-        services.AddSingleton<ExploreViewModel>();
+        services.AddSingleton<BoostViewModel>();
         services.AddSingleton<LegalViewModel>();
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<LogsViewModel>();

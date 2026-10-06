@@ -30,6 +30,10 @@ public enum ProcessPriorityLevel
     Normal,
     AboveNormal,
     High,
+    // Never offered as a choice for the game; they exist so a process found at one of them is
+    // restored to it instead of being rounded up to Normal.
+    BelowNormal,
+    Idle,
 }
 
 /// <summary>Performance portion of a launch profile.</summary>

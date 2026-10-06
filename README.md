@@ -5,7 +5,10 @@ By Inspect Software; see [LICENSE](LICENSE).
 
 Optima runs beside the game, never inside it: no injection, no memory access, no binary or
 network tampering. It sets up the environment with documented Windows APIs and restores every
-change when the game exits.
+change when the game exits. One exception, opt-in: the Boost memory cleaner empties Windows'
+standby file cache through the same system call RAMMap and ISLC use, which Windows does not
+document and which has nothing to restore (the cache refills by itself). The optional 0.5 ms
+timer step is likewise only reachable through an undocumented call; it is released on exit.
 
 ```
 pick a profile → PLAY
@@ -29,8 +32,12 @@ pick a profile → PLAY
 - **Kill switch** (Ctrl+Alt+K), floating log console (Alt+F9), overlay toggle (Alt+F10).
 - **Diagnostics and repair**: virtualization, platform, driver and refresh-rate checks with fixes,
   crash bundles from the platform's own logs, and a redacted support export.
-- **Discord activity**, ranked session stats from the public Critical Ops profile API, news,
-  and a self-updater from GitHub releases.
+- **Discord activity**, ranked session stats from the public Critical Ops profile API, and news.
+- **OptimaBot**, the Discord bot that draws Critical Ops stats cards and links your Discord account
+  to the game account Optima already tracks: `/link` here, a code into Settings, and `/searchplayer`
+  from then on. It lives in its own repository,
+  [inspectsoftware/OptimaBot](https://github.com/inspectsoftware/OptimaBot), so building or
+  installing Optima never needs it.
 
 ## Downloading
 
@@ -43,7 +50,7 @@ Every release carries:
   sign-in autostart, and uninstalls cleanly while keeping your data in `%LOCALAPPDATA%\Optima`.
   This is the one to take.
 - `Optima-v<version>-win-x64.zip`, the same build as a portable folder. Unpack it anywhere and
-  run `Optima.exe`. The in-app updater downloads this same archive to update an existing copy.
+  run `Optima.exe`.
 - Source code (zip / tar.gz), the repository at that tag, for building it yourself.
 
 Both binaries are unsigned, so Windows SmartScreen warns about an unknown publisher the first
@@ -81,6 +88,11 @@ Without the game: Settings > "mock fps provider" fakes the frametime feed, and
 `%LOCALAPPDATA%\Optima\detection.json` with `"emulatorProcessPatterns": ["^notepad$"]` and
 `"gameWindowTitlePattern": "Notepad"` lets Notepad stand in for the game.
 
+## Community
+
+Questions, builds and feedback: join the Optima Discord server at
+<https://discord.gg/bGuJ4tvsF7>.
+
 ## Data
 
 Everything lives under `%LOCALAPPDATA%\Optima\`: `config.json`, `profiles.json`,
@@ -92,7 +104,13 @@ The UI never runs elevated. `Optima.Watchdog.exe` performs only whitelisted, val
 operations over a private, ACL-restricted pipe. FPS measurement is an ETW present trace. The
 app contacts, exhaustively: the game's own endpoints or a reference host (ICMP),
 `default.prod.copsapi.criticalforce.fi` (public profile, only with an in-game name set),
-`criticalopsgame.com` (news), `api.github.com` (updates), and Discord over local IPC only.
+`criticalopsgame.com` (news), `discord.com` (which presence artwork exists, only with presence on),
+OptimaBot, the community Discord bot (account linking), and the local Discord client over IPC.
+Updates arrive as installers; the app does not check for them.
 Logs and exports are redacted.
+
+Pressing "link account" in Settings sends the link code and the player identity to OptimaBot, once,
+and stores the answer. Nothing else is sent there, ever. Running your own bot: set `discordBotUrl`
+in `config.json`; the app has no field for it.
 
 Optima is an independent project, not affiliated with Critical Force Oy or Google LLC.

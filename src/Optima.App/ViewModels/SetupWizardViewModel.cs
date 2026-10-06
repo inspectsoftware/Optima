@@ -59,6 +59,11 @@ public sealed partial class SetupWizardViewModel : ObservableObject
         var current = await _settings.GetSettingsAsync();
         PlayerIgn = current.PlayerIgn;
         DiscordApplicationId = current.DiscordApplicationId;
+        if (current.FirstRunCompleted)
+        {
+            // A second run starts from the user's own choice, not from the first-run default.
+            StartWithWindows = current.StartWithWindows;
+        }
 
         await AnalyzeAsync();
         IsDetecting = false;

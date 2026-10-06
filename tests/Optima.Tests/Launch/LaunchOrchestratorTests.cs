@@ -36,10 +36,17 @@ public sealed class LaunchOrchestratorTests : IDisposable
         _paths, _store, _displayService, _power, _virtualDisplay, _processOptimizer,
         NullLogger<RecoveryService>.Instance);
 
-    private LaunchOrchestrator CreateOrchestrator() => new(
+    private LaunchOrchestrator CreateOrchestrator(SettingsService? settings = null) => new(
         _detector, [_launcher], _virtualDisplay, _displayService, _power,
         _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
-        NullLogger<LaunchOrchestrator>.Instance);
+        NullLogger<LaunchOrchestrator>.Instance, settings);
+
+    private SettingsService SettingsWithPriority(string priority)
+    {
+        var settings = new SettingsService(_paths, _store, NullLogger<SettingsService>.Instance);
+        settings.SaveSettingsAsync(new AppSettings { GamePriority = priority }).GetAwaiter().GetResult();
+        return settings;
+    }
 
     private static LaunchProfile CompetitiveProfile => new()
     {
@@ -123,42 +130,6 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.Contains("restore", _power.Log);
         Assert.Contains("restoreTopology", _displayService.Log);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
-    }
-
-    [Fact]
-    public async Task RunSession_DisabledOptInLauncher_IsSkippedNotFatal()
-    {
-        var optIn = new FakeOptInLauncher { CanLaunch = true, IsEnabled = false };
-        var orchestrator = new LaunchOrchestrator(
-            _detector, [optIn, _launcher], _virtualDisplay, _displayService, _power,
-            _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
-            NullLogger<LaunchOrchestrator>.Instance);
-
-        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
-
-        // A disabled opt-in strategy never blocks the standard strategies.
-        Assert.True(result.Success);
-        Assert.Equal(0, optIn.LaunchCalls);
-        Assert.Equal(1, _launcher.LaunchCalls);
-    }
-
-    [Fact]
-    public async Task RunSession_EnabledOptInLauncherFailure_DoesNotFallThrough()
-    {
-        var optIn = new FakeOptInLauncher { CanLaunch = true, IsEnabled = true, LaunchSucceeds = false };
-        var orchestrator = new LaunchOrchestrator(
-            _detector, [optIn, _launcher], _virtualDisplay, _displayService, _power,
-            _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
-            NullLogger<LaunchOrchestrator>.Instance);
-
-        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
-
-        // An enabled opt-in strategy that claims but fails the launch must not silently
-        // fall through to the consumer-client launchers.
-        Assert.False(result.Success);
-        Assert.Equal("LAUNCH_FAILED", result.Error?.Code);
-        Assert.Equal(1, optIn.LaunchCalls);
-        Assert.Equal(0, _launcher.LaunchCalls);
     }
 
     [Fact]
@@ -277,6 +248,148 @@ public sealed class LaunchOrchestratorTests : IDisposable
 
         Assert.Equal("SESSION_ACTIVE", play.Error?.Code);
         Assert.True((await attach).Success);
+    }
+
+    [Fact]
+    public async Task RunSession_SettingsGamePriority_OverridesEveryProfile()
+    {
+        var result = await CreateOrchestrator(SettingsWithPriority("AboveNormal")).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(ProcessPriorityLevel.AboveNormal, Assert.Single(_processOptimizer.AppliedProfiles).Priority);
+    }
+
+    [Fact]
+    public async Task RunSession_SettingsGamePriorityNormal_OverridesEveryProfile()
+    {
+        var result = await CreateOrchestrator(SettingsWithPriority("Normal")).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(ProcessPriorityLevel.Normal, Assert.Single(_processOptimizer.AppliedProfiles).Priority);
+    }
+
+    [Fact]
+    public async Task RunSession_SettingsGamePriorityUnchanged_KeepsProfilePriority()
+    {
+        var result = await CreateOrchestrator(SettingsWithPriority("Unchanged")).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(ProcessPriorityLevel.High, Assert.Single(_processOptimizer.AppliedProfiles).Priority);
+    }
+
+    [Fact]
+    public async Task RunSession_UnknownGamePriority_KeepsProfilePriority()
+    {
+        var result = await CreateOrchestrator(SettingsWithPriority("definitely-not-a-priority")).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(ProcessPriorityLevel.High, Assert.Single(_processOptimizer.AppliedProfiles).Priority);
+    }
+
+    [Fact]
+    public async Task RunSession_NoSettingsAtAll_KeepsProfilePriority()
+    {
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(ProcessPriorityLevel.High, Assert.Single(_processOptimizer.AppliedProfiles).Priority);
+    }
+
+    [Fact]
+    public async Task Attach_SettingsGamePriority_IsAppliedToo()
+    {
+        var result = await CreateOrchestrator(SettingsWithPriority("AboveNormal"))
+            .AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false);
+
+        Assert.True(result.Success);
+        Assert.Equal(ProcessPriorityLevel.AboveNormal, Assert.Single(_processOptimizer.AppliedProfiles).Priority);
+    }
+
+    [Fact]
+    public async Task RunSession_KeepsReassertingPriorityUntilTheGameExits()
+    {
+        _processMonitor.ExitAfter = TimeSpan.FromSeconds(5);
+        var orchestrator = CreateOrchestrator();
+        orchestrator.PriorityKeeperInterval = TimeSpan.FromMilliseconds(20);
+
+        var session = orchestrator.RunSessionAsync(CompetitiveProfile);
+        // The first pass is recorded before it waits on the gate, so the wait cannot race it.
+        await WaitForAsync(() => _processOptimizer.Reasserted.Count >= 1);
+        Assert.Single(_processOptimizer.Reasserted);
+        Assert.Equal([4242], _processOptimizer.Reasserted);
+        Assert.Equal(ProcessPriorityLevel.High, _processOptimizer.ReassertedProfiles[0].Priority);
+
+        // Releasing the gate lets each pass finish; the keeper must keep going for the whole
+        // session, not stop after correcting once.
+        _processOptimizer.ReleaseGate();
+        await WaitForAsync(() => _processOptimizer.Reasserted.Count >= 3);
+
+        _processMonitor.EndGameNow();
+        var result = await session;
+        Assert.True(result.Success);
+        Assert.True(_processOptimizer.Reasserted.Count >= 3);
+        Assert.Equal([4242], _processOptimizer.Restored);
+    }
+
+    [Fact]
+    public async Task RunSession_PriorityKeeper_UsesTheSettingsPriority()
+    {
+        _processMonitor.ExitAfter = TimeSpan.FromSeconds(5);
+        var orchestrator = CreateOrchestrator(SettingsWithPriority("AboveNormal"));
+        orchestrator.PriorityKeeperInterval = TimeSpan.FromMilliseconds(20);
+
+        var session = orchestrator.RunSessionAsync(CompetitiveProfile);
+        await WaitForAsync(() => _processOptimizer.ReassertedProfiles.Count >= 1);
+
+        Assert.Equal(ProcessPriorityLevel.AboveNormal, _processOptimizer.ReassertedProfiles[0].Priority);
+
+        _processOptimizer.ReleaseGate();
+        _processMonitor.EndGameNow();
+        Assert.True((await session).Success);
+    }
+
+    [Fact]
+    public async Task Attach_PriorityKeeper_RunsForTheAttachedSessionToo()
+    {
+        _processMonitor.ExitAfter = TimeSpan.FromSeconds(5);
+        var orchestrator = CreateOrchestrator();
+        orchestrator.PriorityKeeperInterval = TimeSpan.FromMilliseconds(20);
+
+        var attach = orchestrator.AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false);
+        await WaitForAsync(() => _processOptimizer.Reasserted.Count >= 1);
+        Assert.Equal([4242], _processOptimizer.Reasserted);
+
+        _processOptimizer.ReleaseGate();
+        _processMonitor.EndGameNow();
+        Assert.True((await attach).Success);
+    }
+
+    [Fact]
+    public async Task RunSession_ProfileWithoutProcessTuning_StartsNoKeeper()
+    {
+        _processOptimizer.ReturnSnapshot = false;
+        _processMonitor.ExitAfter = TimeSpan.FromMilliseconds(200);
+        var orchestrator = CreateOrchestrator();
+        orchestrator.PriorityKeeperInterval = TimeSpan.FromMilliseconds(20);
+
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
+
+        // Nothing was applied, so there is nothing to keep correcting.
+        Assert.True(result.Success);
+        Assert.Empty(_processOptimizer.Reasserted);
+    }
+
+    private static async Task WaitForAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                Assert.Fail("Timed out waiting for the priority keeper");
+            }
+            await Task.Delay(10);
+        }
     }
 
     public void Dispose()

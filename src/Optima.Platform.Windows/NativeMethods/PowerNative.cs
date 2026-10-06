@@ -8,6 +8,8 @@ internal static class PowerNative
     internal static readonly Guid BalancedScheme = new("381b4222-f694-41f0-9685-ff5bb260df2e");
     internal static readonly Guid HighPerformanceScheme = new("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
     internal static readonly Guid UltimatePerformanceScheme = new("e9a42b02-d5df-448d-aa00-03f14749eb61");
+    /// <summary>The one copy of Ultimate Performance Optima makes where Windows hides the built-in plan.</summary>
+    internal static readonly Guid OptimaUltimatePerformanceScheme = new("0b71a3c5-6d2e-4f0a-9c1b-5e8f2a7d4c10");
 
     private const int ERROR_SUCCESS = 0;
 
@@ -23,7 +25,7 @@ internal static class PowerNative
         IntPtr powerSettingGuid, IntPtr buffer, ref uint bufferSize);
 
     [DllImport("powrprof.dll")]
-    private static extern uint PowerDuplicateScheme(IntPtr rootPowerKey, ref Guid sourceSchemeGuid, out IntPtr destinationSchemeGuid);
+    private static extern uint PowerDuplicateScheme(IntPtr rootPowerKey, ref Guid sourceSchemeGuid, ref IntPtr destinationSchemeGuid);
 
     [DllImport("powrprof.dll")]
     private static extern uint PowerEnumerate(
@@ -31,6 +33,47 @@ internal static class PowerNative
         uint accessFlags, uint index, [Out] byte[]? buffer, ref uint bufferSize);
 
     private const uint ACCESS_SCHEME = 16;
+
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadACValueIndex(IntPtr rootPowerKey, ref Guid scheme, ref Guid subGroup, ref Guid setting, out uint value);
+
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerReadDCValueIndex(IntPtr rootPowerKey, ref Guid scheme, ref Guid subGroup, ref Guid setting, out uint value);
+
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerWriteACValueIndex(IntPtr rootPowerKey, ref Guid scheme, ref Guid subGroup, ref Guid setting, uint value);
+
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerWriteDCValueIndex(IntPtr rootPowerKey, ref Guid scheme, ref Guid subGroup, ref Guid setting, uint value);
+
+    // Processor power management, "processor performance core parking min cores" (percent kept unparked).
+    private static readonly Guid ProcessorSubGroup = new("54533251-82be-4824-96c1-47b60b740d00");
+    private static readonly Guid MinUnparkedCores = new("0cc5b647-c1df-4637-891a-dec35c318583");
+
+    internal static (uint Ac, uint Dc) ReadMinUnparkedCores(Guid scheme)
+    {
+        var sub = ProcessorSubGroup;
+        var setting = MinUnparkedCores;
+        var acResult = PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out var ac);
+        var dcResult = PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out var dc);
+        if (acResult != ERROR_SUCCESS || dcResult != ERROR_SUCCESS)
+        {
+            throw new System.ComponentModel.Win32Exception((int)(acResult != ERROR_SUCCESS ? acResult : dcResult), "Reading the core parking setting failed");
+        }
+        return (ac, dc);
+    }
+
+    internal static void WriteMinUnparkedCores(Guid scheme, uint ac, uint dc)
+    {
+        var sub = ProcessorSubGroup;
+        var setting = MinUnparkedCores;
+        var acResult = PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, ac);
+        var dcResult = PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, dc);
+        if (acResult != ERROR_SUCCESS || dcResult != ERROR_SUCCESS)
+        {
+            throw new System.ComponentModel.Win32Exception((int)(acResult != ERROR_SUCCESS ? acResult : dcResult), "Writing the core parking setting failed");
+        }
+    }
 
     internal static Guid GetActiveScheme()
     {
@@ -103,16 +146,20 @@ internal static class PowerNative
         {
             return UltimatePerformanceScheme;
         }
-
-        var source = UltimatePerformanceScheme;
-        var result = PowerDuplicateScheme(IntPtr.Zero, ref source, out var destPtr);
-        if (result != ERROR_SUCCESS)
+        if (existing.Contains(OptimaUltimatePerformanceScheme))
         {
-            return HighPerformanceScheme;
+            return OptimaUltimatePerformanceScheme;
         }
+
+        // Duplicated under a GUID of Optima's own: left to pick one, Windows makes a new plan with a
+        // random GUID on every call, and nothing here could find it again the next time.
+        var source = UltimatePerformanceScheme;
+        var destPtr = Marshal.AllocHGlobal(Marshal.SizeOf<Guid>());
         try
         {
-            return Marshal.PtrToStructure<Guid>(destPtr);
+            Marshal.StructureToPtr(OptimaUltimatePerformanceScheme, destPtr, fDeleteOld: false);
+            var result = PowerDuplicateScheme(IntPtr.Zero, ref source, ref destPtr);
+            return result == ERROR_SUCCESS ? OptimaUltimatePerformanceScheme : HighPerformanceScheme;
         }
         finally
         {

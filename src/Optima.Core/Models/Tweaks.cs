@@ -49,6 +49,10 @@ public sealed record TweakDefinition
     public required string PotentialDownside { get; init; }
     public TweakRisk Risk { get; init; } = TweakRisk.Safe;
     public bool RequiresRestart { get; init; }
+
+    /// <summary>The first Windows build the tweak means anything on; older systems do not list it.</summary>
+    public int MinWindowsBuild { get; init; }
+
     public required IReadOnlyList<TweakValue> Values { get; init; }
 
     public bool RequiresElevation => Values.Any(v => v.Hive == TweakHive.LocalMachine);
@@ -57,6 +61,8 @@ public sealed record TweakDefinition
 /// <summary>The curated Windows tweak catalog.</summary>
 public static class TweakCatalog
 {
+    public const string GlobalTimerRequestsId = "global-timer-requests";
+
     public static string ValueKey(TweakValue value) => $"{value.KeyPath}::{value.ValueName}";
 
     public static TweakDefinition? Find(string id)
@@ -167,6 +173,23 @@ public static class TweakCatalog
             Values =
             [
                 new() { Hive = TweakHive.LocalMachine, KeyPath = @"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling", ValueName = "PowerThrottlingOff", Kind = TweakValueKind.Dword, EnabledData = "1", DefaultData = null },
+            ],
+        },
+
+        new()
+        {
+            Id = GlobalTimerRequestsId,
+            Name = "System-wide timer resolution requests",
+            Category = "cpu",
+            Risk = TweakRisk.Moderate,
+            RequiresRestart = true,
+            MinWindowsBuild = Optima.Core.Boost.TimerResolutionPolicy.Windows11Build,
+            WhatItChanges = "Sets GlobalTimerResolutionRequests to 1: the finest timer any program asks for applies to every program again, as it did before Windows 10 version 2004.",
+            PotentialBenefit = "The timer BOOST holds while the game runs reaches the game, instead of staying inside Optima.",
+            PotentialDownside = "Any program asking for a fine timer now raises it for the whole system, which costs some battery life and idle power. Windows 11 only. Needs a restart.",
+            Values =
+            [
+                new() { Hive = TweakHive.LocalMachine, KeyPath = @"SYSTEM\CurrentControlSet\Control\Session Manager\kernel", ValueName = "GlobalTimerResolutionRequests", Kind = TweakValueKind.Dword, EnabledData = "1", DefaultData = null },
             ],
         },
 

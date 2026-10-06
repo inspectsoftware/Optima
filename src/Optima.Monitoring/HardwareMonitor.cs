@@ -182,7 +182,7 @@ public sealed class HardwareMonitor : IPerformanceMonitor
 
         var (totalRam, availableRam) = ProcessNative.GetMemoryStatus();
 
-        double gpuUtil = 0;
+        double gpuUtil;
         ulong gpuMemory = 0;
         double? gpuTemp = null, gpuClock = null;
         if (_nvml is { IsAvailable: true })
