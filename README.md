@@ -30,7 +30,10 @@ pick a profile → PLAY
 - **Watch mode**: start the game any way you like and Optima applies the profile from the tray.
 - **Windows tweaks** with an on/off toggle each, originals captured and restored.
 - **Kill switch** (Ctrl+Alt+K), floating log console (Alt+F9), overlay toggle (Alt+F10).
-- **Debug page**: one place for what went wrong. Environment checks with their fixes
+- **Debug page**: one place for what went wrong. Optima reads its own log as it is written and
+  runs quick checks in the background, and lists every problem once as an issue, with what it
+  means, how to put it right and its evidence; no error goes by unlisted. Under that: environment
+  checks with their fixes
   (virtualization, platform, driver, refresh rate), a log where any line opens to its full error
   (the whole exception, the code Windows returned, the error guide's fix) and copies as a redacted
   report that stands on its own, crash bundles from the platform's own logs, the error guide, and a
@@ -100,7 +103,8 @@ Questions, builds and feedback: join the Optima Discord server at
 
 Everything lives under `%LOCALAPPDATA%\Optima\`: `config.json`, `profiles.json`,
 `detection.json`, `sessions.db`, `logs/`, `recovery/`, `backups/`, `crashes/`, `health/`
-(how the last run ended, and the fatal error it ended on if there was one).
+(how the last run ended, the fatal error it ended on if there was one, and the issues you chose
+to ignore).
 
 ## Security boundaries
 

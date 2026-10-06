@@ -80,7 +80,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase
             RequiresElevation = true,
         });
 
-    private string MarkerPath => Path.Combine(_paths.BackupsDirectory, "vdd-settings.pending");
+    private string MarkerPath => _paths.VddRestoreMarkerFile;
 
     public override async Task InitializeAsync(CancellationToken ct = default)
     {

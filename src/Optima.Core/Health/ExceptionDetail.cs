@@ -27,6 +27,12 @@ public sealed record ExceptionDetail
     /// <summary>The Optima error code, when the chain carries an <see cref="OptimaException"/>.</summary>
     public string ErrorCode { get; init; } = string.Empty;
 
+    /// <summary>
+    /// The method the exception was thrown from, without the file and line: the same in every
+    /// build, which makes it the part of a failure that says "this is that one again".
+    /// </summary>
+    public string TopFrame { get; init; } = string.Empty;
+
     /// <summary>The native error line, then the exception with its stack and inner exceptions.</summary>
     public required string FullText { get; init; }
 
@@ -53,6 +59,7 @@ public sealed record ExceptionDetail
             NativeErrorCode = native?.NativeErrorCode,
             NativeErrorText = nativeText,
             ErrorCode = typed?.Error.Code ?? string.Empty,
+            TopFrame = FirstFrame(shown),
             // The original, wrappers included: a full text that hid a layer would not be full.
             FullText = native is null
                 ? exception.ToString()
@@ -80,6 +87,29 @@ public sealed record ExceptionDetail
         {
             yield return current;
         }
+    }
+
+    private static string FirstFrame(Exception exception)
+    {
+        var trace = exception.StackTrace;
+        if (string.IsNullOrEmpty(trace))
+        {
+            return string.Empty;
+        }
+        var line = trace.AsSpan();
+        var end = line.IndexOfAny('\r', '\n');
+        if (end >= 0)
+        {
+            line = line[..end];
+        }
+        line = line.Trim();
+        if (line.StartsWith("at ", StringComparison.Ordinal))
+        {
+            line = line[3..];
+        }
+        // "Method(args) in C:\path\File.cs:line 12": the path differs per machine and per build.
+        var source = line.IndexOf(" in ", StringComparison.Ordinal);
+        return (source >= 0 ? line[..source] : line).ToString();
     }
 
     /// <summary>The exception built from a bare code carries the text Windows has for it.</summary>

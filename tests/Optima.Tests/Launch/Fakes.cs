@@ -78,6 +78,13 @@ internal sealed class FakePowerService : IPowerProfileService
 
     public Task<Guid> GetActiveSchemeAsync(CancellationToken ct = default) => Task.FromResult(Active);
     public Task<string> GetSchemeNameAsync(Guid scheme, CancellationToken ct = default) => Task.FromResult("Fake Plan");
+
+    /// <summary>What the PC lists; Balanced alone unless a test says otherwise.</summary>
+    public List<Optima.Core.Launch.PowerScheme> Listed { get; } =
+        [new(Optima.Core.Launch.PowerPlanPolicy.Balanced, "Balanced")];
+
+    public Task<IReadOnlyList<Optima.Core.Launch.PowerScheme>> ListSchemesAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Optima.Core.Launch.PowerScheme>>(Listed);
     public Task<Guid> ApplyAsync(PowerPlanKind kind, CancellationToken ct = default)
     {
         Log.Add($"apply:{kind}");

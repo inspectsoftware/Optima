@@ -262,6 +262,129 @@ public static class ErrorCatalog
                 "Close any program using the virtual display and retry",
                 "Remove the device from Device Manager under Display adapters",
             ]),
+        new(
+            "OPTIMA_CRASHED",
+            "Optima hit a fatal error",
+            "An error reached the top of Optima without anything handling it, and Optima closed. Temporary system changes were rolled back first.",
+            "This is a bug in Optima, not something wrong with the PC.",
+            [
+                "Open the issue's occurrences: the exception names the exact place",
+                "Copy the report and send it; it is redacted",
+                "Start Optima again; if a session was running, it offers to restore what was changed",
+            ]),
+        new(
+            "PREVIOUS_RUN_CRASHED",
+            "The previous run of Optima crashed",
+            "The last time Optima ran it ended on a fatal error. It wrote the error down on the way out, and this run found it.",
+            "A bug in Optima. The error is from the earlier run, so nothing in this run's log leads up to it.",
+            [
+                "Copy the report and send it: it carries the full error from the run that crashed",
+                "If system settings look changed (display, power plan), accept the restore prompt at startup or use the emergency restore on the Display page",
+            ]),
+        new(
+            "UNCLEAN_EXIT",
+            "The previous run did not shut down normally",
+            "Optima was running and then was not, without going through its exit: it was ended from Task Manager or by an installer, or the PC lost power or was reset.",
+            "Nothing inside Optima failed, or there would be a recorded error. Whatever a session had changed at that moment could not be put back by that run.",
+            [
+                "Nothing to do if Optima was ended on purpose, for instance by installing a new build over it",
+                "If a session was running, accept the restore prompt Optima shows at startup",
+            ]),
+        new(
+            "BACKGROUND_TASK_FAILED",
+            "A background task failed unnoticed",
+            "Something Optima started in the background threw an error that nothing was waiting for. It was caught at the last moment and logged; the feature it belonged to may have stopped without saying so.",
+            "A bug in Optima: a task was started and its result was never checked.",
+            [
+                "The occurrence names the method; the feature it belongs to is the one to distrust until Optima is restarted",
+                "Copy the report and send it",
+            ]),
+        new(
+            "RESTORE_STEP_FAILED",
+            "A system setting could not be put back",
+            "After a session Optima restores what it changed, one step at a time. One step failed. The others still ran.",
+            "The thing to restore was gone or busy: a display that is no longer connected, a process that had already exited, a power plan Windows refused.",
+            [
+                "The occurrence says which setting; check that one by hand in Windows",
+                "For the display layout, use the emergency restore on the Display page",
+                "Restart the PC if a display stays in the wrong mode",
+            ]),
+        new(
+            "SETTINGS_CORRUPT",
+            "A settings file was damaged and set aside",
+            "One of Optima's own files could not be read. It was renamed with a .corrupt suffix so nothing is lost, and Optima carried on with defaults in its place.",
+            "The file was cut off while being written (a crash, a power loss, a full disk), or edited by hand into something that is not valid JSON.",
+            [
+                "Use restore settings backups on the Checks tab of the Debug page to put back the previous saved generation",
+                "The damaged file sits next to the original, named .corrupt and a number, if it needs to be looked at",
+            ]),
+        new(
+            "HELPER_MISSING",
+            "The elevated helper is missing",
+            "Optima.Watchdog.exe is not next to Optima.exe. Everything that needs administrator rights goes through it: the virtual display, frametime capture, machine-wide tweaks and the memory cleaner are unavailable without it.",
+            "The install is incomplete, or security software removed the file.",
+            [
+                "Reinstall Optima from its setup",
+                "Check whether security software quarantined Optima.Watchdog.exe, and restore it",
+            ]),
+        new(
+            "VIRTUALIZATION_OFF",
+            "Hardware virtualization is off",
+            "The processor's virtualization support (Intel VT-x, AMD-V or SVM) is disabled in the firmware. Google Play Games cannot run the game without it.",
+            "Many PCs ship with it switched off, and a firmware update can switch it off again.",
+            [
+                "Restart into the BIOS or UEFI setup and enable virtualization; the setup guide on the Play page walks through it",
+                "This cannot be changed from inside Windows",
+            ]),
+        new(
+            "HYPERVISOR_OFF",
+            "No Windows hypervisor feature is on",
+            "Neither Virtual Machine Platform, Windows Hypervisor Platform nor Hyper-V is enabled. Google Play Games needs one of them to run the game.",
+            "They are optional Windows features and are off on a fresh install.",
+            [
+                "Run the setup wizard again from the Checks tab of the Debug page: it enables them with one administrator prompt",
+                "Or turn on Virtual Machine Platform in Windows Features (OptionalFeatures.exe)",
+                "Restart the PC afterwards; the features only take effect then",
+            ]),
+        new(
+            "DISK_SPACE_LOW",
+            "The system drive is nearly full",
+            "Less than 3 GB is free on the drive Windows is installed on.",
+            "Game updates and the emulator's disk image need room, and Windows itself misbehaves on a full drive.",
+            [
+                "Free up space on the system drive",
+                "Storage in Windows Settings lists what is using it",
+            ]),
+        new(
+            "VDD_RESTORE_PENDING",
+            "A virtual display settings restore never ran",
+            "A session changed the virtual display driver's settings file and left a marker naming the backup to put back. That restore has not happened, and the next virtual display session will carry it out without asking.",
+            "The session ended without its restore: Optima was closed or crashed in the middle of it, or the restore could not write the file.",
+            [
+                "The Checks tab of the Debug page shows which backup would overwrite which file",
+                "If the backup is what should be there, start a session with a virtual display profile and let the restore run",
+                "To keep the settings file as it is now, delete backups\\vdd-settings.pending under %LOCALAPPDATA%\\Optima",
+            ]),
+        new(
+            "UNCLASSIFIED",
+            "An error Optima has no explanation for yet",
+            "Something logged an error that no rule recognises. It is listed so that it does not go by unnoticed, with everything it carried.",
+            "It is new or rare. Whether it matters depends on what stopped working.",
+            [
+                "Read the occurrence: the source names the part of Optima, the exception names the failure",
+                "If something visibly stopped working, copy the report and send it",
+                "Dismiss it if nothing is wrong; ignore it to never be shown it again",
+            ]),
+        new(
+            "ISSUES_OVERFLOW",
+            "More errors than the list can show",
+            "More than fifty different unrecognised errors were logged in this run. The rest are counted here instead of being listed one by one.",
+            "Something is failing in a loop, or on a broad front.",
+            [
+                "Start with the oldest issues on the list: the first failure is usually the cause of the rest",
+                "Export the log from the Log tab of the Debug page for the full picture",
+                "Restart Optima",
+            ]),
     ];
 
     /// <summary>Case-insensitive lookup by code; null when unknown.</summary>

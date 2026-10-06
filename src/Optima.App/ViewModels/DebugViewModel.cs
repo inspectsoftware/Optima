@@ -7,6 +7,7 @@ namespace Optima.App.ViewModels;
 /// <summary>The tabs of the DEBUG page.</summary>
 public enum DebugTab
 {
+    Issues,
     Checks,
     Log,
     Crashes,
@@ -20,12 +21,16 @@ public enum DebugTab
 /// </summary>
 public sealed partial class DebugViewModel : ObservableObject
 {
-    public DebugViewModel(ChecksViewModel checks, LogStreamViewModel stream, CrashesViewModel crashes)
+    public DebugViewModel(IssuesViewModel issues, ChecksViewModel checks, LogStreamViewModel stream, CrashesViewModel crashes)
     {
+        Issues = issues;
         Checks = checks;
         Stream = stream;
         Crashes = crashes;
     }
+
+    /// <summary>What is wrong right now, found by Optima. The page opens on it.</summary>
+    public IssuesViewModel Issues { get; }
 
     public ChecksViewModel Checks { get; }
 
@@ -35,12 +40,14 @@ public sealed partial class DebugViewModel : ObservableObject
     public CrashesViewModel Crashes { get; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsIssues))]
     [NotifyPropertyChangedFor(nameof(IsChecks))]
     [NotifyPropertyChangedFor(nameof(IsLog))]
     [NotifyPropertyChangedFor(nameof(IsCrashes))]
     [NotifyPropertyChangedFor(nameof(IsGuide))]
-    private DebugTab _selectedTab = DebugTab.Checks;
+    private DebugTab _selectedTab = DebugTab.Issues;
 
+    public bool IsIssues => SelectedTab == DebugTab.Issues;
     public bool IsChecks => SelectedTab == DebugTab.Checks;
     public bool IsLog => SelectedTab == DebugTab.Log;
     public bool IsCrashes => SelectedTab == DebugTab.Crashes;

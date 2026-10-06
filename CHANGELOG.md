@@ -4,6 +4,18 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-06 - Indev: Optima notices what goes wrong
+
+- New on DEBUG: ISSUES, the tab the page now opens on. Optima reads its own log as it is written and runs quick checks in the background shortly after it starts, and lists whatever is wrong: once per problem, however many log lines it wrote.
+- Every issue says what it is, why it happens and how to put it right, taken from the error guide, and carries its evidence: the first occurrence and the latest five with their full errors, and the log lines that led up to it.
+- No error goes by unlisted. A failure Optima has a name for is listed under that name; any other error is listed as unclassified, with everything it carried. A storm of different errors is capped at fifty, with the rest counted under one entry.
+- The rail shows a count on DEBUG when something needs attention, whatever page is open. Notes, such as a power plan the PC does not offer, are listed without being counted.
+- copy report puts an issue on the clipboard as redacted text that stands on its own. dismiss takes it off the list until it happens again. ignore keeps it off for good, and IGNORED lists what was ignored so it can be brought back.
+- scan now runs every check. A check that fails opens an issue and a check that passes closes it, so fixing a problem and scanning clears it.
+- New checks: whether this PC offers the power plan the selected profile asks for, said before the launch instead of after it; and a virtual display settings restore left pending by an old session, which would otherwise overwrite the settings file, silently, at the next one.
+- Recognised by name: a fatal error in Optima, a previous run that crashed or was ended from outside, a background task that failed unnoticed, a system setting that could not be put back after a session, a damaged settings file, a missing helper, virtualization or the hypervisor switched off, a nearly full system drive, and every launch error.
+- Optima only detects and lists here. It changes nothing on the PC.
+
 ## 2026-10-06 - Indev: Diagnostics and Logs are one page, Debug
 
 - New: the DEBUG page, in place of DIAGNOSTICS and LOGS. The two answered halves of one question, what went wrong and why, from two rail items. DEBUG has them as tabs: CHECKS, LOG, CRASHES and ERROR GUIDE.

@@ -69,17 +69,23 @@ public static class LogReport
             }
         }
 
-        if (leadUp.Count > 0)
-        {
-            text.AppendLine().AppendLine("Leading up to it:");
-            foreach (var earlier in leadUp)
-            {
-                text.Append("  ").Append(earlier.Timestamp.ToString("HH:mm:ss.fff")).Append(' ')
-                    .Append(earlier.LevelText.PadRight(8)).Append(' ')
-                    .Append(earlier.ShortSource).Append(": ").AppendLine(earlier.Line);
-            }
-        }
-
+        AppendLeadUp(text, leadUp);
         return Redactor.Redact(text.ToString().TrimEnd(), identity ?? RedactionIdentity.Current);
+    }
+
+    /// <summary>The lines before the one a report is about, one each, in the short form of the log list.</summary>
+    internal static void AppendLeadUp(StringBuilder text, IReadOnlyList<LogRecord> leadUp)
+    {
+        if (leadUp.Count == 0)
+        {
+            return;
+        }
+        text.AppendLine().AppendLine("Leading up to it:");
+        foreach (var earlier in leadUp)
+        {
+            text.Append("  ").Append(earlier.Timestamp.ToString("HH:mm:ss.fff")).Append(' ')
+                .Append(earlier.LevelText.PadRight(8)).Append(' ')
+                .Append(earlier.ShortSource).Append(": ").AppendLine(earlier.Line);
+        }
     }
 }

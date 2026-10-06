@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Optima.App.Services;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
+using Optima.Core.Health;
 using Optima.Core.Models;
 using Microsoft.Extensions.Logging;
 
@@ -21,10 +22,12 @@ public sealed partial class ChecksViewModel : ObservableObject
     private readonly SettingsService _settings;
     private readonly FirstRunFixService _firstRunFix;
     private readonly StatusViewModel _status;
+    private readonly IssueEngine _issues;
     private readonly ILogger<ChecksViewModel> _logger;
 
     public ChecksViewModel(
         IEnumerable<IDiagnosticCheck> checks,
+        IssueEngine issues,
         RepairService repair,
         SettingsService settings,
         FirstRunFixService firstRunFix,
@@ -32,6 +35,7 @@ public sealed partial class ChecksViewModel : ObservableObject
         ILogger<ChecksViewModel> logger)
     {
         _checks = checks.OrderBy(c => c.Order).ToList();
+        _issues = issues;
         _repair = repair;
         _settings = settings;
         _firstRunFix = firstRunFix;
@@ -84,6 +88,8 @@ public sealed partial class ChecksViewModel : ObservableObject
                     };
                 }
                 Results.Add(result);
+                // A failing check opens an issue and a passing one closes it; advice does neither.
+                _issues.Report(result);
             }
 
             var passed = Results.Count(r => r.Status == DiagnosticStatus.Pass);

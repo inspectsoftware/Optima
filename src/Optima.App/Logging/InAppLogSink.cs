@@ -95,9 +95,16 @@ public sealed class InAppLogSink : ILogEventSink
     /// </summary>
     private static readonly MessageTemplateTextFormatter MessageFormatter = new("{Message:l}");
 
+    /// <summary>How many records are held for a reader that has not attached yet.</summary>
+    private const int MaxEarly = 512;
+
     private readonly ConcurrentQueue<LogEntry> _incoming = new();
     private readonly Timer _flushTimer;
     private int _flushScheduled;
+
+    private readonly object _readerGate = new();
+    private Action<LogRecord>? _reader;
+    private List<LogRecord>? _early = [];
 
     public InAppLogSink()
     {
@@ -107,25 +114,78 @@ public sealed class InAppLogSink : ILogEventSink
     public LogEntryCollection Entries { get; } = [];
 
     /// <summary>
+    /// Gives every record to a second reader, the issue engine, on the thread that logged it. The
+    /// page is fed through the dispatcher and so sees nothing while there is none; this reader
+    /// does not wait for a window. The sink exists before the reader does, so what was logged in
+    /// between (how the previous run ended, a service that failed to build) is handed over first,
+    /// in order.
+    /// </summary>
+    public void Attach(Action<LogRecord> reader)
+    {
+        lock (_readerGate)
+        {
+            var early = _early ?? [];
+            // The reader logs too. What it writes while the early records are replayed lands in a
+            // fresh list instead of in the one being walked.
+            _early = [];
+            foreach (var record in early)
+            {
+                reader(record);
+            }
+            var during = _early;
+            _early = null;
+            Volatile.Write(ref _reader, reader);
+            foreach (var record in during)
+            {
+                reader(record);
+            }
+        }
+    }
+
+    /// <summary>
     /// Runs on whatever thread logged, the UI thread and the launch pipeline included, so it only
     /// maps and queues. A line written while no dispatcher exists (before the first window, during
     /// shutdown) waits in the queue instead of being thrown away.
     /// </summary>
     public void Emit(LogEvent logEvent)
     {
+        var record = ToRecord(logEvent);
+        // The reader first, and always: the page's queue can be full, the issue list must not miss an error.
+        Hand(record);
+
         var queued = _incoming.Count;
         if (queued >= MaxQueued && (logEvent.Level < LogEventLevel.Warning || queued >= MaxQueued * 2))
         {
             return;
         }
-
-        _incoming.Enqueue(new LogEntry(ToRecord(logEvent)));
+        _incoming.Enqueue(new LogEntry(record));
 
         // One timer per burst: whoever arrives first arms it, the rest just join the queue.
         if (Interlocked.Exchange(ref _flushScheduled, 1) == 0)
         {
             _flushTimer.Change(FlushIntervalMs, Timeout.Infinite);
         }
+    }
+
+    private void Hand(LogRecord record)
+    {
+        var reader = Volatile.Read(ref _reader);
+        if (reader is null)
+        {
+            lock (_readerGate)
+            {
+                reader = _reader;
+                if (reader is null)
+                {
+                    if (_early is { Count: < MaxEarly } early)
+                    {
+                        early.Add(record);
+                    }
+                    return;
+                }
+            }
+        }
+        reader(record);
     }
 
     private void Flush()

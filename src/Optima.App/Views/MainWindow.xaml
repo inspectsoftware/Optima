@@ -142,20 +142,32 @@
                           </Style>
                         </TextBlock.Style>
                       </TextBlock>
-                      <Button Style="{StaticResource NavButton}"
-                              Content="{Binding Label}" Tag="{Binding IconKey}"
-                              HorizontalAlignment="Stretch"
-                              Command="{Binding DataContext.NavigateCommand,
-                                        RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                              CommandParameter="{Binding Key}">
-                        <Button.Visibility>
-                          <MultiBinding Converter="{StaticResource NavItemVisibility}">
-                            <Binding Path="Key" />
-                            <Binding Path="DataContext.DeveloperModeVisible"
-                                     RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
-                          </MultiBinding>
-                        </Button.Visibility>
-                      </Button>
+                      <Grid>
+                        <Button Style="{StaticResource NavButton}"
+                                Content="{Binding Label}" Tag="{Binding IconKey}"
+                                HorizontalAlignment="Stretch"
+                                Command="{Binding DataContext.NavigateCommand,
+                                          RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding Key}">
+                          <Button.Visibility>
+                            <MultiBinding Converter="{StaticResource NavItemVisibility}">
+                              <Binding Path="Key" />
+                              <Binding Path="DataContext.DeveloperModeVisible"
+                                       RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                            </MultiBinding>
+                          </Button.Visibility>
+                        </Button>
+                        <!-- How many things on the page want looking at. Over the row, not in it, so
+                             it stays where it is when the rail is collapsed to icons. -->
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"
+                                MinWidth="17" Height="16" Padding="4,0" CornerRadius="8"
+                                Background="{DynamicResource Brush.Fail}" IsHitTestVisible="False"
+                                Visibility="{Binding HasBadge, Converter={StaticResource BoolToVis}}">
+                          <TextBlock Text="{Binding BadgeCount}" FontSize="{StaticResource Type.Micro}" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource Brush.Background}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                      </Grid>
                     </StackPanel>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>

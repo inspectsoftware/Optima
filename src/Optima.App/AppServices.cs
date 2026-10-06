@@ -1,8 +1,8 @@
-﻿using Optima.App.Diagnostics;
-using Optima.App.ViewModels;
+﻿using Optima.App.ViewModels;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Detection;
+using Optima.Core.Health.Checks;
 using Optima.Core.Crashes;
 using Optima.Core.Launch;
 using Optima.Core.Models;
@@ -174,12 +174,28 @@ public static class AppServices
         services.AddSingleton<IDiagnosticCheck, WindowsHypervisorCheck>();
         services.AddSingleton<IDiagnosticCheck, GooglePlayGamesCheck>();
         services.AddSingleton<IDiagnosticCheck, CriticalOpsCheck>();
-        services.AddSingleton<IDiagnosticCheck, VirtualDriverCheck>();
+        services.AddSingleton<IDiagnosticCheck>(sp => new VirtualDriverCheck(
+            sp.GetRequiredService<IVirtualDisplayProvider>(),
+            sp.GetRequiredService<IDriverInstaller>(),
+            VddDriverInstaller.BundledDriverFolder));
         services.AddSingleton<IDiagnosticCheck, RefreshRateCheck>();
         services.AddSingleton<IDiagnosticCheck, GpuDriverCheck>();
         services.AddSingleton<IDiagnosticCheck, DiskSpaceCheck>();
         services.AddSingleton<IDiagnosticCheck, AdminPermissionsCheck>();
         services.AddSingleton<IDiagnosticCheck, OptimaOverheadCheck>();
+        services.AddSingleton<IDiagnosticCheck, PowerPlanCheck>();
+        // Asked lazily: the orchestrator is built long after the checks are listed.
+        services.AddSingleton<IDiagnosticCheck>(sp => new StaleDisplayRestoreCheck(
+            paths, () => sp.GetRequiredService<LaunchOrchestrator>().IsSessionActive));
+
+        // The issue list: read off the running log and the checks, changes nothing on the system.
+        services.AddSingleton(sp => new Optima.Core.Health.IssueStateFile(
+            sp.GetRequiredService<JsonStore>(), paths.IssuesFile,
+            sp.GetRequiredService<ILogger<Optima.Core.Health.IssueStateFile>>()));
+        services.AddSingleton(sp => new Optima.Core.Health.IssueEngine(
+            sp.GetRequiredService<Optima.Core.Health.IssueStateFile>(),
+            sp.GetServices<IDiagnosticCheck>(),
+            sp.GetRequiredService<ILogger<Optima.Core.Health.IssueEngine>>()));
 
         services.AddSingleton<StatusViewModel>();
         services.AddSingleton<PlayerStatsViewModel>();
@@ -194,6 +210,7 @@ public static class AppServices
         services.AddSingleton<CompViewModel>();
         services.AddSingleton<BoostViewModel>();
         services.AddSingleton<LegalViewModel>();
+        services.AddSingleton<IssuesViewModel>();
         services.AddSingleton<ChecksViewModel>();
         services.AddSingleton<LogStreamViewModel>();
         services.AddSingleton<CrashesViewModel>();

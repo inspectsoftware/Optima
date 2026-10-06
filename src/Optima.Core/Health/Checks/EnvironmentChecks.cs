@@ -1,9 +1,7 @@
-using System.IO;
 using Optima.Core.Abstractions;
 using Optima.Core.Models;
-using Optima.Driver;
 
-namespace Optima.App.Diagnostics;
+namespace Optima.Core.Health.Checks;
 
 /// <summary>The environment checks of DEBUG (§15/§16).</summary>
 public sealed class VirtualizationCheck : IDiagnosticCheck
@@ -13,6 +11,7 @@ public sealed class VirtualizationCheck : IDiagnosticCheck
 
     public string Name => "Virtualization";
     public int Order => 10;
+    public CheckScope Scope => CheckScope.Startup;
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
@@ -24,6 +23,7 @@ public sealed class VirtualizationCheck : IDiagnosticCheck
                 CheckName = Name,
                 Status = DiagnosticStatus.Pass,
                 Reason = "A hypervisor is running, so hardware virtualization is active.",
+                IssueCode = "VIRTUALIZATION_OFF",
             };
         }
         if (state.FirmwareVirtualizationEnabled == true)
@@ -42,6 +42,7 @@ public sealed class VirtualizationCheck : IDiagnosticCheck
             Status = DiagnosticStatus.Fail,
             Reason = "Hardware virtualization looks disabled.",
             RecommendedFix = "Enable virtualization (Intel VT-x / AMD-V / SVM) in the BIOS/UEFI firmware settings. This cannot be changed from Windows.",
+            IssueCode = "VIRTUALIZATION_OFF",
         };
     }
 }
@@ -53,6 +54,7 @@ public sealed class WindowsHypervisorCheck : IDiagnosticCheck
 
     public string Name => "Windows Hypervisor";
     public int Order => 20;
+    public CheckScope Scope => CheckScope.Startup;
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
@@ -72,6 +74,7 @@ public sealed class WindowsHypervisorCheck : IDiagnosticCheck
             RecommendedFix = anyPlatform
                 ? string.Empty
                 : "Turn on 'Virtual Machine Platform' in Windows Features (OptionalFeatures.exe) and restart. Google Play Games requires it.",
+            IssueCode = "HYPERVISOR_OFF",
         };
     }
 
@@ -93,6 +96,7 @@ public sealed class GooglePlayGamesCheck : IDiagnosticCheck
 
     public string Name => "Google Play Games";
     public int Order => 30;
+    public CheckScope Scope => CheckScope.Startup;
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
@@ -105,11 +109,14 @@ public sealed class GooglePlayGamesCheck : IDiagnosticCheck
                 Status = DiagnosticStatus.Fail,
                 Reason = "Google Play Games for PC was not found.",
                 RecommendedFix = "Install Google Play Games from Google's website, or set its install folder manually in Settings.",
+                IssueCode = "GPG_NOT_FOUND",
             };
         }
         return new DiagnosticResult
         {
             CheckName = Name,
+            // Found is found: a pass here closes the issue, and the protocol warning stays advice.
+            IssueCode = platform.ProtocolHandlerRegistered ? "GPG_NOT_FOUND" : null,
             Status = platform.ProtocolHandlerRegistered ? DiagnosticStatus.Pass : DiagnosticStatus.Warning,
             Reason = $"Version {platform.Version} at {platform.InstallDirectory}"
                 + (platform.ServiceRunning ? " (service running)." : " (service not running)."),
@@ -128,6 +135,7 @@ public sealed class CriticalOpsCheck : IDiagnosticCheck
 
     public string Name => "Critical Ops";
     public int Order => 40;
+    public CheckScope Scope => CheckScope.Startup;
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
@@ -139,11 +147,13 @@ public sealed class CriticalOpsCheck : IDiagnosticCheck
                 Status = DiagnosticStatus.Fail,
                 Reason = "Critical Ops is not installed in Google Play Games.",
                 RecommendedFix = "Open Google Play Games and install Critical Ops.",
+                IssueCode = "GAME_NOT_FOUND",
             }
             : new DiagnosticResult
             {
                 CheckName = Name,
                 Status = DiagnosticStatus.Pass,
+                IssueCode = "GAME_NOT_FOUND",
                 Reason = $"Installed ({game.PackageId}).",
                 Details = $"Launch URI: {game.LaunchUri}\nShortcut: {game.ShortcutPath}",
             };
@@ -154,11 +164,14 @@ public sealed class VirtualDriverCheck : IDiagnosticCheck
 {
     private readonly IVirtualDisplayProvider _provider;
     private readonly IDriverInstaller _installer;
+    private readonly string _bundledDriverFolder;
 
-    public VirtualDriverCheck(IVirtualDisplayProvider provider, IDriverInstaller installer)
+    /// <param name="bundledDriverFolder">The folder next to Optima.exe a driver package ships in, named in the fix.</param>
+    public VirtualDriverCheck(IVirtualDisplayProvider provider, IDriverInstaller installer, string bundledDriverFolder)
     {
         _provider = provider;
         _installer = installer;
+        _bundledDriverFolder = bundledDriverFolder;
     }
 
     public string Name => "Optima Virtualization";
@@ -178,7 +191,7 @@ public sealed class VirtualDriverCheck : IDiagnosticCheck
                     : "No virtual display device is present and no driver package is bundled, so the mock provider will be used.",
                 RecommendedFix = driverState == DriverState.NotInstalledPackageAvailable
                     ? "Open the Display page and choose Install Driver (one administrator prompt)."
-                    : $"Add a driver package to the '{VddDriverInstaller.BundledDriverFolder}' folder next to Optima.exe, or install one yourself.",
+                    : $"Add a driver package to the '{_bundledDriverFolder}' folder next to Optima.exe, or install one yourself.",
             };
         }
 
@@ -265,6 +278,7 @@ public sealed class DiskSpaceCheck : IDiagnosticCheck
 {
     public string Name => "Disk Space";
     public int Order => 80;
+    public CheckScope Scope => CheckScope.Startup;
 
     public Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
@@ -277,6 +291,8 @@ public sealed class DiskSpaceCheck : IDiagnosticCheck
             Status = freeGb >= 10 ? DiagnosticStatus.Pass : freeGb >= 3 ? DiagnosticStatus.Warning : DiagnosticStatus.Fail,
             Reason = $"{freeGb:F1} GB free on {drive.Name}",
             RecommendedFix = freeGb >= 10 ? string.Empty : "Free up disk space. Game updates and the emulator image need room.",
+            // Tight is advice; nearly full is a fault, and room again closes it.
+            IssueCode = freeGb is >= 3 and < 10 ? null : "DISK_SPACE_LOW",
         });
     }
 }
@@ -288,6 +304,7 @@ public sealed class AdminPermissionsCheck : IDiagnosticCheck
 
     public string Name => "Administrator Permissions";
     public int Order => 90;
+    public CheckScope Scope => CheckScope.Startup;
 
     public Task<DiagnosticResult> RunAsync(CancellationToken ct = default)
     {
@@ -305,6 +322,7 @@ public sealed class AdminPermissionsCheck : IDiagnosticCheck
             Status = status,
             Reason = reason,
             RecommendedFix = helperPresent ? string.Empty : "Reinstall or rebuild the application so Optima.Watchdog.exe sits next to the main executable.",
+            IssueCode = "HELPER_MISSING",
         });
     }
 }

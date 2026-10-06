@@ -109,6 +109,11 @@ public partial class App : Application
             .ConfigureServices(services => AppServices.Register(services, paths))
             .Build();
 
+        // From here on the issue list reads every log line, the ones already written included.
+        var issues = _host.Services.GetRequiredService<Core.Health.IssueEngine>();
+        LogSink.Attach(issues.Ingest);
+        issues.Start();
+
         _splash?.SetStatus("starting services", 0.5);
         _host.Start();
         Log.Information("Optima starting (version {Version})",

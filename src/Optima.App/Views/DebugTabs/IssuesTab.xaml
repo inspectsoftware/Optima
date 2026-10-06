@@ -1,0 +1,133 @@
+<UserControl x:Class="Optima.App.Views.DebugTabs.IssuesTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:Optima.App.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="24,0,24,24">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="ISSUES">
+        <HeaderedContentControl.Tag>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Text.Micro}"
+                       Foreground="{DynamicResource Brush.Ok}" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <ctl:AsciiSpinner Cells="10" Margin="0,0,12,0"
+                              Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" />
+            <Button Style="{StaticResource SecondaryButton}" Content="scan now"
+                    Command="{Binding ScanNowCommand}" Padding="10,3"
+                    ToolTip="Runs every check now. Optima also watches the log all the time and runs the quick checks at startup." />
+          </StackPanel>
+        </HeaderedContentControl.Tag>
+
+        <StackPanel>
+          <TextBlock Text="{Binding Headline}" Style="{StaticResource Text.Value}" Margin="0,0,0,10" />
+          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="720" HorizontalAlignment="Left"
+                     Text="Optima reads its own log as it is written and runs quick checks in the background. Anything that goes wrong is listed here once, however often it happens, with what it means and how to put it right."
+                     Visibility="{Binding HasIssues, Converter={StaticResource InverseBoolToVis}}" />
+
+          <ItemsControl ItemsSource="{Binding Issues}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource Callout}" Margin="0,0,0,8"
+                        BorderBrush="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}">
+                  <StackPanel>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <Border Style="{StaticResource Badge}" Margin="0,0,10,0" VerticalAlignment="Top"
+                              BorderBrush="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}">
+                        <TextBlock Text="{Binding SeverityTag}" Style="{StaticResource Text.Badge}"
+                                   Foreground="{Binding SeverityLevel, Converter={StaticResource LogLevelBrush}}" />
+                      </Border>
+                      <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="{StaticResource Type.Title}"
+                                 Foreground="{DynamicResource Brush.Text}" TextWrapping="Wrap" />
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+                        <Button Style="{StaticResource GhostButton}" Content="copy report" Padding="6,0"
+                                Command="{Binding DataContext.CopyReportCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}"
+                                ToolTip="The issue as redacted text that stands on its own: what to send when reporting it" />
+                        <Button Style="{StaticResource GhostButton}" Content="dismiss" Padding="6,0"
+                                Command="{Binding DataContext.DismissCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}"
+                                ToolTip="Takes it off the list for now. It comes back if it happens again." />
+                        <Button Style="{StaticResource GhostButton}" Content="ignore" Padding="6,0"
+                                Command="{Binding DataContext.IgnoreCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}"
+                                ToolTip="Never raise this one again, in this run or a later one. Listed under IGNORED." />
+                      </StackPanel>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                      <TextBlock Text="{Binding Code}" Style="{StaticResource Text.Micro}"
+                                 Foreground="{DynamicResource Brush.Accent}" />
+                      <TextBlock Text="{Binding SeenText, StringFormat='  ·  {0}'}" Style="{StaticResource Text.Micro}"
+                                 Foreground="{DynamicResource Brush.TextMuted}" />
+                    </StackPanel>
+
+                    <TextBox Text="{Binding Detail, Mode=OneWay}" Style="{StaticResource SelectableText}" Margin="0,8,0,0"
+                             Visibility="{Binding Detail, Converter={StaticResource EmptyToCollapsed}}" />
+
+                    <!-- What the error guide says about it: the part that turns a failure into a next step. -->
+                    <StackPanel Margin="0,10,0,0" Visibility="{Binding Guide, Converter={StaticResource NullToCollapsed}}">
+                      <TextBlock Text="{Binding Guide.WhatHappened}" Style="{StaticResource Text.Prose}"
+                                 MaxWidth="760" HorizontalAlignment="Left" />
+                      <TextBlock Text="{Binding Guide.WhyItHappens, StringFormat='Why: {0}'}" Style="{StaticResource Text.Prose}"
+                                 MaxWidth="760" HorizontalAlignment="Left" Margin="0,4,0,0" />
+                      <ItemsControl ItemsSource="{Binding Guide.HowToFix}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border BorderBrush="{DynamicResource Brush.Warn}" BorderThickness="2,0,0,0" Padding="10,2" Margin="0,2">
+                              <TextBlock Text="{Binding}" Style="{StaticResource Text.Prose}"
+                                         Foreground="{DynamicResource Brush.Warn}" MaxWidth="720" HorizontalAlignment="Left" />
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+
+                    <Expander Header="evidence" Margin="0,8,0,0"
+                              Visibility="{Binding HasEvidence, Converter={StaticResource BoolToVis}}">
+                      <TextBox Text="{Binding EvidenceText, Mode=OneWay}" Style="{StaticResource SelectableText}"
+                               FontFamily="{StaticResource Font.Mono}" Margin="0,4,0,0"
+                               MaxHeight="260" VerticalScrollBarVisibility="Auto" />
+                    </Expander>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="IGNORED"
+                              Visibility="{Binding HasIgnored, Converter={StaticResource BoolToVis}}">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="720" HorizontalAlignment="Left" Margin="0,0,0,6"
+                     Text="Issues you said not to raise again. They still happen and are still in the log; they are only kept off the list." />
+          <ItemsControl ItemsSource="{Binding Ignored}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition />
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Cell}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text="{Binding At, StringFormat='since {0:yyyy-MM-dd}'}"
+                               Style="{StaticResource Text.CellDim}" Margin="12,0" />
+                    <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="stop ignoring" Padding="6,0"
+                            Command="{Binding DataContext.StopIgnoringCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

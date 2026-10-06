@@ -35,6 +35,13 @@ public sealed partial class NavItem : ObservableObject
 
     [ObservableProperty]
     private bool _isActive;
+
+    /// <summary>How many things on the page want looking at; shown as a count on the row when above zero.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBadge))]
+    private int _badgeCount;
+
+    public bool HasBadge => BadgeCount > 0;
 }
 
 /// <summary>
@@ -106,6 +113,17 @@ public sealed partial class MainViewModel : ObservableObject
         _logger = logger;
         _currentPage = home;
         _settings.SettingsChanged += (_, s) => DeveloperModeVisible = s.DeveloperMode;
+
+        // The issue count rides on the rail, so a problem is visible from whatever page is open.
+        var debugItem = NavItems.First(item => item.Key == "DEBUG");
+        debugItem.BadgeCount = Debug.Issues.AttentionCount;
+        Debug.Issues.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IssuesViewModel.AttentionCount))
+            {
+                debugItem.BadgeCount = Debug.Issues.AttentionCount;
+            }
+        };
     }
 
     public HomeViewModel Home { get; }

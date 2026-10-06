@@ -21,6 +21,9 @@
          only their visibility changes: the log list needs a bounded viewport to virtualize, and a
          page that stacked its sections in a scroller would give it an unbounded one. -->
     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="24,0,24,10">
+      <Button Style="{StaticResource ChipButton}" Content="{Binding Issues.TabLabel}" Margin="0,0,6,0" Tag="{Binding IsIssues}"
+              Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:DebugTab.Issues}"
+              ToolTip="What is wrong right now, found by Optima: each with what it means and how to put it right" />
       <Button Style="{StaticResource ChipButton}" Content="CHECKS" Margin="0,0,6,0" Tag="{Binding IsChecks}"
               Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:DebugTab.Checks}"
               ToolTip="Is this PC set up to run the game: each check with its reason and its fix" />
@@ -35,6 +38,8 @@
               ToolTip="What every error code means and how to fix it" />
     </StackPanel>
 
+    <tabs:IssuesTab Grid.Row="2" DataContext="{Binding Issues}"
+                    Visibility="{Binding DataContext.IsIssues, RelativeSource={RelativeSource AncestorType=views:DebugView}, Converter={StaticResource BoolToVis}}" />
     <tabs:ChecksTab Grid.Row="2" DataContext="{Binding Checks}"
                      Visibility="{Binding DataContext.IsChecks, RelativeSource={RelativeSource AncestorType=views:DebugView}, Converter={StaticResource BoolToVis}}" />
     <views:LogStreamView Grid.Row="2" DataContext="{Binding Stream}"

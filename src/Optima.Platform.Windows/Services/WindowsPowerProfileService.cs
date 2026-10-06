@@ -23,6 +23,9 @@ public sealed class WindowsPowerProfileService : IPowerProfileService
     public Task<string> GetSchemeNameAsync(Guid scheme, CancellationToken ct = default)
         => Task.Run(() => PowerNative.GetFriendlyName(scheme), ct);
 
+    public Task<IReadOnlyList<PowerScheme>> ListSchemesAsync(CancellationToken ct = default)
+        => Task.Run(PowerNative.ListSchemes, ct);
+
     public Task<Guid> ApplyAsync(PowerPlanKind kind, CancellationToken ct = default)
         => Task.Run(() =>
         {
