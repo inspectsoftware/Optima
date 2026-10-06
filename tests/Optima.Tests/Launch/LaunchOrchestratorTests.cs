@@ -145,6 +145,98 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task RunSession_PowerPlanUnavailable_StillStartsTheGameWithAWarning()
+    {
+        _power.ApplyError = OptimaException.From(
+            "POWER_PLAN_UNAVAILABLE", "This PC does not offer that power plan", "Windows does not list it on this PC.");
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal("POWER_PLAN_UNAVAILABLE", warning.Code);
+        Assert.Equal("This PC does not offer that power plan", warning.Title);
+
+        // The rest of the profile still went on, and the game was launched and recorded.
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Equal(1, _launcher.LaunchCalls);
+        Assert.Equal([4242], _processOptimizer.Applied);
+        Assert.Single(_sessionStore.Saved);
+
+        // No plan was switched, so there is none to put back.
+        Assert.DoesNotContain("restore", _power.Log);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_PowerCallFailsOutright_TheWarningCarriesWhatWindowsReported()
+    {
+        _power.ApplyError = new System.ComponentModel.Win32Exception(5, "PowerSetActiveScheme failed");
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal("LAUNCH_STEP_SKIPPED", warning.Code);
+        Assert.Contains("PowerSetActiveScheme failed (Win32 5", warning.Detail);
+    }
+
+    [Fact]
+    public async Task RunSession_UnexpectedFailure_NamesThePhaseAndCarriesTheException()
+    {
+        _virtualDisplay.EnableError = new InvalidOperationException("the driver went away");
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        Assert.False(result.Success);
+        Assert.Equal("UNEXPECTED", result.Error?.Code);
+        Assert.Contains("configuring the virtual display", result.Error!.Explanation);
+        Assert.StartsWith("phase: ConfiguringDisplay", result.Error.DeveloperDetails);
+        Assert.Contains("System.InvalidOperationException: the driver went away", result.Error.DeveloperDetails);
+
+        // And the half-applied profile came off again.
+        Assert.Contains("restore", _power.Log);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_ProcessTuningFails_TheRunningGameKeepsItsSession()
+    {
+        _processOptimizer.ApplyError = new InvalidOperationException("the process refused the priority");
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal("LAUNCH_STEP_SKIPPED", Assert.Single(result.Warnings).Code);
+        Assert.Single(_sessionStore.Saved);
+        Assert.Contains("restore", _power.Log);
+    }
+
+    [Fact]
+    public async Task RunSession_SessionSaveFails_RestoresOnlyOnce()
+    {
+        _sessionStore.SaveError = new IOException("the database is locked");
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        // The game ran and everything was put back; only the history entry is missing.
+        Assert.True(result.Success);
+        Assert.NotNull(result.Session);
+        Assert.Equal("SESSION_NOT_SAVED", Assert.Single(result.Warnings).Code);
+        Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.Single(_virtualDisplay.Log, entry => entry == "restoreOriginal");
+    }
+
+    [Fact]
+    public async Task RunSession_NothingSkipped_CarriesNoWarnings()
+    {
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
     public async Task RunSession_SecondConcurrentStart_IsRejected()
     {
         _processMonitor.ExitAfter = TimeSpan.FromMilliseconds(600);

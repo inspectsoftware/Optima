@@ -5,8 +5,10 @@ using System.ComponentModel;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Threading;
+using Optima.Core.Health;
 using Serilog.Core;
 using Serilog.Events;
+using Serilog.Formatting.Display;
 
 namespace Optima.App.Logging;
 
@@ -68,6 +70,12 @@ public sealed class InAppLogSink : ILogEventSink
     /// <summary>Ceiling on lines waiting for the view, so a flood behind a busy UI thread stays bounded.</summary>
     private const int MaxQueued = 8000;
 
+    /// <summary>
+    /// Literal rendering. Serilog's own RenderMessage puts every string argument in quotes, which
+    /// is how a phase message ended up on the page as [Failed] "Unexpected error".
+    /// </summary>
+    private static readonly MessageTemplateTextFormatter MessageFormatter = new("{Message:l}");
+
     private readonly ConcurrentQueue<LogEntry> _incoming = new();
     private readonly Timer _flushTimer;
     private int _flushScheduled;
@@ -95,7 +103,7 @@ public sealed class InAppLogSink : ILogEventSink
             logEvent.Timestamp,
             ShortLevel(logEvent.Level),
             SourceName(logEvent),
-            logEvent.RenderMessage() + (logEvent.Exception is { } ex ? $" ({ex.GetType().Name}: {ex.Message})" : string.Empty)));
+            Render(logEvent) + (logEvent.Exception is { } ex ? $" ({ExceptionDetail.Capture(ex).Summary})" : string.Empty)));
 
         // One timer per burst: whoever arrives first arms it, the rest just join the queue.
         if (Interlocked.Exchange(ref _flushScheduled, 1) == 0)
@@ -145,6 +153,13 @@ public sealed class InAppLogSink : ILogEventSink
         {
             Entries.Add(entry);
         }
+    }
+
+    private static string Render(LogEvent logEvent)
+    {
+        using var writer = new System.IO.StringWriter();
+        MessageFormatter.Format(logEvent, writer);
+        return writer.ToString();
     }
 
     private static string ShortLevel(LogEventLevel level) => level switch

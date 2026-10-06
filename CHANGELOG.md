@@ -4,6 +4,16 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-06 - Indev: a launch that says what went wrong
+
+- Fixed: PLAY failed with "Unexpected error" on PCs that do not offer the High performance power plan. A PC with Modern Standby (most recent laptops, some desktops) only lists Balanced and its vendor's own plans, and three of the four built-in profiles ask for High performance. Optima asked Windows for a plan it had just failed to find, Windows refused, and the launch stopped.
+- The power plan is now chosen only from the plans Windows lists on the PC. When the profile's plan is not among them the game starts anyway, on the plan that was already active, and the Play page says so under NOTICES together with the plans the PC does offer.
+- The same holds for the other steps the game does not need in order to run: background cleanup, process tuning and writing the session to the history. A failure in one of them is a notice on the session, not the end of it.
+- An unexpected failure now names the step the session was in, and keeps the whole error under developer details on the error card: the code Windows returned, Windows' own description of it, and where in Optima it happened. That is the part to copy when reporting a problem.
+- LOGS shows the Windows code on the error line as well, and no longer puts quotes around message text.
+- The error guide gained the codes that had no entry, GPG_NOT_FOUND and UNEXPECTED, and the new ones: POWER_PLAN_UNAVAILABLE, POWER_PLAN_REFUSED, LAUNCH_STEP_SKIPPED and SESSION_NOT_SAVED.
+- Ultimate Performance: where Windows hides the plan, Optima no longer leaves a hidden copy of it behind in the power settings.
+
 ## 2026-10-05 - Indev: no bot address to look at
 
 - Removed: the bot address row in SETTINGS, and the same line in the link window. Linking goes through Optima's community bot, and nobody linking an account needs to see or type where that is.

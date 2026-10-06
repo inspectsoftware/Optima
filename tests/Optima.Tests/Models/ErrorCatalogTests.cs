@@ -20,6 +20,17 @@ public sealed class ErrorCatalogTests
         "Code\\s*=\\s*\"(?<code>[A-Z_0-9]+)\"",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// The launch pipeline names its codes inline, for results and for warnings alike, so there the
+    /// scan takes every code-shaped literal instead of looking for one call.
+    /// </summary>
+    private static readonly Regex CodeLiteral = new(
+        "\"(?<code>[A-Z][A-Z_0-9]{3,})\"",
+        RegexOptions.Compiled);
+
+    /// <summary>Outcomes the pipeline reports with a code that are not faults and have nothing to fix.</summary>
+    private static readonly string[] NotFaults = ["SESSION_ACTIVE", "CANCELLED"];
+
     [Fact]
     public void EveryRaisedErrorCodeHasACatalogEntry()
     {
@@ -46,12 +57,29 @@ public sealed class ErrorCatalogTests
                     raised.Add(match.Groups["code"].Value);
                 }
             }
+            if (Path.GetFileName(file) == "LaunchOrchestrator.cs")
+            {
+                foreach (Match match in CodeLiteral.Matches(text))
+                {
+                    raised.Add(match.Groups["code"].Value);
+                }
+            }
         }
+        raised.ExceptWith(NotFaults);
 
         Assert.NotEmpty(raised);
         var missing = raised.Where(c => ErrorCatalog.Find(c) is null).ToList();
         Assert.True(missing.Count == 0, "error codes without a guide entry: " + string.Join(", ", missing));
     }
+
+    [Theory]
+    [InlineData("UNEXPECTED")]
+    [InlineData("GPG_NOT_FOUND")]
+    [InlineData("POWER_PLAN_UNAVAILABLE")]
+    [InlineData("LAUNCH_STEP_SKIPPED")]
+    [InlineData("SESSION_NOT_SAVED")]
+    public void TheLaunchPipelinesOwnCodesAreInTheGuide(string code)
+        => Assert.NotNull(ErrorCatalog.Find(code));
 
     [Fact]
     public void EveryCatalogEntryExplainsItself()

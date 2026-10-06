@@ -190,6 +190,33 @@
         </StackPanel>
       </HeaderedContentControl>
 
+      <!-- What the session went without: a step that failed and was not worth stopping the launch
+           for. Shown next to a successful session as well as a failed one. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="NOTICES"
+                              Visibility="{Binding HasLastWarnings, Converter={StaticResource BoolToVis}}">
+        <ItemsControl ItemsSource="{Binding LastWarnings}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,0,0,8">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource Badge}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,0,10,0">
+                      <TextBlock Text="SKIPPED" Style="{StaticResource Text.Badge}" Foreground="{DynamicResource Brush.Warn}" />
+                    </Border>
+                    <TextBlock Text="{Binding Title}" FontSize="{StaticResource Type.Title}"
+                               Foreground="{DynamicResource Brush.Text}" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <TextBlock Text="{Binding Detail}" Style="{StaticResource Text.Prose}"
+                             Margin="0,8,0,0" MaxWidth="720" HorizontalAlignment="Left" />
+                  <TextBlock Text="{Binding Code, StringFormat='code: {0}'}"
+                             Style="{StaticResource Text.Micro}" Margin="0,10,0,0" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </HeaderedContentControl>
+
       <HeaderedContentControl Style="{StaticResource Section}" Header="ERROR"
                               Visibility="{Binding LastError, Converter={StaticResource NullToCollapsed}}">
         <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Fail}">

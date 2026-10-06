@@ -147,6 +147,65 @@ public static class ErrorCatalog
                 "Apply the tweak by hand if group policy manages it",
             ]),
         new(
+            "GPG_NOT_FOUND",
+            "Google Play Games was not found",
+            "Optima looked for Google Play Games for PC before starting a session and did not find it.",
+            "It is not installed, it was installed somewhere detection does not look, or an update moved it.",
+            [
+                "Install Google Play Games for PC from Google's site",
+                "Set the Google Play Games folder under Settings, Path overrides, if it is installed somewhere unusual",
+                "Run detection again from the Diagnostics page",
+            ]),
+        new(
+            "POWER_PLAN_UNAVAILABLE",
+            "This PC does not offer that power plan",
+            "The profile asks for a power plan that Windows does not list on this PC. The session ran on the plan that was already active.",
+            "A PC with Modern Standby (most recent laptops and many desktops) only offers Balanced and whatever plans its vendor added. Windows hides High performance and Ultimate Performance there and refuses to activate them.",
+            [
+                "Nothing needs repairing: the game starts and everything else in the profile is applied",
+                "To stop the notice, use a profile whose power plan is Unchanged; the Performance page can save a copy of a built-in one",
+                "Run powercfg /list in a terminal to see the plans this PC offers",
+            ]),
+        new(
+            "POWER_PLAN_REFUSED",
+            "Windows refused the power plan change",
+            "Windows lists the plan the profile asks for, but would not make it active. The session ran on the plan that was already active.",
+            "A company policy or a vendor power tool can own the active power plan and refuse a change from any other program.",
+            [
+                "Switch to the plan once in Windows' own power settings to see whether Windows allows it at all",
+                "Check whether a vendor power or battery tool is managing the plan, and let it or Optima do it, not both",
+                "Use a profile whose power plan is Unchanged if the plan is managed for you",
+            ]),
+        new(
+            "LAUNCH_STEP_SKIPPED",
+            "A step of the session was skipped",
+            "One step that the game does not need in order to run failed, so the session carried on without it. The notice names the step and what Windows reported.",
+            "The power plan, background cleanup and process tuning are improvements, not requirements. A failure in one of them used to stop the whole launch.",
+            [
+                "Read the notice on the Play page: it carries the exact error for the step",
+                "Run Diagnostics to verify the environment if the same step is skipped every time",
+            ]),
+        new(
+            "SESSION_NOT_SAVED",
+            "The session was not saved to the history",
+            "The game ran and every setting was restored, but writing the session to sessions.db failed, so it is missing from the Sessions page.",
+            "The history database was locked by another program, the disk is full, or the file is damaged.",
+            [
+                "Check free space on the drive that holds %LOCALAPPDATA%\\Optima",
+                "Close other programs that may have sessions.db open",
+                "Restore sessions.db from sessions.db.bak in the same folder if the file is damaged",
+            ]),
+        new(
+            "UNEXPECTED",
+            "Something went wrong during the session",
+            "A step failed in a way Optima has no specific explanation for. Every temporary setting was restored.",
+            "The error card names the step the session was in, and its developer details hold the full error, including the code Windows returned when a Windows call failed.",
+            [
+                "Open developer details on the error card and read the first lines: the phase and the Windows error",
+                "Copy the developer details when reporting the problem; they are what makes it diagnosable",
+                "Run Diagnostics to verify the environment",
+            ]),
+        new(
             "GAME_NOT_FOUND",
             "Critical Ops is not installed in Google Play Games",
             "Detection could not find a playable Critical Ops install.",

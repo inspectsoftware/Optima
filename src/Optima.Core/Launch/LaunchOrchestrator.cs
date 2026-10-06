@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
+using Optima.Core.Health;
 using Optima.Core.Models;
 using Microsoft.Extensions.Logging;
 
@@ -22,11 +23,19 @@ public enum LaunchPhase
 
 public sealed record LaunchProgress(LaunchPhase Phase, string Message);
 
+/// <summary>
+/// Something a session went without: a step that failed and was not worth stopping the launch for.
+/// </summary>
+public sealed record LaunchWarning(string Code, string Title, string Detail);
+
 public sealed record LaunchResult
 {
     public required bool Success { get; init; }
     public UserFriendlyError? Error { get; init; }
     public SessionRecord? Session { get; init; }
+
+    /// <summary>What the session went without. A session can succeed and still carry these.</summary>
+    public IReadOnlyList<LaunchWarning> Warnings { get; init; } = [];
 }
 
 /// <summary>
@@ -53,6 +62,12 @@ public sealed class LaunchOrchestrator
 
     private int _running;
 
+    /// <summary>
+    /// The phase last reported. One session runs at a time, so a single field is enough for the
+    /// catch-all to say where a failure it knows nothing else about happened.
+    /// </summary>
+    private LaunchPhase _phase;
+
     /// <summary>How often the session re-asserts the applied profile on the game process by default.</summary>
     public static readonly TimeSpan DefaultPriorityKeeperInterval = TimeSpan.FromSeconds(10);
 
@@ -69,6 +84,7 @@ public sealed class LaunchOrchestrator
     {
         public required SystemStateSnapshot Snapshot { get; set; }
         public bool MetricsStarted { get; set; }
+        public List<LaunchWarning> Warnings { get; } = [];
     }
 
     public LaunchOrchestrator(
@@ -213,10 +229,11 @@ public sealed class LaunchOrchestrator
                 "Wait for the current game session to finish before starting another.");
         }
 
+        _phase = LaunchPhase.Idle;
         var context = new SessionContext { Snapshot = new SystemStateSnapshot { ProfileName = profile.Name } };
         try
         {
-            return await body(context, ct).ConfigureAwait(false);
+            return WithWarnings(context, await body(context, ct).ConfigureAwait(false));
         }
         catch (OperationCanceledException)
         {
@@ -224,7 +241,8 @@ public sealed class LaunchOrchestrator
             await StopMonitoringAsync(context).ConfigureAwait(false);
             await _recovery.RestoreAsync(context.Snapshot, CancellationToken.None).ConfigureAwait(false);
             Report(LaunchPhase.Completed, "Cancelled. Settings restored.");
-            return Fail("CANCELLED", "The session was cancelled.", "All temporary settings were restored.");
+            return WithWarnings(context,
+                Fail("CANCELLED", "The session was cancelled.", "All temporary settings were restored."));
         }
         catch (OptimaException ex)
         {
@@ -232,18 +250,33 @@ public sealed class LaunchOrchestrator
             await StopMonitoringAsync(context).ConfigureAwait(false);
             await _recovery.RestoreAsync(context.Snapshot, CancellationToken.None).ConfigureAwait(false);
             Report(LaunchPhase.Failed, ex.Error.Title);
-            return new LaunchResult { Success = false, Error = ex.Error };
+            return WithWarnings(context, new LaunchResult { Success = false, Error = ex.Error });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected session failure");
+            // Read before the Failed report below overwrites it.
+            var phase = _phase;
+            _logger.LogError(ex, "Unexpected session failure during {Phase}", phase);
             await StopMonitoringAsync(context).ConfigureAwait(false);
             await _recovery.RestoreAsync(context.Snapshot, CancellationToken.None).ConfigureAwait(false);
             Report(LaunchPhase.Failed, "Unexpected error");
-            return Fail("UNEXPECTED", "Something went wrong during the session.",
-                "All temporary settings were restored. Details were written to the log.",
-                "Check the Logs page for details",
-                "Run Diagnostics to verify the environment");
+            return WithWarnings(context, new LaunchResult
+            {
+                Success = false,
+                Error = new UserFriendlyError
+                {
+                    Code = "UNEXPECTED",
+                    Title = "Something went wrong during the session.",
+                    Explanation = $"The session stopped while {Describe(phase)}. All temporary settings were restored.",
+                    SuggestedFixes =
+                    [
+                        "Open developer details below: it names the step and what Windows reported",
+                        "Check the Logs page for details",
+                        "Run Diagnostics to verify the environment",
+                    ],
+                    DeveloperDetails = $"phase: {phase}{Environment.NewLine}{ExceptionDetail.Capture(ex).FullText}",
+                },
+            });
         }
         finally
         {
@@ -266,19 +299,25 @@ public sealed class LaunchOrchestrator
         Report(LaunchPhase.ApplyingPerformanceProfile, "Applying performance profile…");
         if (profile.Performance.PowerPlan != PowerPlanKind.Unchanged)
         {
-            var previous = await _power.ApplyAsync(profile.Performance.PowerPlan, ct).ConfigureAwait(false);
-            context.Snapshot = context.Snapshot with { PreviousPowerScheme = previous };
-            await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
-            _logger.LogInformation("Performance profile applied: power plan {Plan}", profile.Performance.PowerPlan);
+            await RunOptionalAsync(context, "LAUNCH_STEP_SKIPPED", "The power plan was left as it was", async () =>
+            {
+                var previous = await _power.ApplyAsync(profile.Performance.PowerPlan, ct).ConfigureAwait(false);
+                context.Snapshot = context.Snapshot with { PreviousPowerScheme = previous };
+                await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+                _logger.LogInformation("Performance profile applied: power plan {Plan}", profile.Performance.PowerPlan);
+            }).ConfigureAwait(false);
         }
 
         if (profile.Performance.CleanupProcessNames.Count > 0)
         {
-            var closed = await _cleanup.CloseAsync(profile.Performance.CleanupProcessNames, ct).ConfigureAwait(false);
-            if (closed.Count > 0)
+            await RunOptionalAsync(context, "LAUNCH_STEP_SKIPPED", "Background cleanup was skipped", async () =>
             {
-                _logger.LogInformation("Background cleanup closed: {Processes}", string.Join(", ", closed));
-            }
+                var closed = await _cleanup.CloseAsync(profile.Performance.CleanupProcessNames, ct).ConfigureAwait(false);
+                if (closed.Count > 0)
+                {
+                    _logger.LogInformation("Background cleanup closed: {Processes}", string.Join(", ", closed));
+                }
+            }).ConfigureAwait(false);
         }
 
         if (profile.Display.VirtualDisplay)
@@ -332,12 +371,17 @@ public sealed class LaunchOrchestrator
         SessionContext context, LaunchKind kind, bool captureAllowed, CancellationToken ct)
     {
         var performance = WithSettingsGamePriority(profile.Performance);
-        var procSnapshot = await _processOptimizer.ApplyAsync(emulatorPid, performance, ct).ConfigureAwait(false);
-        if (procSnapshot is not null)
+        // The game is already running here; a tuning failure must not end a session it is part of.
+        ProcessStateSnapshot? procSnapshot = null;
+        await RunOptionalAsync(context, "LAUNCH_STEP_SKIPPED", "The game's process was not tuned", async () =>
         {
-            context.Snapshot = context.Snapshot with { ProcessStates = [.. context.Snapshot.ProcessStates, procSnapshot] };
-            await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
-        }
+            procSnapshot = await _processOptimizer.ApplyAsync(emulatorPid, performance, ct).ConfigureAwait(false);
+            if (procSnapshot is not null)
+            {
+                context.Snapshot = context.Snapshot with { ProcessStates = [.. context.Snapshot.ProcessStates, procSnapshot] };
+                await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+            }
+        }).ConfigureAwait(false);
 
         Report(LaunchPhase.Monitoring, "Critical Ops is running.");
         var stopwatch = Stopwatch.StartNew();
@@ -395,8 +439,13 @@ public sealed class LaunchOrchestrator
             LaunchKind = kind,
             Network = networkStats,
         };
-        var sessionId = await _sessionStore.SaveSessionAsync(session, CancellationToken.None).ConfigureAwait(false);
-        session = session with { Id = sessionId };
+        // Everything is restored by now. A history that cannot be written must not turn a finished
+        // session into a failed one, nor send the catch-all through a second restore.
+        await RunOptionalAsync(context, "SESSION_NOT_SAVED", "This session was not saved to the history", async () =>
+        {
+            var sessionId = await _sessionStore.SaveSessionAsync(session, CancellationToken.None).ConfigureAwait(false);
+            session = session with { Id = sessionId };
+        }).ConfigureAwait(false);
 
         Report(LaunchPhase.Completed, "Session complete. Settings restored.");
         return new LaunchResult { Success = true, Session = session };
@@ -516,6 +565,45 @@ public sealed class LaunchOrchestrator
         return pids.Distinct().Take(16).ToList();
     }
 
+    /// <summary>
+    /// Runs a step the game does not need in order to start or to have run. A failure is written
+    /// down as a warning on the session and the session carries on: a power plan this PC does not
+    /// offer is no reason to refuse to start the game.
+    /// </summary>
+    private async Task RunOptionalAsync(SessionContext context, string code, string title, Func<Task> step)
+    {
+        try
+        {
+            await step().ConfigureAwait(false);
+        }
+        catch (OptimaException ex)
+        {
+            // The step already knows what went wrong and says it better than the generic title.
+            _logger.LogWarning(ex, "Session step skipped ({Code}): {Title}", ex.Error.Code, ex.Error.Title);
+            context.Warnings.Add(new LaunchWarning(ex.Error.Code, ex.Error.Title, ex.Error.Explanation));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Session step skipped ({Code}): {Title}", code, title);
+            context.Warnings.Add(new LaunchWarning(code, title, ExceptionDetail.Capture(ex).Summary));
+        }
+    }
+
+    private static LaunchResult WithWarnings(SessionContext context, LaunchResult result)
+        => context.Warnings.Count == 0 ? result : result with { Warnings = [.. context.Warnings] };
+
+    private static string Describe(LaunchPhase phase) => phase switch
+    {
+        LaunchPhase.Validating => "checking Google Play Games and Critical Ops",
+        LaunchPhase.ApplyingPerformanceProfile => "applying the performance profile",
+        LaunchPhase.ConfiguringDisplay => "configuring the virtual display",
+        LaunchPhase.StartingPlatform => "starting Google Play Games",
+        LaunchPhase.WaitingForGame => "waiting for the game to start",
+        LaunchPhase.Monitoring => "the game was running",
+        LaunchPhase.Restoring => "restoring system settings",
+        _ => "getting ready",
+    };
+
     private async Task<LaunchResult> FailAndRestoreAsync(
         SessionContext context, string code, string title, string explanation, params string[] fixes)
     {
@@ -539,6 +627,7 @@ public sealed class LaunchOrchestrator
 
     private void Report(LaunchPhase phase, string message)
     {
+        _phase = phase;
         _logger.LogInformation("[{Phase}] {Message}", phase, message);
         ProgressChanged?.Invoke(this, new LaunchProgress(phase, message));
     }

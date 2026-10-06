@@ -229,6 +229,13 @@ public sealed partial class PlayViewModel : ObservableObject
     [ObservableProperty]
     private UserFriendlyError? _lastError;
 
+    /// <summary>What the last session went without: steps that failed and were not worth stopping it for.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLastWarnings))]
+    private IReadOnlyList<LaunchWarning> _lastWarnings = [];
+
+    public bool HasLastWarnings => LastWarnings.Count > 0;
+
     public string PlayButtonText => IsSessionActive ? "Running" : "Play Critical Ops";
 
     public string SelectedProfileSummary => SelectedProfile is null
@@ -283,6 +290,7 @@ public sealed partial class PlayViewModel : ObservableObject
 
         LastError = null;
         LastSession = null;
+        LastWarnings = [];
         IsSessionActive = true;
         ResetSteps();
         _sessionCts = new CancellationTokenSource();
@@ -304,6 +312,7 @@ public sealed partial class PlayViewModel : ObservableObject
             await _standbyCleaner.SyncAsync(allowPrompt: true);
             _crashRelaunch.NoteSessionStart(profile);
             var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, _sessionCts.Token));
+            LastWarnings = result.Warnings;
             if (result.Success)
             {
                 LastSession = result.Session;
@@ -323,7 +332,7 @@ public sealed partial class PlayViewModel : ObservableObject
                 Code = "UNEXPECTED",
                 Title = "Something went wrong during the session.",
                 Explanation = "Details were written to the log.",
-                DeveloperDetails = ex.ToString(),
+                DeveloperDetails = Core.Health.ExceptionDetail.Capture(ex).FullText,
             };
             MarkLiveFailed();
         }

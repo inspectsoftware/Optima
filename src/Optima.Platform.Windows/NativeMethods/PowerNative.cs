@@ -1,16 +1,11 @@
 using System.Runtime.InteropServices;
+using Optima.Core.Launch;
 
 namespace Optima.Platform.Windows.NativeMethods;
 
 /// <summary>Documented power scheme APIs (powrprof.dll).</summary>
 internal static class PowerNative
 {
-    internal static readonly Guid BalancedScheme = new("381b4222-f694-41f0-9685-ff5bb260df2e");
-    internal static readonly Guid HighPerformanceScheme = new("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
-    internal static readonly Guid UltimatePerformanceScheme = new("e9a42b02-d5df-448d-aa00-03f14749eb61");
-    /// <summary>The one copy of Ultimate Performance Optima makes where Windows hides the built-in plan.</summary>
-    internal static readonly Guid OptimaUltimatePerformanceScheme = new("0b71a3c5-6d2e-4f0a-9c1b-5e8f2a7d4c10");
-
     private const int ERROR_SUCCESS = 0;
 
     [DllImport("powrprof.dll")]
@@ -26,6 +21,9 @@ internal static class PowerNative
 
     [DllImport("powrprof.dll")]
     private static extern uint PowerDuplicateScheme(IntPtr rootPowerKey, ref Guid sourceSchemeGuid, ref IntPtr destinationSchemeGuid);
+
+    [DllImport("powrprof.dll")]
+    private static extern uint PowerDeleteScheme(IntPtr rootPowerKey, ref Guid schemeGuid);
 
     [DllImport("powrprof.dll")]
     private static extern uint PowerEnumerate(
@@ -139,31 +137,40 @@ internal static class PowerNative
         return schemes;
     }
 
-    internal static Guid EnsureUltimatePerformance()
+    /// <summary>The plans Windows lists on this PC, each with the name Windows shows for it.</summary>
+    internal static IReadOnlyList<PowerScheme> ListSchemes()
+        => EnumerateSchemes().Select(id => new PowerScheme(id, GetFriendlyName(id))).ToList();
+
+    /// <summary>
+    /// Makes Optima's copy of Ultimate Performance where Windows hides the built-in plan, and says
+    /// whether Windows then lists it. A PC with Modern Standby accepts the copy and hides it like
+    /// the original; a hidden copy can never be made active, so it is removed again instead of
+    /// being left behind in the power settings.
+    /// </summary>
+    internal static bool TryCreateUltimatePerformance()
     {
-        var existing = EnumerateSchemes();
-        if (existing.Contains(UltimatePerformanceScheme))
-        {
-            return UltimatePerformanceScheme;
-        }
-        if (existing.Contains(OptimaUltimatePerformanceScheme))
-        {
-            return OptimaUltimatePerformanceScheme;
-        }
+        var source = PowerPlanPolicy.UltimatePerformance;
+        var copy = PowerPlanPolicy.OptimaUltimatePerformance;
 
         // Duplicated under a GUID of Optima's own: left to pick one, Windows makes a new plan with a
         // random GUID on every call, and nothing here could find it again the next time.
-        var source = UltimatePerformanceScheme;
         var destPtr = Marshal.AllocHGlobal(Marshal.SizeOf<Guid>());
         try
         {
-            Marshal.StructureToPtr(OptimaUltimatePerformanceScheme, destPtr, fDeleteOld: false);
-            var result = PowerDuplicateScheme(IntPtr.Zero, ref source, ref destPtr);
-            return result == ERROR_SUCCESS ? OptimaUltimatePerformanceScheme : HighPerformanceScheme;
+            Marshal.StructureToPtr(copy, destPtr, fDeleteOld: false);
+            _ = PowerDuplicateScheme(IntPtr.Zero, ref source, ref destPtr);
         }
         finally
         {
             Marshal.FreeHGlobal(destPtr);
         }
+
+        // The return code is not the answer: the duplicate can succeed and still not be listed.
+        if (EnumerateSchemes().Contains(copy))
+        {
+            return true;
+        }
+        _ = PowerDeleteScheme(IntPtr.Zero, ref copy);
+        return false;
     }
 }

@@ -1,3 +1,5 @@
+using Optima.Core.Health;
+
 namespace Optima.Core.Models;
 
 /// <summary>
@@ -31,6 +33,6 @@ public sealed class OptimaException : Exception
             Title = title,
             Explanation = explanation,
             SuggestedFixes = fixes,
-            DeveloperDetails = inner?.ToString() ?? string.Empty,
+            DeveloperDetails = inner is null ? string.Empty : ExceptionDetail.Capture(inner).FullText,
         }, inner);
 }

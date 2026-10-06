@@ -73,11 +73,18 @@ internal sealed class FakePowerService : IPowerProfileService
     public Guid? Restored { get; private set; }
     public List<string> Log { get; } = [];
 
+    /// <summary>Thrown by the apply instead of switching the plan, as a PC without that plan does.</summary>
+    public Exception? ApplyError { get; set; }
+
     public Task<Guid> GetActiveSchemeAsync(CancellationToken ct = default) => Task.FromResult(Active);
     public Task<string> GetSchemeNameAsync(Guid scheme, CancellationToken ct = default) => Task.FromResult("Fake Plan");
     public Task<Guid> ApplyAsync(PowerPlanKind kind, CancellationToken ct = default)
     {
         Log.Add($"apply:{kind}");
+        if (ApplyError is not null)
+        {
+            return Task.FromException<Guid>(ApplyError);
+        }
         var previous = Active;
         Active = Guid.Parse("22222222-2222-2222-2222-222222222222");
         return Task.FromResult(previous);
@@ -133,6 +140,7 @@ internal sealed class FakeProcessOptimizer : IProcessOptimizer
     public List<PerformanceProfile> ReassertedProfiles { get; } = [];
     public List<int> Restored { get; } = [];
     public bool ReturnSnapshot { get; set; } = true;
+    public Exception? ApplyError { get; set; }
 
     /// <summary>
     /// Holds each re-assert pass until the test releases it (or the session is cancelled), so a
@@ -146,6 +154,10 @@ internal sealed class FakeProcessOptimizer : IProcessOptimizer
     {
         Applied.Add(processId);
         AppliedProfiles.Add(profile);
+        if (ApplyError is not null)
+        {
+            return Task.FromException<ProcessStateSnapshot?>(ApplyError);
+        }
         return Task.FromResult<ProcessStateSnapshot?>(ReturnSnapshot
             ? new ProcessStateSnapshot { ProcessId = processId, ProcessName = "crosvm" }
             : null);
@@ -212,10 +224,15 @@ internal sealed class FakeSessionStore : ISessionStore
     public List<MatchRecord> UpdatedMatches { get; } = [];
     public long? AttachTargetId { get; set; } = 1;
     public bool UpdateResult { get; set; } = true;
+    public Exception? SaveError { get; set; }
 
     public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
     public Task<long> SaveSessionAsync(SessionRecord record, CancellationToken ct = default)
     {
+        if (SaveError is not null)
+        {
+            return Task.FromException<long>(SaveError);
+        }
         Saved.Add(record);
         return Task.FromResult((long)Saved.Count);
     }
@@ -289,6 +306,7 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
 {
     public bool Active { get; set; }
     public List<string> Log { get; } = [];
+    public Exception? EnableError { get; set; }
 
     public string Name => "FakeVdd";
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(true);
@@ -302,6 +320,10 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
     public Task EnableDisplayAsync(CancellationToken ct = default)
     {
         Log.Add("enable");
+        if (EnableError is not null)
+        {
+            return Task.FromException(EnableError);
+        }
         Active = true;
         return Task.CompletedTask;
     }
