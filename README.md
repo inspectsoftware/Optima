@@ -1,19 +1,39 @@
+<div align="center">
+
+<img src="docs/readme/logo.gif" alt="Optima logo" width="128">
+
 # Optima
 
-A Windows launcher and performance companion for **Critical Ops** on **Google Play Games for PC**.
+**A Windows launcher and performance companion for Critical Ops on Google Play Games for PC.**
+
+[![Latest release](https://img.shields.io/github/v/release/inspectsoftware/Optima?label=release&color=d4a94a)](https://github.com/inspectsoftware/Optima/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/inspectsoftware/Optima/total?color=d4a94a)](https://github.com/inspectsoftware/Optima/releases)
+![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)
+![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
+[![Discord](https://img.shields.io/discord/1541945386988470382?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/bGuJ4tvsF7)
+
+[Download](#downloading) · [Features](#features) · [Building](#building) · [Security](#security-boundaries) · [Discord](#community)
+
+<img src="docs/readme/banner.png" alt="Optima: the launcher built for Critical Ops on PC" width="820">
+
+</div>
+
 By Inspect Software; see [LICENSE](LICENSE).
 
 Optima runs beside the game, never inside it: no injection, no memory access, no binary or
 network tampering. It sets up the environment with documented Windows APIs and restores every
 change when the game exits.
 
-```
-pick a profile → PLAY
-  → virtual display (e.g. 1920x1080 @ 240 Hz)
-  → power plan, priority, EcoQoS
-  → Critical Ops starts through Google Play Games
-  → external FPS / frametime capture (ETW)
-  → game closes → everything restored → session saved
+## How a session runs
+
+```mermaid
+flowchart LR
+    A[Pick a profile] --> B[PLAY]
+    B --> C["Virtual display<br>e.g. 1920x1080 @ 240 Hz"]
+    C --> D["Power plan, priority,<br>EcoQoS"]
+    D --> E["Critical Ops starts through<br>Google Play Games"]
+    E --> F["External FPS / frametime<br>capture (ETW)"]
+    F --> G["Game closes: everything<br>restored, session saved"]
 ```
 
 ## Features
@@ -46,8 +66,9 @@ Every release carries:
   run `Optima.exe`. The in-app updater downloads this same archive to update an existing copy.
 - Source code (zip / tar.gz), the repository at that tag, for building it yourself.
 
-Both binaries are unsigned, so Windows SmartScreen warns about an unknown publisher the first
-time you run either of them.
+> [!NOTE]
+> Both binaries are unsigned, so Windows SmartScreen warns about an unknown publisher the first
+> time you run either of them.
 
 ## Building
 
@@ -67,7 +88,9 @@ kept on uninstall). Setup also installs the bundled virtual display driver throu
 `Optima.Watchdog.exe --install-driver`, the same code path the Display page uses. Add `-Publish`
 to republish first, `-Run` to launch the setup when done.
 
-```
+Project layout:
+
+```text
 src/Optima.Core               logic, models, orchestrator, statistics (no Windows deps)
 src/Optima.Platform.Windows   Win32/WMI: display, power, processes, elevation broker
 src/Optima.Driver             virtual display providers
@@ -80,6 +103,12 @@ tests/Optima.Tests            xunit suite
 Without the game: Settings > "mock fps provider" fakes the frametime feed, and
 `%LOCALAPPDATA%\Optima\detection.json` with `"emulatorProcessPatterns": ["^notepad$"]` and
 `"gameWindowTitlePattern": "Notepad"` lets Notepad stand in for the game.
+
+## Community
+
+Questions, builds and feedback: join the Optima Discord server.
+
+[![Join the Optima Discord server](https://discord.com/api/guilds/1541945386988470382/widget.png?style=banner2)](https://discord.gg/bGuJ4tvsF7)
 
 ## Data
 
@@ -95,4 +124,8 @@ app contacts, exhaustively: the game's own endpoints or a reference host (ICMP),
 `criticalopsgame.com` (news), `api.github.com` (updates), and Discord over local IPC only.
 Logs and exports are redacted.
 
-Optima is an independent project, not affiliated with Critical Force Oy or Google LLC.
+---
+
+<div align="center">
+<sub>Optima is an independent project, not affiliated with Critical Force Oy or Google LLC.</sub>
+</div>
