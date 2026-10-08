@@ -32,8 +32,7 @@ flowchart LR
     B --> C["Virtual display<br>e.g. 1920x1080 @ 240 Hz"]
     C --> D["Power plan, priority,<br>EcoQoS"]
     D --> E["Critical Ops starts through<br>Google Play Games"]
-    E --> F["External FPS / frametime<br>capture (ETW)"]
-    F --> G["Game closes: everything<br>restored, session saved"]
+    E --> F["Game closes: everything<br>restored, session saved"]
 ```
 
 ## Features
