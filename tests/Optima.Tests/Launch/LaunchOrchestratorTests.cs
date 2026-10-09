@@ -1,6 +1,8 @@
+using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Launch;
 using Optima.Core.Models;
+using Optima.Core.Monitoring;
 using Optima.Core.Recovery;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -231,6 +233,23 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task RunSession_CaptureStopNeverAnswers_StillSavesTheSession()
+    {
+        _metrics.Available = true;
+        // What a helper that does not answer the stop in time surfaces as.
+        _metrics.StopError = new TaskCanceledException();
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        // The game was played and has ended: that is a session, not a cancelled launch.
+        Assert.True(result.Success);
+        Assert.Single(_sessionStore.Saved);
+        Assert.True(_network.Stopped);
+        Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
     public async Task RunSession_VirtualDisplayMissing_ReloadsOnceAndContinues()
     {
         var support = new FakeLaunchSupport { Repairable = { "VDD_NO_DISPLAY" } };
@@ -270,13 +289,62 @@ public sealed class LaunchOrchestratorTests : IDisposable
     {
         var support = new FakeLaunchSupport();
         _virtualDisplay.EnableErrors.Enqueue(OptimaException.From(
-            "VDD_NOT_INSTALLED", "No virtual display driver device was found.", "It is not in Device Manager."));
+            "DEVICE_TOGGLE_FAILED", "Windows refused to change the virtual display device.", "pnputil said no."));
 
         var result = await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
 
-        Assert.Equal("VDD_NOT_INSTALLED", result.Error?.Code);
+        Assert.Equal("DEVICE_TOGGLE_FAILED", result.Error?.Code);
         Assert.Empty(support.Repaired);
         Assert.Single(_virtualDisplay.Log, entry => entry == "enable");
+    }
+
+    [Fact]
+    public async Task RunSession_WithTheVirtualDisplayOnAndNoDriver_PlaysOnTheRealScreenAndSaysSo()
+    {
+        _virtualDisplay.EnableError = OptimaException.From(
+            "VDD_NOT_INSTALLED", "No virtual display driver device was found.", "It is not in Device Manager.");
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        // A driver nobody installed is not a reason to refuse to start the game.
+        Assert.True(result.Success);
+        Assert.Contains(result.Warnings, warning => warning.Code == "VDD_NOT_INSTALLED");
+        Assert.DoesNotContain(_virtualDisplay.Log, entry => entry.StartsWith("mode:", StringComparison.Ordinal));
+        // The rest of the profile still applied.
+        Assert.Contains("apply:HighPerformance", _power.Log);
+    }
+
+    [Fact]
+    public async Task RunSession_TheDisplayIsTheDisplayPagesChoice_NotTheProfiles()
+    {
+        var settings = new SettingsService(_paths, _store, NullLogger<SettingsService>.Instance);
+        await settings.SaveSettingsAsync(new AppSettings
+        {
+            VirtualDisplayEnabled = true,
+            VirtualDisplayWidth = 2560,
+            VirtualDisplayHeight = 1440,
+            VirtualDisplayRefreshRate = 165,
+        });
+        // A profile that says nothing about a virtual display, which is every built-in one now.
+        var profile = CompetitiveProfile with { Display = new DisplayProfile { VirtualDisplay = false } };
+
+        var result = await CreateOrchestrator(settings).RunSessionAsync(profile);
+
+        Assert.True(result.Success);
+        Assert.Contains("mode:2560x1440 @ 165 Hz", _virtualDisplay.Log);
+    }
+
+    [Fact]
+    public async Task RunSession_TheDisplayPagesChoiceCanAlsoBeOff()
+    {
+        var settings = new SettingsService(_paths, _store, NullLogger<SettingsService>.Instance);
+        await settings.SaveSettingsAsync(new AppSettings { VirtualDisplayEnabled = false });
+
+        // The profile still carries the display it was saved with before the choice moved.
+        var result = await CreateOrchestrator(settings).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.DoesNotContain("enable", _virtualDisplay.Log);
     }
 
     [Fact]
@@ -560,6 +628,170 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.Empty(_processOptimizer.Reasserted);
     }
 
+    [Fact]
+    public async Task Stop_WhileTheGameRuns_EndsTheSessionAndSavesIt()
+    {
+        _metrics.Available = true;
+        _processMonitor.ExitAfter = TimeSpan.FromMinutes(1);
+        var orchestrator = CreateOrchestrator();
+
+        var session = orchestrator.RunSessionAsync(CompetitiveProfile);
+        await WaitForAsync(() => _network.Started);
+        var ended = await orchestrator.StopAsync(TimeSpan.FromSeconds(10));
+        var result = await session;
+
+        // The game is still up, and the session ended as if it had exited: recorded, not cancelled.
+        Assert.True(ended);
+        Assert.False(orchestrator.IsSessionActive);
+        Assert.True(result.Success);
+        Assert.NotNull(result.Session);
+        Assert.Single(_sessionStore.Saved);
+        Assert.True(_metrics.Stopped);
+        Assert.True(_network.Stopped);
+
+        // Everything was put back, once, and no snapshot is left to ask about at the next start.
+        Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.Single(_virtualDisplay.Log, entry => entry == "restoreOriginal");
+        Assert.Equal([4242], _processOptimizer.Restored);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task Stop_BeforeTheGameIsUp_CancelsAndRestores()
+    {
+        _processMonitor.GameStillLoading = true;
+        var orchestrator = CreateOrchestrator();
+
+        var session = orchestrator.RunSessionAsync(CompetitiveProfile);
+        await WaitForAsync(() => _launcher.LaunchCalls == 1);
+        var ended = await orchestrator.StopAsync(TimeSpan.FromSeconds(10));
+        // Checked before the session is awaited: a stop that did not end it must fail here, not
+        // leave the test waiting on a session that never returns.
+        Assert.True(ended);
+        var result = await session;
+
+        // Nothing was played, so there is nothing to record; the half-applied profile came off.
+        Assert.Equal("CANCELLED", result.Error?.Code);
+        Assert.Empty(_sessionStore.Saved);
+        Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.Contains("restoreOriginal", _virtualDisplay.Log);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task Stop_TheSessionItEnded_CannotBeAttachedToAgain()
+    {
+        _processMonitor.ExitAfter = TimeSpan.FromMinutes(1);
+        var orchestrator = CreateOrchestrator();
+        // What watch mode does when a session ends with the game still on screen: one attach per run.
+        Task<LaunchResult>? attach = null;
+        orchestrator.SessionEnded += () =>
+            attach ??= Task.Run(() => orchestrator.AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false));
+
+        var session = orchestrator.RunSessionAsync(CompetitiveProfile);
+        await WaitForAsync(() => _network.Started);
+        await orchestrator.StopAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True((await session).Success);
+        Assert.NotNull(attach);
+        Assert.False((await attach).Success);
+        // The profile went on once and came off once, and stayed off.
+        Assert.Single(_processOptimizer.Applied);
+        Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.Single(_sessionStore.Saved);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task Stop_WithNoSession_ReturnsAtOnceAndRefusesTheNextOne()
+    {
+        var orchestrator = CreateOrchestrator();
+        var sessionsEnded = 0;
+        orchestrator.SessionEnded += () => sessionsEnded++;
+
+        Assert.True(await orchestrator.StopAsync(TimeSpan.FromSeconds(10)));
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
+
+        // Turned away at the door: no session ran, so none ended and nothing was restored.
+        Assert.False(result.Success);
+        Assert.Equal(0, sessionsEnded);
+        Assert.Equal(0, _launcher.LaunchCalls);
+        Assert.Empty(_power.Log);
+    }
+
+    [Fact]
+    public async Task RunSession_CancelledWhileTheGameRuns_RestoresAndRecordsNothing()
+    {
+        _processMonitor.ExitAfter = TimeSpan.FromMinutes(1);
+        using var cancel = new CancellationTokenSource();
+
+        var session = CreateOrchestrator().RunSessionAsync(CompetitiveProfile, cancel.Token);
+        await WaitForAsync(() => _network.Started);
+        await cancel.CancelAsync();
+        var result = await session;
+
+        // The Cancel button: a stop asked for by the player is not a session to keep.
+        Assert.Equal("CANCELLED", result.Error?.Code);
+        Assert.Empty(_sessionStore.Saved);
+        Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    private async Task<GameWatchService> StartWatchModeAsync(LaunchOrchestrator orchestrator, GamePresenceService presence)
+    {
+        _processMonitor.Tracked = [new TrackedProcess { ProcessId = 4242, Name = "crosvm", Kind = TrackedProcessKind.Emulator }];
+        var settings = new SettingsService(_paths, _store, NullLogger<SettingsService>.Instance);
+        await settings.SaveSettingsAsync(new AppSettings { EnableWatchMode = true });
+        var watch = new GameWatchService(
+            presence, _processMonitor, orchestrator, settings,
+            new ProfileService(_paths, _store, NullLogger<ProfileService>.Instance),
+            new FakeElevationBroker(), NullLogger<GameWatchService>.Instance);
+        await watch.StartAsync();
+        return watch;
+    }
+
+    [Fact]
+    public async Task WatchMode_ASessionEndsBecauseTheGameClosed_IsNotAttachedToAgain()
+    {
+        // The window has gone and the emulator is still up. Presence only drops "in game" three
+        // polls later, so for those seconds it still tells of a running game.
+        _processMonitor.GameState = GameRuntimeState.Starting;
+        var presence = new GamePresenceService(_processMonitor, NullLogger<GamePresenceService>.Instance);
+        presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        var orchestrator = CreateOrchestrator();
+        await using var watch = await StartWatchModeAsync(orchestrator, presence);
+        var attached = false;
+        watch.WatchSessionStarted += () => attached = true;
+
+        await orchestrator.RunSessionAsync(CompetitiveProfile);
+        await WaitForAsync(() => _processMonitor.GameStateReads > 0);
+        // An attach would be under way by now; there is nothing else to wait on for one not coming.
+        await Task.Delay(100);
+
+        Assert.False(attached);
+        Assert.Single(_sessionStore.Saved);
+    }
+
+    [Fact]
+    public async Task WatchMode_ASessionEndsWithTheGameStillUp_AttachesToIt()
+    {
+        // The other way round: the sweep sees the game on screen, and presence, which looks half
+        // as often, has not reported it yet.
+        _processMonitor.GameState = GameRuntimeState.Running;
+        var orchestrator = CreateOrchestrator();
+        await using var watch = await StartWatchModeAsync(
+            orchestrator, new GamePresenceService(_processMonitor, NullLogger<GamePresenceService>.Instance));
+        LaunchResult? watched = null;
+        watch.WatchSessionEnded += result => watched = result;
+
+        await orchestrator.RunSessionAsync(CompetitiveProfile);
+        await WaitForAsync(() => watched is not null);
+
+        Assert.True(watched!.Success);
+        Assert.Equal(LaunchKind.Watch, watched.Session?.LaunchKind);
+        Assert.Equal(2, _sessionStore.Saved.Count);
+    }
+
     private static async Task WaitForAsync(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
@@ -567,7 +799,7 @@ public sealed class LaunchOrchestratorTests : IDisposable
         {
             if (DateTime.UtcNow > deadline)
             {
-                Assert.Fail("Timed out waiting for the priority keeper");
+                Assert.Fail("Timed out waiting for the session");
             }
             await Task.Delay(10);
         }

@@ -41,6 +41,7 @@
               <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· your local Discord client over a named pipe (game activity)" />
               <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· discord.com (which artwork the presence application has uploaded, only while presence is on)" />
               <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· OptimaBot, Optima's community Discord bot (account linking, only when you link or check a link)" />
+              <TextBlock Style="{StaticResource Text.Label}" Margin="0,2" Text="· api.github.com (whether a newer Optima is out: once at every start unless Settings turns it off) and github.com (the setup, only when you press Update)" />
             </ItemsControl.Items>
           </ItemsControl>
           <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="760" HorizontalAlignment="Left" TextWrapping="Wrap"

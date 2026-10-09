@@ -3,8 +3,13 @@ namespace Optima.Core.Configuration;
 /// <summary>Well-known storage locations (§21).</summary>
 public sealed class AppPaths
 {
-    public AppPaths() : this(Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Optima"))
+    /// <summary>
+    /// %LOCALAPPDATA%\Optima, unless OPTIMA_DATA_DIR names another folder: a build under test can
+    /// then run against a copy and leave the real settings, sessions and health marker alone.
+    /// </summary>
+    public AppPaths() : this(Environment.GetEnvironmentVariable("OPTIMA_DATA_DIR") is { Length: > 0 } overridden
+        ? overridden
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Optima"))
     {
     }
 

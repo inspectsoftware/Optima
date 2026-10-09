@@ -65,7 +65,12 @@ internal static class WindowNative
             if (GetWindowText(hWnd, buffer, buffer.Capacity) > 0)
             {
                 _ = GetWindowThreadProcessId(hWnd, out var pid);
-                windows.Add(new TopLevelWindow(hWnd, (int)pid, buffer.ToString()));
+                // Optima's own windows are never the game, and its setup guide carries the game's
+                // name in its title: counted, it kept a finished session waiting for an exit.
+                if ((int)pid != Environment.ProcessId)
+                {
+                    windows.Add(new TopLevelWindow(hWnd, (int)pid, buffer.ToString()));
+                }
             }
             return true;
         }, IntPtr.Zero);

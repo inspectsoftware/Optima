@@ -75,21 +75,21 @@
           <Border Style="{StaticResource Tile}">
             <StackPanel>
               <TextBlock Text="CPU" Style="{StaticResource Text.Label}" />
-              <TextBlock Text="{Binding CpuUsage}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+              <TextBlock ctl:Flow.Text="{Binding CpuUsage}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
               <ctl:AsciiBar Value="{Binding CpuPercent}" Maximum="100" Cells="18" />
             </StackPanel>
           </Border>
           <Border Style="{StaticResource Tile}">
             <StackPanel>
               <TextBlock Text="GPU" Style="{StaticResource Text.Label}" />
-              <TextBlock Text="{Binding GpuUsage}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+              <TextBlock ctl:Flow.Text="{Binding GpuUsage}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
               <ctl:AsciiBar Value="{Binding GpuPercent}" Maximum="100" Cells="18" />
             </StackPanel>
           </Border>
           <Border Style="{StaticResource Tile}" Margin="0">
             <StackPanel>
               <TextBlock Text="RAM" Style="{StaticResource Text.Label}" />
-              <TextBlock Text="{Binding RamUsage}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+              <TextBlock ctl:Flow.Text="{Binding RamUsage}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
               <ctl:AsciiBar Value="{Binding RamPercent}" Maximum="100" Cells="18" />
             </StackPanel>
           </Border>
@@ -146,7 +146,7 @@
             <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="260">
               <Button Style="{StaticResource PrimaryButton}" MinHeight="52" FontSize="{StaticResource Type.Title}"
                       Content="{Binding Play.PlayButtonText}" Command="{Binding Play.PlayCommand}" />
-              <ProgressBar Value="{Binding Play.SessionProgress, Mode=OneWay}" Maximum="1" Margin="0,6,0,0"
+              <ProgressBar ctl:Flow.Value="{Binding Play.SessionProgress, Mode=OneWay}" Maximum="1" Margin="0,6,0,0"
                            Visibility="{Binding Play.IsSessionActive, Converter={StaticResource BoolToVis}}" />
             </StackPanel>
           </Grid>
@@ -288,32 +288,47 @@
     <DataTemplate x:Key="Widget.sessions">
       <HeaderedContentControl Style="{StaticResource Section}" Header="RECENT SESSIONS" DataContext="{Binding Host}">
         <StackPanel>
-          <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl ItemsSource="{Binding Sessions.Rows}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Border Style="{StaticResource TableRow}">
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="92" />
-                        <ColumnDefinition Width="150" />
-                        <ColumnDefinition Width="84" />
-                        <ColumnDefinition Width="78" />
-                        <ColumnDefinition Width="78" />
-                        <ColumnDefinition Width="86" />
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Text="{Binding StartedText}" Style="{StaticResource Text.CellDim}" />
-                      <TextBlock Grid.Column="1" Text="{Binding ProfileName}" Style="{StaticResource Text.Cell}" />
-                      <TextBlock Grid.Column="2" Text="{Binding KindTag}" Style="{StaticResource Text.CellDim}" />
-                      <TextBlock Grid.Column="3" Text="{Binding AvgFpsText}" Style="{StaticResource Text.Cell}" />
-                      <TextBlock Grid.Column="4" Text="{Binding OnePercentLowText}" Style="{StaticResource Text.Cell}" />
-                      <TextBlock Grid.Column="5" Text="{Binding DurationText}" Style="{StaticResource Text.CellDim}" />
-                    </Grid>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
+          <!-- The scrolling sits inside the list, so only the rows in view are built: the history
+               holds up to 200 and the card shows nine. It still scrolls by the pixel, and the
+               rows are not selectable, which is why this is not a ListBox. -->
+          <ItemsControl ItemsSource="{Binding Sessions.Rows}"
+                        VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.VirtualizationMode="Recycling">
+            <ItemsControl.Template>
+              <ControlTemplate TargetType="ItemsControl">
+                <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="True">
+                  <ItemsPresenter />
+                </ScrollViewer>
+              </ControlTemplate>
+            </ItemsControl.Template>
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <VirtualizingStackPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="92" />
+                      <ColumnDefinition Width="150" />
+                      <ColumnDefinition Width="84" />
+                      <ColumnDefinition Width="78" />
+                      <ColumnDefinition Width="78" />
+                      <ColumnDefinition Width="86" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding StartedText}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="1" Text="{Binding ProfileName}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="2" Text="{Binding KindTag}" Style="{StaticResource Text.CellDim}" />
+                    <TextBlock Grid.Column="3" Text="{Binding AvgFpsText}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="4" Text="{Binding OnePercentLowText}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="5" Text="{Binding DurationText}" Style="{StaticResource Text.CellDim}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
           <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" Foreground="{DynamicResource Brush.TextMuted}"
                      Text="started · profile · kind · average fps · 1% low · duration. The SESSIONS tab holds the full history, the detail pane and the benchmark." />
         </StackPanel>
@@ -504,6 +519,35 @@
                 Command="{Binding ToggleEditWidgetsCommand}"
                 ToolTip="Arrange HOME: drag cards from any tab onto it, up to 10" />
       </Grid>
+
+      <!-- A newer Optima is out. Above everything else on the page, and not a widget: it cannot be
+           taken off HOME, only put off until the next start. -->
+      <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Accent}" Margin="0,0,0,12"
+              Visibility="{Binding Updates.BannerVisible, Converter={StaticResource BoolToVis}}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{Binding Updates.BannerText}" Style="{StaticResource Text.Prose}" TextWrapping="Wrap" />
+            <StackPanel Margin="0,6,0,0"
+                        Visibility="{Binding Updates.Problem, Converter={StaticResource EmptyToCollapsed}}">
+              <TextBlock Text="{Binding Updates.Problem}" Style="{StaticResource Text.Prose}" TextWrapping="Wrap"
+                         Foreground="{DynamicResource Brush.Warn}" />
+              <Button Style="{StaticResource GhostButton}" Content="download it from the releases page instead"
+                      Padding="0,4" HorizontalAlignment="Left" Command="{Binding Updates.OpenReleasesCommand}" />
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="16,0,0,0">
+            <Button Style="{StaticResource PrimaryButton}" Content="Update" Padding="18,6"
+                    Command="{Binding Updates.InstallCommand}"
+                    ToolTip="Downloads the setup, checks that it is Optima's, and restarts Optima. Windows asks once for administrator approval." />
+            <Button Style="{StaticResource GhostButton}" Content="later" Padding="12,6" Margin="6,0,0,0"
+                    Command="{Binding Updates.DismissCommand}" ToolTip="Hide this until the next start" />
+          </StackPanel>
+        </Grid>
+      </Border>
 
       <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,0,0,12"
               Visibility="{Binding GameUpdateBanner, Converter={StaticResource EmptyToCollapsed}}">

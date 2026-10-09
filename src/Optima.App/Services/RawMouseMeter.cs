@@ -29,11 +29,14 @@ public sealed class RawMouseMeter : IDisposable
         _source = HwndSource.FromHwnd(handle);
         _source?.AddHook(WndProc);
 
+        // No input sink flag: reports arrive only while Optima is the foreground app, which is the
+        // only time the readout is looked at. As a sink the window was sent every mouse report of
+        // a game played beside it, each one handled on the UI thread.
         var device = new RawInputDevice
         {
             UsagePage = 0x01,
             Usage = 0x02,
-            Flags = RidevInputSink,
+            Flags = 0,
             Target = handle,
         };
         if (!RegisterRawInputDevices([device], 1, (uint)Marshal.SizeOf<RawInputDevice>()))
@@ -124,7 +127,6 @@ public sealed class RawMouseMeter : IDisposable
 
     private const int WmInput = 0x00FF;
     private const uint RidInput = 0x10000003;
-    private const uint RidevInputSink = 0x00000100;
     private const uint RidevRemove = 0x00000001;
 
     [StructLayout(LayoutKind.Sequential)]

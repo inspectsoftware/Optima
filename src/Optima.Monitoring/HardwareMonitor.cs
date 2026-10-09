@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Win32.SafeHandles;
 using Optima.Core.Abstractions;
 using Optima.Core.Models;
@@ -20,9 +19,7 @@ public sealed class HardwareMonitor : IPerformanceMonitor
     private NvmlGpuReader? _nvml;
     private GpuEngineCounters? _gpuEngines;
     private bool _gpuEnginesUnavailable;
-    private PerformanceCounter? _cpuPerformanceCounter;
     private bool _countersInitialized;
-    private double _cpuBaseMhz;
     private CancellationTokenSource? _cts;
     private Task? _loop;
 
@@ -70,7 +67,9 @@ public sealed class HardwareMonitor : IPerformanceMonitor
                 return;
             }
 
-            InitializeCountersOnce();
+            // Off the caller's thread: the first start loads NVML, and the caller is the UI thread
+            // just after the window appears.
+            await Task.Run(InitializeCountersOnce, ct).ConfigureAwait(false);
             ProcessNative.GetSystemTimes(out _prevIdle, out _prevKernel, out _prevUser);
             lock (_stateLock)
             {
@@ -127,17 +126,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         _countersInitialized = true;
 
         _nvml = new NvmlGpuReader();
-        try
-        {
-            _cpuPerformanceCounter = new PerformanceCounter("Processor Information", "% Processor Performance", "_Total", readOnly: true);
-            _ = _cpuPerformanceCounter.NextValue();
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
-        {
-            _logger.LogDebug(ex, "CPU performance counter unavailable");
-            _cpuPerformanceCounter = null;
-        }
-        _cpuBaseMhz = ReadCpuBaseMhz();
     }
 
     private async Task SampleLoopAsync(CancellationToken ct)
@@ -167,19 +155,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         (_prevIdle, _prevKernel, _prevUser) = (idle, kernel, user);
         var cpuPercent = totalDelta > 0 ? Math.Clamp(100.0 * busyDelta / totalDelta, 0, 100) : 0;
 
-        double cpuMhz = 0;
-        if (_cpuPerformanceCounter is not null && _cpuBaseMhz > 0)
-        {
-            try
-            {
-                cpuMhz = _cpuBaseMhz * _cpuPerformanceCounter.NextValue() / 100.0;
-            }
-            catch (InvalidOperationException)
-            {
-                cpuMhz = _cpuBaseMhz;
-            }
-        }
-
         var (totalRam, availableRam) = ProcessNative.GetMemoryStatus();
 
         double gpuUtil;
@@ -203,7 +178,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         return new HardwareMetrics
         {
             CpuUtilizationPercent = cpuPercent,
-            CpuFrequencyMhz = cpuMhz,
             GpuUtilizationPercent = gpuUtil,
             GpuMemoryUsedBytes = gpuMemory,
             GpuTemperatureCelsius = gpuTemp,
@@ -269,22 +243,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
         }
     }
 
-    private static double ReadCpuBaseMhz()
-    {
-        try
-        {
-            using var searcher = new System.Management.ManagementObjectSearcher("SELECT MaxClockSpeed FROM Win32_Processor");
-            foreach (var cpu in searcher.Get())
-            {
-                return Convert.ToDouble(cpu["MaxClockSpeed"] ?? 0);
-            }
-        }
-        catch (Exception)
-        {
-        }
-        return 0;
-    }
-
     public async ValueTask DisposeAsync()
     {
         await StopAsync().ConfigureAwait(false);
@@ -296,7 +254,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             }
             _gameProcesses.Clear();
         }
-        _cpuPerformanceCounter?.Dispose();
         _nvml?.Dispose();
     }
 }

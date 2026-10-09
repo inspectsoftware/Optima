@@ -99,7 +99,6 @@ public static class PresenceComposer
 
     public static PresenceCard Compose(
         GamePresence state,
-        double? fps,
         PlayerSeasonBadge? player,
         string? profileName,
         DiscordPresenceOptions? options = null)
@@ -110,7 +109,7 @@ public static class PresenceComposer
 
         return state switch
         {
-            GamePresence.InGame => ComposeInGame(fps, player, options),
+            GamePresence.InGame => ComposeInGame(player, options),
             GamePresence.Starting => ComposeStarting(profileName, player, options),
             _ => ComposeLauncher(player, options),
         };
@@ -118,9 +117,9 @@ public static class PresenceComposer
 
     /// <summary>
     /// Playing: the game on the details line with the rank beside it, and the live session facts
-    /// (who, how fast, how the season is going) on the state line.
+    /// (who, how the season is going) on the state line.
     /// </summary>
-    private static PresenceCard ComposeInGame(double? fps, PlayerSeasonBadge? player, DiscordPresenceOptions options)
+    private static PresenceCard ComposeInGame(PlayerSeasonBadge? player, DiscordPresenceOptions options)
     {
         var rank = options.ShowRank ? player?.RankLabel ?? string.Empty : string.Empty;
         var details = rank.Length == 0 ? "Critical Ops" : "Critical Ops · " + rank;
@@ -130,9 +129,6 @@ public static class PresenceComposer
             Details = Truncate(details),
             State = Join(
                 options.ShowPlayerName ? player?.Name : null,
-                options.ShowFps && fps is { } value
-                    ? value.ToString("F0", CultureInfo.InvariantCulture) + " fps"
-                    : null,
                 options.ShowRankedRecord ? player?.Record : null),
             DetailsUrl = GameUrl,
             LargeImageText = AppName,

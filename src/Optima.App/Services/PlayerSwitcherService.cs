@@ -70,16 +70,23 @@ public sealed class PlayerSwitcherService
         }, ct);
     }
 
-    public async Task AddTrackedAsync(PlayerAccount account, CancellationToken ct = default)
+    /// <summary>False when the player was already tracked and nothing was stored.</summary>
+    public async Task<bool> AddTrackedAsync(PlayerAccount account, CancellationToken ct = default)
     {
-        var settings = await _settings.GetSettingsAsync(ct);
-        var tracked = settings.TrackedPlayers.ToList();
-        if (tracked.Any(t => t.Matches(account.Ign, account.AccountId)))
+        // Decided on the settings as they are when the save runs, not on a copy read beforehand:
+        // two adds close together otherwise both started from the same list, and the second
+        // save dropped the first player.
+        var added = false;
+        await _settings.UpdateSettingsAsync(s =>
         {
-            return;
-        }
-        tracked.Add(account);
-        await _settings.UpdateSettingsAsync(s => s with { TrackedPlayers = tracked }, ct);
+            if (s.TrackedPlayers.Any(t => t.Matches(account.Ign, account.AccountId)))
+            {
+                return s;
+            }
+            added = true;
+            return s with { TrackedPlayers = [.. s.TrackedPlayers, account] };
+        }, ct);
+        return added;
     }
 
     public async Task RemoveTrackedAsync(string key, CancellationToken ct = default)

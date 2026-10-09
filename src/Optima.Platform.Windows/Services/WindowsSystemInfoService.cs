@@ -11,7 +11,7 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
 {
     private readonly IDisplayService _displayService;
     private readonly ILogger<WindowsSystemInfoService> _logger;
-    private SystemInventory? _cached;
+    private Task<SystemInventory>? _inventory;
     private Task<VirtualizationState>? _virtualization;
 
     public WindowsSystemInfoService(IDisplayService displayService, ILogger<WindowsSystemInfoService> logger)
@@ -22,27 +22,26 @@ public sealed class WindowsSystemInfoService : ISystemInfoService
 
     public async Task<SystemInventory> GetInventoryAsync(CancellationToken ct = default)
     {
-        if (_cached is not null)
+        // The WMI-heavy part (processor, graphics cards, Windows) cannot change while the app
+        // runs: it is built once, and callers that arrive while it is being built share that one
+        // build instead of each starting their own. Displays and virtualization can change (a
+        // monitor is plugged in, a feature is enabled), so those are asked for every time.
+        var inventoryTask = _inventory;
+        if (inventoryTask is null || inventoryTask.IsFaulted || inventoryTask.IsCanceled)
         {
-            // Displays and virtualization can change while the app runs (a monitor is plugged in,
-            // a feature is enabled); the WMI-heavy rest of the inventory stays cached.
-            var freshDisplays = await _displayService.GetDisplaysAsync(ct).ConfigureAwait(false);
-            var freshVirtualization = await GetVirtualizationStateAsync(ct).ConfigureAwait(false);
-            return _cached with { Displays = freshDisplays, Virtualization = freshVirtualization };
+            inventoryTask = _inventory = Task.Run(BuildInventory);
         }
 
         // Three independent probes: a cold inventory costs the sum of them if run in sequence.
-        var inventoryTask = Task.Run(BuildInventory, ct);
         var displaysTask = _displayService.GetDisplaysAsync(ct);
         var virtualizationTask = GetVirtualizationStateAsync(ct);
-        await Task.WhenAll(inventoryTask, displaysTask, virtualizationTask).ConfigureAwait(false);
+        await Task.WhenAll(inventoryTask.WaitAsync(ct), displaysTask, virtualizationTask).ConfigureAwait(false);
 
-        _cached = inventoryTask.Result with
+        return inventoryTask.Result with
         {
             Displays = displaysTask.Result,
             Virtualization = virtualizationTask.Result,
         };
-        return _cached;
     }
 
     public Task<VirtualizationState> GetVirtualizationStateAsync(CancellationToken ct = default)

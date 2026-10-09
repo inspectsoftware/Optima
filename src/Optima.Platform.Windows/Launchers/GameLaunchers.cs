@@ -178,6 +178,15 @@ public sealed class CustomCommandLauncher : IGameLauncher
                 return (trimmed[1..end], trimmed[(end + 1)..].TrimStart());
             }
         }
+        // Unquoted, and the program's path may hold spaces itself ("C:\Program Files\..."): the
+        // longest leading part that is a file on disk is the program.
+        for (var end = trimmed.Length; end > 0; end = trimmed.LastIndexOf(' ', end - 1))
+        {
+            if (File.Exists(trimmed[..end]))
+            {
+                return (trimmed[..end], trimmed[end..].TrimStart());
+            }
+        }
         var space = trimmed.IndexOf(' ');
         return space < 0 ? (trimmed, string.Empty) : (trimmed[..space], trimmed[(space + 1)..]);
     }

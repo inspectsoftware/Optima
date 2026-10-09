@@ -14,6 +14,11 @@ public sealed class SettingsService
     private DetectionRules? _rules;
     private readonly SemaphoreSlim _updateGate = new(1, 1);
 
+    // True while the settings in memory hold something the file does not: what the load-time
+    // migration changed, or a first start with no file at all. The next update is then written
+    // even when it changes nothing itself.
+    private volatile bool _unsaved;
+
     public SettingsService(AppPaths paths, JsonStore store, ILogger<SettingsService> logger)
     {
         _paths = paths;
@@ -31,20 +36,28 @@ public sealed class SettingsService
     public AppSettings? Current => _settings;
 
     public async Task<AppSettings> GetSettingsAsync(CancellationToken ct = default)
-        => _settings ??= Migrate(await _store.LoadAsync<AppSettings>(_paths.ConfigFile, ct).ConfigureAwait(false) ?? new AppSettings());
+        => _settings ??= Loaded(await _store.LoadAsync<AppSettings>(_paths.ConfigFile, ct).ConfigureAwait(false));
 
     /// <summary>
     /// Synchronous load for startup work that has to finish before the first paint. Cheaper than
     /// blocking on <see cref="GetSettingsAsync"/>: one small file read, no thread pool hop.
     /// </summary>
     public AppSettings GetSettings()
-        => _settings ??= Migrate(_store.Load<AppSettings>(_paths.ConfigFile) ?? new AppSettings());
+        => _settings ??= Loaded(_store.Load<AppSettings>(_paths.ConfigFile));
+
+    private AppSettings Loaded(AppSettings? read)
+    {
+        var migrated = Migrate(read ?? new AppSettings());
+        _unsaved = !ReferenceEquals(read, migrated);
+        return migrated;
+    }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken ct = default)
     {
         settings = Migrate(settings);
         _settings = settings;
         await _store.SaveAsync(_paths.ConfigFile, settings, ct).ConfigureAwait(false);
+        _unsaved = false;
         SettingsChanged?.Invoke(this, settings);
     }
 
@@ -56,9 +69,20 @@ public sealed class SettingsService
         await _updateGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            updated = Migrate(mutate(await GetSettingsAsync(ct).ConfigureAwait(false)));
-            _settings = updated;
+            var current = await GetSettingsAsync(ct).ConfigureAwait(false);
+            updated = Migrate(mutate(current));
+            // An update that changes nothing is not a save. The app makes several at every start
+            // (re-selecting the profile that is already selected, for one), and each of them
+            // rewrote the file and sent every listener off to re-read what had not changed.
+            if (!_unsaved && updated.Equals(current))
+            {
+                return current;
+            }
+            // Kept only once it is on disk: a save that failed must leave the same update to be
+            // tried again, not judged "nothing changed" against a value that was never written.
             await _store.SaveAsync(_paths.ConfigFile, updated, ct).ConfigureAwait(false);
+            _settings = updated;
+            _unsaved = false;
         }
         finally
         {

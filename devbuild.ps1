@@ -4,7 +4,7 @@
 #   .\devbuild.ps1 -Run       ... and start the app afterwards
 #
 # Publishes the app and its elevated helper (self-contained, ReadyToRun) into
-# %USERPROFILE%\Desktop\Optima Dev, then compiles a matching per-user setup into the Installers
+# %USERPROFILE%\Desktop\Optima Dev, then compiles a matching setup into the Installers
 # subfolder of that same folder, named Optima-Setup-<version>-dev-<timestamp>.exe so every change
 # leaves its own installer behind (earlier setups are kept, not overwritten). The setup excludes
 # the Installers folder and any setup in the payload root, so no setup ever embeds another.

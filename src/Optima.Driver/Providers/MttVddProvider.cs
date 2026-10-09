@@ -22,6 +22,11 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
     public const string DeviceNameMarker = "Virtual Display Driver";
     private const string ReloadCommand = "RELOAD_DRIVER";
 
+    // How often the wait loops look again. A look is one display enumeration, about a millisecond,
+    // and the display attaches a few hundred milliseconds after the device is enabled or the driver
+    // reloads, so a coarser step is time added to every virtual display launch.
+    private const int WaitPollMs = 100;
+
     private readonly IDisplayService _displayService;
     private readonly IElevationBroker _elevation;
     private readonly PnpDeviceLocator _deviceLocator;
@@ -52,7 +57,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
         _logger = logger;
     }
 
-    public override string Name => "Optima Virtualization";
+    public override string Name => "Virtual display driver";
 
     public string? SettingsBackupPath => _settingsChanged ? _backupPath : null;
 
@@ -141,7 +146,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
                 "The virtual display did not appear.",
                 "The driver device is enabled but Windows never attached its display to the desktop.",
                 null,
-                "Send RELOAD_DRIVER from the Display page",
+                "Press Reload driver in Check my setup on the Display page",
                 "Check vdd_settings.xml has a monitor count of at least 1",
                 "Reinstall the virtual display driver");
         }
@@ -268,7 +273,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
                     return true;
                 }
             }
-            await Task.Delay(500, ct).ConfigureAwait(false);
+            await Task.Delay(WaitPollMs, ct).ConfigureAwait(false);
         }
         return false;
     }
@@ -284,7 +289,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
                 {
                     return;
                 }
-                await Task.Delay(500, ct).ConfigureAwait(false);
+                await Task.Delay(WaitPollMs, ct).ConfigureAwait(false);
             }
 
             if (attempt == 0 && await GetDisplayInfoAsync(ct).ConfigureAwait(false) is { } display)
@@ -400,7 +405,16 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
                 File.Copy(lines[0], lines[1], overwrite: true);
                 _logger.LogInformation("vdd_settings.xml restored from crash-recovery backup {Backup}", lines[0]);
                 TryDeleteMarker();
-                await ReloadDriverAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    await ReloadDriverAsync(ct).ConfigureAwait(false);
+                }
+                catch (OptimaException ex)
+                {
+                    // The file is back, which is what the marker was for. A driver that is not there to
+                    // reload reads it when it next loads, and must not fail the launch that got here.
+                    _logger.LogWarning(ex, "The driver did not reload after vdd_settings.xml was restored");
+                }
             }
             else
             {
@@ -433,7 +447,19 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
             _logger.LogInformation("RELOAD_DRIVER sent to the virtual display driver");
             return;
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or TimeoutException)
+        catch (TimeoutException ex)
+        {
+            // Nobody answered, which is a driver that is not loaded. Access denied is thrown at
+            // once, so the helper has nothing to add here: it would wait out the same three seconds
+            // behind an administrator prompt and fail the same way.
+            throw OptimaException.From("VDD_PIPE_FAILED",
+                "The virtual display driver is not running.",
+                "Its control pipe did not answer within three seconds, so there was no driver to tell to reload.",
+                ex,
+                "Enable the virtual display from the Display page, then try again",
+                "Reinstall the virtual display driver from the Display page");
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
             _logger.LogWarning(ex, "Direct pipe write failed, retrying through the elevated helper");
         }
@@ -541,7 +567,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
             {
                 return true;
             }
-            await Task.Delay(500, ct).ConfigureAwait(false);
+            await Task.Delay(WaitPollMs, ct).ConfigureAwait(false);
         }
         return false;
     }

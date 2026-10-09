@@ -1,11 +1,13 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Optima.App.Effects;
 using Optima.App.Services;
+using Optima.Core.Theming;
 
 namespace Optima.App.Controls;
 
@@ -79,6 +81,7 @@ public sealed class GlassPanel : Grid
     private static bool _pointerScheduled;
     private static long _lastPointerApply;
     private static bool _viewboxUpdateScheduled;
+    private static bool _lit = true;
 
     private readonly VisualBrush _brush;
     private readonly Rectangle _backdrop;
@@ -187,11 +190,14 @@ public sealed class GlassPanel : Grid
             _pointerScheduled = false;
         }
 
+        // The light goes out where it is, rather than vanishing: its strength is what fades.
+        _lit = false;
         foreach (var weak in Live)
         {
             if (weak.TryGetTarget(out var panel))
             {
-                panel.Glass.Light = new Point(-1000, -1000);
+                panel.Glass.BeginAnimation(GlassEffect.SpecularProperty,
+                    new DoubleAnimation(0, Motion.Duration(MotionSpec.FastMs)) { EasingFunction = Motion.Ease });
             }
         }
     }
@@ -212,9 +218,21 @@ public sealed class GlassPanel : Grid
             return;
         }
 
+        var comingOn = !_lit;
+        _lit = true;
         for (var i = Live.Count - 1; i >= 0; i--)
         {
-            if (!Live[i].TryGetTarget(out var panel) || !panel.IsVisible)
+            if (!Live[i].TryGetTarget(out var panel))
+            {
+                continue;
+            }
+            if (comingOn)
+            {
+                // Back up to the panel's own strength, whatever that is.
+                panel.Glass.BeginAnimation(GlassEffect.SpecularProperty,
+                    new DoubleAnimation { From = 0, Duration = Motion.Duration(MotionSpec.FastMs), EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
+            }
+            if (!panel.IsVisible)
             {
                 continue;
             }
@@ -244,6 +262,18 @@ public sealed class GlassPanel : Grid
         }
         _viewboxUpdateScheduled = true;
         _ = panel.Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(UpdateDirtyViewboxes));
+    }
+
+    /// <summary>For after something moved panels without a layout pass (an animated transform).</summary>
+    public static void RefreshBackdrops()
+    {
+        for (var i = Live.Count - 1; i >= 0; i--)
+        {
+            if (Live[i].TryGetTarget(out var panel) && panel.IsVisible)
+            {
+                ScheduleViewboxUpdate(panel);
+            }
+        }
     }
 
     private static void UpdateDirtyViewboxes()

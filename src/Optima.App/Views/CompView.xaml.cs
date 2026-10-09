@@ -26,7 +26,16 @@ public partial class CompView
         }
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e) => _mouseReadoutTimer.Stop();
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _mouseReadoutTimer.Stop();
+        // Nobody reads the meter off this page, and every mouse report it counts is handled on the
+        // UI thread. Through the command, so the button reads "start meter" again.
+        if (DataContext is CompViewModel { MouseMeterActive: true } vm)
+        {
+            vm.ToggleMouseMeterCommand.Execute(null);
+        }
+    }
 
     private void OnTestKeyDown(object sender, KeyEventArgs e)
         => (DataContext as CompViewModel)?.OnTestKeyDown();

@@ -31,8 +31,10 @@ public sealed partial class HomeViewModel : ObservableObject
         IPerformanceMonitor monitor,
         CopsNewsService news,
         SettingsService settings,
-        Services.PlayerSwitcherService players)
+        Services.PlayerSwitcherService players,
+        UpdateViewModel updates)
     {
+        Updates = updates;
         Status = status;
         Play = play;
         Player = playerStats;
@@ -283,9 +285,7 @@ public sealed partial class HomeViewModel : ObservableObject
 
         // Every toggle in the app saves settings, and this refresh costs a profile lookup per tracked
         // player, so it only runs for a change it can actually show — or to retry a failed attempt.
-        var signature = string.Join(
-            '\n',
-            settings.TrackedPlayers.Select(t => t.Key + "|" + t.Ign + "|" + t.AccountId));
+        var signature = FriendsSignature(settings);
         if (!_friendsRefreshFailed && string.Equals(signature, _friendsSignature, StringComparison.Ordinal))
         {
             return;
@@ -293,6 +293,9 @@ public sealed partial class HomeViewModel : ObservableObject
         _friendsSignature = signature;
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => _ = RefreshFriendsCommand.ExecuteAsync(null));
     }
+
+    private static string FriendsSignature(AppSettings settings)
+        => string.Join('\n', settings.TrackedPlayers.Select(t => t.Key + "|" + t.Ign + "|" + t.AccountId));
 
     public StatusViewModel Status { get; }
     public PlayViewModel Play { get; }
@@ -352,11 +355,19 @@ public sealed partial class HomeViewModel : ObservableObject
 
     [ObservableProperty] private string _gameUpdateBanner = string.Empty;
 
+    /// <summary>The notice that a newer Optima is out, and the button that installs it.</summary>
+    public UpdateViewModel Updates { get; }
+
     public async Task InitializeAsync(CancellationToken ct = default)
     {
-        ApplyWidgetLayout(SavedLayout(await _settings.GetSettingsAsync(ct)));
+        var settings = await _settings.GetSettingsAsync(ct);
+        ApplyWidgetLayout(SavedLayout(settings));
+        // The strip below is loaded from this list, so the first settings save has nothing to redo.
+        _friendsSignature = FriendsSignature(settings);
 
         _ = Task.Run(() => CheckGameVersionAsync(ct), CancellationToken.None);
+        // Every start, tray starts included: this is the one place Optima asks whether it is current.
+        _ = Updates.CheckAtStartAsync();
         _ = Player.InitializeAsync(ct);
         _ = RefreshFriendsCommand.ExecuteAsync(null);
 

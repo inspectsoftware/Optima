@@ -4,6 +4,399 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-09 - 0.8.0: everything since 0.7.5
+
+- This is the full list of what changed between 0.7.5 and 0.8.0, by area. The entries marked "Indev" further down are the same changes as they were made, build by build.
+- INSTALL:
+- Optima installs to Program Files\Optima now. The setup asks for administrator rights once, and that one prompt also covers the virtual display driver.
+- Why: Optima's helper runs with administrator rights, and in a folder of your own any program could have replaced it or the driver beside it. In Program Files only an administrator can.
+- A copy that an earlier setup put in your own folder is removed by this one, with its shortcuts and its entry in Add/Remove Programs. Settings, profiles and sessions are kept.
+- Running the setup over an install you already have replaces it instead of merging into it. The old files are cleared first, so nothing a new build renamed or dropped is left behind.
+- The first page of the setup names the version being replaced and says that your settings, profiles and session history are kept.
+- Add/Remove Programs shows the new version after an upgrade, and the uninstaller keeps working.
+- Fixed: the setup could stop with a runtime error ("An attempt was made to expand the app constant before it was initialized") before anything was installed.
+- The setup only clears an install folder that holds Optima.
+- The setup no longer closes a running Optima by itself. It waits a few seconds for it to close and says so when it does not.
+- Optima is never started with administrator rights by its setup.
+- Starting at sign-in is no longer a box in the setup. It is the switch in Settings and in the first-run wizard. An existing entry is pointed at the new folder the first time Optima starts.
+- Installing the virtual display driver no longer puts a virtual monitor on the desktop straight away. The device is left off until a session or a test switches it on.
+- Installing the driver over one that is already in place no longer reports a failure, and does not touch its state.
+- A driver install that needs a restart is no longer reported as failed.
+- UPDATES FROM INSIDE OPTIMA:
+- At every start Optima asks GitHub once whether a newer release is out. When there is one, HOME says so at the top, with an Update button. "later" hides it until the next start.
+- Update downloads the setup, checks it and runs it. Windows asks once for administrator approval, Optima closes, and it opens again when the setup is done.
+- The setup is only run when it carries Optima's own signature. One that does not is deleted, and the notice says so.
+- If you answer No to Windows, or the download fails, Optima keeps running as it is and the notice says why, with a link to the releases page.
+- Update is refused while Critical Ops is running, because closing Optima would end your session.
+- The UPDATES page has "check now". Settings, under GENERAL, has the switch that turns the check at start off.
+- The UPDATES page opens at once: the newest entries are drawn first and the rest fill in below.
+- GitHub is contacted for the update check and nothing else. The Legal page and the README list it.
+- DISPLAY:
+- The Display page is three steps now. 1, the driver: installed or not, with the button to install it. 2, whether the virtual display is used for Critical Ops, and at which resolution. 3, a test that shows the display for 15 seconds and puts everything back.
+- New: "Check my setup". It tries the virtual display the way a launch does, one step at a time: the driver, Optima's helper, the display turning on, the resolution, and putting everything back. It stops at the first step that fails, says why and what to do, and where there is something to press it is on that line.
+- New: "Reload driver", which the error guide always told you to press, exists now.
+- The virtual display and its resolution are one choice for every profile, made on this page. They are no longer part of a profile. What you had selected is carried over.
+- "Competitive 1080p240" and "Competitive 1440p165" are one profile now, "Competitive".
+- Your own monitor stays the main screen while the virtual display is on, and the game opens on it as always.
+- With the virtual display switched on and no driver installed, the game starts on your own screen and the session says so. It used to refuse to start.
+- When the virtual display does not appear at launch, Optima reloads the display driver and tries once more before giving up.
+- A new install has the virtual display on, at 1920 x 1080 and 240 Hz, when the driver was installed with it.
+- "Restart needed" after a driver install is still shown after Optima was closed and opened again, until Windows has been restarted.
+- An install or removal that fails says all of it on the page: what happened, why, and every way out.
+- The page says what a virtual display is before it asks for a click. "Optima Virtualization" is called "Virtual display" everywhere, so it is not mistaken for the CPU's virtualization.
+- The question about the driver when Optima closes has "do not ask again".
+- The list of monitors is folded away at the bottom. The enable, disable, preset and custom buttons are gone: the test and the check do what they did, and put things back themselves.
+- The stand-in display for developers is no longer used on a PC without the driver.
+- Reloading the display driver while it is not running says so after 3 seconds, instead of raising an administrator prompt and then failing.
+- The virtual display steps check five times as often, so a launch or a restore that uses one finishes a few hundred milliseconds sooner.
+- MOTION AND LOOK:
+- Moving between pages: the marker in the rail glides to the page you open, the page's sections rise in one after another, and the rail slides when you collapse or expand it.
+- Buttons and chips fade into their hover and pressed states and go down a pixel when pressed.
+- A checkbox fills and its mark is drawn. An expander's arrow turns. Lists, menus and tips open with a short rise.
+- Notices in the corner slide in, fade out, and the ones stacked with them close the gap.
+- Dialogs open with a short fade and grow into place, and their backdrop moves too. It used to be frozen.
+- On DEBUG a line glides under the tab you choose, and the tab's content rises in.
+- Meters and progress bars glide to each new value, and the number printed beside them counts along.
+- Graphs flow to the next sample instead of jumping.
+- On PLAY a finished step has its check drawn, and a marker moves down the launch steps to the one that is running.
+- The backdrop is three pools of light in your accent colour, arranged differently for every page. They pour to the next arrangement when you change page, warm up while a session starts and turn red when a launch fails.
+- Between those moments the backdrop is still. It used to drift all the time, which every panel on the page paid for.
+- The bright line along the top of every panel is gone.
+- New: the launch splash, built around the new mark. A silver square appears, four blades fly in and lock around it, a band of light crosses the mark and OPTIMA is set letter by letter. When the app is ready the centre opens onto the main window.
+- The splash runs on a thread of its own. It used to stand still or stutter while the app was starting.
+- The line under the name on the splash fills with the startup stages Optima is really going through.
+- Everything that moves uses one curve and four lengths, the splash and the BOOST dial included. The dial's segments no longer overshoot when they lock in.
+- Settings, Appearance: "animations" is a choice of three: as Windows says, always on, off. Your old setting is carried over.
+- Nothing is animated while a game is running or while Optima is in the background.
+- BOOST (NEW PAGE):
+- New: the BOOST page, in the TUNE group (Alt+6). It gathers what Optima does while the game runs to keep it smooth.
+- New: the master switch, a round dial at the top of the page. One click arms every feature ticked below; a second click switches them all off and puts back everything they changed. Boost starts switched off.
+- New: the priority guard. The game keeps the priority you chose for as long as it runs, however it was started. If another program lowers it, it is put right within ten seconds. The page says what it is holding, since when and how often it had to correct it.
+- The game priority choice lives on BOOST: Unchanged, Normal, AboveNormal or High, for every session, watch mode included.
+- New: the memory cleaner, which does what ISLC does. While Critical Ops is on screen it empties Windows' standby list when free memory is below one threshold and the standby list is above another. Both thresholds are yours. The page shows live figures and has "purge now".
+- New: timer resolution. While the game is on screen Optima holds a 1.0 ms or 0.5 ms system timer and lets go when the game leaves. The page reports what Windows actually applied and says how your Windows version treats the request.
+- New, Windows 11 only: system-wide timer resolution requests, so the timer Optima holds reaches the game. It needs an administrator prompt and a restart.
+- New: background programs. While the game is on screen, the programs on your list run at below-normal priority in Windows' efficiency mode. Nothing is closed, and each gets back exactly the priority it had.
+- New: keep every processor core awake while the game is on screen, so a parked core does not cost a hitch when it wakes.
+- New: ask Windows to run the game on the high-performance graphics adapter. It matters on a PC with two adapters.
+- Windows, the game, Google Play Games and Optima itself are never touched by background demotion, whatever the list says.
+- Everything on BOOST is off by default, and everything it changes is put back when the game leaves, when it is switched off, or at the next start after a crash.
+- DEBUG (NEW PAGE):
+- New: the DEBUG page, in place of DIAGNOSTICS and LOGS, with tabs: ISSUES, CHECKS, LOG, CRASHES and ERROR GUIDE. Alt+9 opens it, and so does the tray menu.
+- New: ISSUES. Optima reads its own log as it is written and runs quick checks in the background, and lists whatever is wrong: once per problem, with what it is, why it happens, how to put it right, and its evidence.
+- No error goes by unlisted. A failure Optima has a name for is listed under that name; any other is listed as unclassified with everything it carried.
+- The rail shows a count on DEBUG when something needs attention, whatever page is open.
+- "copy report" puts an issue on the clipboard as redacted text that stands on its own. "dismiss" takes it off the list until it happens again. "ignore" keeps it off for good, and IGNORED lists what was ignored.
+- "scan now" runs every check. A check that fails opens an issue and a check that passes closes it.
+- New: repairs. An issue Optima can do something about has buttons on its card, each saying what it changes before it changes it. A repair is proved by the check that raised the issue, not by its own word.
+- New: repair by itself, at the top of ISSUES: "everything it can" (the default), "safe repairs only", or "off".
+- A repair that interrupts says so before it runs: a notice counts down five seconds with a cancel button. Cancelling is remembered.
+- The limits: nothing is repaired while a game is running, a repair that interrupts is not run with the window hidden, an administrator prompt appears at most once per issue per day, no more than six repairs an hour, and a repair that would make a choice for you is never run unasked.
+- The first repairs: Google Play Games is started or restarted after a failed launch, the Windows hypervisor features can be enabled from the card, a restore that did not finish can be tried again, and a stale virtual display restore can be discarded.
+- New: notices. Whatever Optima did without being asked is said in the corner of the window, or from the tray icon when the window is hidden, and never while a game is running.
+- New: REPAIR HISTORY on ISSUES: every repair that was run, when, for which issue and how it went. It is kept across restarts.
+- New checks: whether this PC offers the power plan the selected profile asks for, and a virtual display restore left pending by an old session.
+- The quick checks run again at the start of every launch, before anything is changed. They never hold a launch up for more than three seconds.
+- LOG: click a line to open its detail: the whole exception with its stack, the code Windows returned and Windows' own description of it, and the error guide's entry for the line's code.
+- LOG: "copy report" copies a line as a report that stands on its own, with the build, the Windows version and the fifteen lines that led up to it.
+- LOG: the export writes dates, full source names and whole exceptions. The filter also searches exceptions, and the footer says how many lines it is showing.
+- Reports, exports, crash zips and the support archive mask the Windows user name, the machine name and user profile paths along with tokens.
+- In a flood of log lines, warnings and errors are kept ahead of ordinary lines instead of being dropped with them.
+- Optima notes how its last run ended. A crash is written down on the way out and repeated at the top of the next run's log. A run ended from outside, or by a power loss, is said too.
+- An error inside the elevated helper reaches the log whole.
+- The tools on CHECKS can no longer take Optima down.
+- New in the log: one "Startup timeline" line per start, with the moments of that start in milliseconds.
+- PLAY AND SESSIONS:
+- Fixed: PLAY failed with "Unexpected error" on PCs that do not offer the High performance power plan, which is most recent laptops. The game now starts on the plan that was active, and PLAY says so under NOTICES.
+- A failure in a step the game does not need (background cleanup, process tuning, writing the session to the history) is a notice on the session, not the end of it.
+- An unexpected failure names the step the session was in and keeps the whole error under developer details.
+- The error guide gained GPG_NOT_FOUND, UNEXPECTED, POWER_PLAN_UNAVAILABLE, POWER_PLAN_REFUSED, LAUNCH_STEP_SKIPPED and SESSION_NOT_SAVED.
+- Exiting Optima while a session is running ends the session first: capture stops, everything is put back and the session is saved.
+- The administrator prompt for frametime capture appears when PLAY is pressed, not on top of the game. A No is the answer for that launch and is not asked again.
+- The window no longer freezes while an administrator prompt is open.
+- After a session, each restore step is tried twice. Whatever still fails stays pending so the next start, or the button on the issue, can finish it.
+- Fixed: with "relaunch after a crash" on, the relaunch ran while the crashed session was still putting the PC back, and PLAY could stay stuck on "Running".
+- Fixed: ending the game yourself within five minutes of its start was taken for a crash, and the game was started again.
+- Fixed: crash relaunch could relaunch forever.
+- Fixed: a session could wait forever for the game to close while a window with the game's name in its title was open. The power plan, the display and the priorities were then never put back.
+- Fixed: with watch mode on, closing the game could start a second session a moment later.
+- Fixed: a session whose frametime capture was slow to stop was dropped as cancelled. It is saved with what it measured.
+- Fixed: Game Bar off and fullscreen optimizations off for the session never applied. They do now, and they are put back at the next start if Optima was closed hard while the game ran.
+- Fixed: Optima removed a "High performance" graphics preference you had set for the game in Windows yourself.
+- Fixed: every Ultimate Performance apply created one more Windows power plan. Where Windows hides the plan, no hidden copy is left behind.
+- Fixed: after a crash, recovery left the virtual display device enabled.
+- Fixed: the ping shown during a session stopped updating on a steady connection.
+- Fixed: "refresh stats" and "refresh matches" pressed while a game was running credited that game's matches to the session before it.
+- Fixed: the weekly playtime wrapped at 24 hours and the session timer at 60 minutes.
+- Fixed: a custom launch command with an unquoted path that has spaces in it did not start.
+- Fixed: Restart Google Play Games could stop unrelated programs named client or Service.
+- Fixed: the setup guide's Next button always said Finish and closed the guide, and a failed scan reported ready to play.
+- The Sessions page no longer holds the window while it reads or writes the history. CSV and PDF export no longer load every session's fps graph.
+- Coming back to Performance or Sessions keeps what you left: open rows, the selected session and the scroll position.
+- The session graph draws a long session as its outline, with every spike kept.
+- HOME AND ACCOUNTS:
+- HOME is editable. "edit widgets" lists every card from every tab; drag a card onto HOME to add it, drag to reorder, drop it back to remove it. HOME holds at most 10, and the layout is remembered.
+- Every account in the switcher at the top of the window has an X that takes it off the list.
+- Fixed: tracking the same player twice showed them twice, and two players added quickly could lose the first.
+- Fixed: the first-run finish could crash on HOME.
+- The recent sessions widget on HOME builds only the rows that are in view.
+- DISCORD AND OPTIMABOT:
+- The Discord activity card is rebuilt around your rank: the app mark as the large image and your rank emblem beside it.
+- Discord's status line says what you are doing, not only the app's name.
+- The card is clickable: the game line opens the Critical Ops site and the artwork opens the Optima repository.
+- New: "choose what is shown" in Settings under DISCORD. Start from Minimal, Standard or Full, or tick each fact yourself: name, rank tier, rank emblem, ranked record, rating and the session timer.
+- The launcher card shows your name and rank while you browse, without waiting for a game session.
+- The card recovers on its own: a rank or artwork that could not be read is retried in the background, and the rank refreshes when you switch accounts.
+- Fixed: after Discord was restarted, the presence card stayed away until its text changed.
+- Started in the tray, Optima does not connect to Discord until there is a card to show.
+- The card's button reads Beta.
+- New: OptimaBot, the Discord bot that goes with Optima. /searchplayer posts a stats card for any Critical Ops player, and /link gives you the code that links your Discord account to your game account.
+- Linking is a code, not a login: run /link in Discord, paste the code into Settings under DISCORD. Optima never holds a Discord credential and the bot never sees a password.
+- Linking goes through Optima's community bot with no address to type. Running your own bot still works through discordBotUrl in config.json.
+- New: paste a channel webhook in Settings and the bot posts your new matches and rank changes there as one image. "send test image" checks the channel first.
+- Fixed: closing the link window while OptimaBot was being asked left the account linked on Discord and not in Optima.
+- CRITICAL OPS API:
+- Every Critical Ops request Optima makes goes to the public API and nowhere else on that host. The client refuses any other address before a request is sent.
+- Removed: the EXPLORE page. Its leaderboards read an address that is not part of the public API, and asking it can get an account banned.
+- Fixed: batch player lookups cost about twice as many requests as needed.
+- SPEED:
+- A faster start, measured on a warm start of the development PC: the window is on screen after 0.60 s instead of 0.80 s, answers to input after 0.79 s instead of 1.34 s, and is filled in after 0.81 s instead of 1.94 s. A start uses about a third less processor time.
+- Fixed: the window froze right after it appeared, for half a second on most starts and for about five seconds when Optima had not run for a few minutes.
+- Fixed: every start saved the settings although nothing had changed, and everything that listens for a change then did its work twice.
+- The window paints before the tray icon, the hotkeys and the background services are set up.
+- Less work in the half minute after a start, which is when the game is being launched.
+- Fixed: the COMP mouse meter, once started, kept receiving every mouse movement for as long as Optima ran, during a game too.
+- With the window hidden or minimized, Optima no longer re-reads the display state every 10 seconds.
+- The BOOST dial no longer redraws every frame while the window is unfocused, minimized or behind a game.
+- Frametime capture reserves about 56 MB less memory while a game runs.
+- Background demotion lists the running programs once per pass instead of once per listed program.
+- SETTINGS AND SAVING:
+- Fixed: a save that failed (a file held by a scanner, a full disk, a locked database) closed Optima with "an unexpected error". It now says what could not be saved and carries on.
+- Fixed: settings and profiles could come back as defaults after Optima was killed in the middle of a save, or as an empty file after a power cut. The previous save is recovered instead.
+- Fixed: a damaged settings file was replaced by defaults, and a later save overwrote its only backup.
+- Fixed: two settings saves at the same moment could drop one of them.
+- Saving settings waits out a file that another program holds open for a moment.
+- Fixed: messages on the Settings bar were replaced by "Unsaved changes" the moment they appeared.
+- Fixed: several Settings rows (tracked players, account id, accent, crash relaunch) saved wrongly or not at all.
+- Fixed: the in-game name and account id boxes in Settings were a few pixels wide while empty.
+- Fixed: clicking one of the session switches on PERFORMANCE while the page was loading saved the others as off.
+- Fixed: an exported built-in profile could not be imported again. It comes in under its name with "(imported)" added.
+- Fixed: importing a file that is not a profile renamed that file.
+- Fixed: exporting to a file that is open elsewhere closed the app.
+- WINDOW AND TRAY:
+- Fixed: started in the tray, or closed to it, the launcher came up with focus after every game that watch mode had attached to.
+- Fixed: a second start while Optima runs as administrator, or with a data folder that cannot be written, ended with no window and no message.
+- Fixed: the first-run wizard and the setup guide were taller than a 720p or a scaled laptop screen. The main window never opens larger than the screen either.
+- Fixed: every exit asked Windows about the display driver and waited however long it took. The question gives up after 5 seconds.
+- Fixed: an error during startup showed its message underneath the splash.
+- Fixed: issues you chose to ignore came back at every start.
+- Fixed: Performance showed the GPU temperature on the CPU tile.
+- The Debug item on the rail carries its count in the corner when the rail is collapsed.
+- THE ELEVATED HELPER:
+- The helper starts Windows tools from System32 only and gives each of them a time limit.
+- It installs and removes no driver but the one Optima ships.
+- It no longer ends on a request it cannot read.
+- Fixed: the administrator prompt never led anywhere on a Windows account that is not an administrator itself.
+- A declined administrator prompt is remembered for the run: nothing Optima does by itself raises it again.
+- REMOVED:
+- "HDR off for the session" on PERFORMANCE. It never changed anything.
+- "live fps while the game runs" from the Discord card chooser. The card never showed one.
+- The bot address row in Settings and in the link window.
+- The EXPLORE page.
+- The DIAGNOSTICS and LOGS pages, which are one page now: DEBUG.
+- The enable, disable, preset and custom buttons on the Display page.
+- NOT IN THIS RELEASE:
+- Protected play (Optima Shield) is not part of 0.8.0. Entries below that mention it describe work that is not shipped yet.
+
+## 2026-10-09 - Indev: Optima moves
+
+- Moving between pages: the marker in the rail glides to the page you open, the page's sections rise in one after another, and the rail slides when you collapse or expand it.
+- Controls: buttons and chips fade into their hover and pressed states and go down a pixel when pressed, a checkbox fills and its mark is drawn, lists, menus and tips open with a short rise, an expander's arrow turns.
+- Notices in the corner slide in, fade out, and the ones stacked with them close the gap. Dialogs open with a short fade and grow into place. On DEBUG a line glides under the tab you choose.
+- Live numbers: meters and progress bars glide to each new value and the number printed beside them counts along, graphs flow to the next sample, a finished step on PLAY has its check drawn, and a marker moves down the launch steps to the one that is running.
+- The backdrop is three pools of light in your accent colour, arranged differently for every page. They pour to the next arrangement when you change page, warm up while a session starts and turn red when a launch fails. Between those moments the backdrop is still, where it used to drift all the time.
+- The bright line along the top of every panel is gone.
+- The splash and the BOOST dial move on the same curve as everything else. The dial's segments no longer overshoot when they lock in.
+- Settings, Appearance: "animations" is a choice of three now: as Windows says, always on, off. Your old setting is carried over. Nothing is animated while a game is running or while Optima is in the background, as before.
+- With one of Optima's own dialogs open, the dialog and its backdrop move too. They used to be frozen.
+
+## 2026-10-09 - Indev: the "protected play" row is gone from Settings
+
+- Removed: the "protected play" row under DISCORD in Settings, in every build.
+
+## 2026-10-09 - Indev: an X in the account switcher
+
+- New: every account in the switcher at the top of the window has an X that takes it off the list. The account that is active stays active; only its saved entry goes, and Settings saves it again whenever you want it back.
+
+## 2026-10-09 - Indev: the Display page, in three steps, with a check that says what is wrong
+
+- Changed: the Display page is three steps now. 1, the driver: installed or not, with the button to install it. 2, whether Critical Ops runs on the virtual display, and at which resolution. 3, a test that shows the display for 15 seconds and puts everything back.
+- New: "Check my setup". It tries the virtual display the way a launch does, one step at a time: the driver, Optima's helper, the display turning on, the resolution, and putting everything back. It stops at the first step that fails, says why and what to do, and where there is something to press it is on that line. "Reload driver", which the error guide always told you to press, exists now.
+- Changed: the virtual display and its resolution are one choice for every profile, made on this page. They are no longer part of a profile. What you had selected is carried over once: the profile's resolution becomes the choice, and "Competitive 1080p240" and "Competitive 1440p165" become the one profile "Competitive".
+- Your own monitor stays the main screen while the virtual display is on, and the game opens on it as always. (An earlier build of this page made the virtual display the main screen for the session, and the game opened where it could not be seen. That is gone, switch and all.)
+- Changed: with the virtual display switched on and no driver installed, the game starts on your own screen and the session says so. It used to refuse to start.
+- A new install has the virtual display on, at 1920 x 1080 and 240 Hz, when the driver was installed with it. If you were playing on your own screen, you still are.
+- "Restart needed" after a driver install is still shown after Optima was closed and opened again, until Windows has been restarted.
+- An install or removal that fails says all of it on the page: what happened, why, and every way out.
+- The page says what a virtual display is before it asks for a click. "Optima Virtualization" is called "Virtual display" everywhere, so it is not mistaken for the CPU's virtualization.
+- The stand-in display for developers is no longer used on a PC without the driver. It showed a display that was "active" while nothing existed.
+- The question about the driver when Optima closes has "do not ask again".
+- The list of monitors is folded away at the bottom. The enable, disable, preset and custom buttons are gone: the test and the check do what they did, and put things back themselves.
+
+## 2026-10-09 - Indev: Optima tells you when a newer version is out, and installs it
+
+- New: at every start Optima asks GitHub once whether a newer release is out. When there is one, HOME says so at the top, with an Update button. "later" hides it until the next start.
+- Update downloads the setup, checks it, and runs it. Windows asks once for administrator approval, Optima closes, and it opens again when the setup is done. Your settings stay as they are.
+- The setup is only run when it carries Optima's own signature. One that does not is deleted, and the notice says so. If you answer No to Windows, or the download fails, Optima keeps running as it is and the notice says why, with a link to the releases page.
+- Update is refused while Critical Ops is running: closing Optima would end your session.
+- The UPDATES page has "check now". Settings, under GENERAL, has the switch that turns the check at start off.
+- Changed: Optima contacts GitHub again, for this and nothing else. The list on the Legal page and in the README says so.
+- For whoever releases it: installer.ps1 -Release builds the setup without Optima Shield, signs it, and stops when the signing key is not on the machine. The .sig file goes on the release beside the setup.
+
+## 2026-10-09 - Indev: Optima installs to Program Files
+
+- Changed: the setup now asks for administrator rights once and installs to Program Files\Optima. Optima's helper runs with administrator rights, and in the old place, a folder of your own, any program could have replaced it or the driver beside it. In Program Files only an administrator can.
+- The same prompt covers the virtual display driver. There is no second prompt during setup.
+- A copy that an earlier setup put in your own folder is removed by this one, with its shortcuts and its entry in Add/Remove Programs. Settings, profiles and sessions are not touched.
+- Starting at sign-in is no longer a box in the setup. It is the switch in Settings and in the first-run wizard, as before. An existing entry is pointed at the new folder the first time Optima starts.
+- Optima is never started with administrator rights by its setup.
+- The setup no longer closes a running Optima by itself. It waits a few seconds for it to close and says so when it does not.
+
+## 2026-10-09 - Indev: a build without Optima Shield says nothing about it
+
+- A build made without Optima Shield no longer has a "protected play" row in Settings, and never shows the "What protected play does" screen at PLAY, also on a PC that was linked under an earlier build. Linking a Discord account works as before.
+- For whoever builds it: publish.ps1 and installer.ps1 take -NoShield, which leaves the module out of the payload even when it is in vendor\shield.
+
+## 2026-10-09 - Indev: the Discord card no longer offers an fps line
+
+- Removed: "live fps while the game runs" from the Discord presence chooser. The card never showed one. The Minimal preset is now the game and the session timer.
+- The card is no longer rebuilt every 15 seconds during a game for a number that was not there.
+
+## 2026-10-09 - Indev: "HDR off for the session" is gone
+
+- Removed: the "switch HDR off while the game runs" box on PERFORMANCE. It never changed anything. A stored choice for it is dropped the next time settings are saved.
+
+## 2026-10-09 - Indev: a pass over everything before 0.8.0
+
+- Fixed: with "relaunch after a crash" on, the relaunch ran while the crashed session was still putting the PC back. It was refused as "a session is already running", or it left PLAY stuck on "Running" until Optima was restarted. It now waits for the old session to finish.
+- Fixed: ending the game yourself (Terminate, Ctrl+Alt+K, Cancel) within five minutes of its start was taken for a crash, and the game was started again.
+- Fixed: a session could wait forever for the game to close while Optima's own setup guide, or any window with the game's name in its title, was open. The power plan, the display and the priorities were then never put back.
+- Fixed: Optima removed a "High performance" graphics preference you had set for the game in Windows yourself, at every start, with its own switch off. It now only removes what it set, and keeps the other choices stored in the same Windows value.
+- Fixed: Game Bar off and fullscreen optimizations off for the session stayed off for good when Optima was closed hard or crashed while the game ran. The next start puts them back.
+- Fixed: "HDR off for the session" was reported as applied. It changes nothing in this build, and no longer says it did.
+- Fixed: a save that failed (a file held by a scanner, a full disk, a locked database) closed Optima with "an unexpected error". It now says what could not be saved and carries on.
+- Fixed: settings and profiles could come back as defaults after Optima was killed in the middle of a save, or as an empty file after a power cut. The previous save is recovered instead.
+- Fixed: started in the tray, or closed to it, the launcher came up with focus after every game that watch mode had attached to.
+- Fixed: after Discord was restarted, the presence card stayed away until its text changed.
+- Fixed: a second start while Optima runs as administrator, or with a data folder that cannot be written, ended with no window and no message.
+- Fixed: the first-run wizard and the setup guide were taller than a 720p or a scaled laptop screen, with their buttons under the taskbar. The main window never opens larger than the screen either.
+- Fixed: the in-game name and account id boxes in Settings were a few pixels wide while empty.
+- Fixed: messages on the Settings bar (a test result, an error, "account saved") were replaced by "Unsaved changes" the moment they appeared.
+- Fixed: clicking one of the three session switches on PERFORMANCE while the page was loading saved the other two as off.
+- Fixed: the ping shown during a session stopped updating on a steady connection, and the page then said it was not measuring.
+- Fixed: "refresh stats" and "refresh matches" pressed while a game was running credited that game's matches to the session before it, and listed them a second time afterwards. Both now wait for the game to close.
+- Fixed: an exported built-in profile could not be imported again. It comes in under its name with "(imported)" added.
+- Fixed: a custom launch command with an unquoted path that has spaces in it, such as C:\Program Files\..., did not start.
+- Fixed: a repair that had nothing to do marked its issue as repaired. A repair that was cancelled left its card on "repairing".
+- Fixed: closing the link window while OptimaBot was being asked left the account linked on Discord and not in Optima.
+- Fixed: tracking the same player twice showed them twice, and two players added quickly could lose the first.
+- Fixed: the administrator prompt never led anywhere on a Windows account that is not an administrator itself.
+- The elevated helper starts Windows tools from System32 only, gives each of them a time limit, installs and removes no driver but the one Optima ships, and no longer ends on a request it cannot read. A driver install that needs a restart is no longer reported as failed.
+- The setup only clears an install folder that holds Optima.
+- Building a dev payload no longer closes the installed Optima.
+
+## 2026-10-08 - Indev: protected play keeps trying, and says when it is not running
+
+- Fixed: when OptimaBot could not be reached as a session began, Optima Shield gave up after three tries. The session stayed unprotected under a message that said it would resume. Shield now keeps asking for as long as Optima runs, and starts reporting as soon as the bot answers.
+- Fixed: one lost report could be recorded as a gap in a session. Reports now keep their pace whatever happened to the one before.
+- New: if Optima Shield is not running during a session and starting it once more did not help, Optima says so, once, in the window or from the tray.
+- A reason left behind by an earlier session, such as "OptimaBot did not answer", is no longer shown as this session's.
+- The "What protected play does" screen at PLAY now comes before the administrator prompt, and only for a launch you started yourself.
+- Fixed: a link that succeeded could lose its enrolment on this PC when the check right after it did not get through.
+- A PC whose clock is wrong is told so when a session cannot start, instead of being told to update or link again.
+- Pressing PLAY no longer waits on Shield being started.
+
+## 2026-10-08 - Indev: what protected play does, on one screen, before it runs
+
+- New: a screen called "What protected play does". It says what Optima Shield is, what it looks at, what it sends, what it never does and who sees what. You read it before you link a PC, and the "I have read this" button works once you have scrolled to the end.
+- Optima Shield does not start on a PC whose player has not read the current text. When a later version looks at more, the screen comes back at the next PLAY with what changed, and Shield waits until it was read. Nothing shows it in the background.
+- Linking a PC turns protected play on, so declining the screen is not linking.
+- The Settings page and the README say the same things in fewer words, and the README no longer says that Optima sends the reports itself.
+- The tray icon's tip reads "Optima · Shield running" while Shield is running.
+- If security software removes Optima Shield, Optima says so: on the Settings page, and as an issue with what to do (restore the file, or reinstall).
+- Installing over a running session, and uninstalling, ask Shield to send its last report and exit first.
+
+## 2026-10-08 - Indev: protected play moves into Optima Shield
+
+- Changed: protected play is now done by Optima Shield, a separate program installed beside Optima.exe. Optima starts it when you press PLAY and when watch mode finds the game running, and it stops when Optima closes. Optima itself no longer signs or sends the reports.
+- Optima Shield is closed source and is not in Optima's public repository. A build of Optima made from source has no Shield, runs without protected play, and the Settings page says so.
+- With administrator rights Shield covers more. PLAY asks for them in the same single prompt Optima already uses for frametime capture and the memory cleaner. Say no, or use a Windows account that is not an administrator, and Shield still runs: the session is recorded as reduced coverage. Nothing asks twice, and nothing asks in the background.
+- Only a linked PC runs Shield. An account linked with an earlier build has to be linked once more from this PC: run /link in Discord and press "link account" in Settings.
+- The Settings page, under DISCORD, shows what protected play is doing right now: protected with full or reduced coverage, not protected and why, or not running.
+- What Shield sends in this build, about every 10 seconds while it runs: your Critical Ops account id, its own version, the Windows build number, whether it has administrator rights, and that it is running. No check looks at the PC yet.
+- Link codes of up to 8 characters are accepted.
+- Not changed: a session that is not protected still runs. Optima does not hold the game back or close it.
+
+## 2026-10-08 - Indev: protected play is always on
+
+- Changed: protected play is no longer a setting. The checkbox on the Settings page is gone and every session Optima runs is reported to OptimaBot. Being checked is part of using Optima, not something each player decides.
+- The Settings page, under DISCORD, still says what is sent: your Critical Ops account id, the Optima version and a signed report every 10 seconds while a session runs. It also says whether this PC is enrolled.
+- An account that is not linked, or was linked before protected play, cannot be reported yet. Each of its sessions says so when it starts, with what to do: run /link in Discord and press "link account" in Settings.
+- Not changed: a session that cannot be reported still runs. Optima does not hold the game back or close it.
+
+## 2026-10-08 - Indev: protected play, part 1: a session a tournament can check
+
+- New: protected play, on the Settings page under DISCORD, off unless you turn it on. While a session started by Optima runs, Optima sends OptimaBot a signed report every 10 seconds. A tournament organizer reads the record with /verify in Discord, and you read your own with /protected.
+- A record says who played, when and for how long, whether the reports ever stopped, and whether Optima was closed while the game was still running. Reports that stop for more than 30 seconds count as a gap.
+- What it does not say yet: this build has no sensors that look for cheats. A record from it attests that Optima was running and reporting for the whole session, and the record itself says "presence only". The sensors come in the next builds and report through the same session.
+- The reports are signed with a key that is made on this PC when you link your account and never leaves it. An account linked before this build has to be linked once more, from the PC that plays: run /link in Discord and press "link account" again.
+- A session that could not be protected says so at once, in the window or from the tray, with the reason: the account is not linked, this PC is not enrolled, or OptimaBot did not answer. The game is never held back or closed over it.
+- What is sent while it is on: your Critical Ops account id, the Optima version and the reports. Nothing is sent while it is off.
+- Needs an OptimaBot that knows protected play. With an older bot a session reports itself as not protected.
+
+## 2026-10-06 - Indev: lighter beside the game, and pages that open at once
+
+- Fixed: the COMP mouse meter, once started, kept receiving every mouse movement for as long as Optima ran, during a game too. It now only listens while Optima is the window in front, and stops when you leave the COMP page.
+- With the window hidden or minimized, Optima no longer re-reads the display state every 10 seconds; it reads it once when the window comes back.
+- With the BOOST page open, the dial no longer redraws every frame while the window is unfocused, minimized or behind a game.
+- Two timers that ticked once or twice a second for the whole run, to mark readings as stale, now only run while there are readings.
+- Background demotion lists the running programs once per pass instead of once per listed program.
+- Discord: started in the tray, Optima does not connect to Discord until there is a card to show. In a game the card is recomposed every 15 seconds as intended, not every second, and a failed artwork lookup is retried later instead of on every update.
+- The Updates page opens at once: the newest entries are drawn first and the rest fill in below. It used to freeze for half a second or more.
+- The Sessions page no longer holds the window while it reads or writes the history, and CSV and PDF export no longer load every session's fps graph to write numbers.
+- Coming back to Performance or Sessions keeps what you left: open rows, the selected session and where the list was scrolled to, as long as nothing changed underneath.
+- The session graph draws a long session as its outline, with every spike kept, instead of one point per second.
+- The recent sessions widget on HOME builds only the rows that are in view.
+
+## 2026-10-06 - Indev: an exit that finishes what the session started
+
+- Fixed: exiting Optima while a session was running left the system as the session had set it (power plan, display, game priority), lost the session's record, and made the next start ask about a shutdown that had been a normal one. The exit now ends the session first: capture stops, everything is put back and the session is saved. It waits up to 10 seconds for that.
+- Fixed: every exit first asked Windows about the display driver and waited for the answer however long it took; with Windows not answering, Optima could not be closed. The question now gives up after 5 seconds.
+- Fixed: the session tweaks (HDR, Game Bar, fullscreen optimizations) were put back while Optima was already exiting, and could lose that race. The exit waits for them.
+- Fixed: with watch mode on, closing the game could start a second session a moment later: the profile was applied and restored again, and a row of a few seconds was left in the history.
+- Fixed: a session whose frametime capture was slow to stop was dropped as cancelled. It is saved with what it measured.
+- Fixed: installing the display driver over one that is already in place reported a failure. Windows answers "already there" with a code Optima read as an error.
+- Fixed: reloading the display driver while it is not running waited 3 seconds, raised an administrator prompt, waited 3 more and then failed. It now says so after the first 3.
+- Changed: the administrator prompt for frametime capture appears when PLAY is pressed, not on top of the game as it comes up, and capture starts with the first frames. A No is the answer for that launch: it is not asked again a moment later.
+- The window no longer freezes while an administrator prompt is open.
+- Fixed: issues you chose to ignore came back at every start when they were raised by the first lines of the log, such as how the previous run ended. The ignore list is now read before those lines are.
+- Fixed: an error during startup showed its message underneath the splash.
+- Saving settings waits out a file that another program holds open for a moment, as a virus scanner does right after a write, instead of failing.
+- Frametime capture reserves about 56 MB less memory while a game runs. The virtual display steps check five times as often, so a launch or a restore that uses one finishes a few hundred milliseconds sooner.
+
+## 2026-10-06 - Indev: a faster start
+
+- Faster: measured on a warm start of the development PC, the window is on screen after 0.60 s instead of 0.80 s, answers to input after 0.79 s instead of 1.34 s, and has its status rows, HOME and profiles filled in after 0.81 s instead of 1.94 s. A start uses about a third less processor time.
+- Not changed: the splash still plays in full, so it leaves the screen at the same moment as before, about 2.5 s after the start. The app is now ready well before it does.
+- Fixed: the window froze right after it appeared, for half a second on most starts and for about five seconds when Optima had not run for a few minutes. The live readings opened a Windows performance counter to work out a CPU clock value that no page showed. The counter is gone, and what is left of that setup no longer runs on the window's thread.
+- Fixed: every start saved the settings although nothing had changed (the selected profile was "selected" again), and everything that listens for a settings change then did its work a second time: the display driver was probed twice, the player profile was fetched twice. A save that changes nothing is no longer a save.
+- The status rows no longer wait for each other. The driver, virtualization and game checks ran one after the other, and HOME, the profiles and the watchdog waited behind them; they now run side by side.
+- The window paints before the tray icon, the hotkeys and the background services are set up, instead of after.
+- The splash no longer holds startup back until it is on screen, and the app no longer builds a generic host it never used (configuration files, a console logger, a Ctrl+C handler).
+- Less work after the start: the runtime's profile-guided recompiling is off. It took over a second of processor time in the half minute after every start, which is when the game is being launched.
+- New in the log: one "Startup timeline" line per start, with the moments of that start in milliseconds, so a slow start can be read off the log.
+- For testing a build: with the environment variable OPTIMA_DATA_DIR set to a folder, Optima keeps its settings, sessions and logs there instead of in %LOCALAPPDATA%\Optima.
+
 ## 2026-10-06 - Indev: installing the driver no longer switches a display on
 
 - Fixed: installing the virtual display driver put a virtual monitor on the desktop straight away, at setup and from the DISPLAY page alike, before any session asked for one. A newly created driver device comes up enabled and nothing switched it off. It is now left off after the install: a session with a virtual display profile, or enable on the DISPLAY page, switches it on as before.

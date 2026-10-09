@@ -59,6 +59,10 @@ public sealed class EtwFrametimeCollector : IDisposable
         _session = new TraceEventSession("Optima-PresentTrace")
         {
             StopOnDispose = true,
+            // The library's default is 64 MB, which Windows sets aside from non-paged memory for
+            // as long as the session runs, beside the game. Two event ids, a few thousand events
+            // a second at most and flushed every second, never come near 8.
+            BufferSizeMB = 8,
         };
         var options = new TraceEventProviderOptions { EventIDsToEnable = [.. PresentStartEventIds] };
         if (_candidatePids.Count <= MaxFilteredPids)

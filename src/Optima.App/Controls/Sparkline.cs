@@ -2,6 +2,10 @@ using System.Collections;
 using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using Optima.App.Services;
+using Optima.Core.Theming;
+using Optima.Core.Statistics;
 
 namespace Optima.App.Controls;
 
@@ -33,16 +37,31 @@ public sealed class Sparkline : FrameworkElement
     // list, two geometries, a gradient brush and a pen on every repaint, and it repaints on every
     // sample the host appends.
     private readonly List<double> _values = [];
+    private readonly List<int> _drawn = [];
     private Brush? _fill;
     private Color _fillAccent;
     private Pen? _pen;
     private Brush? _penStroke;
 
+    // The line is drawn into a visual of its own, so that a new sample can flow in: the drawing
+    // is made once per sample and then only moved, which costs nothing to redraw.
+    private readonly DrawingVisual _plot = new();
+    private readonly TranslateTransform _slide = new();
+    private bool _stepped;
+    private int _lastCount;
+
     public Sparkline()
     {
         IsHitTestVisible = false;
         SnapsToDevicePixels = false;
+        ClipToBounds = true;
+        _plot.Transform = _slide;
+        AddVisualChild(_plot);
     }
+
+    protected override int VisualChildrenCount => 1;
+
+    protected override Visual GetVisualChild(int index) => _plot;
 
     /// <summary>
     /// The series behind a sparkline is normally an observable collection that the host appends to
@@ -62,10 +81,15 @@ public sealed class Sparkline : FrameworkElement
         }
     }
 
-    private void OnValuesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => InvalidateVisual();
-
-    protected override void OnRender(DrawingContext dc)
+    private void OnValuesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        _stepped = e.Action == NotifyCollectionChangedAction.Add;
+        InvalidateVisual();
+    }
+
+    protected override void OnRender(DrawingContext drawingContext)
+    {
+        using var dc = _plot.RenderOpen();
         var w = ActualWidth;
         var h = ActualHeight;
         if (w <= 0 || h <= 0 || Values is null)
@@ -123,6 +147,11 @@ public sealed class Sparkline : FrameworkElement
             pad + index * stepX,
             pad + (h - 2 * pad) * (1 - (_values[index] - min) / span));
 
+        // A session's series is one sample per second: an hour is 3600 points across a few hundred
+        // pixels, and the render thread works through all of them again each time this part of
+        // the window is redrawn. Past two samples per pixel only each column's extremes are drawn.
+        SeriesEnvelope.Select(_values, (int)(w - 2 * pad), _drawn);
+
         var line = new StreamGeometry();
         var area = new StreamGeometry();
         using (var lc = line.Open())
@@ -131,10 +160,11 @@ public sealed class Sparkline : FrameworkElement
             lc.BeginFigure(At(0), false, false);
             ac.BeginFigure(new Point(pad, h), true, true);
             ac.LineTo(At(0), false, false);
-            for (var i = 1; i < _values.Count; i++)
+            for (var i = 1; i < _drawn.Count; i++)
             {
-                lc.LineTo(At(i), true, true);
-                ac.LineTo(At(i), false, false);
+                var point = At(_drawn[i]);
+                lc.LineTo(point, true, true);
+                ac.LineTo(point, false, false);
             }
             ac.LineTo(new Point(pad + (_values.Count - 1) * stepX, h), false, false);
         }
@@ -163,5 +193,15 @@ public sealed class Sparkline : FrameworkElement
         dc.DrawGeometry(_fill, null, area);
         dc.DrawGeometry(null, _pen, line);
         dc.DrawEllipse(Stroke, null, At(_values.Count - 1), 2.5, 2.5);
+
+        // A full series that took one more sample has moved one step to the left. Drawn where it
+        // was a moment ago and let go, it flows there instead of jumping.
+        if (_stepped && _values.Count == _lastCount && stepX >= 1 && IsVisible)
+        {
+            _slide.BeginAnimation(TranslateTransform.XProperty,
+                new DoubleAnimation(stepX, 0, Motion.Duration(MotionSpec.DataMs)) { EasingFunction = Motion.Ease });
+        }
+        _stepped = false;
+        _lastCount = _values.Count;
     }
 }

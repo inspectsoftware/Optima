@@ -20,7 +20,8 @@ public sealed partial class CommandExecutor : IAsyncDisposable
 
     private static readonly string[] AllowedWindowsFeatures = ["HypervisorPlatform", "VirtualMachinePlatform"];
 
-    private static readonly Regex ProgressPercentPattern = new(@"(\d+(?:\.\d+)?)%", RegexOptions.Compiled);
+    [GeneratedRegex(@"(\d+(?:\.\d+)?)%")]
+    private static partial Regex ProgressPercentPattern();
 
     private readonly Func<IpcEvent, Task> _publishEvent;
     private EtwFrametimeCollector? _etw;
@@ -202,6 +203,10 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 {
                     return fail("Invalid hardware id.");
                 }
+                if (!IsBundledHardwareId(hardwareId))
+                {
+                    return fail("That is not the driver Optima ships.");
+                }
 
                 var installed = await InstallDriverPackageAsync(infPath, hardwareId, ct);
                 return installed.Success
@@ -216,6 +221,10 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     || !SafeInstanceIdPattern().IsMatch(hardwareId))
                 {
                     return fail("Invalid hardware id.");
+                }
+                if (!IsBundledHardwareId(hardwareId))
+                {
+                    return fail("That is not the driver Optima ships.");
                 }
 
                 var (succeeded, removed, removeError) = DeviceInstaller.RemoveRootDevices(hardwareId);
@@ -258,7 +267,9 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 {
                     return ok(new Dictionary<string, string> { ["created"] = "0" });
                 }
-                await File.WriteAllTextAsync(settingsPath, content, ct);
+                // Only ever the default file. What the caller sent is not written: this process is
+                // the administrator, and the text would otherwise be the caller's to choose.
+                await File.WriteAllTextAsync(settingsPath, Optima.Core.Configuration.VddSettingsDefaults.DefaultXml, ct);
                 return ok(new Dictionary<string, string> { ["created"] = "1" });
             }
 
@@ -413,6 +424,49 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail("The standby list could not be purged: " + ex.Message);
                 }
 
+            case IpcCommand.LaunchShield:
+            {
+                // Starts the protection module with this helper's rights. The only thing a caller
+                // chooses is the mode. The file is the one beside this helper, and only when it is
+                // the file this build of Optima was made with: its SHA-256 was written into this
+                // assembly at build time. It is held open, without write sharing, from the hash to
+                // the start, so the file that runs is the file that was checked.
+                if (!request.Args.TryGetValue("mode", out var mode) || mode is not ("play" or "watch"))
+                {
+                    return fail("Invalid mode.");
+                }
+                var expected = System.Reflection.CustomAttributeExtensions
+                    .GetCustomAttributes<System.Reflection.AssemblyMetadataAttribute>(typeof(CommandExecutor).Assembly)
+                    .FirstOrDefault(a => a.Key == "ShieldSha256")?.Value;
+                if (string.IsNullOrEmpty(expected))
+                {
+                    return fail("This build of Optima has no protection module.");
+                }
+
+                var path = Path.Combine(AppContext.BaseDirectory, "Optima.Shield.exe");
+                try
+                {
+                    await using var exe = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                    var actual = Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(exe, ct));
+                    if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return fail("Optima Shield is not the file this version of Optima was built with.");
+                    }
+
+                    using var started = Process.Start(new ProcessStartInfo(path, "mode=" + mode)
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WorkingDirectory = AppContext.BaseDirectory,
+                    });
+                    return started is null ? fail("Optima Shield did not start.") : ok(null);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+                {
+                    return fail("Optima Shield could not be started: " + ex.Message);
+                }
+            }
+
             case IpcCommand.EnableWindowsFeature:
             {
                 if (!request.Args.TryGetValue("feature", out var feature)
@@ -425,7 +479,7 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     timeout: TimeSpan.FromMinutes(8),
                     onOutputLine: async line =>
                     {
-                        var match = ProgressPercentPattern.Match(line);
+                        var match = ProgressPercentPattern().Match(line);
                         if (match.Success)
                         {
                             var percent = double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
@@ -470,15 +524,19 @@ public sealed partial class CommandExecutor : IAsyncDisposable
     {
         var (stageCode, stageOutput) = await RunProcessAsync("pnputil.exe", $"/add-driver \"{infPath}\" /install", ct);
         HelperLog.Write($"pnputil /add-driver exit={stageCode}: {Truncate(stageOutput)}");
-        if (stageCode != 0)
+        // 259 is pnputil saying the package is already staged and up to date, which is what every
+        // install over an existing one finds. It is the same footing as 0 for what follows.
+        // 3010 is success with a restart owed, which is what replacing a driver that is in use gets.
+        if (stageCode is not (0 or 259 or 3010))
         {
             return (false, false, false, $"pnputil could not stage the driver package (exit {stageCode}). {Truncate(stageOutput)}");
         }
+        var stageNeedsRestart = stageCode == 3010;
 
         if (DeviceInstaller.RootDeviceExists(hardwareId))
         {
             HelperLog.Write($"A present device already carries {hardwareId}; the package was updated in place");
-            return (true, false, true, string.Empty);
+            return (true, stageNeedsRestart, true, string.Empty);
         }
 
         var (created, reboot, createError) = DeviceInstaller.CreateRootDevice(hardwareId, infPath);
@@ -493,7 +551,7 @@ public sealed partial class CommandExecutor : IAsyncDisposable
             HelperLog.Write($"pnputil /disable-device after create exit={disableCode}: {Truncate(disableOutput)}");
         }
         return created
-            ? (true, reboot, false, string.Empty)
+            ? (true, reboot || stageNeedsRestart, false, string.Empty)
             : (false, false, false, createError);
     }
 
@@ -525,6 +583,14 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         }
         return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(full);
     }
+
+    /// <summary>
+    /// The install and remove commands act on one device only, the bundled virtual display. A
+    /// hardware id taken on trust would let a caller remove any display adapter, the real one included.
+    /// </summary>
+    private static bool IsBundledHardwareId(string hardwareId)
+        => Optima.Core.Detection.BundledDriverPackage.Find(Path.Combine(AppContext.BaseDirectory, "drivers")) is { } package
+            && string.Equals(package.HardwareId, hardwareId, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsAcceptableSettingsPath(string path)
     {
@@ -597,9 +663,17 @@ public sealed partial class CommandExecutor : IAsyncDisposable
     internal static IReadOnlyList<string> FindPublishedDriverNames(string pnputilOutput, string originalInfName)
     {
         var results = new List<string>();
+        // A published name is never an original name: asked for "oem12.inf", the search would
+        // match that package's own entry and delete whatever driver it is.
+        if (Regex.IsMatch(originalInfName, @"^oem\d+\.inf$", RegexOptions.IgnoreCase))
+        {
+            return results;
+        }
+        // The whole value of a line, not a part of one ("vdd.inf" is not "myvdd.inf").
+        var wholeValue = new Regex($@":\s*{Regex.Escape(originalInfName)}\s*$", RegexOptions.IgnoreCase | RegexOptions.Multiline);
         foreach (var block in pnputilOutput.Split(["\r\n\r\n", "\n\n"], StringSplitOptions.RemoveEmptyEntries))
         {
-            if (!block.Contains(originalInfName, StringComparison.OrdinalIgnoreCase))
+            if (!wholeValue.IsMatch(block))
             {
                 continue;
             }
@@ -616,9 +690,13 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         string fileName, string arguments, CancellationToken ct, TimeSpan? timeout = null,
         Func<string, Task>? onOutputLine = null)
     {
+        // Always the copy in System32. A bare name is looked up in the helper's own folder first,
+        // and that folder is the user's: a file dropped there under a tool's name would otherwise
+        // be started with this process's administrator rights.
+        var toolPath = Path.IsPathRooted(fileName) ? fileName : Path.Combine(Environment.SystemDirectory, fileName);
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo(fileName, arguments)
+            StartInfo = new ProcessStartInfo(toolPath, arguments)
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -629,33 +707,26 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         process.Start();
         // A hung tool (dism against a stuck servicing stack, for example) must not wedge the elevated
         // helper forever: after the timeout the process tree is killed and a synthetic failure returns.
+        // Every tool gets a limit, because the helper answers one request at a time and would not
+        // even see the app closing behind a tool that never returns.
+        var limit = timeout ?? DefaultToolTimeout;
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        if (timeout is { } limit)
-        {
-            lifetime.CancelAfter(limit);
-        }
+        lifetime.CancelAfter(limit);
         try
         {
-            string output;
-            if (onOutputLine is null)
-            {
-                output = await process.StandardOutput.ReadToEndAsync(lifetime.Token);
-            }
-            else
-            {
-                // Tools like dism redraw progress with \r on one line, so ReadLine/ReadToEnd never see the
-                // intermediate updates. Split on both \r and \n as characters arrive to stream them.
-                var errorTask = process.StandardError.ReadToEndAsync(lifetime.Token);
-                output = await StreamLinesAsync(process.StandardOutput, onOutputLine, lifetime.Token);
-                var error = await errorTask;
-                await process.WaitForExitAsync(lifetime.Token);
-                return (process.ExitCode, output + error);
-            }
-            var errorText = await process.StandardError.ReadToEndAsync(lifetime.Token);
+            // Both streams are read at once: a tool that fills the error pipe while only its
+            // output is being read never exits.
+            var errorTask = process.StandardError.ReadToEndAsync(lifetime.Token);
+            // Tools like dism redraw progress with \r on one line, so ReadLine/ReadToEnd never see the
+            // intermediate updates. Split on both \r and \n as characters arrive to stream them.
+            var output = onOutputLine is null
+                ? await process.StandardOutput.ReadToEndAsync(lifetime.Token)
+                : await StreamLinesAsync(process.StandardOutput, onOutputLine, lifetime.Token);
+            var error = await errorTask;
             await process.WaitForExitAsync(lifetime.Token);
-            return (process.ExitCode, output + errorText);
+            return (process.ExitCode, output + error);
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
             try
             {
@@ -665,9 +736,12 @@ public sealed partial class CommandExecutor : IAsyncDisposable
             {
                 // already gone or access denied; either way there is nothing more to do
             }
-            return (-1, $"{fileName} was killed after {timeout?.TotalMinutes ?? 0:F0} min with no result.");
+            ct.ThrowIfCancellationRequested();
+            return (-1, $"{fileName} was killed after {limit.TotalMinutes:F0} min with no result.");
         }
     }
+
+    private static readonly TimeSpan DefaultToolTimeout = TimeSpan.FromMinutes(5);
 
     private static async Task<string> StreamLinesAsync(
         StreamReader reader, Func<string, Task> onLine, CancellationToken ct)

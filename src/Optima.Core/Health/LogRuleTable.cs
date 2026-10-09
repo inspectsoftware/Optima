@@ -40,6 +40,7 @@ public static class LogRuleTable
         new("Corrupt JSON at {Path}; recovered", "SETTINGS_RECOVERED", IssueSeverity.Note),
         new("Corrupt JSON at {Path}", "SETTINGS_CORRUPT", IssueSeverity.Error),
         new("Elevated helper not found", "HELPER_MISSING", IssueSeverity.Error),
+        new("Optima Shield is missing", "SHIELD_MISSING", IssueSeverity.Error),
         new("Unexpected session failure", "UNEXPECTED", IssueSeverity.Error, PerCallSite: true),
         new("Session task faulted", "UNEXPECTED", IssueSeverity.Error, PerCallSite: true),
     ];

@@ -157,7 +157,8 @@ public sealed partial class SessionsViewModel : ObservableObject
         {
             return;
         }
-        var history = await _sessions.GetSessionsAsync(500);
+        // Summaries: the export writes each session's numbers, never its per-second fps series.
+        var history = await _sessions.GetSessionSummariesAsync(500);
         try
         {
             await File.WriteAllTextAsync(dialog.FileName, TrackedPlayerDigest.ToCsv(history));
@@ -182,7 +183,7 @@ public sealed partial class SessionsViewModel : ObservableObject
             return;
         }
 
-        var history = await _sessions.GetSessionsAsync(500);
+        var history = await _sessions.GetSessionSummariesAsync(500);
         var digest = TrackedPlayerDigest.BuildWeekly(history, DateTimeOffset.Now);
         var lines = new List<string>
         {
@@ -329,34 +330,46 @@ public sealed partial class SessionsViewModel : ObservableObject
         var trend = SessionTrendBuilder.Build(history, TrendLength);
         var changedByid = trend.Where(p => p.ConfigChanged).Select(p => p.Session.Id).ToHashSet();
 
-        Rows.Clear();
-        foreach (var record in history)
+        // The page reloads each time it is opened. A history that reads back the same keeps its
+        // rows, and with them the selected session and where the list was scrolled to; a new or
+        // changed session rebuilds the list and selects the newest, as before.
+        if (history.Count != Rows.Count || !history.Zip(Rows).All(pair => SameSession(pair.First, pair.Second.Record)))
         {
-            Rows.Add(new SessionRowViewModel(record, changedByid.Contains(record.Id)));
+            Rows.Clear();
+            foreach (var record in history)
+            {
+                Rows.Add(new SessionRowViewModel(record, changedByid.Contains(record.Id)));
+            }
         }
+        // Before the awaits below, which now really give the thread back: selected afterwards, the
+        // page was drawn once with no session selected and the detail pane folded away.
+        SelectedRow ??= Rows.FirstOrDefault();
 
         BuildTrend(trend);
         BuildProfileTrends(history);
         BuildWeeklyDigest(history);
 
-        Profiles.Clear();
-        foreach (var profile in await _profiles.GetProfilesAsync(ct))
-        {
-            Profiles.Add(profile);
-        }
+        // Left alone when unchanged for the same reason: clearing it blanks the profile boxes.
+        BoundRows.Replace(Profiles, await _profiles.GetProfilesAsync(ct));
 
         await LoadMatchesAsync(ct);
-
-        SelectedRow ??= Rows.FirstOrDefault();
     }
+
+    /// <summary>
+    /// Whether two reads of a session carry the same data. Each read builds its lists anew, so
+    /// those are compared by content and everything else by the record itself.
+    /// </summary>
+    private static bool SameSession(SessionRecord a, SessionRecord b)
+        => a.TweakIds.SequenceEqual(b.TweakIds)
+            && a.FpsSamples.SequenceEqual(b.FpsSamples)
+            && a with { TweakIds = b.TweakIds, FpsSamples = b.FpsSamples } == b;
 
     private async Task LoadMatchesAsync(CancellationToken ct = default)
     {
-        Matches.Clear();
-        foreach (var match in await _sessions.GetMatchesAsync(50, ct))
-        {
-            Matches.Add(new MatchRowViewModel(match));
-        }
+        // Read first, then fill: the store answers from the pool, so two reloads can overlap, and
+        // clearing before the wait would let both append and list every match twice.
+        var matches = await _sessions.GetMatchesAsync(50, ct);
+        BoundRows.Replace(Matches, matches.Select(match => new MatchRowViewModel(match)).ToList());
 
         var ranked = Matches.Where(m => m.Record.Mode == "ranked").ToList();
         MatchesSummary = ranked.Count == 0

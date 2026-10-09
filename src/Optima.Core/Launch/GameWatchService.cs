@@ -1,5 +1,6 @@
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
+using Optima.Core.Models;
 using Optima.Core.Monitoring;
 using Microsoft.Extensions.Logging;
 
@@ -103,19 +104,30 @@ public sealed class GameWatchService : IAsyncDisposable
     /// </summary>
     private void OnSessionEnded()
     {
+        if (!_watchEnabled)
+        {
+            return;
+        }
+        var ct = _cts?.Token ?? CancellationToken.None;
+        _ = Task.Run(() => AttachIfStillRunningAsync(ct), CancellationToken.None);
+    }
+
+    private async Task AttachIfStillRunningAsync(CancellationToken ct)
+    {
         try
         {
-            var action = _policy.OnSessionEnded(
-                _watchEnabled,
-                _orchestrator.IsSessionActive,
-                _presence.Current == GamePresence.InGame);
-            if (action != WatchAction.Attach)
+            // The monitor is asked, not presence. Presence keeps saying "in game" for three more
+            // polls after the game window has gone, so a session that ended because the game closed
+            // would be told the game is still up and be attached to a second time. The monitor's
+            // sweep is the one that has just ended the session.
+            var running = await _processMonitor.GetGameStateAsync(ct).ConfigureAwait(false) == GameRuntimeState.Running;
+            if (_policy.OnSessionEnded(_watchEnabled, _orchestrator.IsSessionActive, running) == WatchAction.Attach)
             {
-                return;
+                await AttachAsync(ct).ConfigureAwait(false);
             }
-
-            var ct = _cts?.Token ?? CancellationToken.None;
-            _ = Task.Run(() => AttachSafeAsync(ct), CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex)
         {

@@ -1,6 +1,7 @@
-﻿<UserControl x:Class="Optima.App.Views.SettingsView"
+<UserControl x:Class="Optima.App.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:Optima.App.Controls">
   <UserControl.Resources>
     <Style x:Key="RowLabel" TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
       <Setter Property="VerticalAlignment" Value="Center" />
@@ -74,12 +75,12 @@
                         ToolTip="Preview of the accent that will apply on save" />
               </StackPanel>
 
-              <TextBlock Grid.Row="2" Text="motion" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="2" Grid.Column="1" IsChecked="{Binding FollowWindowsMotion}" VerticalAlignment="Center" Margin="0,5"
-                        Content="follow the Windows animation setting" />
+              <TextBlock Grid.Row="2" Text="animations" Style="{StaticResource RowLabel}" />
+              <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AnimationOptions}" SelectedItem="{Binding Animations}"
+                        Width="200" HorizontalAlignment="Left" Margin="0,5" />
 
               <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource Text.Micro}" Margin="0,2,0,4" TextWrapping="Wrap"
-                         Text="Theme and accent apply the moment you save. Motion follows Windows by default; untick to keep Optima's drift, light and transitions on regardless." />
+                         Text="Theme and accent apply the moment you save. Animations follow the Windows setting by default (Settings, Accessibility, Visual effects). Off makes everything arrive at once. Nothing is animated while a game is running." />
             </Grid>
           </HeaderedContentControl>
 
@@ -114,7 +115,7 @@
                              VerticalAlignment="Center" Margin="12,0,0,0" />
                 </StackPanel>
                 <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Pick exactly which facts the card carries: your name, rank, emblem, ranked record, rating, live fps and the session timer, plus which line Discord shows as your status. Start from a preset or tick each field yourself. Nothing is sent while the game and the launcher card are off." />
+                           Text="Pick exactly which facts the card carries: your name, rank, emblem, ranked record, rating and the session timer, plus which line Discord shows as your status. Start from a preset or tick each field yourself. Nothing is sent while the game and the launcher card are off." />
               </StackPanel>
 
               <TextBlock Grid.Row="3" Text="application id" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
@@ -214,13 +215,13 @@
               </Grid.RowDefinitions>
               <TextBlock Text="in-game name" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
               <StackPanel Grid.Column="1" Margin="0,5">
-                <TextBox Text="{Binding PlayerIgn, UpdateSourceTrigger=PropertyChanged}" MaxWidth="320" HorizontalAlignment="Left" />
+                <TextBox Text="{Binding PlayerIgn, UpdateSourceTrigger=PropertyChanged}" MinWidth="220" MaxWidth="320" HorizontalAlignment="Left" />
                 <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
                            Text="Reads your public profile from Critical Force's public API so sessions can record ranked kills, deaths and wins. Either this or the account id below enables all stat lookups." />
               </StackPanel>
               <TextBlock Grid.Row="1" Text="account id" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
               <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,5">
-                <TextBox Text="{Binding PlayerAccountId, UpdateSourceTrigger=PropertyChanged}" MaxWidth="320" HorizontalAlignment="Left" />
+                <TextBox Text="{Binding PlayerAccountId, UpdateSourceTrigger=PropertyChanged}" MinWidth="220" MaxWidth="320" HorizontalAlignment="Left" />
                 <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
                            Text="The number on your Critical Ops profile. The id is checked first and is exact, so it keeps working if you rename. The in-game name is the fallback when no id is set." />
                 <Grid Margin="0,8,0,0">
@@ -305,6 +306,10 @@
               <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding StartWithWindows}" VerticalAlignment="Center" Margin="0,5"
                         Content="launch the Watchdog minimized to the tray at sign-in" />
 
+              <TextBlock Grid.Row="6" Text="updates" Style="{StaticResource RowLabel}" />
+              <CheckBox Grid.Row="6" Grid.Column="1" IsChecked="{Binding CheckForUpdatesAtStart}" VerticalAlignment="Center" Margin="0,5"
+                        Content="check for a newer Optima at every start (one request to GitHub)" />
+
               <TextBlock Grid.Row="7" Text="mock fps provider" Style="{StaticResource RowLabel}" />
               <CheckBox Grid.Row="7" Grid.Column="1" IsChecked="{Binding UseMockMetricsProvider}" VerticalAlignment="Center" Margin="0,5"
                         Content="developer: synthetic fps data (applies after restart)" />
@@ -347,7 +352,7 @@
 
   <!-- Pinned save bar: the one save control on the page. It appears whenever anything
        differs from the last save, and confirms in place with [ OK ] before fading out. -->
-  <Border x:Name="SaveBar" VerticalAlignment="Bottom"
+  <Border x:Name="SaveBar" VerticalAlignment="Bottom" ctl:Flow.Arrive="14"
           Background="{DynamicResource Brush.Surface}"
           BorderBrush="{DynamicResource Brush.Accent}" BorderThickness="0,1,0,0"
           Padding="22,10" Visibility="{Binding SaveBarVisible, Converter={StaticResource BoolToVis}}">

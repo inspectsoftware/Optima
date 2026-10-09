@@ -102,6 +102,10 @@ public static class ProcessSnapshot
             {
                 result.Add((process.Id, process.ProcessName));
             }
+            catch (InvalidOperationException)
+            {
+                // Exited between the listing and the read.
+            }
             finally
             {
                 process.Dispose();

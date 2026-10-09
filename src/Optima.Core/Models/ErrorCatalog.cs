@@ -23,7 +23,7 @@ public static class ErrorCatalog
             "Optima enabled the virtual display driver, but Windows never attached a display to the desktop within 15 seconds.",
             "The driver device was enabled but its monitor output stayed parked. This is the most common virtual display fault; a settings reload almost always wakes it.",
             [
-                "Open the Display page and press RELOAD DRIVER so the driver re-reads vdd_settings.xml",
+                "Open the Display page, run Check my setup, and press Reload driver on the step that failed",
                 "Check vdd_settings.xml (default C:\\VirtualDisplayDriver\\vdd_settings.xml) has a monitor count of at least 1",
                 "Reinstall the virtual display driver from the Display page",
             ]),
@@ -42,7 +42,7 @@ public static class ErrorCatalog
             "Optima wrote RELOAD_DRIVER to the driver's control pipe, but the driver never acknowledged it.",
             "The driver service is loaded but not answering: it can be stuck, partially installed, or its control pipe is held by another program.",
             [
-                "Restart the machine once, then press RELOAD DRIVER again",
+                "Restart the PC once, then run Check my setup on the Display page again",
                 "Reinstall the virtual display driver from the Display page",
                 "Check the log on the Debug page for the underlying pipe error",
             ]),
@@ -61,7 +61,7 @@ public static class ErrorCatalog
             "Optima needs to edit vdd_settings.xml to apply the requested mode, and writing it requires administrator access.",
             "The file sits in a protected folder and no equivalent mode was available without an edit.",
             [
-                "Pick a mode the driver already advertises (the Display page lists them)",
+                "Pick one of the resolutions offered on the Display page",
                 "Run the request once more and approve the administrator prompt",
             ]),
         new(
@@ -70,8 +70,8 @@ public static class ErrorCatalog
             "Windows accepted the mode change, but the display kept running at its own preferred mode instead of the requested one.",
             "The driver reverted to a mode it prefers; some driver builds do this for modes that were never loaded from its settings file.",
             [
-                "Add the exact mode to vdd_settings.xml, then press RELOAD DRIVER on the Display page",
-                "Pick the mode from the live list on the Display page instead of typing one",
+                "Pick the resolution on the Display page and run Check my setup: Optima adds the mode to the driver settings and reloads the driver",
+                "Try a lower refresh rate at the same resolution",
             ]),
         new(
             "DEVICE_TOGGLE_FAILED",
@@ -97,8 +97,8 @@ public static class ErrorCatalog
             "The requested resolution or refresh rate is not in the display's advertised mode list.",
             "The display (or driver, as configured) does not offer that mode on this machine.",
             [
-                "Pick a mode from the list instead of typing a custom one",
-                "For the virtual display, add the mode to vdd_settings.xml and press RELOAD DRIVER",
+                "Pick one of the resolutions offered on the Display page",
+                "For the virtual display, run Check my setup on the Display page: it adds the mode to the driver settings and reloads the driver",
             ]),
         new(
             "DISPLAY_NOT_ACTIVE",
@@ -106,7 +106,7 @@ public static class ErrorCatalog
             "The display Optima was asked to use has no current mode, so it cannot be part of the layout.",
             "The display was disabled, disconnected, or is a phantom entry that Windows no longer drives.",
             [
-                "Enable the display on the Display page first",
+                "Run Check my setup on the Display page to see whether the virtual display turns on",
                 "Hide inactive displays on the Display page to drop phantom entries",
             ]),
         new(
@@ -335,6 +335,15 @@ public static class ErrorCatalog
             [
                 "Reinstall Optima from its setup",
                 "Check whether security software quarantined Optima.Watchdog.exe, and restore it",
+            ]),
+        new(
+            "SHIELD_MISSING",
+            "Optima Shield is missing",
+            "Optima.Shield.exe is not next to Optima.exe. It is the program that runs protected play, so sessions on this PC are not protected until it is back.",
+            "Security software removed the file, or the install is incomplete. Optima Shield asks for administrator rights and is new, and some security software distrusts a program like that until it has seen it often.",
+            [
+                "Check whether security software quarantined Optima.Shield.exe, and restore it",
+                "Reinstall Optima from its setup",
             ]),
         new(
             "VIRTUALIZATION_OFF",

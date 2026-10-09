@@ -1,3 +1,5 @@
+using static Optima.Core.Theming.MotionSpec;
+
 namespace Optima.Core.Theming;
 
 /// <summary>One of the four blades of the mark: how far it still is from home, and how visible.</summary>
@@ -53,10 +55,10 @@ public static class SplashTimeline
             var landed = Clamp(p);
             // Brightest as the blade seats, gone a moment later.
             var flash = p is > 0.7 and < 1.7 ? Math.Sin(Math.PI * (p - 0.7)) : 0;
-            blades[i] = new SplashBlade(BladeDistance * (1 - Back(landed)), Clamp(p * 3), flash);
+            blades[i] = new SplashBlade(BladeDistance * (1 - EaseOut(landed)), Clamp(p * 3), flash);
         }
 
-        var lockIn = Back(Clamp((t - 950) / 300));
+        var lockIn = EaseOut(Clamp((t - 950) / 300));
         var sweep = Clamp((t - 1000) / 380);
         var letterOpacity = new double[Letters];
         var letterRise = new double[Letters];
@@ -69,7 +71,7 @@ public static class SplashTimeline
         var breathe = t > IntroMs ? 0.006 * Math.Sin((t - IntroMs) / 900) : 0;
 
         var frame = new SplashFrame(
-            SquareScale: Back(squareIn),
+            SquareScale: EaseOut(squareIn),
             SquareRotation: 45 * (1 - EaseOut(squareIn)),
             SquareOpacity: Clamp(t / 120),
             Blades: blades,
@@ -106,12 +108,4 @@ public static class SplashTimeline
             Fade = 1 - Clamp((o / OpenMs - 0.55) / 0.45),
         };
     }
-
-    private static double Clamp(double x) => Math.Max(0, Math.Min(1, x));
-
-    private static double EaseOut(double x) => 1 - Math.Pow(1 - x, 3);
-
-    private static double EaseInOut(double x) => x < 0.5 ? 4 * x * x * x : 1 - Math.Pow(-2 * x + 2, 3) / 2;
-
-    private static double Back(double x) => 1 + 2.70158 * Math.Pow(x - 1, 3) + 1.70158 * Math.Pow(x - 1, 2);
 }

@@ -19,6 +19,7 @@
                 <DataTrigger Binding="{Binding State}" Value="Done">
                   <Setter Property="Symbol" Value="{StaticResource Icon.Check}" />
                   <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                  <Setter Property="ctl:Flow.Draw" Value="True" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding State}" Value="Live">
                   <Setter Property="Symbol" Value="{StaticResource Icon.Dot}" />
@@ -110,8 +111,18 @@
           </Grid.ColumnDefinitions>
 
           <StackPanel>
-            <ItemsControl ItemsSource="{Binding Steps}" ItemTemplate="{StaticResource StepRow}" />
-            <ProgressBar Value="{Binding SessionProgress, Mode=OneWay}" Maximum="1" Margin="24,4,0,0" />
+            <Grid>
+              <!-- Beside the step that is running now; it moves down the list as the launch does. -->
+              <Rectangle x:Name="StepMarker" Width="2" Height="15" Margin="-10,0,0,0" Opacity="0"
+                         HorizontalAlignment="Left" VerticalAlignment="Top"
+                         Fill="{DynamicResource Brush.Accent}" IsHitTestVisible="False">
+                <Rectangle.RenderTransform>
+                  <TranslateTransform x:Name="StepMarkerShift" />
+                </Rectangle.RenderTransform>
+              </Rectangle>
+              <ItemsControl x:Name="StepList" ItemsSource="{Binding Steps}" ItemTemplate="{StaticResource StepRow}" />
+            </Grid>
+            <ProgressBar ctl:Flow.Value="{Binding SessionProgress, Mode=OneWay}" Maximum="1" Margin="24,4,0,0" />
           </StackPanel>
 
           <StackPanel Grid.Column="2">

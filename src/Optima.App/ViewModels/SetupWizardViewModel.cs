@@ -53,23 +53,36 @@ public sealed partial class SetupWizardViewModel : ObservableObject
     public async Task RunDetectionAsync()
     {
         IsDetecting = true;
-        await Status.RefreshAsync();
-        await Checks.InitializeAsync();
-
-        var current = await _settings.GetSettingsAsync();
-        PlayerIgn = current.PlayerIgn;
-        DiscordApplicationId = current.DiscordApplicationId;
-        if (current.FirstRunCompleted)
+        try
         {
-            // A second run starts from the user's own choice, not from the first-run default.
-            StartWithWindows = current.StartWithWindows;
-        }
+            await Status.RefreshAsync();
+            await Checks.InitializeAsync();
 
-        await AnalyzeAsync();
-        IsDetecting = false;
-        Headline = _report is { AllGood: true }
-            ? "Everything found. You're ready to play."
-            : "Setup found things it can fix for you.";
+            var current = await _settings.GetSettingsAsync();
+            PlayerIgn = current.PlayerIgn;
+            DiscordApplicationId = current.DiscordApplicationId;
+            if (current.FirstRunCompleted)
+            {
+                // A second run starts from the user's own choice, not from the first-run default.
+                StartWithWindows = current.StartWithWindows;
+            }
+
+            await AnalyzeAsync();
+            Headline = _report is { AllGood: true }
+                ? "Everything found. You're ready to play."
+                : "Setup found things it can fix for you.";
+        }
+        catch (Exception ex)
+        {
+            // A probe that throws on this PC must not leave the wizard, which is modal, on its
+            // "setting things up" screen with nothing to press.
+            Serilog.Log.Warning(ex, "First-run detection failed");
+            Headline = "Setup could not check this PC. You can finish and run the checks later from the Debug page.";
+        }
+        finally
+        {
+            IsDetecting = false;
+        }
     }
 
     private async Task AnalyzeAsync()

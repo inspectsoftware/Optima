@@ -146,7 +146,7 @@
                            ToolTip="Optional: enables Discord game activity (see Settings for the how-to)" />
                 </Grid>
                 <TextBlock Style="{StaticResource Text.Micro}" Margin="0,8,0,0" MaxWidth="640" HorizontalAlignment="Left" TextWrapping="Wrap"
-                           Text="Both fields are optional and can be set later in Settings. Default profiles are ready: Default, Balanced, Competitive 1080p240 and Competitive 1440p165." />
+                           Text="Both fields are optional and can be set later in Settings. Three profiles are ready: Default, Balanced and Competitive. Whether the game runs on the virtual display is on the Display page." />
               </StackPanel>
             </HeaderedContentControl>
           </StackPanel>
@@ -154,7 +154,6 @@
 
         <ctl:GlassPanel Grid.Row="3" Chamfer="{StaticResource Chamfer.Strip}" Padding="18,12" Margin="12,0,12,0"
                         Tint="{DynamicResource Color.Glass.Tint}"
-                        TopLine="{DynamicResource Brush.Strip.Top}"
                         BottomLine="{DynamicResource Brush.Strip.Bottom}"
                         LeadingEdge="{DynamicResource Brush.Strip.Edge}">
           <ctl:GlassPanel.Child>

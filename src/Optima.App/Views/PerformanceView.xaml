@@ -25,7 +25,7 @@
             <Border Style="{StaticResource Tile}" Margin="0,0,10,0">
               <StackPanel>
                 <TextBlock Text="CPU" Style="{StaticResource Text.Label}" />
-                <TextBlock Text="{Binding CpuText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+                <TextBlock ctl:Flow.Text="{Binding CpuText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
                 <ctl:AsciiBar Value="{Binding CpuPercent}" Maximum="100" Cells="22" />
                 <ctl:Sparkline Values="{Binding CpuHistory}" Height="44" Margin="0,8,0,0"
                                Stroke="{DynamicResource Brush.Accent}" Minimum="0" Maximum="100" />
@@ -38,7 +38,7 @@
                   <TextBlock Text="{Binding GpuTempText}" Style="{StaticResource Text.Micro}"
                              HorizontalAlignment="Right" Visibility="{Binding GpuTempText, Converter={StaticResource EmptyToCollapsed}}" />
                 </Grid>
-                <TextBlock Text="{Binding GpuText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+                <TextBlock ctl:Flow.Text="{Binding GpuText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
                 <ctl:AsciiBar Value="{Binding GpuPercent}" Maximum="100" Cells="22" />
                 <ctl:Sparkline Values="{Binding GpuHistory}" Height="44" Margin="0,8,0,0"
                                Stroke="{DynamicResource Brush.Accent}" Minimum="0" Maximum="100" />
@@ -47,7 +47,7 @@
             <Border Style="{StaticResource Tile}">
               <StackPanel>
                 <TextBlock Text="RAM" Style="{StaticResource Text.Label}" />
-                <TextBlock Text="{Binding RamText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
+                <TextBlock ctl:Flow.Text="{Binding RamText}" Style="{StaticResource Text.Metric}" Margin="0,2,0,6" />
                 <ctl:AsciiBar Value="{Binding RamPercent}" Maximum="100" Cells="22" />
                 <ctl:Sparkline Values="{Binding RamHistory}" Height="44" Margin="0,8,0,0"
                                Stroke="{DynamicResource Brush.Accent}" Minimum="0" Maximum="100" />
@@ -115,8 +115,6 @@
         <StackPanel>
           <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="820" HorizontalAlignment="Left" Margin="0,0,0,8"
                      Text="These apply only while a game session runs and are restored the moment it ends, even after a crash. Unlike the persistent tweaks below, nothing survives the session." />
-          <CheckBox IsChecked="{Binding SessionHdrOff}" Margin="0,2"
-                    Content="switch HDR off while the game runs" />
           <CheckBox IsChecked="{Binding SessionGameBarOff}" Margin="0,2"
                     Content="Xbox Game Bar off while the game runs" />
           <CheckBox IsChecked="{Binding SessionFseOff}" Margin="0,2"
@@ -278,19 +276,9 @@
                 <TextBlock Text="name" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
                 <TextBox Grid.Column="1" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" Margin="0,4" />
 
-                <TextBlock Grid.Row="1" Text="virtual display" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
-                <CheckBox Grid.Row="1" Grid.Column="1" IsChecked="{Binding EditVirtualDisplay}" VerticalAlignment="Center" Margin="0,4"
-                          Content="enable for this profile" />
-
-                <TextBlock Grid.Row="2" Text="resolution" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
-                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,4">
-                  <TextBox Text="{Binding EditWidth}" Width="72" />
-                  <TextBlock Text="x" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
-                  <TextBox Text="{Binding EditHeight}" Width="72" />
-                  <TextBlock Text="@" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
-                  <TextBox Text="{Binding EditRefreshRate}" Width="60" />
-                  <TextBlock Text="Hz" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
-                </StackPanel>
+                <TextBlock Grid.Row="1" Text="display" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" Margin="0,4" TextWrapping="Wrap"
+                           Text="The virtual display and its resolution are one choice for every profile now. It is on the DISPLAY page." />
 
                 <TextBlock Grid.Row="3" Text="power plan" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0,4" />
                 <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding PowerPlanOptions}"

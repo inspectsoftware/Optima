@@ -60,6 +60,8 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly GameWatchService _gameWatch;
     private readonly Services.FirstRunFixService _firstRunFix;
     private readonly ILogger<MainViewModel> _logger;
+    private readonly ProfileService _profiles;
+    private readonly IDriverInstaller _driverInstaller;
 
     public MainViewModel(
         HomeViewModel home,
@@ -86,8 +88,12 @@ public sealed partial class MainViewModel : ObservableObject
         Core.Monitoring.GamePresenceService presence,
         GameWatchService gameWatch,
         Services.FirstRunFixService firstRunFix,
+        ProfileService profiles,
+        IDriverInstaller driverInstaller,
         ILogger<MainViewModel> logger)
     {
+        _profiles = profiles;
+        _driverInstaller = driverInstaller;
         Home = home;
         Play = play;
         Performance = performance;
@@ -175,6 +181,33 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Switching the active account failed");
+        }
+    }
+
+    /// <summary>
+    /// The X beside an account in the switcher: takes it off the list. The identity that is active
+    /// stays active; only its saved entry goes, and Settings can save it again. The list rebuilds
+    /// itself from the settings change.
+    /// </summary>
+    // Takes anything, on purpose. The button sits in the switcher's item template, and that
+    // template is also what the closed box shows: while the list is being rebuilt the box holds an
+    // empty text and no account. A command typed to PlayerAccount throws on that the moment WPF
+    // asks whether it can run, in the middle of the rebuild, and the list was left empty.
+    [RelayCommand]
+    private async Task RemoveAccountAsync(object? row)
+    {
+        if (row is not PlayerAccount { Key.Length: > 0 } account)
+        {
+            return;
+        }
+        try
+        {
+            await _players.RemoveAccountAsync(account.Key);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            _logger.LogError(ex, "Removing a saved account failed");
+            Toasts.Show("Account not removed", "The settings could not be saved: " + ex.Message, Services.ToastKind.Warn);
         }
     }
 
@@ -367,7 +400,9 @@ public sealed partial class MainViewModel : ObservableObject
             App.LogLevelSwitch.MinimumLevel = LogStreamViewModel.ToSerilogLevel(settings.MinimumLogLevel);
             await ReloadSavedAccountsAsync();
             // SettingsChanged can fire from any thread; the collections must be touched on the UI one.
-            _settings.SettingsChanged += async (_, _) => await Application.Current.Dispatcher.InvokeAsync(ReloadSavedAccountsAsync);
+            // Posted, never awaited: a save that lands while the app closes finds no application or
+            // a dispatcher that has stopped, and an await on either threw on a pool thread.
+            _settings.SettingsChanged += (_, _) => Application.Current?.Dispatcher.BeginInvoke(() => _ = ReloadSavedAccountsAsync());
 
             if (!settings.FirstRunCompleted)
             {
@@ -378,19 +413,58 @@ public sealed partial class MainViewModel : ObservableObject
                 wizard.ShowDialog();
             }
 
-            await _sessionStore.InitializeAsync();
-            await Status.RefreshAsync();
-            await Home.InitializeAsync();
-            await Play.InitializeAsync();
+            // Before the PLAY page loads its profiles: it selects by name, and a selection that
+            // names one of the retired built-ins has to be moved over first, not fall back to Default.
+            await MoveDisplayChoiceAsync(freshInstall: !settings.FirstRunCompleted);
+
+            try
+            {
+                await _sessionStore.InitializeAsync();
+            }
+            catch (Exception ex)
+            {
+                // A session history that cannot be opened must not take the status rows, the
+                // profiles and the watchdog down with it; the Sessions page reports it by itself.
+                _logger.LogError(ex, "The session store could not be opened");
+            }
+            // Side by side: none of these reads what another one loads, and the status probes ask
+            // WMI, so everything queued behind them used to wait half a second for nothing.
+            var status = Status.RefreshAsync();
+            var home = Home.InitializeAsync();
+            var play = Play.InitializeAsync();
             _ = Play.InitializeCrashBannerAsync();
             await _presence.StartAsync();
             await _gameWatch.StartAsync();
+            await Task.WhenAll(status, home, play);
 
             _ = Task.Run(BackgroundStatusLoopAsync);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Startup initialization failed");
+        }
+    }
+
+    /// <summary>
+    /// Once, on the first start of a build that has the display as one choice: fills that choice
+    /// in from the profile that was selected (see <see cref="DisplayChoice"/>). A failure leaves
+    /// it for the next start, and until then a launch follows the profile as it always did.
+    /// </summary>
+    private async Task MoveDisplayChoiceAsync(bool freshInstall)
+    {
+        try
+        {
+            if ((await _settings.GetSettingsAsync()).VirtualDisplayEnabled is not null)
+            {
+                return;
+            }
+            var profiles = await _profiles.GetProfilesAsync();
+            var driverInstalled = await _driverInstaller.GetStateAsync().WaitAsync(TimeSpan.FromSeconds(5)) == DriverState.Installed;
+            await _settings.UpdateSettingsAsync(s => DisplayChoice.Migrate(s, profiles, freshInstall, driverInstalled));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "The display choice could not be moved out of the profiles yet");
         }
     }
 
@@ -416,7 +490,13 @@ public sealed partial class MainViewModel : ObservableObject
                     hadGamePids = false;
                 }
 
-                await Application.Current.Dispatcher.InvokeAsync(() => Status.RefreshLiveAsync()).Task.Unwrap();
+                // The rows this refreshes are only drawn in the window. While it is in the tray or
+                // minimized, which is where it sits through a game, the display sweeps and the hops
+                // to the UI thread are for nobody; the app refreshes once as the window returns.
+                if (Services.RepairMoment.WindowVisible)
+                {
+                    await Application.Current.Dispatcher.InvokeAsync(() => Status.RefreshLiveAsync()).Task.Unwrap();
+                }
             }
             catch (Exception ex)
             {

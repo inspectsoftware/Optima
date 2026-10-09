@@ -61,6 +61,63 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.StartsWith("https://", settings.DiscordBotUrl);
     }
 
+    [Fact]
+    public async Task AnUpdateThatChangesNothingIsNotASave()
+    {
+        // What every start does: the selected profile is "selected" again, and nothing is different.
+        var service = CreateService();
+        await service.UpdateSettingsAsync(s => s with { SelectedProfileName = "Competitive" });
+        var written = File.GetLastWriteTimeUtc(_paths.ConfigFile);
+        var raised = 0;
+        service.SettingsChanged += (_, _) => raised++;
+
+        await service.UpdateSettingsAsync(s => s with { SelectedProfileName = "Competitive" });
+
+        Assert.Equal(0, raised);
+        Assert.Equal(written, File.GetLastWriteTimeUtc(_paths.ConfigFile));
+
+        await service.UpdateSettingsAsync(s => s with { SelectedProfileName = "Balanced" });
+
+        Assert.Equal(1, raised);
+        Assert.Equal("Balanced", (await CreateService().GetSettingsAsync()).SelectedProfileName);
+    }
+
+    [Fact]
+    public async Task AFirstStartWritesItsMigrationEvenWhenNothingElseChanges()
+    {
+        // The flag has to reach the file at the first start: it is what lets a self-hoster edit
+        // the address by hand afterwards and keep it.
+        await _store.SaveAsync(_paths.ConfigFile, new AppSettings { DiscordBotUrl = "http://127.0.0.1:5099" });
+        var service = CreateService();
+
+        await service.UpdateSettingsAsync(s => s with { SelectedProfileName = s.SelectedProfileName });
+
+        var onDisk = await _store.LoadAsync<AppSettings>(_paths.ConfigFile);
+        Assert.True(onDisk!.DiscordBotUrlMigrated);
+        Assert.Equal(BotLinkClient.DefaultBaseUrl, onDisk.DiscordBotUrl);
+    }
+
+    [Fact]
+    public async Task AnUpdateWhoseSaveFailedIsStillAnUpdateTheNextTime()
+    {
+        var service = CreateService();
+        await service.UpdateSettingsAsync(s => s with { SelectedProfileName = "Competitive" });
+        var raised = 0;
+        service.SettingsChanged += (_, _) => raised++;
+
+        // Held open without sharing, the file cannot be replaced: the save gives up and throws.
+        using (new FileStream(_paths.ConfigFile, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            await Assert.ThrowsAnyAsync<Exception>(() => service.UpdateSettingsAsync(s => s with { EnableWatchMode = true }));
+        }
+        Assert.Equal(0, raised);
+
+        await service.UpdateSettingsAsync(s => s with { EnableWatchMode = true });
+
+        Assert.Equal(1, raised);
+        Assert.True((await CreateService().GetSettingsAsync()).EnableWatchMode);
+    }
+
     public void Dispose()
     {
         try

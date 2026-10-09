@@ -26,19 +26,21 @@
 
         <ctl:GlassPanel Grid.Row="1" Chamfer="{StaticResource Chamfer.Strip}" Padding="20,16,20,16"
                         Tint="{DynamicResource Color.Glass.Tint}"
-                        TopLine="{DynamicResource Brush.Strip.Top}"
+                        ctl:Flow.Open="True"
                         BottomLine="{DynamicResource Brush.Strip.Bottom}"
                         LeadingEdge="{DynamicResource Brush.Warn}">
           <ctl:GlassPanel.Child>
             <StackPanel>
               <TextBlock Text="Driver still installed" FontSize="{StaticResource Type.Title}" FontWeight="SemiBold" />
-              <TextBlock Text="the virtual display driver stays active after Optima closes"
+              <TextBlock Text="the virtual display driver stays on this PC after Optima closes"
                          Style="{StaticResource Text.PageSubtitle}" Margin="0,4,0,10" />
               <TextBlock Style="{StaticResource Text.Prose}"
-                         Text="Closing Optima does not remove the virtual display driver. It remains installed in Windows and keeps advertising its virtual display until it is uninstalled." />
+                         Text="Closing Optima does not remove the virtual display driver. It stays installed in Windows, switched off, until a game session uses it again." />
               <TextBlock Style="{StaticResource Text.Prose}" Margin="0,8,0,0"
-                         Text="Keep it if you plan to use Optima Virtualization again. Uninstalling takes one administrator prompt and can be undone at any time from the Display page." />
-              <Grid Margin="0,18,0,0">
+                         Text="Keep it if you plan to use the virtual display again. Uninstalling takes one administrator prompt and can be undone at any time from the Display page." />
+              <CheckBox x:Name="DoNotAskAgain" Margin="0,14,0,0" Content="do not ask again when I close Optima"
+                        ToolTip="Optima then closes and keeps the driver. It can still be uninstalled from the Display page." />
+              <Grid Margin="0,14,0,0">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="*" />

@@ -71,6 +71,91 @@ public sealed class JsonStoreRecoveryTests : IDisposable
         Assert.True(WasSetAside());
     }
 
+    [Fact]
+    public async Task AFileLostBetweenTheTwoRenamesOfASave_ComesBackFromItsBackup()
+    {
+        await SaveTwice();
+        // What a process that ends mid-replace leaves: the backup, and nothing under the name.
+        File.Delete(File_);
+
+        Assert.Equal("the earlier save", (await _store.LoadAsync<AppSettings>(File_))?.PlayerIgn);
+        Assert.True(File.Exists(File_));
+
+        File.Delete(File_);
+        Assert.Equal("the earlier save", _store.Load<AppSettings>(File_)?.PlayerIgn);
+    }
+
+    [Fact]
+    public async Task ADeletedFileTakesItsBackupWithIt()
+    {
+        await SaveTwice();
+        _store.Delete(File_);
+        Assert.False(File.Exists(File_ + ".bak"));
+        Assert.Null(await _store.LoadAsync<AppSettings>(File_));
+
+        // The next file under that name is a new one. When it turns out damaged, there is nothing
+        // of the deleted one left to come back in its place.
+        await _store.SaveAsync(File_, new AppSettings { PlayerIgn = "a new file" });
+        File.WriteAllText(File_, "not json at all");
+
+        Assert.Null(await _store.LoadAsync<AppSettings>(File_));
+    }
+
+    [Fact]
+    public async Task ASaveWaitsOutAFileThatIsHeldOpenForAMoment()
+    {
+        await _store.SaveAsync(File_, new AppSettings { PlayerIgn = "the earlier save" });
+
+        // What a virus scanner does right after a write: the file is open, and not for long.
+        Task save;
+        using (new FileStream(File_, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            save = _store.SaveAsync(File_, new AppSettings { PlayerIgn = "the latest save" });
+            await Task.Delay(50);
+        }
+        await save;
+
+        Assert.Equal("the latest save", _store.Load<AppSettings>(File_)?.PlayerIgn);
+    }
+
+    [Fact]
+    public async Task ASaveNeverComesBackToTheCallersThread()
+    {
+        // The window's thread in miniature: a context that counts what is sent back to it.
+        var caller = new CountingContext();
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(caller);
+        Task save;
+        try
+        {
+            // Small enough to fit the file stream's buffer, which is the save that used to finish
+            // (the rename, and the release of the store-wide gate) on the thread that started it.
+            save = _store.SaveAsync(File_, new AppSettings { PlayerIgn = "a small save" });
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        await save;
+
+        Assert.Equal(0, caller.Posts);
+        Assert.Equal("a small save", _store.Load<AppSettings>(File_)?.PlayerIgn);
+    }
+
+    private sealed class CountingContext : SynchronizationContext
+    {
+        private int _posts;
+
+        public int Posts => Volatile.Read(ref _posts);
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            Interlocked.Increment(ref _posts);
+            base.Post(d, state);
+        }
+    }
+
     public void Dispose()
     {
         try

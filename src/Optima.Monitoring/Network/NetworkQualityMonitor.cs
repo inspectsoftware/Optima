@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using Optima.Core.Abstractions;
@@ -56,9 +57,13 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
         {
             _calculator = new NetworkQualityCalculator();
         }
+        _published = null;
         _processIds = processIds;
         _cts = new CancellationTokenSource();
-        _loop = Task.Run(() => RunAsync(_cts.Token), CancellationToken.None);
+        // Read here, not inside the task: a stop that lands first clears the field, and the task
+        // would then fault on it and leave a loop that can never be started again.
+        var token = _cts.Token;
+        _loop = Task.Run(() => RunAsync(token), CancellationToken.None);
         return Task.CompletedTask;
     }
 
@@ -163,15 +168,28 @@ public sealed class NetworkQualityMonitor : INetworkQualityMonitor
     /// </summary>
     private bool HasChanged(NetworkQualitySample sample)
     {
+        // Against the last sample subscribers saw, not the last one measured: compared tick to
+        // tick, a ping that drifts by less than a millisecond a second was never published at all.
+        // And at least every few seconds regardless, because a reader that hears nothing for five
+        // takes the measurement for stopped.
         var previous = _published;
-        _published = sample;
-        return previous is null
+        var changed = previous is null
+            || Stopwatch.GetElapsedTime(_publishedAt) >= Heartbeat
             || Math.Abs(previous.PingMs - sample.PingMs) >= 1
             || Math.Abs(previous.JitterMs - sample.JitterMs) >= 1
             || Math.Abs(previous.PacketLossPct - sample.PacketLossPct) >= 1
             || previous.IsReferenceHost != sample.IsReferenceHost
             || !string.Equals(previous.Target, sample.Target, StringComparison.Ordinal);
+        if (changed)
+        {
+            _published = sample;
+            _publishedAt = Stopwatch.GetTimestamp();
+        }
+        return changed;
     }
+
+    private static readonly TimeSpan Heartbeat = TimeSpan.FromSeconds(3);
+    private long _publishedAt;
 
     private async Task<(List<IPAddress> Targets, bool ReferenceMode)> DiscoverTargetsAsync(CancellationToken ct)
     {

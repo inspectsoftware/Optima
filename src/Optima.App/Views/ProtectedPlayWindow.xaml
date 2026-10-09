@@ -1,0 +1,108 @@
+<Window x:Class="Optima.App.Views.ProtectedPlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="clr-namespace:Optima.App.Controls"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Optima"
+        Width="680" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Brush.Background}" UseLayoutRounding="True">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="0"
+                        CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Window.Resources>
+    <Style x:Key="Heading" TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
+      <Setter Property="Margin" Value="0,12,0,2" />
+    </Style>
+    <Style x:Key="Line" TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+  </Window.Resources>
+
+  <Border Background="{DynamicResource Brush.Background}"
+          TextElement.Foreground="{DynamicResource Brush.Text}"
+          TextElement.FontFamily="{StaticResource Font.Body}"
+          TextElement.FontSize="{StaticResource Type.Body}">
+    <Grid>
+      <ctl:AmbientField x:Name="Ambient" />
+      <Grid Margin="12" ctl:GlassPanel.Backdrop="{Binding ElementName=Ambient}">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="28" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ctl:TitleBar Grid.Row="0" ShowMinimize="False" ShowMaximize="False" Breadcrumb="OPTIMA · PROTECTED PLAY" />
+
+        <ctl:GlassPanel Grid.Row="1" Chamfer="{StaticResource Chamfer.Strip}" Padding="20,16,20,16"
+                        Tint="{DynamicResource Color.Glass.Tint}"
+                        ctl:Flow.Open="True"
+                        BottomLine="{DynamicResource Brush.Strip.Bottom}"
+                        LeadingEdge="{DynamicResource Brush.Strip.Edge}">
+          <ctl:GlassPanel.Child>
+            <StackPanel>
+              <TextBlock Text="What protected play does" FontSize="{StaticResource Type.Title}" FontWeight="SemiBold" />
+              <TextBlock Style="{StaticResource Line}" Margin="0,6,0,0"
+                         Text="Protected play lets a tournament organizer check that you played fair. It comes with linking this PC and cannot be switched off while the PC is linked. Unlinking (run /unlink in Discord) turns it off." />
+
+              <ScrollViewer MaxHeight="430" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0"
+                            ScrollChanged="OnScrolled">
+                <StackPanel Margin="0,0,10,0">
+                  <TextBlock Style="{StaticResource Heading}" Text="what runs" />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="A program called Optima Shield, installed with Optima. Its source code is not public, so that cheat makers cannot read how it looks." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="It starts when you press PLAY, or when Optima sees the game running, and it stops when Optima closes. You can end it from Task Manager at any time. Your session is then recorded as stopped." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="At PLAY Windows asks once for administrator rights. If you say no, or your Windows account is not an administrator, Shield still runs but sees less, and your session is recorded as reduced coverage." />
+
+                  <TextBlock Style="{StaticResource Heading}" Text="what it looks at, only while it runs" />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="Whether Google Play Games on this PC is the real one: the signatures and fingerprints of its program files." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="Which other programs have opened the game in a way that would let them read or change its memory: each one's file name, its folder with your Windows user name taken out, and who signed it." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="Whether Optima's own files are the ones that were released, and whether something is set up to load extra code into Optima." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="A few Windows security settings: Secure Boot, driver signature checks, and whether a debugger is attached to the game, to Optima or to Windows itself." />
+
+                  <TextBlock Style="{StaticResource Heading}" Text="what it sends to OptimaBot" />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="About every 10 seconds: your Critical Ops account id, Shield's version, the Windows build number, whether it has administrator rights, how long the PC has been awake, and what the checks above found. Each report is signed with a key that was made on this PC and never leaves it." />
+
+                  <TextBlock Style="{StaticResource Heading}" Text="what it never does" />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="It does not read your documents, messages, passwords, what you type or what is on your screen." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="It does not change, block or close any program, and it does not ban anyone. People read the record and decide, and a decision can be appealed." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="It does not run while Optima is closed, and nothing of it stays running in the background." />
+
+                  <TextBlock Style="{StaticResource Heading}" Text="who sees what" />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="You see your own sessions with /protected in Discord: when they ran, how they ended and how much they covered." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="Organizers of a Discord server you are a member of can see whether you are in a protected session right now. Nothing else." />
+                  <TextBlock Style="{StaticResource Line}"
+                             Text="Organizers of servers that Optima has approved, and Optima's own reviewers, can see your session history. What a check found is seen only by reviewers." />
+
+                  <TextBlock Style="{StaticResource Line}" Margin="0,12,0,0"
+                             Text="When a later version of Optima looks at more than this, it shows you this screen again with what changed, and Shield does not start until you have seen it." />
+                </StackPanel>
+              </ScrollViewer>
+
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="Not now" Style="{StaticResource GhostButton}" MinWidth="110" Margin="0,0,8,0"
+                        IsCancel="True" ToolTip="Protected play stays off until you have read this" />
+                <Button x:Name="AcceptButton" Content="I have read this" Style="{StaticResource PrimaryButton}" MinWidth="170"
+                        IsEnabled="False" Click="OnAccept" ToolTipService.ShowOnDisabled="True"
+                        ToolTip="Scroll to the end first: the last part says who sees what" />
+              </StackPanel>
+            </StackPanel>
+          </ctl:GlassPanel.Child>
+        </ctl:GlassPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

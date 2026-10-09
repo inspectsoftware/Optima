@@ -42,19 +42,36 @@ public sealed class ElevationBrokerClient : IElevationBroker
         }
     }
 
-    public async Task<bool> EnsureStartedAsync(CancellationToken ct = default)
+    /// <summary>
+    /// A cancel frees the caller at once; the attempt itself runs on to "connected" or "cleaned
+    /// up", so a helper approved after the caller left is kept for whoever asks next.
+    /// </summary>
+    public Task<bool> EnsureStartedAsync(CancellationToken ct = default)
+        => IsConnected ? Task.FromResult(true) : StartHelperAsync(ct).WaitAsync(ct);
+
+    // Counts the prompts answered with No, so that a caller who waited behind one can tell.
+    private int _declines;
+
+    private async Task<bool> StartHelperAsync(CancellationToken ct)
     {
         if (IsConnected)
         {
             return true;
         }
 
+        var declines = Volatile.Read(ref _declines);
         await _startGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             if (IsConnected)
             {
                 return true;
+            }
+            // Queued behind a prompt that was answered with No: that answer stands for this
+            // request as well. Asking again straight away is a second prompt for the same click.
+            if (Volatile.Read(ref _declines) != declines)
+            {
+                return false;
             }
 
             CleanupConnection();
@@ -65,6 +82,11 @@ public sealed class ElevationBrokerClient : IElevationBroker
             {
                 security.AddAccessRule(new PipeAccessRule(identity.User!, PipeAccessRights.FullControl, AccessControlType.Allow));
             }
+            // On a standard account the prompt is answered with another person's administrator
+            // login, and the helper then runs as them: this user's SID alone would lock it out.
+            security.AddAccessRule(new PipeAccessRule(
+                new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+                PipeAccessRights.ReadWrite, AccessControlType.Allow));
 
             _pipe = NamedPipeServerStreamAcl.Create(
                 pipeName, PipeDirection.InOut, maxNumberOfServerInstances: 1,
@@ -82,28 +104,33 @@ public sealed class ElevationBrokerClient : IElevationBroker
 
             try
             {
-                _helperProcess = Process.Start(new ProcessStartInfo(helperPath, $"--pipe {pipeName}")
+                // On the pool: the call only returns once the prompt has been answered, and a caller
+                // on the UI thread would be held for all of that time.
+                _helperProcess = await Task.Run(() => Process.Start(new ProcessStartInfo(helperPath, $"--pipe {pipeName}")
                 {
                     UseShellExecute = true,
                     Verb = "runas", // triggers UAC; helper's manifest also requires administrator
                     WindowStyle = ProcessWindowStyle.Hidden,
-                });
+                })).ConfigureAwait(false);
             }
             catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
                 _logger.LogInformation("User declined the UAC prompt for the elevated helper");
                 LastStartFailure = ElevationStartFailure.Declined;
+                Interlocked.Increment(ref _declines);
                 CleanupConnection();
                 return false;
             }
 
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            // Its own 30 seconds and not the caller's token. A caller can run out of time while the
+            // prompt is still open, and the helper approved after that has to end up connected or
+            // cleaned up, never running against a pipe nobody reads.
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try
             {
                 await _pipe.WaitForConnectionAsync(timeout.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
                 _logger.LogError("Elevated helper did not connect within 30 seconds");
                 LastStartFailure = ElevationStartFailure.Timeout;
@@ -212,6 +239,9 @@ public sealed class ElevationBrokerClient : IElevationBroker
         }
         finally
         {
+            // Closed here as well: a loop that ended on a bad frame leaves the pipe connected, and
+            // every later request would be written to a helper nobody is listening to.
+            pipe.Dispose();
             FailAllPending("The elevated helper disconnected.");
         }
     }

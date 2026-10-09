@@ -19,6 +19,7 @@ public partial class DiscordLinkWindow : Window
     private readonly long? _accountId;
     private readonly string _inGameName;
     private readonly string? _webhook;
+    private readonly string? _devicePublicKey;
 
     /// <summary>The bot's answer once a link was written, or null when the dialog was dismissed.</summary>
     public BotLinkClaimResponse? Result { get; private set; }
@@ -29,7 +30,8 @@ public partial class DiscordLinkWindow : Window
         long? accountId,
         string inGameName,
         BotLinkStatusResponse? status,
-        string? webhook = null)
+        string? webhook = null,
+        string? devicePublicKey = null)
     {
         InitializeComponent();
         _client = client;
@@ -37,6 +39,7 @@ public partial class DiscordLinkWindow : Window
         _accountId = accountId;
         _inGameName = inGameName;
         _webhook = webhook;
+        _devicePublicKey = devicePublicKey;
 
         TrackerText.Text = webhook is null
             ? "no tracker webhook: linking without match posts"
@@ -73,10 +76,11 @@ public partial class DiscordLinkWindow : Window
 
         LinkButton.IsEnabled = false;
         StatusText.Text = "Asking OptimaBot…";
+        _claiming = true;
         try
         {
             var result = await _client.ClaimAsync(
-                _baseUrl, normalized, _accountId ?? 0, _inGameName, _webhook, CancellationToken.None);
+                _baseUrl, normalized, _accountId ?? 0, _inGameName, _webhook, _devicePublicKey, CancellationToken.None);
 
             // A failure the user can act on (no code, expired code, unknown player) comes back as a
             // sentence with ok: false, and the dialog stays open so they can fix it.
@@ -84,6 +88,7 @@ public partial class DiscordLinkWindow : Window
             {
                 Result = claim;
                 StatusText.Text = claim.Message;
+                _claiming = false;
                 DialogResult = true;
                 return;
             }
@@ -99,8 +104,21 @@ public partial class DiscordLinkWindow : Window
         }
         finally
         {
+            _claiming = false;
             LinkButton.IsEnabled = true;
         }
+    }
+
+    private bool _claiming;
+
+    /// <summary>
+    /// Not while the bot is being asked. Closed in that moment, the bot went on to make the link and
+    /// Optima never heard the answer: linked on Discord, and not linked here.
+    /// </summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        e.Cancel = _claiming;
+        base.OnClosing(e);
     }
 
     /// <summary>Opens the Optima server, because /link lives in Discord and the code is read there.</summary>

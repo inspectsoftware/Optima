@@ -51,11 +51,14 @@ public sealed class BoostDialTimelineTests
     }
 
     [Fact]
-    public void TheSnapBackOvershoots_SoTheSegmentsSeatWithAKick()
+    public void TheSegmentsSeatOnTheSharedCurve_WithoutGoingPastHome()
     {
-        var seating = Enumerable.Range(0, 40).Select(i => BoostDialTimeline.At(BoostDialMode.Enabling, 2000 + i * 10).Detach);
+        var seating = Enumerable.Range(0, 41).Select(i => BoostDialTimeline.At(BoostDialMode.Enabling, 2000 + i * 10).Detach).ToList();
 
-        Assert.Contains(seating, detach => detach < 0);
+        // Fast away and a soft landing, like everything else that moves: never through the ring.
+        Assert.All(seating, detach => Assert.InRange(detach, 0, 1));
+        Assert.True(seating[10] < 0.5);
+        Assert.Equal(0, seating[^1], 6);
     }
 
     [Fact]

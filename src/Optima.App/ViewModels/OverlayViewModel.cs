@@ -30,15 +30,17 @@ public sealed partial class OverlayViewModel : ObservableObject, IDisposable
         {
             Interval = TimeSpan.FromSeconds(1),
         };
+        // Runs from a sample until the reading it left has gone stale, not for the life of the
+        // process: without samples there is nothing to reset.
         _stalenessTimer.Tick += (_, _) =>
         {
             if (DateTimeOffset.Now - _lastSample > Staleness)
             {
                 FpsText = "--";
                 FrametimeText = "-- ms";
+                _stalenessTimer.Stop();
             }
         };
-        _stalenessTimer.Start();
     }
 
     private void OnSample(object? sender, (double Fps, double FrametimeMs) sample)
@@ -48,6 +50,7 @@ public sealed partial class OverlayViewModel : ObservableObject, IDisposable
             _lastSample = DateTimeOffset.Now;
             FpsText = $"{sample.Fps:F0}";
             FrametimeText = $"{sample.FrametimeMs:F1} ms";
+            _stalenessTimer.Start();
         });
     }
 

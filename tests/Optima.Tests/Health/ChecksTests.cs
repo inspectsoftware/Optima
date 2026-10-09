@@ -47,11 +47,11 @@ public sealed class ChecksTests : IDisposable
     public async Task APcWithoutThePlanAProfileAsksForIsToldBeforeTheLaunch()
     {
         // Balanced is all the fake lists, as a Modern Standby PC without vendor plans would.
-        var result = await PowerPlanFor("Competitive 1080p240");
+        var result = await PowerPlanFor("Competitive");
 
         Assert.Equal(DiagnosticStatus.Warning, result.Status);
         Assert.Equal("POWER_PLAN_UNAVAILABLE", result.IssueCode);
-        Assert.Contains("Competitive 1080p240", result.Reason);
+        Assert.Contains("Competitive", result.Reason);
         Assert.Contains("High performance", result.Reason);
         Assert.Contains("It lists: Balanced", result.Reason);
     }
@@ -61,7 +61,7 @@ public sealed class ChecksTests : IDisposable
     {
         _power.Listed.Add(new PowerScheme(PowerPlanPolicy.HighPerformance, "High performance"));
 
-        var result = await PowerPlanFor("Competitive 1080p240");
+        var result = await PowerPlanFor("Competitive");
 
         Assert.Equal(DiagnosticStatus.Pass, result.Status);
         Assert.Equal("POWER_PLAN_UNAVAILABLE", result.IssueCode);

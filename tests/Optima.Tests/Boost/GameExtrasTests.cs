@@ -148,6 +148,28 @@ public sealed class GameExtrasTests : IDisposable
     }
 
     [Fact]
+    public async Task APreferenceThePlayerSetInWindows_IsLeftAloneWhileTheSwitchStaysOff()
+    {
+        _settings = _settings with { BoostGpuHighPerformance = false, BoostGamePath = _extras.PathOfGame };
+        _extras.HighPerformance.Add(_extras.PathOfGame!);
+        using var service = Create();
+
+        await service.SyncAsync();
+        await service.SyncAsync();
+
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+    }
+
+    [Theory]
+    [InlineData(null, true, "GpuPreference=2;")]
+    [InlineData("GpuPreference=1;", true, "GpuPreference=2;")]
+    [InlineData("SwapEffectUpgradeEnable=1;GpuPreference=1;", true, "SwapEffectUpgradeEnable=1;GpuPreference=2;")]
+    [InlineData("SwapEffectUpgradeEnable=1;GpuPreference=2;", false, "SwapEffectUpgradeEnable=1;")]
+    [InlineData("GpuPreference=2;", false, "")]
+    public void OnlyTheAdapterEntryOfTheWindowsValueIsTouched(string? existing, bool on, string expected)
+        => Assert.Equal(expected, WindowsGameExtras.WithGpuPreference(existing, on));
+
+    [Fact]
     public void TheRealGraphicsPreferenceRoundTrips_AndLeavesNothingBehind()
     {
         var extras = new WindowsGameExtras(NullLogger<WindowsGameExtras>.Instance);

@@ -25,16 +25,13 @@ public sealed record DiscordPresenceOptions
     /// <summary>The ranked rating (MMR), added to the rank's hover caption.</summary>
     public bool ShowRankedRating { get; init; }
 
-    /// <summary>The live frame rate while the game runs.</summary>
-    public bool ShowFps { get; init; } = true;
-
     /// <summary>The session timer, which also gives Discord its elapsed counter.</summary>
     public bool ShowElapsedTime { get; init; } = true;
 
     /// <summary>Which line Discord renders as the status above your name.</summary>
     public PresenceStatusDisplay StatusDisplay { get; init; } = PresenceStatusDisplay.Details;
 
-    /// <summary>The game and the fps: no name, no rank, no record.</summary>
+    /// <summary>The game and the timer: no name, no rank, no record.</summary>
     public static DiscordPresenceOptions Minimal { get; } = new()
     {
         ShowPlayerName = false,
@@ -42,11 +39,10 @@ public sealed record DiscordPresenceOptions
         ShowRankEmblem = false,
         ShowRankedRecord = false,
         ShowRankedRating = false,
-        ShowFps = true,
         ShowElapsedTime = true,
     };
 
-    /// <summary>Name, rank and record beside the live fps: what most players want.</summary>
+    /// <summary>Name, rank and record: what most players want.</summary>
     public static DiscordPresenceOptions Standard { get; } = new();
 
     /// <summary>Standard plus the ranked rating.</summary>

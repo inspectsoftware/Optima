@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Windows.Threading;
@@ -19,15 +19,18 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly SettingsService _settings;
     private readonly Services.PlayerSwitcherService _players;
     private readonly Optima.Core.Linking.BotLinkClient _botLink;
+    private readonly Optima.Core.Protection.ShieldLoader _shield;
 
     public SettingsViewModel(
         SettingsService settings,
         Services.PlayerSwitcherService players,
-        Optima.Core.Linking.BotLinkClient botLink)
+        Optima.Core.Linking.BotLinkClient botLink,
+        Optima.Core.Protection.ShieldLoader shield)
     {
         _settings = settings;
         _players = players;
         _botLink = botLink;
+        _shield = shield;
     }
 
     public IReadOnlyList<string> ProviderOptions { get; } = ["Auto", "MttVdd", "Mock"];
@@ -35,6 +38,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     public IReadOnlyList<string> CornerOptions { get; } = ["TopLeft", "TopRight", "BottomLeft", "BottomRight"];
     public IReadOnlyList<double> OpacityOptions { get; } = [0.5, 0.65, 0.8, 1.0];
     public IReadOnlyList<string> ThemeOptions { get; } = ["Dark", "Light"];
+
+    // In the order of MotionPolicy.Modes: System, On, Off.
+    private static readonly string[] AnimationLabels = ["as Windows says", "always on", "off"];
+    public IReadOnlyList<string> AnimationOptions => AnimationLabels;
 
     /// <summary>
     /// The priority Optima pins for the Google Play Games process that runs Critical Ops.
@@ -96,7 +103,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         long? accountId = long.TryParse(NewTrackedAccountId.Trim(), out var id) && id > 0 ? id : null;
         // One instance for both: the row has to carry the key that was stored, or it cannot be removed.
         var tracked = new PlayerAccount { Ign = ign, AccountId = accountId };
-        await _players.AddTrackedAsync(tracked);
+        if (!await _players.AddTrackedAsync(tracked))
+        {
+            SaveBarMark = "[ ! ]";
+            SaveBarText = $"{ign} is already tracked.";
+            SaveBarVisible = true;
+            return;
+        }
         TrackedPlayers.Add(tracked);
         NewTrackedIgn = string.Empty;
         NewTrackedAccountId = string.Empty;
@@ -114,6 +127,8 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private bool _discordPresenceEnabled = true;
     [ObservableProperty] private bool _discordPresenceInLauncher = true;
+
+    private bool _discordBotLinkEnrolled;
     /// <summary>The field-by-field Discord card choice, edited in the presence chooser window.</summary>
     [ObservableProperty] private DiscordPresenceOptions _discordOptions = new();
 
@@ -183,7 +198,19 @@ public sealed partial class SettingsViewModel : ObservableObject
             }
         }
 
-        var window = new Views.DiscordLinkWindow(_botLink, baseUrl, accountId, PlayerIgn.Trim(), status, webhook)
+        // This PC's protected play key travels with the claim: the code proves who is linking, so it
+        // is the one moment the key can be bound to them. Optima Shield holds the key and prints its
+        // public half. A build without the module, or a key Windows will not make, is not a reason
+        // to refuse the link; it links without protected play and the summary says so.
+        var deviceKey = await Task.Run(_shield.PublicKey);
+        // Linking a PC that has the module turns protected play on, so what it does is read first.
+        // Not reading it is not linking.
+        if (deviceKey is not null && !Views.ProtectedPlayWindow.Ask())
+        {
+            return;
+        }
+
+        var window = new Views.DiscordLinkWindow(_botLink, baseUrl, accountId, PlayerIgn.Trim(), status, webhook, deviceKey)
         {
             Owner = System.Windows.Application.Current?.MainWindow,
         };
@@ -195,6 +222,22 @@ public sealed partial class SettingsViewModel : ObservableObject
         _discordBotLinkTag = claim.DiscordTag ?? string.Empty;
         _discordBotLinkedPlayer = claim.PlayerName ?? string.Empty;
         _discordBotLinkedAt = claim.LinkedAt;
+        // Asked, not assumed: a bot from before protected play takes the link and drops the key.
+        // An answer that did not arrive is not a no: the link was made a moment ago, and if the key
+        // really was dropped, the module's first start is refused in the bot's own words.
+        var after = deviceKey is not null && claim.AccountId is { } linkedId
+            ? await _botLink.GetStatusAsync(baseUrl, linkedId)
+            : null;
+        _discordBotLinkEnrolled = after is { Ok: false } or { Value.ProtectionReady: true };
+        // The module runs only with this file, and only for the account that was just enrolled.
+        if (_discordBotLinkEnrolled && claim.AccountId is { } enrolled)
+        {
+            _shield.WriteLink(enrolled, baseUrl);
+        }
+        else
+        {
+            _shield.RemoveLink();
+        }
         DiscordBotUrl = baseUrl;
         DiscordBotWebhookUrl = webhook ?? string.Empty;
         UpdateDiscordLinkSummary();
@@ -206,6 +249,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             DiscordBotLinkTag = _discordBotLinkTag,
             DiscordBotLinkedPlayer = _discordBotLinkedPlayer,
             DiscordBotLinkedAt = _discordBotLinkedAt,
+            DiscordBotLinkEnrolled = _discordBotLinkEnrolled,
         });
 
         SaveBarMark = "[ OK ]";
@@ -309,10 +353,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             parts.Add("rating");
         }
-        if (options.ShowFps)
-        {
-            parts.Add("fps");
-        }
         if (options.ShowElapsedTime)
         {
             parts.Add("timer");
@@ -326,7 +366,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _logLevel = "Information";
     [ObservableProperty] private bool _developerMode;
     [ObservableProperty] private bool _keepInTrayOnClose;
-    [ObservableProperty] private bool _followWindowsMotion = true;
+    [ObservableProperty] private bool _checkForUpdatesAtStart = true;
+    /// <summary>One of <see cref="AnimationOptions"/>.</summary>
+    [ObservableProperty] private string _animations = AnimationLabels[0];
     [ObservableProperty] private bool _startWithWindows;
     [ObservableProperty] private bool _overlayEnabled;
     [ObservableProperty] private string _overlayCorner = "TopRight";
@@ -354,7 +396,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (e.PropertyName is not nameof(HasUnsavedChanges))
+        // Not for the bar's own three: with a change pending, every message set on the bar (a test
+        // result, an error, "account saved") was replaced by the unsaved warning the moment it was set.
+        if (e.PropertyName is not (nameof(HasUnsavedChanges) or nameof(SaveBarMark) or nameof(SaveBarText) or nameof(SaveBarVisible)))
         {
             RefreshUnsavedState();
         }
@@ -426,7 +470,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         [nameof(LogLevel)] = LogLevel,
         [nameof(DeveloperMode)] = DeveloperMode,
         [nameof(KeepInTrayOnClose)] = KeepInTrayOnClose,
-        [nameof(FollowWindowsMotion)] = FollowWindowsMotion,
+        [nameof(CheckForUpdatesAtStart)] = CheckForUpdatesAtStart,
+        [nameof(Animations)] = Animations,
         [nameof(StartWithWindows)] = StartWithWindows,
         [nameof(OverlayEnabled)] = OverlayEnabled,
         [nameof(OverlayCorner)] = OverlayCorner,
@@ -501,13 +546,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         _discordBotLinkTag = settings.DiscordBotLinkTag;
         _discordBotLinkedPlayer = settings.DiscordBotLinkedPlayer;
         _discordBotLinkedAt = settings.DiscordBotLinkedAt;
+        _discordBotLinkEnrolled = settings.DiscordBotLinkEnrolled;
         UpdateDiscordLinkSummary();
         Provider = settings.VirtualDisplayProvider;
         EnableFrametimeCapture = settings.EnableFrametimeCapture;
         LogLevel = settings.MinimumLogLevel;
         DeveloperMode = settings.DeveloperMode;
         KeepInTrayOnClose = settings.KeepInTrayOnClose;
-        FollowWindowsMotion = settings.FollowWindowsMotion;
+        CheckForUpdatesAtStart = settings.CheckForUpdatesAtStart;
+        Animations = AnimationLabels[Math.Max(0, Optima.Core.Theming.MotionPolicy.Modes.ToList().FindIndex(mode => string.Equals(mode, settings.EffectiveAnimations, StringComparison.OrdinalIgnoreCase)))];
         StartWithWindows = settings.StartWithWindows;
         OverlayEnabled = settings.OverlayEnabled;
         OverlayCorner = settings.OverlayCorner;
@@ -574,7 +621,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             MinimumLogLevel = LogLevel,
             DeveloperMode = DeveloperMode,
             KeepInTrayOnClose = KeepInTrayOnClose,
-            FollowWindowsMotion = FollowWindowsMotion,
+            CheckForUpdatesAtStart = CheckForUpdatesAtStart,
+            Animations = Optima.Core.Theming.MotionPolicy.Modes[Math.Max(0, Array.IndexOf(AnimationLabels, Animations))],
             StartWithWindows = StartWithWindows,
             OverlayEnabled = OverlayEnabled,
             OverlayCorner = OverlayCorner,

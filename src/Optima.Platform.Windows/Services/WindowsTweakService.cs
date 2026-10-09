@@ -119,6 +119,21 @@ public sealed class WindowsTweakService : ITweakService
         }
     }
 
+    public async Task<IReadOnlyList<string>> GetCapturedIdsAsync(CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var backups = await _store.LoadAsync<Dictionary<string, Dictionary<string, string?>>>(
+                _paths.TweaksBackupFile, ct).ConfigureAwait(false);
+            return backups is null ? [] : [.. backups.Keys];
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     private async Task ApplyElevatedAsync(string tweakId, Dictionary<string, string?> targets, CancellationToken ct)
     {
         if (!await _elevation.EnsureStartedAsync(ct).ConfigureAwait(false))
@@ -150,6 +165,11 @@ public sealed class WindowsTweakService : ITweakService
 
     private static TweakStatus Evaluate(TweakDefinition definition)
     {
+        // A tweak with no values has nothing that could be on: none of zero is not "all of them".
+        if (definition.Values.Count == 0)
+        {
+            return TweakStatus.Disabled;
+        }
         var matches = definition.Values.Count(v =>
             string.Equals(ReadData(v), v.EnabledData, StringComparison.OrdinalIgnoreCase));
         return matches == definition.Values.Count ? TweakStatus.Enabled

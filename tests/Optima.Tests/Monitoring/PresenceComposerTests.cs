@@ -17,46 +17,36 @@ public sealed class PresenceComposerTests
     [Fact]
     public void InGameLeadsWithTheGameAndTheRank()
     {
-        var card = PresenceComposer.Compose(GamePresence.InGame, 141.4, Badge, "Competitive");
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, "Competitive");
 
         Assert.Equal("Critical Ops · Gold 2", card.Details);
-        Assert.Equal("frosty · 141 fps · 41W-23L", card.State);
+        Assert.Equal("frosty · 41W-23L", card.State);
         Assert.Equal(4, card.RankTier);
     }
 
     [Fact]
     public void InGameStatusLineShowsTheDetailsSoFriendsSeeMoreThanTheGameName()
     {
-        var card = PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, null);
 
         Assert.Equal(PresenceStatusDisplay.Details, card.StatusDisplay);
     }
 
     [Fact]
-    public void InGameWithoutBadgeFallsBackToFps()
+    public void InGameWithoutBadgeKeepsItClean()
     {
-        var card = PresenceComposer.Compose(GamePresence.InGame, 59.6, null, null);
+        var card = PresenceComposer.Compose(GamePresence.InGame, null, "Balanced");
 
         Assert.Equal("Critical Ops", card.Details);
-        Assert.Equal("60 fps", card.State);
+        Assert.Equal("", card.State);
         Assert.Null(card.RankTier);
         Assert.Equal("", card.SmallImageText);
     }
 
     [Fact]
-    public void InGameWithoutFpsOrBadgeKeepsItClean()
-    {
-        var card = PresenceComposer.Compose(GamePresence.InGame, null, null, "Balanced");
-
-        Assert.Equal("Critical Ops", card.Details);
-        Assert.Equal("", card.State);
-    }
-
-    [Fact]
     public void ZeroWinsPlayerShowsTheRecord()
     {
-        var card = PresenceComposer.Compose(
-            GamePresence.InGame, null, new PlayerSeasonBadge("rookie", 0, 4), null);
+        var card = PresenceComposer.Compose(GamePresence.InGame, new PlayerSeasonBadge("rookie", 0, 4), null);
 
         Assert.Equal("Critical Ops", card.Details);
         Assert.Equal("rookie · 0W-4L", card.State);
@@ -65,8 +55,7 @@ public sealed class PresenceComposerTests
     [Fact]
     public void ASeasonWithoutAMatchOmitsTheRecordRatherThanSayingZeroAndZero()
     {
-        var card = PresenceComposer.Compose(
-            GamePresence.InGame, null, new PlayerSeasonBadge("rookie", 0, 0), null);
+        var card = PresenceComposer.Compose(GamePresence.InGame, new PlayerSeasonBadge("rookie", 0, 0), null);
 
         Assert.Equal("rookie", card.State);
     }
@@ -74,8 +63,8 @@ public sealed class PresenceComposerTests
     [Fact]
     public void TheEmblemCaptionCarriesTheRatingOnlyWhenItIsChosen()
     {
-        var standard = PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null, DiscordPresenceOptions.Standard);
-        var full = PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null, DiscordPresenceOptions.Full);
+        var standard = PresenceComposer.Compose(GamePresence.InGame, Badge, null, DiscordPresenceOptions.Standard);
+        var full = PresenceComposer.Compose(GamePresence.InGame, Badge, null, DiscordPresenceOptions.Full);
 
         Assert.Equal("Gold 2", standard.SmallImageText);
         Assert.Equal("Gold 2 · 1440 MMR", full.SmallImageText);
@@ -84,11 +73,10 @@ public sealed class PresenceComposerTests
     [Fact]
     public void MinimalKeepsThePlayerOutOfTheCardEntirely()
     {
-        var card = PresenceComposer.Compose(
-            GamePresence.InGame, 141.4, Badge, "Competitive", DiscordPresenceOptions.Minimal);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, "Competitive", DiscordPresenceOptions.Minimal);
 
         Assert.Equal("Critical Ops", card.Details);
-        Assert.Equal("141 fps", card.State);
+        Assert.Equal("", card.State);
         Assert.Null(card.RankTier);
         Assert.Equal("", card.SmallImageText);
         Assert.DoesNotContain("frosty", card.Details);
@@ -101,26 +89,26 @@ public sealed class PresenceComposerTests
     /// chooser that quietly drops a second field is worse than no chooser at all.
     /// </summary>
     [Theory]
-    [InlineData(false, true, "Critical Ops", "frosty · 141 fps · 41W-23L")]
-    [InlineData(true, false, "Critical Ops · Gold 2", "141 fps · 41W-23L")]
-    [InlineData(true, true, "Critical Ops · Gold 2", "frosty · 141 fps · 41W-23L")]
-    [InlineData(false, false, "Critical Ops", "141 fps · 41W-23L")]
+    [InlineData(false, true, "Critical Ops", "frosty · 41W-23L")]
+    [InlineData(true, false, "Critical Ops · Gold 2", "41W-23L")]
+    [InlineData(true, true, "Critical Ops · Gold 2", "frosty · 41W-23L")]
+    [InlineData(false, false, "Critical Ops", "41W-23L")]
     public void RankAndNameAreEachRemovedOnTheirOwn(bool showRank, bool showName, string details, string state)
     {
         var options = DiscordPresenceOptions.Standard with { ShowRank = showRank, ShowPlayerName = showName };
 
-        var card = PresenceComposer.Compose(GamePresence.InGame, 141.4, Badge, null, options);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, null, options);
 
         Assert.Equal(details, card.Details);
         Assert.Equal(state, card.State);
     }
 
     [Fact]
-    public void TurningOffFpsAndTheRecordLeavesTheNameAlone()
+    public void TurningOffTheRecordLeavesTheNameAlone()
     {
-        var options = DiscordPresenceOptions.Standard with { ShowFps = false, ShowRankedRecord = false };
+        var options = DiscordPresenceOptions.Standard with { ShowRankedRecord = false };
 
-        var card = PresenceComposer.Compose(GamePresence.InGame, 141.4, Badge, null, options);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, null, options);
 
         Assert.Equal("frosty", card.State);
     }
@@ -130,7 +118,7 @@ public sealed class PresenceComposerTests
     {
         var options = DiscordPresenceOptions.Standard with { ShowRankEmblem = false };
 
-        var card = PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null, options);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, null, options);
 
         Assert.Null(card.RankTier);
         Assert.Equal("", card.SmallImageText);
@@ -143,7 +131,7 @@ public sealed class PresenceComposerTests
     {
         var options = DiscordPresenceOptions.Standard with { StatusDisplay = PresenceStatusDisplay.State };
 
-        var card = PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null, options);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, null, options);
 
         Assert.Equal(PresenceStatusDisplay.State, card.StatusDisplay);
     }
@@ -152,9 +140,9 @@ public sealed class PresenceComposerTests
     public void TheLauncherCardFollowsTheSameSwitches()
     {
         var hidden = DiscordPresenceOptions.Standard with { ShowPlayerName = false, ShowRank = false };
-        var shown = PresenceComposer.Compose(GamePresence.NotRunning, null, Badge, null);
+        var shown = PresenceComposer.Compose(GamePresence.NotRunning, Badge, null);
 
-        var card = PresenceComposer.Compose(GamePresence.NotRunning, null, Badge, null, hidden);
+        var card = PresenceComposer.Compose(GamePresence.NotRunning, Badge, null, hidden);
 
         Assert.Equal("frosty · Gold 2", shown.State);
         Assert.Equal("Browsing the launcher", card.State);
@@ -165,7 +153,7 @@ public sealed class PresenceComposerTests
     [Fact]
     public void TheGameAndTheProjectAreBothClickable()
     {
-        var card = PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, null);
 
         Assert.Equal("https://criticalopsgame.com/", card.DetailsUrl);
         Assert.Equal("https://github.com/inspectsoftware/Optima", card.LargeImageUrl);
@@ -174,7 +162,7 @@ public sealed class PresenceComposerTests
     [Fact]
     public void LaunchingShowsTheProfileBeingApplied()
     {
-        var card = PresenceComposer.Compose(GamePresence.Starting, null, Badge, "Competitive");
+        var card = PresenceComposer.Compose(GamePresence.Starting, Badge, "Competitive");
 
         Assert.Equal("Launching Critical Ops", card.Details);
         Assert.Equal("applying Competitive", card.State);
@@ -184,7 +172,7 @@ public sealed class PresenceComposerTests
     [Fact]
     public void LaunchingWithoutAProfileOmitsTheState()
     {
-        var card = PresenceComposer.Compose(GamePresence.Starting, null, Badge, " ");
+        var card = PresenceComposer.Compose(GamePresence.Starting, Badge, " ");
 
         Assert.Equal("Launching Critical Ops", card.Details);
         Assert.Equal("", card.State);
@@ -193,7 +181,7 @@ public sealed class PresenceComposerTests
     [Fact]
     public void IdleIsTheLauncherCard()
     {
-        var card = PresenceComposer.Compose(GamePresence.NotRunning, null, null, null);
+        var card = PresenceComposer.Compose(GamePresence.NotRunning, null, null);
 
         Assert.Equal("Optima Launcher", card.Details);
         Assert.Equal("Browsing the launcher", card.State);
@@ -202,7 +190,7 @@ public sealed class PresenceComposerTests
     [Fact]
     public void TheLauncherCardShowsThePlayerOnceTheirRankIsKnown()
     {
-        var card = PresenceComposer.Compose(GamePresence.NotRunning, null, Badge, null);
+        var card = PresenceComposer.Compose(GamePresence.NotRunning, Badge, null);
 
         Assert.Equal("Optima Launcher", card.Details);
         Assert.Equal("frosty · Gold 2", card.State);
@@ -213,8 +201,7 @@ public sealed class PresenceComposerTests
     public void OverlongStringsAreTruncatedWithAnEllipsis()
     {
         var longName = new string('x', 200);
-        var card = PresenceComposer.Compose(
-            GamePresence.InGame, 100, new PlayerSeasonBadge(longName, 1, 1), null);
+        var card = PresenceComposer.Compose(GamePresence.InGame, new PlayerSeasonBadge(longName, 1, 1), null);
 
         Assert.True(card.State.Length <= 120);
         Assert.EndsWith("…", card.State);
@@ -227,25 +214,23 @@ public sealed class PresenceComposerTests
     [Fact]
     public void EveryVisibleChangeMovesTheSignature()
     {
-        var baseline = PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null);
+        var baseline = PresenceComposer.Compose(GamePresence.InGame, Badge, null);
 
-        Assert.NotEqual(baseline.Signature, PresenceComposer.Compose(GamePresence.InGame, 61, Badge, null).Signature);
-        Assert.NotEqual(baseline.Signature, PresenceComposer.Compose(GamePresence.InGame, 60, null, null).Signature);
+        Assert.NotEqual(baseline.Signature, PresenceComposer.Compose(GamePresence.InGame, null, null).Signature);
         Assert.NotEqual(baseline.Signature,
-            PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null, DiscordPresenceOptions.Full).Signature);
+            PresenceComposer.Compose(GamePresence.InGame, Badge, null, DiscordPresenceOptions.Full).Signature);
         Assert.NotEqual(baseline.Signature,
-            PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null, DiscordPresenceOptions.Minimal).Signature);
+            PresenceComposer.Compose(GamePresence.InGame, Badge, null, DiscordPresenceOptions.Minimal).Signature);
         Assert.NotEqual(baseline.Signature,
-            PresenceComposer.Compose(GamePresence.NotRunning, 60, Badge, null).Signature);
+            PresenceComposer.Compose(GamePresence.NotRunning, Badge, null).Signature);
     }
 
     [Fact]
     public void AnIdenticalCardKeepsItsSignature()
     {
-        var first = PresenceComposer.Compose(GamePresence.InGame, 60.2, Badge, null);
-        var second = PresenceComposer.Compose(GamePresence.InGame, 60.4, Badge, null);
+        var first = PresenceComposer.Compose(GamePresence.InGame, Badge, null);
+        var second = PresenceComposer.Compose(GamePresence.InGame, Badge, null);
 
-        // 60.2 and 60.4 both render as "60 fps", so nothing about the card actually changed.
         Assert.Equal(first.Signature, second.Signature);
     }
 
@@ -263,8 +248,7 @@ public sealed class PresenceComposerTests
     {
         var settings = new AppSettings { DiscordPresenceDetail = detail };
 
-        var card = PresenceComposer.Compose(
-            GamePresence.InGame, 60, Badge, null, settings.EffectivePresenceOptions);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, null, settings.EffectivePresenceOptions);
 
         Assert.Equal(expectName, card.State.Contains("frosty", StringComparison.Ordinal));
         Assert.Equal(expectRecord, card.State.Contains("41W-23L", StringComparison.Ordinal));
@@ -275,9 +259,9 @@ public sealed class PresenceComposerTests
     {
         var settings = new AppSettings { DiscordPresenceDetail = "Minimal", DiscordPresenceOptions = DiscordPresenceOptions.Full };
 
-        var card = PresenceComposer.Compose(GamePresence.InGame, 60, Badge, null, settings.EffectivePresenceOptions);
+        var card = PresenceComposer.Compose(GamePresence.InGame, Badge, null, settings.EffectivePresenceOptions);
 
-        Assert.Equal("frosty · 60 fps · 41W-23L", card.State);
+        Assert.Equal("frosty · 41W-23L", card.State);
         Assert.Equal("Gold 2 · 1440 MMR", card.SmallImageText);
     }
 }

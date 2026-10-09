@@ -27,7 +27,7 @@
 
         <ctl:GlassPanel Grid.Row="1" Chamfer="{StaticResource Chamfer.Strip}" Padding="20,16,20,16"
                         Tint="{DynamicResource Color.Glass.Tint}"
-                        TopLine="{DynamicResource Brush.Strip.Top}"
+                        ctl:Flow.Open="True"
                         BottomLine="{DynamicResource Brush.Strip.Bottom}"
                         LeadingEdge="{DynamicResource Brush.Strip.Edge}">
           <ctl:GlassPanel.Child>
@@ -37,11 +37,11 @@
                          Text="Every friend who sees the activity sees these fields, so this is a privacy choice as much as a cosmetic one. Start from a preset, then tick exactly what you want - a card carrying nothing but the game name is fine too." />
 
               <WrapPanel Margin="0,12,0,0">
-                <Button Content="Minimal" Padding="12,5" Margin="0,0,8,0" Click="OnPresetMinimal"
-                        ToolTip="The game and your fps only" />
-                <Button Content="Standard (name + rank)" Padding="12,5" Margin="0,0,8,0" Click="OnPresetStandard"
+                <Button Style="{StaticResource ChipButton}" Content="Minimal" Padding="12,5" Margin="0,0,8,0" Click="OnPresetMinimal"
+                        ToolTip="The game and the session timer only" />
+                <Button Style="{StaticResource ChipButton}" Content="Standard (name + rank)" Padding="12,5" Margin="0,0,8,0" Click="OnPresetStandard"
                         ToolTip="Adds your name, rank, emblem and ranked record" />
-                <Button Content="Full (adds rating)" Padding="12,5" Margin="0,0,8,0" Click="OnPresetFull"
+                <Button Style="{StaticResource ChipButton}" Content="Full (adds rating)" Padding="12,5" Margin="0,0,8,0" Click="OnPresetFull"
                         ToolTip="Standard plus your ranked rating" />
               </WrapPanel>
 
@@ -51,7 +51,6 @@
                   <ColumnDefinition />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                  <CheckBox x:Name="FpsCheck" Content="live fps while the game runs" Margin="0,4" />
                   <CheckBox x:Name="NameCheck" Content="your in-game name" Margin="0,4" />
                   <CheckBox x:Name="RankCheck" Content="rank tier and division" Margin="0,4" />
                   <CheckBox x:Name="EmblemCheck" Content="rank emblem beside the artwork" Margin="0,4" />

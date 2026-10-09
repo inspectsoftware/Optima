@@ -108,8 +108,6 @@ public sealed record AppSettings
     public DateTimeOffset? LastAutoRelaunchAt { get; init; }
 
     /// <summary>Session-scoped competitive tweaks, applied on session start and restored on exit.</summary>
-    public bool SessionTweakHdrOff { get; init; }
-
     public bool SessionTweakGameBarOff { get; init; }
 
     public bool SessionTweakFseOff { get; init; }
@@ -172,6 +170,9 @@ public sealed record AppSettings
     public string DiscordBotLinkedPlayer { get; init; } = string.Empty;
     public DateTimeOffset? DiscordBotLinkedAt { get; init; }
 
+    /// <summary>Whether the last link carried this PC's protected play key, so Settings can say when a relink is needed.</summary>
+    public bool DiscordBotLinkEnrolled { get; init; }
+
     public string LastKnownGameVersion { get; init; } = string.Empty;
     public bool DeveloperMode { get; init; }
     public string MinimumLogLevel { get; init; } = "Information";
@@ -184,6 +185,51 @@ public sealed record AppSettings
     public Optima.Core.Health.AutoRepairMode AutoRepair { get; init; } = Optima.Core.Health.AutoRepairMode.Escalate;
 
     public string VirtualDisplayProvider { get; init; } = "Auto";
+
+    /// <summary>
+    /// Whether Critical Ops runs on the virtual display. One choice for every profile, made on the
+    /// Display page. Null until the first start of a build that has it: until then a launch still
+    /// follows the profile, and <see cref="Optima.Core.Configuration.DisplayChoice"/> fills it in
+    /// from what that profile said.
+    /// </summary>
+    public bool? VirtualDisplayEnabled { get; init; }
+
+    public int VirtualDisplayWidth { get; init; } = 1920;
+
+    public int VirtualDisplayHeight { get; init; } = 1080;
+
+    public int VirtualDisplayRefreshRate { get; init; } = 240;
+
+    /// <summary>
+    /// The display part of a launch, as the Display page has it. Only meaningful once
+    /// <see cref="VirtualDisplayEnabled"/> is set.
+    ///
+    /// Never the main screen. A build of 2026-10-09 made the virtual display the main screen for
+    /// the session, on by default, and the game then opened on a screen nobody can look at: the
+    /// player's own monitor stays the main one, and the game stays on it.
+    /// </summary>
+    [JsonIgnore]
+    public DisplayProfile EffectiveDisplay => new()
+    {
+        VirtualDisplay = VirtualDisplayEnabled == true,
+        Width = VirtualDisplayWidth,
+        Height = VirtualDisplayHeight,
+        RefreshRate = VirtualDisplayRefreshRate,
+        MakePrimary = false,
+    };
+
+    /// <summary>
+    /// When Windows asked for a restart to finish the driver install. The restart is still owed
+    /// for as long as the PC has been up since before this moment (<see cref="DriverRestartPending"/>).
+    /// </summary>
+    public DateTimeOffset? DriverRestartAskedAt { get; init; }
+
+    /// <summary>True when the driver install asked for a restart and Windows has not been restarted since.</summary>
+    public bool DriverRestartPending(DateTimeOffset now, TimeSpan upTime)
+        => DriverRestartAskedAt is { } asked && now - upTime < asked;
+
+    /// <summary>Cleared by "do not ask again" on the question a full close asks about the installed driver.</summary>
+    public bool AskAboutDriverOnExit { get; init; } = true;
 
     public bool EnableFrametimeCapture { get; init; } = true;
 
@@ -199,7 +245,26 @@ public sealed record AppSettings
 
     public bool KeepInTrayOnClose { get; init; }
 
+    /// <summary>Ask GitHub at every start whether a newer Optima is out. One request; nothing is downloaded unasked.</summary>
+    public bool CheckForUpdatesAtStart { get; init; } = true;
+
+    /// <summary>
+    /// The old checkbox, "follow the Windows animation setting". Only read now, for a configuration
+    /// that has no <see cref="Animations"/> yet: unticked meant "move regardless".
+    /// </summary>
     public bool FollowWindowsMotion { get; init; } = true;
+
+    /// <summary>
+    /// "System", "On" or "Off" (<see cref="Optima.Core.Theming.MotionPolicy"/>): whether Optima's
+    /// animations follow Windows, always play, or never do. Null in a configuration from before the
+    /// choice existed.
+    /// </summary>
+    public string? Animations { get; init; }
+
+    /// <summary>The animation choice as it applies, whichever of the two settings it came from.</summary>
+    [JsonIgnore]
+    public string EffectiveAnimations => Animations
+        ?? (FollowWindowsMotion ? Optima.Core.Theming.MotionPolicy.System : Optima.Core.Theming.MotionPolicy.On);
 
     public bool RailCollapsed { get; init; }
 

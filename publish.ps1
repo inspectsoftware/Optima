@@ -14,7 +14,10 @@ param(
     [switch]$Run,
     [string]$Output = "publish",
     [string]$Runtime = "win-x64",
-    [string]$Configuration = "Release"
+    [string]$Configuration = "Release",
+    # Leave Optima Shield out of the payload even when vendor\shield has it. The app is then the
+    # same kind of build as one made from source: no protected play, and nothing in it says so.
+    [switch]$NoShield
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,9 +32,24 @@ function Get-AssemblyVersion([string]$path) {
 $out = if ([System.IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path $root $Output }
 
 # A running instance locks the assemblies it loaded; publishing over them fails.
+# Only an instance started from the output folder does that. The installed copy runs from its own
+# folder, and stopping it here ended whatever session it was in with nothing put back. A process
+# whose path cannot be read is the elevated helper of some Optima, seen from an ordinary shell: it
+# is left alone as well. Should it be this folder's, the clean below fails on the locked file and
+# says so, which is better than ending the installed copy's helper in the middle of a session.
+$outPrefix = $out.TrimEnd('\') + '\'
 $stopped = @()
-foreach ($name in @("Optima", "Optima.Watchdog")) {
+foreach ($name in @("Optima", "Optima.Watchdog", "Optima.Shield")) {
     foreach ($process in Get-Process -Name $name -ErrorAction SilentlyContinue) {
+        $path = try { $process.Path } catch { $null }
+        if (-not $path) {
+            Write-Host "leaving running $name (pid $($process.Id)) alone: it is elevated, so not this folder's to stop"
+            continue
+        }
+        if (-not $path.StartsWith($outPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            Write-Host "leaving running $name (pid $($process.Id)) alone: it runs from $(Split-Path $path -Parent)"
+            continue
+        }
         Write-Host "stopping running $name (pid $($process.Id))"
         try {
             $process | Stop-Process -Force -ErrorAction Stop
@@ -91,7 +109,8 @@ dotnet publish (Join-Path $root "src\Optima.Watchdog") -c $Configuration -r $Run
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.Watchdog failed (exit $LASTEXITCODE)" }
 
 Write-Host "publishing Optima.App ($Configuration $Runtime)"
-dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet -p:PublishReadyToRun=true
+$includeShield = if ($NoShield) { "false" } else { "true" }
+dotnet publish (Join-Path $root "src\Optima.App") -c $Configuration -r $Runtime --self-contained -o $out --nologo -v quiet -p:PublishReadyToRun=true "-p:IncludeShield=$includeShield"
 if ($LASTEXITCODE -ne 0) { throw "publishing Optima.App failed (exit $LASTEXITCODE)" }
 
 # The helper's own files always travel; everything else only fills gaps the app left, so a shared
@@ -132,6 +151,14 @@ if ($stale.Count -gt 0) {
 $exe = Join-Path $out "Optima.exe"
 $stamp = (Get-Item $exe).LastWriteTime
 Write-Host "done: $exe (built $stamp)"
+
+# Optima Shield is not built here: it arrives as vendor\shield\Optima.Shield.exe. Say which kind of
+# payload this is, so a build without it is never published by accident.
+if (Test-Path (Join-Path $out "Optima.Shield.exe")) {
+    Write-Host "protected play: Optima.Shield.exe is in the payload"
+} else {
+    Write-Host "protected play: NOT in this payload (no vendor\shield\Optima.Shield.exe). This build runs without it."
+}
 
 if ($Run) {
     Start-Process -FilePath $exe -WorkingDirectory $out

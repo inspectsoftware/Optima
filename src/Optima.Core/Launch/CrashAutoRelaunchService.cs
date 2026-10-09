@@ -62,6 +62,19 @@ public sealed class CrashAutoRelaunchService
         }
     }
 
+    // Long.MinValue / 2 rather than 0: the tick count starts near zero after a restart of the PC,
+    // and "never" must not read as "just now".
+    private long _intentionalExitAt = long.MinValue / 2;
+
+    /// <summary>How long after the player ended the game an exit still counts as theirs.</summary>
+    private const long IntentionalExitWindowMs = 60_000;
+
+    /// <summary>
+    /// Call when the player ends the game from Optima (Terminate, the hotkey, Cancel). The exit that
+    /// follows looks exactly like a crash, an early death with the emulator gone, and is not one.
+    /// </summary>
+    public void NoteIntentionalExit() => Volatile.Write(ref _intentionalExitAt, Environment.TickCount64);
+
     public void Start(GamePresenceService presence)
     {
         if (_subscribed)
@@ -91,6 +104,11 @@ public sealed class CrashAutoRelaunchService
     {
         try
         {
+            if (Environment.TickCount64 - Volatile.Read(ref _intentionalExitAt) < IntentionalExitWindowMs)
+            {
+                _logger.LogDebug("Crash relaunch not needed: the player ended the game");
+                return;
+            }
             var settings = await _settings.GetSettingsAsync().ConfigureAwait(false);
             var decision = Decide(exit, settings.AutoRelaunchOnCrash, _relaunchesUsed);
             if (decision != CrashRelaunchDecision.Relaunch)

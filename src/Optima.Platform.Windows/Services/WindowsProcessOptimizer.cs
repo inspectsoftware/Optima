@@ -107,15 +107,15 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
 
             using (process)
             {
-                // Guard against PID reuse: only touch the process if the name still matches.
-                if (!string.Equals(process.ProcessName, baseline.ProcessName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
                 var changed = false;
                 try
                 {
+                    // Guard against PID reuse: only touch the process if the name still matches.
+                    if (!string.Equals(process.ProcessName, baseline.ProcessName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
                     if (profile.Priority != ProcessPriorityLevel.Unchanged
                         && process.PriorityClass != ToPriorityClass(profile.Priority))
                     {
@@ -166,14 +166,16 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
 
             using (process)
             {
-                // Guard against PID reuse: only touch the process if the name still matches.
-                if (!string.Equals(process.ProcessName, snapshot.ProcessName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
                 try
                 {
+                    // Guard against PID reuse: only touch the process if the name still matches.
+                    // Inside the try: a process that exits right here throws on the name read, and
+                    // that must not end the restore of every process after it.
+                    if (!string.Equals(process.ProcessName, snapshot.ProcessName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return;
+                    }
+
                     process.PriorityClass = ToPriorityClass(snapshot.OriginalPriority);
                     if (snapshot.OriginalAffinityMask != 0)
                     {

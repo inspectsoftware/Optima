@@ -24,7 +24,7 @@ public partial class DiscordPresenceWindow : Window
     public DiscordPresenceWindow(DiscordPresenceOptions initial)
     {
         InitializeComponent();
-        _fields = [FpsCheck, NameCheck, RankCheck, EmblemCheck, RecordCheck, RatingCheck, TimerCheck];
+        _fields = [NameCheck, RankCheck, EmblemCheck, RecordCheck, RatingCheck, TimerCheck];
         Apply(initial);
 
         // The live summary is the only place the chosen field set is spelled out, so it follows
@@ -39,7 +39,6 @@ public partial class DiscordPresenceWindow : Window
 
     private void Apply(DiscordPresenceOptions options)
     {
-        FpsCheck.IsChecked = options.ShowFps;
         NameCheck.IsChecked = options.ShowPlayerName;
         RankCheck.IsChecked = options.ShowRank;
         EmblemCheck.IsChecked = options.ShowRankEmblem;
@@ -57,7 +56,6 @@ public partial class DiscordPresenceWindow : Window
 
     private DiscordPresenceOptions Current() => new()
     {
-        ShowFps = FpsCheck.IsChecked == true,
         ShowPlayerName = NameCheck.IsChecked == true,
         ShowRank = RankCheck.IsChecked == true,
         ShowRankEmblem = EmblemCheck.IsChecked == true,
@@ -95,10 +93,6 @@ public partial class DiscordPresenceWindow : Window
         if (options.ShowRankedRating)
         {
             parts.Add("rating");
-        }
-        if (options.ShowFps)
-        {
-            parts.Add("fps");
         }
         if (options.ShowElapsedTime)
         {

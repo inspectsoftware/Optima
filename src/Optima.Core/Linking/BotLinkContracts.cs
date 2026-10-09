@@ -14,7 +14,11 @@ public sealed record BotLinkClaimRequest(
     [property: JsonPropertyName("clientVersion")] string ClientVersion,
     // Optional: the tracker webhook the app copied out of Discord, when the user wants match and rank
     // posts after linking. Null links without tracking.
-    [property: JsonPropertyName("webhookUrl")] string? WebhookUrl = null);
+    [property: JsonPropertyName("webhookUrl")] string? WebhookUrl = null,
+    // Optional: this PC's protected play key (base64 SubjectPublicKeyInfo, ECDSA P-256), as Optima
+    // Shield prints it. The code proves the Discord identity, so this is the one moment a key can be
+    // bound to it. Null links without protected play, which is what a build without the module sends.
+    [property: JsonPropertyName("devicePublicKey")] string? DevicePublicKey = null);
 
 /// <summary>The bot's answer to a claim: whether the link was written, and what to tell the user.</summary>
 public sealed record BotLinkClaimResponse(
@@ -31,7 +35,9 @@ public sealed record BotLinkStatusResponse(
     [property: JsonPropertyName("discordTag")] string? DiscordTag = null,
     [property: JsonPropertyName("playerName")] string? PlayerName = null,
     [property: JsonPropertyName("accountId")] long? AccountId = null,
-    [property: JsonPropertyName("linkedAt")] DateTimeOffset? LinkedAt = null);
+    [property: JsonPropertyName("linkedAt")] DateTimeOffset? LinkedAt = null,
+    // Whether the link carries a device key, so Settings can say when a relink is needed.
+    [property: JsonPropertyName("protectionReady")] bool ProtectionReady = false);
 
 /// <summary>
 /// Optima's tracker test: the app asks the bot to draw a sample report and deliver it to this webhook,
@@ -59,8 +65,15 @@ public static class LinkCode
     /// <summary>Characters a code body may use (Crockford-style: no I, O, 0 or 1).</summary>
     public const string Alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-    /// <summary>Characters in a code body, excluding the prefix.</summary>
+    /// <summary>Characters in the shortest code body, excluding the prefix. What the bot mints unless told otherwise.</summary>
     public const int BodyLength = 5;
+
+    /// <summary>
+    /// Characters in the longest code body. Five characters are 33 million codes, which a caller with
+    /// many addresses can search; eight are a trillion. Both lengths are read, so the bot can move to
+    /// the longer one once the apps in use accept it.
+    /// </summary>
+    public const int MaxBodyLength = 8;
 
     /// <summary>
     /// Parses what the user typed into the canonical uppercase form, or null when it cannot be a
@@ -91,7 +104,7 @@ public static class LinkCode
             text = text[3..];
         }
 
-        if (text.Length != BodyLength || !text.All(Alphabet.Contains))
+        if (text.Length is < BodyLength or > MaxBodyLength || !text.All(Alphabet.Contains))
         {
             return null;
         }

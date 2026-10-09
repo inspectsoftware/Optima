@@ -25,48 +25,55 @@ public sealed class WindowsBackgroundDemoter : IBackgroundDemoter
             var names = processNames
                 .Select(NormalizeName)
                 .Where(name => name.Length > 0 && !WindowsBackgroundCleanupService.IsProtected(name))
-                .Distinct(StringComparer.OrdinalIgnoreCase);
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var name in names)
+            // One listing of the system for the whole list. Asking by name listed every process
+            // once per name, and this runs every twenty seconds beside the game.
+            foreach (var process in Process.GetProcesses())
             {
-                foreach (var process in Process.GetProcessesByName(name))
+                using (process)
                 {
-                    using (process)
+                    if (ct.IsCancellationRequested)
                     {
-                        if (ct.IsCancellationRequested)
+                        continue;
+                    }
+                    var name = string.Empty;
+                    try
+                    {
+                        name = process.ProcessName;
+                        if (!names.Contains(name))
                         {
                             continue;
                         }
-                        try
+                        // Another user's programs are not this user's to slow down.
+                        if (alreadyDemoted.Contains(process.Id) || process.SessionId != self.SessionId)
                         {
-                            // Another user's programs are not this user's to slow down.
-                            if (alreadyDemoted.Contains(process.Id) || process.SessionId != self.SessionId)
-                            {
-                                continue;
-                            }
-                            var original = process.PriorityClass;
-                            // Already out of the way, or raised on purpose by something that knows why.
-                            if (original is ProcessPriorityClass.Idle or ProcessPriorityClass.BelowNormal or ProcessPriorityClass.RealTime)
-                            {
-                                continue;
-                            }
-                            var snapshot = new ProcessStateSnapshot
-                            {
-                                ProcessId = process.Id,
-                                ProcessName = process.ProcessName,
-                                OriginalPriority = WindowsProcessOptimizer.FromPriorityClass(original),
-                                OriginalAffinityMask = 0,
-                                PowerThrottlingWasEnabled = ProcessNative.IsPowerThrottlingEnabled(process.Handle),
-                            };
-                            process.PriorityClass = ProcessPriorityClass.BelowNormal;
-                            ProcessNative.SetPowerThrottling(process.Handle, enabled: true);
-                            demoted.Add(snapshot);
+                            continue;
                         }
-                        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                        var original = process.PriorityClass;
+                        // Already out of the way, or raised on purpose by something that knows why.
+                        if (original is ProcessPriorityClass.Idle or ProcessPriorityClass.BelowNormal or ProcessPriorityClass.RealTime)
                         {
-                            // Exited, or protected: left exactly as it is.
-                            _logger.LogDebug(ex, "Could not demote {Name}", name);
+                            continue;
                         }
+                        var snapshot = new ProcessStateSnapshot
+                        {
+                            ProcessId = process.Id,
+                            ProcessName = name,
+                            OriginalPriority = WindowsProcessOptimizer.FromPriorityClass(original),
+                            OriginalAffinityMask = 0,
+                            PowerThrottlingWasEnabled = ProcessNative.IsPowerThrottlingEnabled(process.Handle),
+                        };
+                        process.PriorityClass = ProcessPriorityClass.BelowNormal;
+                        // Recorded before the second step: a priority lowered here has to be put
+                        // back even when efficiency mode then fails.
+                        demoted.Add(snapshot);
+                        ProcessNative.SetPowerThrottling(process.Handle, enabled: true);
+                    }
+                    catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                    {
+                        // Exited, or protected: left exactly as it is.
+                        _logger.LogDebug(ex, "Could not demote {Name}", name);
                     }
                 }
             }

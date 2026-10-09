@@ -5,166 +5,202 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Style="{StaticResource PageRoot}" MaxWidth="940" HorizontalAlignment="Left">
       <TextBlock Text="Display" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="Virtual display control and attached monitors" Style="{StaticResource Text.PageSubtitle}" />
+      <TextBlock Text="The virtual display, in three steps" Style="{StaticResource Text.PageSubtitle}" />
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="OPTIMA VIRTUALIZATION">
+      <!-- What it is and whether you need it, before anything asks for a click. -->
+      <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="820" HorizontalAlignment="Left" Margin="0,0,0,4"
+                 Text="A virtual display is an extra screen that exists only in software. Critical Ops can run on it at a resolution and refresh rate your own monitor may not have, for example 1920 x 1080 at 240 Hz. It is optional: without it the game runs on your real screen, and everything else in Optima works the same." />
+
+      <!-- Whatever the last action came to. One place, above the steps, so it is seen wherever the click was. -->
+      <Border Style="{StaticResource Callout}" Margin="0,8,0,0"
+              Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToCollapsed}}">
+        <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Text.Prose}" TextWrapping="Wrap" />
+      </Border>
+
+      <StackPanel Orientation="Horizontal" Margin="0,10,0,0"
+                  Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+        <ctl:AsciiSpinner Cells="12" Margin="0,0,10,0" />
+        <TextBlock Text="working" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding TestStatus}" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="12,0,0,0" />
+      </StackPanel>
+
+      <!-- Only after a check that could not put the screens back by itself. -->
+      <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,12,0,0"
+              Visibility="{Binding CanEmergencyRestore, Converter={StaticResource BoolToVis}}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="Your screens were not put back" Foreground="{DynamicResource Brush.Warn}" FontWeight="SemiBold" />
+            <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" TextWrapping="Wrap"
+                       Text="The check changed the layout and could not restore it. This puts back the layout from before the check." />
+          </StackPanel>
+          <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Put my screens back"
+                  Command="{Binding EmergencyRestoreCommand}" Margin="12,0,0,0" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <!-- 1 · the driver -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="1 · DRIVER">
+        <HeaderedContentControl.Tag>
+          <Border VerticalAlignment="Center">
+            <Border.Style>
+              <Style TargetType="Border" BasedOn="{StaticResource Badge}">
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Warn}" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding DriverBadge}" Value="INSTALLED">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Ok}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding DriverBadge}">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Badge}">
+                  <Setter Property="Foreground" Value="{DynamicResource Brush.Warn}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding DriverBadge}" Value="INSTALLED">
+                      <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Border>
+        </HeaderedContentControl.Tag>
+
         <StackPanel>
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel>
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="{Binding ProviderName}" FontSize="{StaticResource Type.Title}"
-                           Foreground="{DynamicResource Brush.Text}" />
-                <Border Margin="12,0,0,0" VerticalAlignment="Center">
-                  <Border.Style>
-                    <Style TargetType="Border" BasedOn="{StaticResource Badge}">
-                      <Setter Property="BorderBrush" Value="{DynamicResource Brush.TextMuted}" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding VirtualDisplayActive}" Value="True">
-                          <Setter Property="BorderBrush" Value="{DynamicResource Brush.Ok}" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </Border.Style>
-                  <TextBlock>
-                    <TextBlock.Style>
-                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Badge}">
-                        <Setter Property="Text" Value="OFF" />
-                        <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
-                        <Style.Triggers>
-                          <DataTrigger Binding="{Binding VirtualDisplayActive}" Value="True">
-                            <Setter Property="Text" Value="ACTIVE" />
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
-                          </DataTrigger>
-                        </Style.Triggers>
-                      </Style>
-                    </TextBlock.Style>
-                  </TextBlock>
-                </Border>
-              </StackPanel>
-              <TextBlock Text="{Binding ProviderCapabilities}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0" />
-              <TextBlock Text="{Binding VirtualDisplayModeText, StringFormat='mode · {0}'}"
-                         Style="{StaticResource Text.Value}" Margin="0,6,0,0" />
-            </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-              <Button Style="{StaticResource SecondaryButton}" Content="enable"
-                      Command="{Binding EnableVirtualDisplayCommand}" Margin="0,0,8,0" />
-              <Button Style="{StaticResource SecondaryButton}" Content="disable"
-                      Command="{Binding DisableVirtualDisplayCommand}" Margin="0,0,8,0" />
-              <Button Style="{StaticResource GhostButton}" Content="uninstall driver"
-                      Command="{Binding UninstallDriverCommand}"
-                      Visibility="{Binding DriverMissing, Converter={StaticResource InverseBoolToVis}}"
-                      ToolTip="Removes the virtual display device Optima installed" />
-            </StackPanel>
-          </Grid>
-
-          <Rectangle Height="1" Fill="{DynamicResource Brush.Hairline}" Margin="0,14" />
-
-          <Grid>
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition />
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="preset" Style="{StaticResource Text.Label}" VerticalAlignment="Center"
-                       Width="70" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-              <ComboBox ItemsSource="{Binding ModePresets}" SelectedItem="{Binding SelectedPreset}" Width="210" />
-              <Button Style="{StaticResource SecondaryButton}" Content="apply"
-                      Command="{Binding ApplyPresetCommand}" Margin="10,0,0,0" />
-            </StackPanel>
-          </Grid>
-
-          <Grid Margin="0,10,0,0">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition />
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="custom" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Width="70" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-              <TextBox Text="{Binding CustomWidth}" Width="76" />
-              <TextBlock Text="x" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
-              <TextBox Text="{Binding CustomHeight}" Width="76" />
-              <TextBlock Text="@" Margin="8,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
-              <TextBox Text="{Binding CustomRefreshRate}" Width="64" />
-              <TextBlock Text="Hz" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Text.Label}" />
-              <Button Style="{StaticResource SecondaryButton}" Content="apply"
-                      Command="{Binding ApplyCustomModeCommand}" Margin="10,0,0,0" />
-            </StackPanel>
-          </Grid>
-
-          <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
-                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
-            <ctl:AsciiSpinner Cells="12" Margin="0,0,10,0" />
-            <TextBlock Text="working" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
-          </StackPanel>
-
-          <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource Text.Prose}"
-                     Foreground="{DynamicResource Brush.Warn}" Margin="0,10,0,0" MaxWidth="760"
-                     HorizontalAlignment="Left"
-                     Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToCollapsed}}" />
-
-          <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,12,0,0"
-                  Visibility="{Binding DriverMissing, Converter={StaticResource BoolToVis}}">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="No virtual display device" Foreground="{DynamicResource Brush.Warn}" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding DriverBannerText}" Style="{StaticResource Text.Prose}"
-                           Margin="0,4,0,0" MaxWidth="620" HorizontalAlignment="Left" />
-                <TextBlock Text="{Binding DriverPackageText}" Style="{StaticResource Text.Micro}" Margin="0,5,0,0"
-                           Visibility="{Binding DriverPackageText, Converter={StaticResource EmptyToCollapsed}}" />
-              </StackPanel>
-
-              <Button Grid.Column="1" Style="{StaticResource PrimaryButton}"
-                      Padding="16,8" FontSize="{StaticResource Type.Label}"
-                      Content="Install driver" Command="{Binding InstallDriverCommand}"
-                      Margin="12,0,0,0" VerticalAlignment="Center"
+            <TextBlock Text="{Binding DriverDetail}" Style="{StaticResource Text.Prose}" TextWrapping="Wrap"
+                       VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+              <Button Style="{StaticResource PrimaryButton}" Padding="16,8" Content="Install driver"
+                      Command="{Binding InstallDriverCommand}"
                       Visibility="{Binding CanInstallDriver, Converter={StaticResource BoolToVis}}" />
-              <Button Grid.Column="1" Style="{StaticResource SecondaryButton}"
-                      Padding="14,8" Content="open drivers folder"
-                      Command="{Binding OpenDriversFolderCommand}"
-                      Margin="12,0,0,0" VerticalAlignment="Center"
-                      Visibility="{Binding CanInstallDriver, Converter={StaticResource InverseBoolToVis}}" />
-            </Grid>
-          </Border>
+              <Button Style="{StaticResource GhostButton}" Content="uninstall"
+                      Command="{Binding UninstallDriverCommand}"
+                      Visibility="{Binding DriverInstalled, Converter={StaticResource BoolToVis}}"
+                      ToolTip="Removes the virtual display driver from this PC" />
+            </StackPanel>
+          </Grid>
 
+          <!-- Why an install or a removal did not go through: all of it, not its first line. -->
           <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,10,0,0"
-                  Visibility="{Binding RestartRequired, Converter={StaticResource BoolToVis}}">
-            <TextBlock Style="{StaticResource Text.Prose}" MaxWidth="760" HorizontalAlignment="Left"
-                       Foreground="{DynamicResource Brush.Warn}"
-                       Text="Windows asked for a restart to finish installing the display driver. The virtual display will not appear until you restart." />
+                  Visibility="{Binding DriverProblem, Converter={StaticResource EmptyToCollapsed}}">
+            <TextBlock Text="{Binding DriverProblem}" Style="{StaticResource Text.Prose}" TextWrapping="Wrap" />
           </Border>
 
-          <Border Style="{StaticResource Callout}" BorderBrush="{DynamicResource Brush.Warn}" Margin="0,12,0,0"
-                  Visibility="{Binding CanEmergencyRestore, Converter={StaticResource BoolToVis}}">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="Display configuration changed this session"
-                           Foreground="{DynamicResource Brush.Warn}" FontWeight="SemiBold" />
-                <TextBlock Style="{StaticResource Text.Prose}" Margin="0,4,0,0" MaxWidth="560"
-                           HorizontalAlignment="Left"
-                           Text="If anything looks wrong, this puts the previous layout back immediately." />
-              </StackPanel>
-              <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Emergency restore"
-                      Command="{Binding EmergencyRestoreCommand}" Margin="12,0,0,0" VerticalAlignment="Center" />
-            </Grid>
-          </Border>
+          <StackPanel Orientation="Horizontal" Margin="0,10,0,0"
+                      Visibility="{Binding DeveloperMode, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="{Binding ProviderName, StringFormat='developer · provider: {0}'}" Style="{StaticResource Text.Micro}"
+                       VerticalAlignment="Center" />
+            <Button Style="{StaticResource GhostButton}" Content="open drivers folder" Padding="8,0" Margin="12,0,0,0"
+                    Command="{Binding OpenDriversFolderCommand}" />
+          </StackPanel>
         </StackPanel>
       </HeaderedContentControl>
 
-      <HeaderedContentControl Style="{StaticResource Section}" Header="ATTACHED DISPLAYS">
+      <!-- 2 · the one choice every launch follows -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="2 · USE IT FOR CRITICAL OPS">
         <HeaderedContentControl.Tag>
-          <StackPanel Orientation="Horizontal">
+          <CheckBox IsChecked="{Binding UseVirtualDisplay}" Content="on" VerticalAlignment="Center"
+                    ToolTip="Run Critical Ops on the virtual display. Applies to every profile." />
+        </HeaderedContentControl.Tag>
+
+        <StackPanel>
+          <TextBlock Text="{Binding ChoiceNote}" Style="{StaticResource Text.Prose}" TextWrapping="Wrap" />
+
+          <StackPanel IsEnabled="{Binding UseVirtualDisplay}" Margin="0,12,0,0">
+            <WrapPanel>
+              <TextBlock Text="resolution" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Width="90" />
+              <ComboBox ItemsSource="{Binding Sizes}" SelectedItem="{Binding SelectedSize}" Width="170" Margin="0,0,10,0" />
+              <ComboBox ItemsSource="{Binding RefreshRates}" SelectedItem="{Binding SelectedRefreshRate}" Width="90" />
+              <TextBlock Text="Hz" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="8,0,0,0" />
+            </WrapPanel>
+            <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" Margin="90,8,0,0"
+                       Text="This is the resolution PLAY uses, with every profile. Your own monitor stays the main screen, and the game opens there as always. The virtual display is switched off again when the game closes." />
+          </StackPanel>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <!-- 3 · seeing it without starting the game -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="3 · TRY IT NOW">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Style="{StaticResource Text.Prose}" TextWrapping="Wrap" VerticalAlignment="Center"
+                     Text="Turns the virtual display on at the resolution above, keeps it for 15 seconds so you can see it in Windows, then puts everything back. Your screens may flicker. Windows may ask for administrator approval." />
+          <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Test for 15 seconds" Padding="16,8"
+                  Margin="16,0,0,0" VerticalAlignment="Center" Command="{Binding TestCommand}" />
+        </Grid>
+      </HeaderedContentControl>
+
+      <!-- The same steps a launch takes, each with its own verdict and its own way out. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="CHECK MY SETUP">
+        <HeaderedContentControl.Tag>
+          <Button Style="{StaticResource SecondaryButton}" Content="Run check" Padding="14,5"
+                  Command="{Binding RunCheckCommand}"
+                  ToolTip="Tries the virtual display for real, step by step, and puts everything back" />
+        </HeaderedContentControl.Tag>
+
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" Margin="0,0,0,8"
+                     Text="If the virtual display does not work in a game, run this. It stops at the first step that fails and says what to do." />
+          <ItemsControl ItemsSource="{Binding CheckRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="84" />
+                      <ColumnDefinition />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Mark}" VerticalAlignment="Top">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Badge}">
+                          <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Warn}" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                    <StackPanel Grid.Column="1">
+                      <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Cell}" />
+                      <TextBlock Text="{Binding Detail}" Style="{StaticResource Text.Micro}" TextWrapping="Wrap" Margin="0,3,0,0"
+                                 Visibility="{Binding Detail, Converter={StaticResource EmptyToCollapsed}}" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Content="{Binding FixLabel}" Padding="14,5"
+                            Margin="12,0,0,0" VerticalAlignment="Top"
+                            Command="{Binding DataContext.FixCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            CommandParameter="{Binding}"
+                            Visibility="{Binding HasFix, Converter={StaticResource BoolToVis}}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <!-- The screens Windows knows, folded away: naming and ordering them is for Optima's own lists only. -->
+      <Expander Header="{Binding MonitorsHeader}" Margin="0,14,0,0">
+        <StackPanel Margin="0,8,0,0">
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
             <CheckBox Content="hide inactive" IsChecked="{Binding HideInactive}"
                       FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center" Margin="0,0,12,0"
                       ToolTip="Hide attached outputs that are not driving a desktop (0x0 @ 0 Hz)" />
@@ -172,121 +208,123 @@
                       FontSize="{StaticResource Type.Micro}" VerticalAlignment="Center" Margin="0,0,12,0"
                       ToolTip="Reveal displays you removed from this list" />
             <Button Style="{StaticResource GhostButton}" Content="refresh" Command="{Binding RefreshCommand}" Padding="6,0" />
+            <TextBlock Text="names, order and hiding change Optima's lists only; Windows is untouched"
+                       Style="{StaticResource Text.Micro}" VerticalAlignment="Center" Margin="12,0,0,0" />
           </StackPanel>
-        </HeaderedContentControl.Tag>
-        <ItemsControl ItemsSource="{Binding DisplayRows}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <Border Style="{StaticResource TableRow}">
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="128" />
-                    <ColumnDefinition />
-                    <ColumnDefinition Width="150" />
-                    <ColumnDefinition Width="92" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
+          <ItemsControl ItemsSource="{Binding DisplayRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource TableRow}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="128" />
+                      <ColumnDefinition />
+                      <ColumnDefinition Width="150" />
+                      <ColumnDefinition Width="92" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding DeviceName}" Style="{StaticResource Text.CellDim}" />
 
-                  <TextBlock Grid.Column="1" Text="{Binding DisplayedName}" ToolTip="{Binding OriginalName}"
-                             Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
-                    <TextBlock.Style>
-                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Cell}">
-                        <Style.Triggers>
-                          <DataTrigger Binding="{Binding IsHidden}" Value="True">
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
-                          </DataTrigger>
-                        </Style.Triggers>
-                      </Style>
-                    </TextBlock.Style>
-                  </TextBlock>
-                  <TextBox Grid.Column="1" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
-                           Margin="0,0,10,0" VerticalAlignment="Center"
-                           Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
-                           ToolTip="Leave empty to restore the original name">
-                    <TextBox.InputBindings>
-                      <KeyBinding Key="Return"
-                                  Command="{Binding DataContext.SaveNameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                  CommandParameter="{Binding}" />
-                      <KeyBinding Key="Escape"
-                                  Command="{Binding DataContext.CancelRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                  CommandParameter="{Binding}" />
-                    </TextBox.InputBindings>
-                  </TextBox>
+                    <TextBlock Grid.Column="1" Text="{Binding DisplayedName}" ToolTip="{Binding OriginalName}"
+                               Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Cell}">
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                    <TextBox Grid.Column="1" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,10,0" VerticalAlignment="Center"
+                             Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                             ToolTip="Leave empty to restore the original name">
+                      <TextBox.InputBindings>
+                        <KeyBinding Key="Return"
+                                    Command="{Binding DataContext.SaveNameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}" />
+                        <KeyBinding Key="Escape"
+                                    Command="{Binding DataContext.CancelRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    CommandParameter="{Binding}" />
+                      </TextBox.InputBindings>
+                    </TextBox>
 
-                  <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" Style="{StaticResource Text.Cell}" />
-                  <TextBlock Grid.Column="3" VerticalAlignment="Center">
-                    <TextBlock.Style>
-                      <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Badge}">
-                        <Setter Property="Text" Value="" />
-                        <Setter Property="Foreground" Value="{DynamicResource Brush.Hairline}" />
-                        <Style.Triggers>
-                          <DataTrigger Binding="{Binding IsPrimary}" Value="True">
-                            <Setter Property="Text" Value="PRIMARY" />
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
-                          </DataTrigger>
-                          <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                              <Condition Binding="{Binding IsActive}" Value="True" />
-                              <Condition Binding="{Binding IsPrimary}" Value="False" />
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Text" Value="ACTIVE" />
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
-                          </MultiDataTrigger>
-                          <DataTrigger Binding="{Binding IsHidden}" Value="True">
-                            <Setter Property="Text" Value="HIDDEN" />
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
-                          </DataTrigger>
-                        </Style.Triggers>
-                      </Style>
-                    </TextBlock.Style>
-                  </TextBlock>
+                    <TextBlock Grid.Column="2" Text="{Binding CurrentMode}" Style="{StaticResource Text.Cell}" />
+                    <TextBlock Grid.Column="3" VerticalAlignment="Center">
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Badge}">
+                          <Setter Property="Text" Value="" />
+                          <Setter Property="Foreground" Value="{DynamicResource Brush.Hairline}" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsPrimary}" Value="True">
+                              <Setter Property="Text" Value="MAIN" />
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                            </DataTrigger>
+                            <MultiDataTrigger>
+                              <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding IsActive}" Value="True" />
+                                <Condition Binding="{Binding IsPrimary}" Value="False" />
+                              </MultiDataTrigger.Conditions>
+                              <Setter Property="Text" Value="ACTIVE" />
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Ok}" />
+                            </MultiDataTrigger>
+                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                              <Setter Property="Text" Value="HIDDEN" />
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
 
-                  <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal"
-                                Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
-                      <Button Style="{StaticResource GhostButton}" Content="&#x2191;" Padding="5,0" ToolTip="Move up"
-                              Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                              CommandParameter="{Binding}" />
-                      <Button Style="{StaticResource GhostButton}" Content="&#x2193;" Padding="5,0" ToolTip="Move down"
-                              Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                              CommandParameter="{Binding}" />
-                      <Button Style="{StaticResource GhostButton}" Content="rename" Padding="5,0"
-                              Command="{Binding DataContext.StartRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                              CommandParameter="{Binding}" />
-                      <Button Padding="5,0"
-                              Command="{Binding DataContext.ToggleHiddenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                              CommandParameter="{Binding}">
-                        <Button.Style>
-                          <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
-                            <Setter Property="Content" Value="hide" />
-                            <Setter Property="ToolTip" Value="Remove this display from the list (Optima only; Windows is untouched)" />
-                            <Style.Triggers>
-                              <DataTrigger Binding="{Binding IsHidden}" Value="True">
-                                <Setter Property="Content" Value="unhide" />
-                                <Setter Property="ToolTip" Value="Put this display back in the list" />
-                              </DataTrigger>
-                            </Style.Triggers>
-                          </Style>
-                        </Button.Style>
-                      </Button>
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                      <StackPanel Orientation="Horizontal"
+                                  Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVis}}">
+                        <Button Style="{StaticResource GhostButton}" Content="&#x2191;" Padding="5,0" ToolTip="Move up"
+                                Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}" />
+                        <Button Style="{StaticResource GhostButton}" Content="&#x2193;" Padding="5,0" ToolTip="Move down"
+                                Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}" />
+                        <Button Style="{StaticResource GhostButton}" Content="rename" Padding="5,0"
+                                Command="{Binding DataContext.StartRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}" />
+                        <Button Padding="5,0"
+                                Command="{Binding DataContext.ToggleHiddenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}">
+                          <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                              <Setter Property="Content" Value="hide" />
+                              <Setter Property="ToolTip" Value="Remove this display from the list (Optima only; Windows is untouched)" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                  <Setter Property="Content" Value="unhide" />
+                                  <Setter Property="ToolTip" Value="Put this display back in the list" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Button.Style>
+                        </Button>
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal"
+                                  Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
+                        <Button Style="{StaticResource GhostButton}" Content="save" Padding="5,0"
+                                Command="{Binding DataContext.SaveNameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}" />
+                        <Button Style="{StaticResource GhostButton}" Content="cancel" Padding="5,0"
+                                Command="{Binding DataContext.CancelRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}" />
+                      </StackPanel>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal"
-                                Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}">
-                      <Button Style="{StaticResource GhostButton}" Content="save" Padding="5,0"
-                              Command="{Binding DataContext.SaveNameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                              CommandParameter="{Binding}" />
-                      <Button Style="{StaticResource GhostButton}" Content="cancel" Padding="5,0"
-                              Command="{Binding DataContext.CancelRenameCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                              CommandParameter="{Binding}" />
-                    </StackPanel>
-                  </StackPanel>
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </HeaderedContentControl>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Expander>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

@@ -7,8 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Driver;
 
 /// <summary>
-/// Routes IVirtualDisplayProvider calls to the configured provider (§6): "Auto" probes the real driver and falls back
-/// to the mock; "MttVdd" / "Mock" force a specific one.
+/// Routes IVirtualDisplayProvider calls to the configured provider (§6): "Auto" is the real driver, and in developer
+/// mode falls back to the mock when the driver is not there; "MttVdd" / "Mock" force a specific one.
 /// </summary>
 public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider, IVirtualDisplayMaintenance
 {
@@ -54,7 +54,10 @@ public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider, I
             {
                 "MTTVDD" => _real,
                 "MOCK" => _mock,
-                _ => await _real.IsAvailableAsync(ct).ConfigureAwait(false) ? _real : _mock,
+                // The stand-in is a developer's tool. For a player without the driver it reported a
+                // display that was "active" and modes that "applied" while nothing existed; the real
+                // provider says what is true, that the driver is not installed.
+                _ => !settings.DeveloperMode || await _real.IsAvailableAsync(ct).ConfigureAwait(false) ? _real : _mock,
             };
             _logger.LogInformation("Virtual display provider selected: {Provider}", _selected.Name);
             return _selected;

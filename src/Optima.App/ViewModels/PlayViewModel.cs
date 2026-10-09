@@ -82,6 +82,8 @@ public sealed partial class PlayViewModel : ObservableObject
     private readonly AppPaths _paths;
     private readonly ILogger<PlayViewModel> _logger;
     private readonly Optima.Monitoring.Metrics.StandbyCleanerService _standbyCleaner;
+    private readonly Optima.Monitoring.Metrics.EtwMetricsProviderClient _capture;
+    private readonly Optima.Core.Protection.ShieldLoader _shield;
     private CancellationTokenSource? _sessionCts;
     private DispatcherTimer? _elapsedTimer;
 
@@ -96,9 +98,13 @@ public sealed partial class PlayViewModel : ObservableObject
         CrashSentinel crashSentinel,
         AppPaths paths,
         Optima.Monitoring.Metrics.StandbyCleanerService standbyCleaner,
+        Optima.Monitoring.Metrics.EtwMetricsProviderClient capture,
+        Optima.Core.Protection.ShieldLoader shield,
         ILogger<PlayViewModel> logger)
     {
         _standbyCleaner = standbyCleaner;
+        _capture = capture;
+        _shield = shield;
         _orchestrator = orchestrator;
         _profiles = profiles;
         _settings = settings;
@@ -110,6 +116,9 @@ public sealed partial class PlayViewModel : ObservableObject
         _paths = paths;
         _logger = logger;
         _orchestrator.ProgressChanged += OnProgress;
+        // The line under the profile names the display, and the display is a setting now.
+        _settings.SettingsChanged += (_, _) =>
+            Application.Current?.Dispatcher.BeginInvoke(() => OnPropertyChanged(nameof(SelectedProfileSummary)));
         // New crash bundles surface on the Play tab as a dismissible banner; dismissal is persisted.
         _crashSentinel.BundleWritten += folder => Application.Current?.Dispatcher.BeginInvoke(() => _ = RefreshCrashBannerAsync());
     }
@@ -175,9 +184,29 @@ public sealed partial class PlayViewModel : ObservableObject
         {
             return;
         }
-        SelectedProfile = Profiles.FirstOrDefault(p => string.Equals(p.Name, profile.Name, StringComparison.OrdinalIgnoreCase)) ?? profile;
-        await PlayCommand.ExecuteAsync(null);
+        // The exit that brought this here arrives while the crashed session is still putting the
+        // PC back. Starting over it was refused as "a session is already running", and the one
+        // relaunch was spent on that.
+        for (var waited = 0; waited < 60 && (IsSessionActive || _orchestrator.IsSessionActive); waited++)
+        {
+            await Task.Delay(500).ConfigureAwait(false);
+        }
+
+        // Called from the pool. The command and everything bound to it belong to the window's thread.
+        await Application.Current.Dispatcher.InvokeAsync(async () =>
+        {
+            if (IsSessionActive)
+            {
+                return;
+            }
+            SelectedProfile = Profiles.FirstOrDefault(p => string.Equals(p.Name, profile.Name, StringComparison.OrdinalIgnoreCase)) ?? profile;
+            _unattendedLaunch = true;
+            await PlayCommand.ExecuteAsync(null);
+        }).Task.Unwrap().ConfigureAwait(false);
     }
+
+    // Set for a launch nobody clicked for. Such a launch never puts a window up.
+    private bool _unattendedLaunch;
 
     public ObservableCollection<LaunchProfile> Profiles { get; } = [];
 
@@ -187,7 +216,7 @@ public sealed partial class PlayViewModel : ObservableObject
     [
         new("Launcher resolved", "checking the install"),
         new("Profile applied", "power plan, priority, throttling"),
-        new("Virtual display", "as the profile says"),
+        new("Virtual display", "as the Display page says"),
         new("Game running", "waiting for the game window"),
         new("Restore on exit", "pending"),
     ];
@@ -238,11 +267,24 @@ public sealed partial class PlayViewModel : ObservableObject
 
     public string PlayButtonText => IsSessionActive ? "Running" : "Play Critical Ops";
 
-    public string SelectedProfileSummary => SelectedProfile is null
-        ? string.Empty
-        : SelectedProfile.Display.VirtualDisplay
-            ? $"{SelectedProfile.Display.Mode} virtual display · {SelectedProfile.Performance.PowerPlan} power plan · restored on exit"
-            : $"Physical display · {SelectedProfile.Performance.PowerPlan} power plan · restored on exit";
+    public string SelectedProfileSummary
+    {
+        get
+        {
+            if (SelectedProfile is null)
+            {
+                return string.Empty;
+            }
+            // The display is the Display page's choice for every profile; a profile's own only
+            // counts until that choice exists, which is what the launch does as well.
+            var display = _settings.Current is { VirtualDisplayEnabled: not null } settings
+                ? settings.EffectiveDisplay
+                : SelectedProfile.Display;
+            return display.VirtualDisplay
+                ? $"{display.Mode} virtual display · {SelectedProfile.Performance.PowerPlan} power plan · restored on exit"
+                : $"Your own screen · {SelectedProfile.Performance.PowerPlan} power plan · restored on exit";
+        }
+    }
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -283,6 +325,8 @@ public sealed partial class PlayViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanPlay))]
     private async Task PlayAsync()
     {
+        var unattended = _unattendedLaunch;
+        _unattendedLaunch = false;
         if (SelectedProfile is null)
         {
             return;
@@ -307,8 +351,33 @@ public sealed partial class PlayViewModel : ObservableObject
 
         try
         {
-            // BOOST's memory cleaner needs the elevated helper; PLAY is where its one admin prompt
-            // belongs, before the game covers the screen. A no-op with the cleaner off.
+            // Frametime capture needs the elevated helper, and would only ask for it once the game
+            // is on screen. Asked for here instead, and not waited for: the prompt and the helper's
+            // start then overlap the game's own, and the launch is never held up by either. Only
+            // for a launch that can go ahead: one that fails at once must not cost a prompt.
+            if (_status.DetectedPlatform is not null && _status.DetectedGame is not null && !_orchestrator.IsSessionActive)
+            {
+                // A PC linked under an older "what protected play does" is shown the current one
+                // first. Here and only here, from a click: nothing in the background may put a
+                // window up, and a launch that did not come from the window (a relaunch after a
+                // crash) does not either. Before the helper is asked for, so the requests below
+                // still reach its gate together.
+                // And only in a build that has Shield: a PC linked under an earlier build keeps its
+                // link file, and a build without the module has nothing to disclose.
+                if (_shield.Installed && _shield.NeedsDisclosure && !unattended && Views.ProtectedPlayWindow.Ask())
+                {
+                    _shield.AcceptDisclosure();
+                }
+                _ = _capture.EnsureHelperAsync();
+                // Protected play wants the helper as well, for the same reason and under the same
+                // rule: its request meets the others at the helper's gate, so there is one prompt
+                // for all of them. Not waited for either. Without the helper it runs with reduced
+                // coverage; on a PC that is not linked it does not run at all.
+                _ = _shield.StartAsync("play", allowPrompt: true);
+            }
+            // BOOST's memory cleaner needs the helper too; PLAY is where its one admin prompt
+            // belongs, before the game covers the screen. A no-op with the cleaner off. After the
+            // line above, so the two requests meet at the helper's gate and share one prompt.
             await _standbyCleaner.SyncAsync(allowPrompt: true);
             _crashRelaunch.NoteSessionStart(profile);
             var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, _sessionCts.Token));
@@ -350,7 +419,11 @@ public sealed partial class PlayViewModel : ObservableObject
     private bool CanPlay() => !IsSessionActive;
 
     [RelayCommand(CanExecute = nameof(IsSessionActive))]
-    private void Cancel() => _sessionCts?.Cancel();
+    private void Cancel()
+    {
+        _crashRelaunch.NoteIntentionalExit();
+        _sessionCts?.Cancel();
+    }
 
     /// <summary>Opens the five-step Critical Ops on PC setup guide as a dialog, with a fresh PC scan.</summary>
     [RelayCommand]
@@ -375,6 +448,7 @@ public sealed partial class PlayViewModel : ObservableObject
         KillStatusText = "killing...";
         try
         {
+            _crashRelaunch.NoteIntentionalExit();
             var result = await _terminator.KillGameAsync();
             KillStatusText = result.Message;
             await _status.RefreshAsync();

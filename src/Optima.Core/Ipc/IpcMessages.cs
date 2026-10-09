@@ -24,6 +24,7 @@ public enum IpcCommand
     StartStandbyCleaner,
     StopStandbyCleaner,
     PurgeStandbyList,
+    LaunchShield,
     Shutdown,
 }
 

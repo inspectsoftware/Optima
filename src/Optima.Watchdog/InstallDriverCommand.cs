@@ -8,9 +8,8 @@ namespace Optima.Watchdog;
 /// bundled virtual display driver, gives it a device node and writes the default settings file,
 /// then exits instead of serving the IPC pipe.
 ///
-/// The setup cannot do this itself: it installs per-user and never runs elevated. It launches this
-/// helper instead, whose manifest asks Windows for administrator rights, so the user sees one UAC
-/// prompt during setup rather than having to find the install on the app's Display page.
+/// The setup runs as administrator and starts this helper directly, so the driver is in place
+/// when Optima first opens and nobody has to find the install on the app's Display page.
 ///
 /// Exit codes: 0 installed (or already installed), 1 the install failed, 2 nothing installable was
 /// found in the folder, 3 the arguments were rejected.

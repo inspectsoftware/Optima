@@ -174,7 +174,7 @@ public sealed class VirtualDriverCheck : IDiagnosticCheck
         _bundledDriverFolder = bundledDriverFolder;
     }
 
-    public string Name => "Optima Virtualization";
+    public string Name => "Virtual display";
     public int Order => 50;
 
     public async Task<DiagnosticResult> RunAsync(CancellationToken ct = default)

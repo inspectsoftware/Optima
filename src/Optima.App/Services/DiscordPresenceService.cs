@@ -21,14 +21,11 @@ namespace Optima.App.Services;
 /// </summary>
 public sealed class DiscordPresenceService : IDisposable
 {
-    /// <summary>How often a running session re-pushes the card so the fps line stays fresh.</summary>
-    private static readonly TimeSpan FpsPushInterval = TimeSpan.FromSeconds(15);
-
     /// <summary>How long a looked-up player badge is trusted before it is re-read from the API.</summary>
     private static readonly TimeSpan BadgeLifetime = TimeSpan.FromMinutes(30);
 
     /// <summary>
-    /// The housekeeping tick. It exists so the card can move for reasons other than a game or fps
+    /// The housekeeping tick. It exists so the card can move for reasons other than a game
     /// event: a stale badge, or art that failed to resolve the first time. Identical cards are
     /// dropped before they reach Discord, so an idle tick costs one string comparison.
     /// </summary>
@@ -36,7 +33,6 @@ public sealed class DiscordPresenceService : IDisposable
 
     private readonly GamePresenceService _presence;
     private readonly SettingsService _settings;
-    private readonly IPerformanceMonitor _monitor;
     private readonly CopsApiClient _cops;
     private readonly DiscordArtCatalog _artCatalog;
     private readonly ILogger<DiscordPresenceService> _logger;
@@ -94,25 +90,23 @@ public sealed class DiscordPresenceService : IDisposable
     private IReadOnlyList<(string Name, ulong Id)> _uploadedAssets = [];
     private bool _artResolved;
     private bool _artResolving;
+    private DateTimeOffset _artRetryAt = DateTimeOffset.MinValue;
 
     private PlayerSeasonBadge? _badge;
     // Which player the cached badge belongs to, so a change of identity invalidates it immediately.
     private string _badgeName = "";
     private DateTimeOffset _badgeAt = DateTimeOffset.MinValue;
-    private DateTimeOffset _lastPush = DateTimeOffset.MinValue;
     private string _lastSignature = "";
 
     public DiscordPresenceService(
         GamePresenceService presence,
         SettingsService settings,
-        IPerformanceMonitor monitor,
         CopsApiClient cops,
         DiscordArtCatalog artCatalog,
         ILogger<DiscordPresenceService> logger)
     {
         _presence = presence;
         _settings = settings;
-        _monitor = monitor;
         _cops = cops;
         _artCatalog = artCatalog;
         _logger = logger;
@@ -126,7 +120,6 @@ public sealed class DiscordPresenceService : IDisposable
         {
             _settings.SettingsChanged += OnSettingsChanged;
             _presence.PresenceChanged += OnPresenceChanged;
-            _monitor.MetricsUpdated += OnMetrics;
             _subscribed = true;
         }
         _tick ??= new Timer(_ => UpdatePresence(), null, TickInterval, TickInterval);
@@ -153,7 +146,16 @@ public sealed class DiscordPresenceService : IDisposable
                 }
                 _launcherVisible = visible;
             }
-            UpdatePresence();
+            // After a tray start the first show is the first update with a card, so it is the
+            // one that builds the Discord client: on the pool, not while the window is appearing.
+            if (args.NewValue is true)
+            {
+                _ = Task.Run(UpdatePresence);
+            }
+            else
+            {
+                UpdatePresence();
+            }
         };
         UpdatePresence();
     }
@@ -175,6 +177,7 @@ public sealed class DiscordPresenceService : IDisposable
             _applicationId = newId;
             // A different application has its own assets, so the art is looked up again.
             _artResolved = false;
+            _artRetryAt = DateTimeOffset.MinValue;
             _uploadedAssets = [];
             TearDownClient();
         }
@@ -199,18 +202,11 @@ public sealed class DiscordPresenceService : IDisposable
 
     private void OnPresenceChanged(PresenceChange change)
     {
-        // A new run starts with an empty fps history; push right away rather than on the next tick.
-        _lastPush = DateTimeOffset.MinValue;
-        UpdatePresence();
-    }
-
-    private void OnMetrics(object? sender, HardwareMetrics metrics)
-    {
-        // Live fps only matters while a session runs; throttled so the pipe stays quiet.
-        if (_presence.Current != GamePresence.InGame
-            || DateTimeOffset.Now - _lastPush < FpsPushInterval)
+        // The art may be asked for again: a lookup that failed as the game started would
+        // otherwise keep the fallback artwork until the tick after next.
+        lock (_gate)
         {
-            return;
+            _artRetryAt = DateTimeOffset.MinValue;
         }
         UpdatePresence();
     }
@@ -221,7 +217,18 @@ public sealed class DiscordPresenceService : IDisposable
         {
             lock (_gate)
             {
-                if (!_enabled || !TryEnsureClient())
+                if (!_enabled)
+                {
+                    return;
+                }
+                // Nothing to show and nothing shown: a launcher that was never opened (a tray
+                // autostart) stays off Discord's pipe, and asks for no art or badge, until there
+                // is a card to send. A client that exists still goes on to clear its card below.
+                if (_client is not { IsDisposed: false } && BuildCard() is null)
+                {
+                    return;
+                }
+                if (!TryEnsureClient())
                 {
                     return;
                 }
@@ -254,17 +261,14 @@ public sealed class DiscordPresenceService : IDisposable
         switch (_presence.Current)
         {
             case GamePresence.InGame:
-            {
-                var fps = _monitor.Latest?.CurrentFps;
-                return (PresenceComposer.Compose(GamePresence.InGame, fps, _badge, _profileName, _options),
+                return (PresenceComposer.Compose(GamePresence.InGame, _badge, _profileName, _options),
                     _options.ShowElapsedTime ? _presence.InGameSince ?? DateTimeOffset.Now : null);
-            }
             case GamePresence.Starting:
-                return (PresenceComposer.Compose(GamePresence.Starting, null, _badge, _profileName, _options), null);
+                return (PresenceComposer.Compose(GamePresence.Starting, _badge, _profileName, _options), null);
             default:
                 if (_inLauncherEnabled && _launcherEverShown)
                 {
-                    return (PresenceComposer.Compose(GamePresence.NotRunning, null, _badge, null, _options),
+                    return (PresenceComposer.Compose(GamePresence.NotRunning, _badge, null, _options),
                         _options.ShowElapsedTime ? _launcherVisibleSince : null);
                 }
                 return null;
@@ -285,7 +289,6 @@ public sealed class DiscordPresenceService : IDisposable
             return;
         }
         _lastSignature = signature;
-        _lastPush = DateTimeOffset.Now;
 
         _client!.SetPresence(new RichPresence
         {
@@ -332,11 +335,14 @@ public sealed class DiscordPresenceService : IDisposable
     /// </summary>
     private void RefreshArtIfNeeded()
     {
-        if (_artResolved || _artResolving)
+        if (_artResolved || _artResolving || DateTimeOffset.Now < _artRetryAt)
         {
             return;
         }
         _artResolving = true;
+        // An empty or failed answer is asked again a housekeeping tick later, not by every update
+        // in between, each of which was a request and a log line.
+        _artRetryAt = DateTimeOffset.Now + TickInterval;
         _ = ResolveArtAsync();
     }
 
@@ -438,10 +444,10 @@ public sealed class DiscordPresenceService : IDisposable
         }
         try
         {
-            _client = new DiscordRpcClient(_applicationId)
-            {
-                SkipIdenticalPresence = true,
-            };
+            // Not SkipIdenticalPresence: the library sends the current card again each time Discord
+            // comes back, and with that flag it skipped exactly that send as "identical". A Discord
+            // that was restarted then showed no card until the card's text changed.
+            _client = new DiscordRpcClient(_applicationId);
             // The library runs its own reconnect loop with a backoff, so a Discord client that is not
             // running yet (or is restarted later) is recovered on its own; these events only explain
             // what is happening in the log.
@@ -501,7 +507,6 @@ public sealed class DiscordPresenceService : IDisposable
         {
             _settings.SettingsChanged -= OnSettingsChanged;
             _presence.PresenceChanged -= OnPresenceChanged;
-            _monitor.MetricsUpdated -= OnMetrics;
             _subscribed = false;
         }
         _tick?.Dispose();

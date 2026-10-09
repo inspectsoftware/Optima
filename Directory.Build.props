@@ -12,8 +12,12 @@
          without this, every self-contained publish ships the same resource assemblies again in
          cs, de, es, fr, it, ja, ko, pl, pt-BR, ru, tr, zh-Hans and zh-Hant. -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- No profile-guided re-jitting. It makes long-running hot code a little faster, which a
+         launcher that mostly waits has none of, and it paid for that with over a second of
+         background compiling in the half minute after every start, beside the game being launched. -->
+    <TieredPGO>false</TieredPGO>
     <Company>Inspect Software</Company>
     <Product>Optima</Product>
-    <Version>0.7.5</Version>
+    <Version>0.8.0</Version>
   </PropertyGroup>
 </Project>

@@ -13,4 +13,16 @@
   <ItemGroup>
     <ProjectReference Include="..\Optima.Core\Optima.Core.csproj" />
   </ItemGroup>
+
+  <!-- The helper starts Optima Shield only when the file beside it is the one this build was made
+       with, so that file's SHA-256 is written into the helper here. Without the file (a build from
+       source) nothing is written, and the helper refuses the command. -->
+  <Target Name="StampShield" BeforeTargets="GetAssemblyAttributes" Condition="Exists('..\..\vendor\shield\Optima.Shield.exe')">
+    <GetFileHash Files="..\..\vendor\shield\Optima.Shield.exe" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="ShieldSha256" />
+    </GetFileHash>
+    <ItemGroup>
+      <AssemblyMetadata Include="ShieldSha256" Value="$(ShieldSha256)" />
+    </ItemGroup>
+  </Target>
 </Project>

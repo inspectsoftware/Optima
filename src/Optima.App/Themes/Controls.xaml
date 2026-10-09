@@ -259,17 +259,24 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <ctl:ChamferBorder x:Name="Root" Background="{TemplateBinding Background}"
-                             Chamfer="{StaticResource Chamfer.Control}" Padding="{TemplateBinding Padding}"
-                             TopLine="{DynamicResource Brush.Glass.Highlight}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </ctl:ChamferBorder>
+          <!-- Hover and press are layers that fade over the resting ground (see Flow). -->
+          <Grid x:Name="Frame">
+            <ctl:ChamferBorder x:Name="Root" Background="{TemplateBinding Background}"
+                               Chamfer="{StaticResource Chamfer.Control}"
+                               TopLine="{DynamicResource Brush.Glass.Highlight}" />
+            <ctl:ChamferBorder x:Name="Hover" Background="{DynamicResource Brush.AccentHover}"
+                               Chamfer="{StaticResource Chamfer.Control}" Opacity="0" />
+            <ctl:ChamferBorder x:Name="Down" Background="{DynamicResource Brush.AccentPressed}"
+                               Chamfer="{StaticResource Chamfer.Control}" Opacity="0" />
+            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.AccentHover}" />
+              <Setter TargetName="Hover" Property="ctl:Flow.Show" Value="True" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.AccentPressed}" />
+              <Setter TargetName="Down" Property="ctl:Flow.Show" Value="True" />
+              <Setter TargetName="Frame" Property="ctl:Flow.Sink" Value="True" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter TargetName="Root" Property="Background" Value="Transparent" />
@@ -295,18 +302,25 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <ctl:ChamferBorder x:Name="Root" Background="{TemplateBinding Background}"
-                             Chamfer="{StaticResource Chamfer.Control}" Padding="{TemplateBinding Padding}"
-                             TopLine="{DynamicResource Brush.Glass.Border}" BottomLine="{DynamicResource Brush.Strip.Bottom}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </ctl:ChamferBorder>
+          <!-- Each layer adds one step of the glass surface: resting, plus hover, plus press. -->
+          <Grid x:Name="Frame">
+            <ctl:ChamferBorder x:Name="Root" Background="{TemplateBinding Background}"
+                               Chamfer="{StaticResource Chamfer.Control}"
+                               TopLine="{DynamicResource Brush.Glass.Border}" BottomLine="{DynamicResource Brush.Strip.Bottom}" />
+            <ctl:ChamferBorder x:Name="Hover" Background="{DynamicResource Brush.Glass.Surface1}"
+                               LeadingEdge="{DynamicResource Brush.Accent}"
+                               Chamfer="{StaticResource Chamfer.Control}" Opacity="0" />
+            <ctl:ChamferBorder x:Name="Down" Background="{DynamicResource Brush.Glass.Surface1}"
+                               Chamfer="{StaticResource Chamfer.Control}" Opacity="0" />
+            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Glass.Surface2}" />
-              <Setter TargetName="Root" Property="LeadingEdge" Value="{DynamicResource Brush.Accent}" />
+              <Setter TargetName="Hover" Property="ctl:Flow.Show" Value="True" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Glass.Surface3}" />
+              <Setter TargetName="Down" Property="ctl:Flow.Show" Value="True" />
+              <Setter TargetName="Frame" Property="ctl:Flow.Sink" Value="True" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
@@ -326,15 +340,19 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <ctl:ChamferBorder x:Name="Root" Background="#1AE08A8A"
-                             Chamfer="{StaticResource Chamfer.Control}" Padding="{TemplateBinding Padding}"
-                             TopLine="#59E08A8A">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </ctl:ChamferBorder>
+          <Grid x:Name="Frame">
+            <ctl:ChamferBorder x:Name="Root" Background="#1AE08A8A"
+                               Chamfer="{StaticResource Chamfer.Control}" TopLine="#59E08A8A" />
+            <ctl:ChamferBorder x:Name="Hover" Background="#1AE08A8A" LeadingEdge="{DynamicResource Brush.Fail}"
+                               Chamfer="{StaticResource Chamfer.Control}" Opacity="0" />
+            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Root" Property="Background" Value="#33E08A8A" />
-              <Setter TargetName="Root" Property="LeadingEdge" Value="{DynamicResource Brush.Fail}" />
+              <Setter TargetName="Hover" Property="ctl:Flow.Show" Value="True" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Frame" Property="ctl:Flow.Sink" Value="True" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
@@ -355,13 +373,14 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <Border x:Name="Root" Background="Transparent" Padding="{TemplateBinding Padding}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
+          <Grid Background="Transparent">
+            <Border x:Name="Hover" Background="{DynamicResource Brush.Glass.Surface1}" Opacity="0" />
+            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
+              <Setter TargetName="Hover" Property="ctl:Flow.Show" Value="True" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Foreground" Value="{DynamicResource Brush.Hairline}" />
@@ -380,22 +399,30 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <ctl:ChamferBorder x:Name="Root" Background="{DynamicResource Brush.Glass.Surface1}"
-                             Chamfer="{StaticResource Chamfer.Chip}" Padding="{TemplateBinding Padding}"
-                             Outline="{DynamicResource Brush.Field.Outline}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </ctl:ChamferBorder>
+          <Grid x:Name="Frame">
+            <ctl:ChamferBorder x:Name="Root" Background="{DynamicResource Brush.Glass.Surface1}"
+                               Chamfer="{StaticResource Chamfer.Chip}"
+                               Outline="{DynamicResource Brush.Field.Outline}" />
+            <ctl:ChamferBorder x:Name="Hover" Background="{DynamicResource Brush.Glass.Surface1}"
+                               Chamfer="{StaticResource Chamfer.Chip}" Opacity="0" />
+            <!-- The chosen chip: the accent fills in over the resting chip. -->
+            <ctl:ChamferBorder x:Name="Chosen" Background="{DynamicResource Brush.Accent}"
+                               Chamfer="{StaticResource Chamfer.Chip}" Opacity="0" />
+            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Glass.Surface2}" />
+              <Setter TargetName="Hover" Property="ctl:Flow.Show" Value="True" />
               <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Frame" Property="ctl:Flow.Sink" Value="True" />
             </Trigger>
             <Trigger Property="Tag">
               <Trigger.Value>
                 <sys:Boolean>True</sys:Boolean>
               </Trigger.Value>
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Accent}" />
-              <Setter TargetName="Root" Property="Outline" Value="{x:Null}" />
+              <Setter TargetName="Chosen" Property="ctl:Flow.Show" Value="True" />
               <Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" />
               <Setter Property="FontWeight" Value="SemiBold" />
             </Trigger>
@@ -455,26 +482,29 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <ctl:ChamferBorder x:Name="Root" Background="Transparent" Chamfer="0" Padding="12,7,10,7" Margin="0,1">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="18" />
-                <ColumnDefinition x:Name="Gap" Width="12" />
-                <ColumnDefinition />
-              </Grid.ColumnDefinitions>
-              <ctl:Icon Size="17" Foreground="{TemplateBinding Foreground}"
-                        Symbol="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource IconKey}}" />
-              <ContentPresenter x:Name="Label" Grid.Column="2" VerticalAlignment="Center" />
-            </Grid>
-          </ctl:ChamferBorder>
+          <Grid>
+            <Border x:Name="Hover" Background="{DynamicResource Brush.Glass.Surface1}" Margin="0,1" Opacity="0" />
+            <ctl:ChamferBorder x:Name="Root" Background="Transparent" Chamfer="0" Padding="12,7,10,7" Margin="0,1">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="18" />
+                  <ColumnDefinition x:Name="Gap" Width="12" />
+                  <ColumnDefinition />
+                </Grid.ColumnDefinitions>
+                <ctl:Icon Size="17" Foreground="{TemplateBinding Foreground}"
+                          Symbol="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource IconKey}}" />
+                <ContentPresenter x:Name="Label" Grid.Column="2" VerticalAlignment="Center" />
+              </Grid>
+            </ctl:ChamferBorder>
+          </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
+              <Setter TargetName="Hover" Property="ctl:Flow.Show" Value="True" />
               <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
             </Trigger>
+            <!-- The ground and the accent edge of the open page's row are the rail's one marker
+                 (MainWindow, NavMarker), which glides between rows. -->
             <DataTrigger Binding="{Binding IsActive}" Value="True">
-              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Nav.Active}" />
-              <Setter TargetName="Root" Property="LeadingEdge" Value="{DynamicResource Brush.Accent}" />
               <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding DataContext.RailCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
@@ -545,18 +575,23 @@
             <ctl:ChamferBorder x:Name="Box" Width="16" Height="16" Chamfer="{StaticResource Chamfer.Box}"
                                Background="{DynamicResource Brush.Field}" Outline="{DynamicResource Brush.Field.Outline}"
                                VerticalAlignment="Center">
-              <ctl:Icon x:Name="Mark" Symbol="{StaticResource Icon.Check}" Size="12" StrokeThickness="2.5"
-                        Foreground="{DynamicResource Brush.OnAccent}" Opacity="0"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Grid>
+                <ctl:ChamferBorder x:Name="Fill" Chamfer="{StaticResource Chamfer.Box}"
+                                   Background="{DynamicResource Brush.Accent}" Opacity="0" />
+                <ctl:Icon x:Name="Mark" Symbol="{StaticResource Icon.Check}" Size="12" StrokeThickness="2.5"
+                          Foreground="{DynamicResource Brush.OnAccent}" Opacity="0"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Grid>
             </ctl:ChamferBorder>
             <ContentPresenter x:Name="Label" Margin="9,0,0,0" VerticalAlignment="Center"
                               RecognizesAccessKey="True" />
           </StackPanel>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="Box" Property="Background" Value="{DynamicResource Brush.Accent}" />
-              <Setter TargetName="Box" Property="Outline" Value="{x:Null}" />
-              <Setter TargetName="Mark" Property="Opacity" Value="1" />
+              <!-- The box fills and the mark is drawn. -->
+              <Setter TargetName="Fill" Property="ctl:Flow.Show" Value="True" />
+              <Setter TargetName="Mark" Property="ctl:Flow.Show" Value="True" />
+              <Setter TargetName="Mark" Property="ctl:Flow.Draw" Value="True" />
             </Trigger>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter TargetName="Box" Property="Outline" Value="{DynamicResource Brush.Accent}" />
@@ -565,6 +600,8 @@
               <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
               <Setter TargetName="Box" Property="Outline" Value="{DynamicResource Brush.Hairline}" />
               <Setter TargetName="Box" Property="Background" Value="Transparent" />
+              <Setter TargetName="Fill" Property="Visibility" Value="Collapsed" />
+              <Setter TargetName="Mark" Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -665,7 +702,7 @@
                                  Chamfer="{StaticResource Chamfer.Control}"
                                  TopLine="{DynamicResource Brush.Glass.Highlight}" Padding="4"
                                  Margin="0" Effect="{StaticResource Shadow.Popup}"
-                                 HorizontalAlignment="Left"
+                                 HorizontalAlignment="Left" ctl:Flow.Arrive="6"
                                  MinWidth="{TemplateBinding ActualWidth}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="{TemplateBinding MaxDropDownHeight}">
                   <ItemsPresenter />
@@ -747,11 +784,7 @@
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="Glyph" Property="RenderTransform">
-                <Setter.Value>
-                  <RotateTransform Angle="90" />
-                </Setter.Value>
-              </Setter>
+              <Setter TargetName="Glyph" Property="ctl:Flow.Turn" Value="90" />
               <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Brush.Accent}" />
             </Trigger>
             <Trigger Property="IsMouseOver" Value="True">
@@ -778,7 +811,7 @@
                           Foreground="{TemplateBinding Foreground}"
                           FontFamily="{TemplateBinding FontFamily}"
                           FontSize="{TemplateBinding FontSize}" />
-            <ContentPresenter x:Name="Body" Margin="19,4,0,6" Visibility="Collapsed" />
+            <ContentPresenter x:Name="Body" Margin="19,4,0,6" Visibility="Collapsed" ctl:Flow.Arrive="6" />
           </StackPanel>
           <ControlTemplate.Triggers>
             <Trigger Property="IsExpanded" Value="True">
@@ -869,7 +902,7 @@
       <Setter.Value>
         <ControlTemplate TargetType="ToolTip">
           <ctl:ChamferBorder Background="{TemplateBinding Background}" Chamfer="{StaticResource Chamfer.Chip}"
-                             TopLine="{DynamicResource Brush.Glass.Highlight}" Margin="12"
+                             TopLine="{DynamicResource Brush.Glass.Highlight}" Margin="12" ctl:Flow.Arrive="6"
                              Effect="{StaticResource Shadow.Popup}"
                              Padding="{TemplateBinding Padding}" MaxWidth="420">
             <ContentPresenter />
@@ -900,7 +933,7 @@
         <ControlTemplate TargetType="ContextMenu">
           <ctl:ChamferBorder Background="{TemplateBinding Background}" Chamfer="{StaticResource Chamfer.Control}"
                              TopLine="{DynamicResource Brush.Glass.Highlight}" BottomLine="{DynamicResource Brush.Strip.Bottom}"
-                             Margin="12" Effect="{StaticResource Shadow.Popup}" Padding="0,6" MinWidth="190">
+                             Margin="12" Effect="{StaticResource Shadow.Popup}" Padding="0,6" MinWidth="190" ctl:Flow.Arrive="6">
             <ItemsPresenter />
           </ctl:ChamferBorder>
         </ControlTemplate>

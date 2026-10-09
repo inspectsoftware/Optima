@@ -72,6 +72,19 @@ public sealed class ProfileServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task AnExportedBuiltInProfile_ImportsUnderANewName()
+    {
+        var service = CreateService();
+        var exportPath = Path.Combine(_tempRoot, "balanced.json");
+        await service.ExportProfileAsync("Balanced", exportPath);
+
+        var imported = await service.ImportProfileAsync(exportPath);
+
+        Assert.Equal("Balanced (imported)", imported.Name);
+        Assert.Contains(await service.GetProfilesAsync(), p => p.Name == "Balanced (imported)" && !p.IsBuiltIn);
+    }
+
+    [Fact]
     public async Task ExportThenImport_RoundTrips()
     {
         var service = CreateService();

@@ -37,7 +37,13 @@ public sealed class GameDetectionEngine : IGameDetector
     public async Task<GooglePlayGamesInstallation?> DetectPlatformAsync(CancellationToken ct = default)
     {
         var rules = await _rulesProvider(ct).ConfigureAwait(false);
+        // On the pool: the registry walk, the process list and the file probes are synchronous, and
+        // the usual caller is the UI thread.
+        return await Task.Run(() => DetectPlatform(rules), ct).ConfigureAwait(false);
+    }
 
+    private GooglePlayGamesInstallation? DetectPlatform(DetectionRules rules)
+    {
         var (installDir, version) = FindInstallDirectory(rules);
         if (installDir is null)
         {
@@ -71,6 +77,12 @@ public sealed class GameDetectionEngine : IGameDetector
     public async Task<IReadOnlyList<InstalledGame>> DetectInstalledGamesAsync(CancellationToken ct = default)
     {
         var rules = await _rulesProvider(ct).ConfigureAwait(false);
+        // On the pool, for the same reason as the platform probe: every shortcut on the desktop is read.
+        return await Task.Run(() => DetectInstalledGames(rules, ct), ct).ConfigureAwait(false);
+    }
+
+    private IReadOnlyList<InstalledGame> DetectInstalledGames(DetectionRules rules, CancellationToken ct)
+    {
         var games = new Dictionary<string, InstalledGame>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var folderTemplate in rules.ShortcutFolders)

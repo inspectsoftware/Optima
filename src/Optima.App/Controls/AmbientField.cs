@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Optima.App.Services;
+using Optima.Core.Theming;
 
 namespace Optima.App.Controls;
 
@@ -14,22 +15,18 @@ public enum AmbientState
 }
 
 /// <summary>
-/// The in-app ambient field under everything: a diagonal band of the accent, a cool body in the opposite corner, a HUD
-/// grid fading toward the edges, and a red wash for attention.
+/// The in-app ambient field under everything: three pools of light tinted from the accent, in an
+/// arrangement of their own for every page (<see cref="Pools"/>). Going to another page, and a
+/// launch starting, succeeding or failing, pours them to the next arrangement. In between nothing
+/// moves and nothing is drawn again: every glass panel above re-runs its shader whenever this
+/// changes, so a backdrop that drifts all the time is paid for by the whole window.
 /// </summary>
 public sealed class AmbientField : FrameworkElement
 {
-    public static readonly DependencyProperty PhaseProperty = DependencyProperty.Register(
-        nameof(Phase), typeof(double), typeof(AmbientField),
-        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
-
-    public static readonly DependencyProperty WarmthProperty = DependencyProperty.Register(
-        nameof(Warmth), typeof(double), typeof(AmbientField),
-        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
-
-    public static readonly DependencyProperty AlarmProperty = DependencyProperty.Register(
-        nameof(Alarm), typeof(double), typeof(AmbientField),
-        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
+    /// <summary>How far the pour in progress has come, 0 to 1. At rest it is 1.</summary>
+    private static readonly DependencyProperty PouredProperty = DependencyProperty.Register(
+        "Poured", typeof(double), typeof(AmbientField),
+        new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty AccentProperty = DependencyProperty.Register(
         nameof(Accent), typeof(Color), typeof(AmbientField),
@@ -43,32 +40,16 @@ public sealed class AmbientField : FrameworkElement
         nameof(GridColor), typeof(Color), typeof(AmbientField),
         new FrameworkPropertyMetadata(Color.FromArgb(0x09, 0xFF, 0xFF, 0xFF), FrameworkPropertyMetadataOptions.AffectsRender));
 
-    /// <summary>
-    /// The field is re-rendered whenever the drift moves, and every glass panel above it re-renders
-    /// with it, so its brushes are built once per colour and reused: allocating three gradient
-    /// brushes per frame was pure garbage in the middle of the render pass.
-    /// </summary>
-    private RadialGradientBrush? _bandBrush;
-    private Color _bandBrushColor;
-    private double _bandBrushAlpha = -1;
-    private RadialGradientBrush? _coolBrush;
-    private Color _coolBrushColor;
-    private RadialGradientBrush? _washBrush;
-    private double _washBrushAlarm = -1;
-
-    private AnimationClock? _drift;
+    private Pool[] _from = Pools.For("");
+    private Pool[] _to = Pools.For("");
+    private string _page = "";
     private AmbientState _state;
 
     public AmbientField()
     {
         IsHitTestVisible = false;
-        Loaded += (_, _) => { Motion.Changed += OnMotionChanged; OnMotionChanged(); };
-        Unloaded += (_, _) => { Motion.Changed -= OnMotionChanged; StopDrift(); };
     }
 
-    public double Phase { get => (double)GetValue(PhaseProperty); set => SetValue(PhaseProperty, value); }
-    public double Warmth { get => (double)GetValue(WarmthProperty); set => SetValue(WarmthProperty, value); }
-    public double Alarm { get => (double)GetValue(AlarmProperty); set => SetValue(AlarmProperty, value); }
     public Color Accent { get => (Color)GetValue(AccentProperty); set => SetValue(AccentProperty, value); }
     public Color Cool { get => (Color)GetValue(CoolProperty); set => SetValue(CoolProperty, value); }
     public Color GridColor { get => (Color)GetValue(GridColorProperty); set => SetValue(GridColorProperty, value); }
@@ -78,49 +59,62 @@ public sealed class AmbientField : FrameworkElement
         get => _state;
         set
         {
-            if (_state == value)
+            if (_state != value)
             {
-                return;
+                _state = value;
+                Send();
             }
-            _state = value;
-            var warmth = value == AmbientState.Session ? 1.0 : 0.0;
-            var alarm = value == AmbientState.Attention ? 1.0 : 0.0;
-            var duration = Motion.Enabled ? TimeSpan.FromMilliseconds(600) : TimeSpan.Zero;
-            BeginAnimation(WarmthProperty, new DoubleAnimation(warmth, duration) { EasingFunction = new SineEase() });
-            BeginAnimation(AlarmProperty, new DoubleAnimation(alarm, duration) { EasingFunction = new SineEase() });
         }
     }
 
-    private void OnMotionChanged()
+    /// <summary>Pours the backdrop to the arrangement of this page.</summary>
+    public void Pour(string page)
     {
-        // Software rendering has no business animating a full-window backdrop: the field keeps its
-        // first frame and the glass panels above it stay still.
-        if (Motion.Enabled && Motion.EffectsAvailable)
+        if (_page != page)
         {
-            if (_drift is null)
-            {
-                var animation = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(10)) { RepeatBehavior = RepeatBehavior.Forever };
-                // The band drifts across a ten-second arc; eight frames a second reads as smooth for
-                // something this slow, at a little over half the cost of the old fifteen.
-                Timeline.SetDesiredFrameRate(animation, 8);
-                _drift = animation.CreateClock();
-                ApplyAnimationClock(PhaseProperty, _drift);
-            }
-            else
-            {
-                _drift.Controller?.Resume();
-            }
-        }
-        else
-        {
-            _drift?.Controller?.Pause();
+            _page = page;
+            Send();
         }
     }
 
-    private void StopDrift()
+    private void Send()
     {
-        _drift?.Controller?.Stop();
-        _drift = null;
+        var rest = Pools.For(_page);
+        _from = Now();
+        _to = _state switch
+        {
+            AmbientState.Session => Pools.Warm(rest),
+            AmbientState.Attention => Pools.Alarmed(rest),
+            _ => rest,
+        };
+
+        // Before the window is up there is nobody to watch a pour, and start has other work to do.
+        // Without a GPU the glass above would be redrawn on the CPU for every frame of it.
+        var seconds = IsLoaded && Motion.EffectsAvailable ? Motion.Seconds(MotionSpec.AmbientMs) : 0;
+        if (seconds <= 0)
+        {
+            BeginAnimation(PouredProperty, null);
+            InvalidateVisual();
+            return;
+        }
+
+        // The curve is in Pools.At, pool by pool; here time just runs. Thirty frames a second:
+        // each one re-runs the shader of every glass panel on the page.
+        var pour = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(seconds));
+        Timeline.SetDesiredFrameRate(pour, 30);
+        BeginAnimation(PouredProperty, pour);
+    }
+
+    /// <summary>Where the pools are at this moment: what a pour that is redirected sets off from.</summary>
+    private Pool[] Now()
+    {
+        var poured = (double)GetValue(PouredProperty);
+        var now = new Pool[_to.Length];
+        for (var i = 0; i < now.Length; i++)
+        {
+            now[i] = Pools.At(_from[i], _to[i], poured, i);
+        }
+        return now;
     }
 
     protected override void OnRender(DrawingContext dc)
@@ -131,23 +125,28 @@ public sealed class AmbientField : FrameworkElement
         {
             return;
         }
-        var angle = Phase * Math.PI * 2;
-        var sx = Math.Sin(angle);
-        var cy = Math.Cos(angle);
-        var warmth = Math.Clamp(Warmth, 0, 1);
-        var alarm = Math.Clamp(Alarm, 0, 1);
 
-        var bandAlpha = 0.20 + 0.14 * warmth;
-        var bandY = h * (0.32 - 0.10 * warmth) + cy * 18;
-        dc.PushTransform(new RotateTransform(-14, w * 0.5, bandY));
-        dc.DrawEllipse(BandBrush(bandAlpha), null, new Point(w * 0.5 + sx * 60, bandY), w * 0.75, 150 + 30 * warmth);
-        dc.Pop();
-
-        dc.DrawEllipse(CoolBrush(), null, new Point(w * 0.92 - sx * 40, h * 0.98 + cy * 24), 360, 260);
-
-        if (alarm > 0.005)
+        static uint Argb(Color c) => (uint)(c.A << 24 | c.R << 16 | c.G << 8 | c.B);
+        var pools = Now();
+        for (var i = 0; i < pools.Length; i++)
         {
-            dc.DrawEllipse(WashBrush(alarm), null, new Point(w * 0.5, h * 0.5), w * 0.7, h * 0.7);
+            var pool = pools[i];
+            var argb = Pools.Colour(pool, Argb(Accent), Argb(Cool));
+            var colour = Color.FromArgb((byte)(argb >> 24), (byte)(argb >> 16), (byte)(argb >> 8), (byte)argb);
+            var brush = new RadialGradientBrush(colour, Color.FromArgb(0, colour.R, colour.G, colour.B));
+            brush.Freeze();
+            var centre = new Point(w * pool.X, h * pool.Y);
+
+            // The first pool lies at a slant, as the accent band always has.
+            if (i == 0)
+            {
+                dc.PushTransform(new RotateTransform(-14, centre.X, centre.Y));
+            }
+            dc.DrawEllipse(brush, null, centre, w * pool.Rx, h * pool.Ry);
+            if (i == 0)
+            {
+                dc.Pop();
+            }
         }
 
         if (DrawGrid)
@@ -166,57 +165,6 @@ public sealed class AmbientField : FrameworkElement
             dc.Pop();
         }
     }
-
-    private RadialGradientBrush BandBrush(double alpha)
-    {
-        // Quantized so a running warmth fade reuses brushes instead of building one per frame.
-        var quantized = Math.Round(alpha, 2);
-        if (_bandBrush is null || _bandBrushColor != Accent || _bandBrushAlpha != quantized)
-        {
-            var brush = new RadialGradientBrush(
-                Color.FromArgb((byte)(quantized * 255), Accent.R, Accent.G, Accent.B),
-                Color.FromArgb(0, Accent.R, Accent.G, Accent.B))
-            {
-                RadiusX = 0.5,
-                RadiusY = 0.5,
-            };
-            brush.Freeze();
-            _bandBrush = brush;
-            _bandBrushColor = Accent;
-            _bandBrushAlpha = quantized;
-        }
-        return _bandBrush;
-    }
-
-    private RadialGradientBrush CoolBrush()
-    {
-        if (_coolBrush is null || _coolBrushColor != Cool)
-        {
-            var brush = new RadialGradientBrush(
-                Color.FromArgb(0x24, Cool.R, Cool.G, Cool.B),
-                Color.FromArgb(0, Cool.R, Cool.G, Cool.B));
-            brush.Freeze();
-            _coolBrush = brush;
-            _coolBrushColor = Cool;
-        }
-        return _coolBrush;
-    }
-
-    private RadialGradientBrush WashBrush(double alarm)
-    {
-        var quantized = Math.Round(alarm, 2);
-        if (_washBrush is null || _washBrushAlarm != quantized)
-        {
-            var brush = new RadialGradientBrush(
-                Color.FromArgb((byte)(0x3C * quantized), 0xE0, 0x5A, 0x5A),
-                Color.FromArgb(0, 0xE0, 0x5A, 0x5A));
-            brush.Freeze();
-            _washBrush = brush;
-            _washBrushAlarm = quantized;
-        }
-        return _washBrush;
-    }
-
     public static readonly DependencyProperty DrawGridProperty = DependencyProperty.Register(
         nameof(DrawGrid), typeof(bool), typeof(AmbientField),
         new FrameworkPropertyMetadata(true, FrameworkPropertyMetadataOptions.AffectsRender));

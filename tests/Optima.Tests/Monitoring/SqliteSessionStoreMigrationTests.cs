@@ -346,6 +346,28 @@ public sealed class SqliteSessionStoreMigrationTests : IDisposable
         Assert.Null(open.Baseline);
     }
 
+    [Fact]
+    public async Task ACallReturnsToItsCallerBeforeTheDatabaseAnswers()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        // Another writer holds the database, so the store's own write cannot finish yet. The call
+        // must come back at once all the same: on the history page its caller is the UI thread,
+        // which would otherwise wait here for as long as the other writer takes.
+        await using var writer = new SqliteConnection(
+            new SqliteConnectionStringBuilder { DataSource = _paths.SessionsDatabase }.ToString());
+        await writer.OpenAsync();
+        await using var held = writer.BeginTransaction(deferred: false);
+
+        var save = store.SaveMatchAsync(new MatchRecord { StartedAt = DateTimeOffset.Now, Mode = "ranked", Result = "win" });
+        Assert.False(save.IsCompleted);
+
+        held.Commit();
+        await save;
+        Assert.Single(await store.GetMatchesAsync());
+    }
+
     private static SessionRecord MakeRecord(string profile) => new()
     {
         ProfileName = profile,

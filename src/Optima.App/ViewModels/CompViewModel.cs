@@ -212,7 +212,8 @@ public sealed partial class CompViewModel : ObservableObject
     [RelayCommand]
     private void ComputeDpi()
     {
-        if (!double.TryParse(DpiDistance.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var cm) || cm <= 0)
+        // "10,5" is how half the world types it.
+        if (!double.TryParse(DpiDistance.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var cm) || cm <= 0)
         {
             DpiResult = "enter the distance you moved, in centimeters";
             return;

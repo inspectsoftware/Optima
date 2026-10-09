@@ -90,7 +90,7 @@ public sealed class WindowsDisplayService : IDisplayService
                     $"{mode} is not supported on {deviceName}.",
                     "Windows rejected the requested resolution or refresh rate for this display.",
                     null,
-                    "Pick a mode from the supported list on the Display page",
+                    "Pick one of the resolutions offered on the Display page",
                     "If this is the virtual display, add the mode to the driver's settings and reload the driver");
             }
 
@@ -111,60 +111,88 @@ public sealed class WindowsDisplayService : IDisplayService
             _logger.LogInformation("Resolution applied: {Mode} on {Device}", mode, deviceName);
         }, ct);
 
+    /// <summary>
+    /// Makes one display the main screen for now: the one whose desktop starts at 0,0, which is
+    /// where Windows opens a program that has no place of its own yet, the game included.
+    ///
+    /// Done on the display-configuration API this class already restores a layout with. Every
+    /// active desktop is moved by the same amount, so the displays keep their places relative to
+    /// each other and the target lands on 0,0. Applied without saving it to Windows' own database:
+    /// it lasts until the session puts the captured layout back, or until the next sign-in.
+    /// </summary>
     public Task MakePrimaryAsync(string deviceName, CancellationToken ct = default)
         => Task.Run(() =>
         {
-            var targetMode = DEVMODE.Create();
-            if (!EnumDisplaySettingsEx(deviceName, ENUM_CURRENT_SETTINGS, ref targetMode, 0))
+            var (paths, modes) = QueryActiveTopology();
+            var target = SourceModeIndex(paths, modes, deviceName);
+            if (target < 0)
             {
                 throw OptimaException.From("DISPLAY_NOT_ACTIVE",
                     "That display is not active.",
-                    $"{deviceName} has no current mode, so it cannot become the primary display.");
+                    $"{deviceName} is not part of the desktop right now, so it cannot become the main screen.");
             }
-            var offsetX = targetMode.dmPositionX;
-            var offsetY = targetMode.dmPositionY;
-            if (offsetX == 0 && offsetY == 0)
+
+            var offset = modes[target].sourceMode.position;
+            if (offset.x == 0 && offset.y == 0)
             {
                 return;
             }
-
-            const int CDS_NORESET = 0x10000000;
-            const int CDS_SET_PRIMARY = 0x00000010;
-            const uint DM_POSITION = 0x20;
-
-            for (uint i = 0; ; i++)
+            for (var i = 0; i < modes.Length; i++)
             {
-                var adapter = new DISPLAY_DEVICE { cb = Marshal.SizeOf<DISPLAY_DEVICE>() };
-                if (!EnumDisplayDevices(null, i, ref adapter, 0))
+                if (modes[i].infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
                 {
-                    break;
+                    modes[i].sourceMode.position.x -= offset.x;
+                    modes[i].sourceMode.position.y -= offset.y;
                 }
-                if ((adapter.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP) == 0)
-                {
-                    continue;
-                }
-
-                var mode = DEVMODE.Create();
-                if (!EnumDisplaySettingsEx(adapter.DeviceName, ENUM_CURRENT_SETTINGS, ref mode, 0))
-                {
-                    continue;
-                }
-                mode.dmPositionX -= offsetX;
-                mode.dmPositionY -= offsetY;
-                mode.dmFields = DM_POSITION;
-                var flags = (uint)(CDS_NORESET | (adapter.DeviceName == deviceName ? CDS_SET_PRIMARY : 0));
-                _ = ChangeDisplaySettingsEx(adapter.DeviceName, ref mode, IntPtr.Zero, flags, IntPtr.Zero);
             }
 
-            var commit = ChangeDisplaySettingsExCommit(null, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero);
-            if (commit != DISP_CHANGE_SUCCESSFUL)
+            var result = SetDisplayConfig((uint)paths.Length, paths, (uint)modes.Length, modes,
+                SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES);
+            if (result != 0)
             {
                 throw OptimaException.From("DISPLAY_PRIMARY_FAILED",
                     "Windows refused to change the primary display.",
-                    $"ChangeDisplaySettingsEx returned {commit}.");
+                    $"SetDisplayConfig returned {result} while moving {deviceName} to 0,0.",
+                    new System.ComponentModel.Win32Exception(result));
+            }
+
+            // Asked again instead of taken on trust: Windows may accept a layout and adjust it.
+            var (pathsAfter, modesAfter) = QueryActiveTopology();
+            var after = SourceModeIndex(pathsAfter, modesAfter, deviceName);
+            if (after < 0 || modesAfter[after].sourceMode.position.x != 0 || modesAfter[after].sourceMode.position.y != 0)
+            {
+                throw OptimaException.From("DISPLAY_PRIMARY_FAILED",
+                    "Windows refused to change the primary display.",
+                    $"The new layout was accepted, but {deviceName} is not at 0,0 afterwards.");
             }
             _logger.LogInformation("{Device} is now the primary display", deviceName);
         }, ct);
+
+    /// <summary>Where in <paramref name="modes"/> the desktop of a GDI device ("\\.\DISPLAY3") is described, or -1.</summary>
+    private static int SourceModeIndex(DISPLAYCONFIG_PATH_INFO[] paths, DISPLAYCONFIG_MODE_INFO[] modes, string deviceName)
+    {
+        foreach (var path in paths)
+        {
+            var source = new DISPLAYCONFIG_SOURCE_DEVICE_NAME
+            {
+                header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                {
+                    type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
+                    size = (uint)Marshal.SizeOf<DISPLAYCONFIG_SOURCE_DEVICE_NAME>(),
+                    adapterId = path.sourceInfo.adapterId,
+                    id = path.sourceInfo.id,
+                },
+            };
+            if (DisplayConfigGetDeviceInfo(ref source) != 0
+                || !string.Equals(source.viewGdiDeviceName, deviceName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            var index = path.sourceInfo.modeInfoIdx;
+            return index < modes.Length && modes[index].infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE ? (int)index : -1;
+        }
+        return -1;
+    }
 
     public Task<string> CaptureTopologyAsync(CancellationToken ct = default)
         => Task.Run(() =>

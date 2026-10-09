@@ -1,3 +1,5 @@
+using static Optima.Core.Theming.MotionSpec;
+
 namespace Optima.Core.Theming;
 
 public enum BoostDialMode
@@ -52,7 +54,7 @@ public static class BoostDialTimeline
             case BoostDialMode.Enabling:
             {
                 var dip = t < 300 ? Math.Sin(Math.PI * Clamp(t / 300)) : 0;
-                var detach = EaseOut(Clamp((t - 150) / 450)) * (1 - Back(Clamp((t - 2000) / 400)));
+                var detach = EaseOut(Clamp((t - 150) / 450)) * (1 - EaseOut(Clamp((t - 2000) / 400)));
                 var spin = EaseInOut(Clamp((t - 600) / 1800));
                 var progress = Clamp((t - 600) / 1400);
                 var gradient = progress * progress * (3 - 2 * progress);
@@ -94,13 +96,4 @@ public static class BoostDialTimeline
                 return new BoostDialFrame(0, 0, 0, 0, 0, 0, 1, 0, BoostDialLabel.Idle, 1);
         }
     }
-
-    private static double Clamp(double x) => Math.Max(0, Math.Min(1, x));
-
-    private static double EaseOut(double x) => 1 - Math.Pow(1 - x, 3);
-
-    private static double EaseInOut(double x) => x < 0.5 ? 4 * x * x * x : 1 - Math.Pow(-2 * x + 2, 3) / 2;
-
-    /// <summary>Ease-out with overshoot: passes 1 and settles back, which is the snap of the segments locking home.</summary>
-    private static double Back(double x) => 1 + 2.70158 * Math.Pow(x - 1, 3) + 1.70158 * Math.Pow(x - 1, 2);
 }

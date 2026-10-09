@@ -37,11 +37,47 @@ public sealed class EtwMetricsProviderClient : IPerformanceMetricsProvider
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
         => (await _settings.GetSettingsAsync(ct).ConfigureAwait(false)).EnableFrametimeCapture;
 
+    /// <summary>
+    /// Starts the elevated helper when capture is going to want it. Called at the click that starts
+    /// a session, which is where the administrator prompt belongs: capture itself only starts once
+    /// the game is on screen, and a prompt raised then lands on top of the game. Never throws,
+    /// because a session starts just as well without capture. Runs on the pool; the returned task
+    /// is also what <see cref="StartAsync"/> waits for, so capture is decided by the answer to
+    /// this prompt and not by the one before it.
+    /// </summary>
+    public Task EnsureHelperAsync() => _helperStart = Task.Run(EnsureHelperCoreAsync);
+
+    private volatile Task _helperStart = Task.CompletedTask;
+
+    private async Task EnsureHelperCoreAsync()
+    {
+        try
+        {
+            var settings = await _settings.GetSettingsAsync().ConfigureAwait(false);
+            if (settings.EnableFrametimeCapture && !settings.UseMockMetricsProvider && !_elevation.IsConnected)
+            {
+                await _elevation.EnsureStartedAsync().ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "The elevated helper could not be started ahead of the session");
+        }
+    }
+
     public async Task StartAsync(IReadOnlyList<int> processIds, CancellationToken ct = default)
     {
         if (processIds.Count == 0)
         {
             throw new ArgumentException("At least one process id is required.", nameof(processIds));
+        }
+        // The click that started the session already asked, and may still be waiting for its
+        // answer. A no there is not answered by asking again now, over the game; the session runs
+        // without capture.
+        await _helperStart.WaitAsync(ct).ConfigureAwait(false);
+        if (!_elevation.IsConnected && _elevation.LastStartFailure == ElevationStartFailure.Declined)
+        {
+            throw new InvalidOperationException("The administrator prompt was declined, so frametime capture is off for this session.");
         }
         if (!await _elevation.EnsureStartedAsync(ct).ConfigureAwait(false))
         {

@@ -31,6 +31,10 @@ public sealed partial class ToastItem : ObservableObject
     public IRelayCommand? ActionCommand { get; init; }
 
     public required IRelayCommand DismissCommand { get; init; }
+
+    /// <summary>True from the moment it is dismissed until it has faded and is taken off the list.</summary>
+    [ObservableProperty]
+    private bool _leaving;
 }
 
 /// <summary>
@@ -147,12 +151,16 @@ public sealed class ToastService
         }
     }
 
-    private void Remove(ToastItem? toast)
+    /// <summary>Lets the notice fade and the stack close up, then takes it off the list. Called on the UI thread.</summary>
+    private async void Remove(ToastItem? toast)
     {
-        if (toast is not null)
+        if (toast is null || toast.Leaving)
         {
-            Toasts.Remove(toast);
+            return;
         }
+        toast.Leaving = true;
+        await Task.Delay(Motion.Duration(Optima.Core.Theming.MotionSpec.MoveMs));
+        Toasts.Remove(toast);
     }
 
     private static void OnUi(Action action)

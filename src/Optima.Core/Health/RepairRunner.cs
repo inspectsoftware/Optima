@@ -105,6 +105,12 @@ public sealed class RepairRunner : IDisposable
         finally
         {
             Volatile.Write(ref _evaluating, 0);
+            // Asked for between the loop's last look and the line above: nobody is running any
+            // more, and the request would wait for whatever happens to ask next.
+            if (Interlocked.Exchange(ref _again, 0) == 1 && !ct.IsCancellationRequested)
+            {
+                _ = Task.Run(() => EvaluateAsync(ct), CancellationToken.None);
+            }
         }
     }
 
@@ -209,7 +215,14 @@ public sealed class RepairRunner : IDisposable
             {
                 result = await action.RunAsync(issue, ct).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException)
+            {
+                // Nothing looks at an issue marked as being repaired, so one left that way by a
+                // cancel would say "repairing" for good.
+                _issues.SetState(issue.Key, IssueState.Open, "the repair was cancelled");
+                throw;
+            }
+            catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Repair {Repair} threw", action.Id);
                 result = new RepairResult(RepairOutcome.Failed, ExceptionDetail.Capture(ex).Summary);
@@ -227,6 +240,12 @@ public sealed class RepairRunner : IDisposable
                 _ => IssueState.Open,
             };
             var stillThere = false;
+            if (result.Outcome == RepairOutcome.NotNeeded && RepairCatalog.For(issue.Code).VerifyCheck is null)
+            {
+                // "Nothing needed doing" changed nothing, and with no check to ask there is no
+                // reason to call the issue repaired. It stays open for the next step of the ladder.
+                state = IssueState.Open;
+            }
             if (state == IssueState.Repaired && RepairCatalog.For(issue.Code).VerifyCheck is { } check)
             {
                 // The repair's own word is not the proof; the check that raised the issue is.

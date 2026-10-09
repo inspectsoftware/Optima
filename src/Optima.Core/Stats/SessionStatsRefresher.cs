@@ -77,18 +77,31 @@ public sealed class SessionStatsRefresher
     private readonly SettingsService _settings;
     private readonly Func<string, long?, CancellationToken, Task<CopsPlayerProfile?>> _fetchProfile;
     private readonly ILogger<SessionStatsRefresher> _logger;
+    private readonly Func<bool> _runInProgress;
 
+    /// <param name="runInProgress">
+    /// True while a game is running. A session is only written to the history when its run ends, so
+    /// during a run the newest row is the one before it, and the live profile already holds matches
+    /// of the run in progress: measured against it, they were credited to the wrong session, and
+    /// then listed a second time when the run ended.
+    /// </param>
     public SessionStatsRefresher(
         ISessionStore store,
         SettingsService settings,
         Func<string, long?, CancellationToken, Task<CopsPlayerProfile?>> fetchProfile,
-        ILogger<SessionStatsRefresher> logger)
+        ILogger<SessionStatsRefresher> logger,
+        Func<bool>? runInProgress = null)
     {
         _store = store;
         _settings = settings;
         _fetchProfile = fetchProfile;
         _logger = logger;
+        _runInProgress = runInProgress ?? (() => false);
     }
+
+    private const string RunInProgressMessage =
+        "A game is running, so where the newest session ended cannot be read from the live profile yet. " +
+        "Refresh again once the game is closed.";
 
     /// <summary>
     /// Recomputes one session's stats from a fresh API reading. Passing <paramref name="attempts"/>
@@ -142,6 +155,11 @@ public sealed class SessionStatsRefresher
             return new SessionStatsRefreshResult(SessionStatsRefreshStatus.Updated,
                 (written.DeltaChanged ? "Re-measured" : "Already correct") + " from the next session's snapshot: " +
                 Describe(settled) + "." + MatchNote(written.MatchesAdded, written.MatchesCorrected), settled);
+        }
+
+        if (_runInProgress())
+        {
+            return new SessionStatsRefreshResult(SessionStatsRefreshStatus.NoEndSnapshot, RunInProgressMessage, null);
         }
 
         var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
@@ -219,7 +237,10 @@ public sealed class SessionStatsRefresher
         // Only the newest session depends on the API, and only it can still be behind; retrying is
         // pointless the moment its run already reads as finished.
         var delay = retryDelay ?? DefaultRetryDelay;
-        var tries = Math.Max(1, attempts);
+        // With a game running the newest session is not measured at all (see the constructor), so
+        // there is nothing to wait for; the older ones are settled by their stored snapshots.
+        var running = _runInProgress();
+        var tries = running ? 1 : Math.Max(1, attempts);
         CopsPlayerProfile? profile = null;
         for (var attempt = 1; attempt <= tries; attempt++)
         {
@@ -242,6 +263,7 @@ public sealed class SessionStatsRefresher
                 "The stats API could not be reached just now. Check the connection and try again.", 0, 0, 0);
         }
 
+        var live = running ? null : profile.CurrentSeason;
         var updated = 0;
         var added = 0;
         var corrected = 0;
@@ -249,7 +271,7 @@ public sealed class SessionStatsRefresher
         for (var index = 0; index < summaries.Count; index++)
         {
             var session = summaries[index];
-            var delta = DeltaFor(summaries, index, profile.CurrentSeason);
+            var delta = DeltaFor(summaries, index, live);
             if (delta is null)
             {
                 // Either this session has no start snapshot, or the run after it has none, which
@@ -281,7 +303,7 @@ public sealed class SessionStatsRefresher
                 UnmeasurableNote(unmeasurable), 0, 0, 0);
         }
 
-        var newestStillEmpty = DeltaFor(summaries, 0, profile.CurrentSeason) is null or { IsZero: true };
+        var newestStillEmpty = !running && DeltaFor(summaries, 0, live) is null or { IsZero: true };
         var message = $"Re-derived {updated} session{(updated == 1 ? string.Empty : "s")} from the API" +
             (added + corrected > 0
                 ? $": {added} match row{(added == 1 ? string.Empty : "s")} added, {corrected} corrected"

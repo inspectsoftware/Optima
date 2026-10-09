@@ -157,6 +157,9 @@ public sealed class TrayService : IDisposable
         PlayReturn();
     }
 
+    // True when the window was on screen and this service took it away for the session.
+    private bool _hiddenForSession;
+
     private void OnLaunchProgress(object? sender, LaunchProgress progress)
     {
         _window.Dispatcher.BeginInvoke(() =>
@@ -164,10 +167,21 @@ public sealed class TrayService : IDisposable
             switch (_policy.OnPhase(progress.Phase))
             {
                 case TrayWindowAction.Hide:
-                    HideToTray();
+                    // Already in the tray, by the player's choice or from a tray start: nothing to
+                    // hide, and so nothing to bring back when the game ends. Without this the
+                    // launcher nobody had opened came up, with focus, after every session.
+                    _hiddenForSession = _window.IsVisible;
+                    if (_hiddenForSession)
+                    {
+                        HideToTray();
+                    }
                     break;
                 case TrayWindowAction.Restore:
-                    RestoreWindow();
+                    if (_hiddenForSession)
+                    {
+                        _hiddenForSession = false;
+                        RestoreWindow();
+                    }
                     break;
             }
         });
@@ -267,6 +281,15 @@ public sealed class TrayService : IDisposable
         {
             Log.Warning("Could not add the tray icon");
         }
+    }
+
+    /// <summary>The line shown when the pointer rests on the tray icon.</summary>
+    public void SetTip(string tip)
+    {
+        var data = NewIconData();
+        data.uFlags = NifTip;
+        data.szTip = tip.Length > 127 ? tip[..127] : tip;
+        Shell_NotifyIconW(NimModify, ref data);
     }
 
     /// <summary>

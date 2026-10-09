@@ -22,7 +22,8 @@ public partial class DriverExitDialog : Window
         InitializeComponent();
     }
 
-    public static DriverExitChoice Ask(Window mainWindow)
+    /// <param name="doNotAskAgain">True when the box was ticked and the dialog was answered, not cancelled.</param>
+    public static DriverExitChoice Ask(Window mainWindow, out bool doNotAskAgain)
     {
         var dialog = new DriverExitDialog();
         if (mainWindow.IsVisible && mainWindow.WindowState != WindowState.Minimized)
@@ -37,6 +38,7 @@ public partial class DriverExitDialog : Window
             dialog.ShowInTaskbar = true;
         }
         dialog.ShowDialog();
+        doNotAskAgain = dialog.Choice != DriverExitChoice.Cancel && dialog.DoNotAskAgain.IsChecked == true;
         return dialog.Choice;
     }
 

@@ -144,7 +144,9 @@ public sealed class BackgroundDemotionTests : IDisposable
             // Any other instance on the machine is declared "already demoted" so this test only touches its own.
             var others = Process.GetProcessesByName("waitfor").Select(p => p.Id).Where(id => id != child.Id).ToHashSet();
 
-            var snapshot = Assert.Single(await demoter.DemoteAsync(["waitfor.exe"], others));
+            // Written the way a user might type it: the list is matched by name, whatever the case,
+            // the extension or the spaces around it.
+            var snapshot = Assert.Single(await demoter.DemoteAsync(["WaitFor.exe "], others));
 
             child.Refresh();
             Assert.Equal(ProcessPriorityClass.BelowNormal, child.PriorityClass);

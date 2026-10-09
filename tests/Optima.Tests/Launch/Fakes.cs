@@ -1,4 +1,5 @@
 ﻿using Optima.Core.Abstractions;
+using Optima.Core.Ipc;
 using Optima.Core.Models;
 
 namespace Optima.Tests.Launch;
@@ -126,10 +127,27 @@ internal sealed class FakeProcessMonitor : IProcessMonitor
 
     public Task<IReadOnlyList<TrackedProcess>> GetTrackedProcessesAsync(CancellationToken ct = default)
         => Task.FromResult(Tracked);
+    /// <summary>What a sweep of the process list and the window list finds.</summary>
+    public GameRuntimeState GameState { get; set; } = GameRuntimeState.NotRunning;
+
+    public int GameStateReads { get; private set; }
+
     public Task<GameRuntimeState> GetGameStateAsync(CancellationToken ct = default)
-        => Task.FromResult(GameRuntimeState.NotRunning);
-    public Task<int?> WaitForGameStartAsync(TimeSpan timeout, CancellationToken ct = default)
-        => Task.FromResult(GameStartPid);
+    {
+        GameStateReads++;
+        return Task.FromResult(GameState);
+    }
+    /// <summary>Keeps the wait for the game to start going until the session is cancelled, as a game that is still loading does.</summary>
+    public bool GameStillLoading { get; set; }
+
+    public async Task<int?> WaitForGameStartAsync(TimeSpan timeout, CancellationToken ct = default)
+    {
+        if (GameStillLoading)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
+        }
+        return GameStartPid;
+    }
     public async Task WaitForGameExitAsync(CancellationToken ct = default)
     {
         if (ExitAfter <= TimeSpan.Zero)
@@ -221,13 +239,56 @@ internal sealed class FakeMetrics : IPerformanceMetricsProvider
         return Task.CompletedTask;
     }
     public IReadOnlyList<int> StartedPids { get; private set; } = [];
+
+    /// <summary>Thrown by the stop instead of finishing it, as a helper that never answers does.</summary>
+    public Exception? StopError { get; set; }
+
     public Task StopAsync()
     {
         Stopped = true;
-        return Task.CompletedTask;
+        return StopError is null ? Task.CompletedTask : Task.FromException(StopError);
     }
     public SessionStats GetSessionStats() => new() { AverageFps = 200, SampleCount = 100 };
     public IReadOnlyList<double> GetFpsSamples() => [200, 201];
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+/// <summary>
+/// An elevated helper that is there or is not. Asking it to start does not change which, unless a
+/// test says the prompt is accepted.
+/// </summary>
+internal sealed class FakeElevationBroker : IElevationBroker
+{
+    public bool IsConnected { get; set; }
+    public ElevationStartFailure LastStartFailure { get; set; }
+    public bool CurrentProcessIsElevated => false;
+
+    /// <summary>How often the helper was asked to start, each of which is an administrator prompt.</summary>
+    public int Prompts { get; private set; }
+
+    /// <summary>The prompt is answered with Yes: the helper is there afterwards.</summary>
+    public bool ConnectOnPrompt { get; set; }
+
+    /// <summary>The helper is there and refuses what it is asked.</summary>
+    public bool Refuse { get; set; }
+
+    public List<IpcRequest> Sent { get; } = [];
+
+    public event EventHandler<IpcEvent>? EventReceived { add { } remove { } }
+
+    public Task<bool> EnsureStartedAsync(CancellationToken ct = default)
+    {
+        Prompts++;
+        IsConnected |= ConnectOnPrompt;
+        return Task.FromResult(IsConnected);
+    }
+
+    public Task<IpcResponse> SendAsync(IpcRequest request, CancellationToken ct = default)
+    {
+        Sent.Add(request);
+        return Task.FromResult(new IpcResponse { Success = IsConnected && !Refuse });
+    }
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 

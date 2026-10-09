@@ -78,6 +78,7 @@ public sealed class ErrorCatalogTests
     [InlineData("POWER_PLAN_UNAVAILABLE")]
     [InlineData("LAUNCH_STEP_SKIPPED")]
     [InlineData("SESSION_NOT_SAVED")]
+    [InlineData("SHIELD_MISSING")]
     public void TheLaunchPipelinesOwnCodesAreInTheGuide(string code)
         => Assert.NotNull(ErrorCatalog.Find(code));
 

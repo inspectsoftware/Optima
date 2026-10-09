@@ -72,7 +72,7 @@ public sealed partial class StatusViewModel : ObservableObject
 
     public StatusItem GooglePlayGames { get; } = new("Google Play Games");
     public StatusItem CriticalOps { get; } = new("Critical Ops");
-    public StatusItem VirtualDisplay { get; } = new("Optima Virtualization");
+    public StatusItem VirtualDisplay { get; } = new("Virtual display");
     public StatusItem Virtualization { get; } = new("VT-x");
     public StatusItem Display { get; } = new("Display");
 
@@ -87,28 +87,14 @@ public sealed partial class StatusViewModel : ObservableObject
     {
         try
         {
-            DetectedPlatform = await _detector.DetectPlatformAsync(ct);
-            Set(GooglePlayGames,
-                DetectedPlatform is null ? "NOT FOUND" : DetectedPlatform.ServiceRunning ? "READY" : "INSTALLED",
-                DetectedPlatform is null ? StatusKind.Bad : StatusKind.Good);
-
-            DetectedGame = await _detector.DetectTargetGameAsync(ct);
-            Set(CriticalOps,
-                DetectedGame is null ? "NOT INSTALLED" : "INSTALLED",
-                DetectedGame is null ? StatusKind.Bad : StatusKind.Good);
-
-            _lastDriverState = await _driverInstaller.GetStateAsync(ct);
-            await RefreshVirtualDisplayAsync(ct);
-
-            var virtualization = await _systemInfo.GetVirtualizationStateAsync(ct);
-            var virtOk = virtualization.HypervisorPresent == true || virtualization.FirmwareVirtualizationEnabled == true;
-            Set(Virtualization,
-                virtOk ? "ENABLED" : "DISABLED",
-                virtOk ? StatusKind.Good : StatusKind.Bad);
-
-            await RefreshDisplayReadoutAsync(ct);
-
-            GameIsRunning = await _processMonitor.GetGameStateAsync(ct) == GameRuntimeState.Running;
+            // Each row has its own probe and none reads the answer of another, so they run side
+            // by side: the driver and virtualization probes both ask WMI, and a refresh now costs
+            // the slowest of them instead of their sum.
+            await Task.WhenAll(
+                RefreshDetectionAsync(ct),
+                RefreshDriverAndDisplayAsync(ct),
+                RefreshVirtualizationAsync(ct),
+                RefreshGameStateAsync(ct));
         }
         catch (OperationCanceledException)
         {
@@ -118,6 +104,39 @@ public sealed partial class StatusViewModel : ObservableObject
             _logger.LogError(ex, "Status refresh failed");
         }
     }
+
+    private async Task RefreshDetectionAsync(CancellationToken ct)
+    {
+        DetectedPlatform = await _detector.DetectPlatformAsync(ct);
+        Set(GooglePlayGames,
+            DetectedPlatform is null ? "NOT FOUND" : DetectedPlatform.ServiceRunning ? "READY" : "INSTALLED",
+            DetectedPlatform is null ? StatusKind.Bad : StatusKind.Good);
+
+        DetectedGame = await _detector.DetectTargetGameAsync(ct);
+        Set(CriticalOps,
+            DetectedGame is null ? "NOT INSTALLED" : "INSTALLED",
+            DetectedGame is null ? StatusKind.Bad : StatusKind.Good);
+    }
+
+    /// <summary>One after the other: both rows talk to the virtual display provider.</summary>
+    private async Task RefreshDriverAndDisplayAsync(CancellationToken ct)
+    {
+        _lastDriverState = await _driverInstaller.GetStateAsync(ct);
+        await RefreshVirtualDisplayAsync(ct);
+        await RefreshDisplayReadoutAsync(ct);
+    }
+
+    private async Task RefreshVirtualizationAsync(CancellationToken ct)
+    {
+        var virtualization = await _systemInfo.GetVirtualizationStateAsync(ct);
+        var virtOk = virtualization.HypervisorPresent == true || virtualization.FirmwareVirtualizationEnabled == true;
+        Set(Virtualization,
+            virtOk ? "ENABLED" : "DISABLED",
+            virtOk ? StatusKind.Good : StatusKind.Bad);
+    }
+
+    private async Task RefreshGameStateAsync(CancellationToken ct)
+        => GameIsRunning = await _processMonitor.GetGameStateAsync(ct) == GameRuntimeState.Running;
 
     public async Task RefreshLiveAsync(CancellationToken ct = default)
     {

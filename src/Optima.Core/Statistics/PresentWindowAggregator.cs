@@ -21,7 +21,11 @@ public sealed class PresentWindowAggregator
         public int PresentsInWindow;
         public double FrametimeSumInWindow;
         public long TotalPresents;
-        public List<double> FrametimesMs { get; } = [];
+
+        // Every frame of the capture stays here until it stops, a million and more in a long
+        // session, so they are kept as floats: half the memory, and a float still holds a
+        // frametime to well under a microsecond.
+        public List<float> FrametimesMs { get; } = [];
     }
 
     private readonly Dictionary<int, PidState> _candidates;
@@ -49,7 +53,7 @@ public sealed class PresentWindowAggregator
             var delta = timestampMs - state.LastPresentMs;
             if (delta > MinDeltaMs && delta < MaxDeltaMs)
             {
-                state.FrametimesMs.Add(delta);
+                state.FrametimesMs.Add((float)delta);
                 state.PresentsInWindow++;
                 state.FrametimeSumInWindow += delta;
                 state.TotalPresents++;
@@ -92,7 +96,7 @@ public sealed class PresentWindowAggregator
     {
         var dominant = _candidates.OrderByDescending(kv => kv.Value.TotalPresents).First();
         return new PresentCaptureResult(
-            [.. dominant.Value.FrametimesMs],
+            dominant.Value.FrametimesMs.ConvertAll(t => (double)t),
             [.. _fpsSamples],
             dominant.Value.TotalPresents > 0 ? dominant.Key : 0);
     }

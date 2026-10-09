@@ -56,6 +56,14 @@ public sealed class SplashSurface : FrameworkElement
     private Rect _target = new(0, 0, CardWidth, CardHeight);
     private TaskCompletionSource? _opened;
 
+    // Text is laid out once and drawn every frame: the name and the version never change, the
+    // status only when startup names a new stage. Rebuilt when the window lands on another DPI.
+    private double _textDpi;
+    private FormattedText[]? _letters;
+    private FormattedText? _statusText;
+    private FormattedText? _versionText;
+    private string _statusTextFor = string.Empty;
+
     public SplashSurface(bool animate, string version)
     {
         _animate = animate;
@@ -226,8 +234,16 @@ public sealed class SplashSurface : FrameworkElement
         // The name, one letter at a time, tracked wide.
         const string name = "OPTIMA";
         const double tracking = 9;
-        var letters = name.Select(ch => new FormattedText(
-            ch.ToString(), CultureInfo.InvariantCulture, FlowDirection.LeftToRight, NameFace, 24, Solid(SilverLight, 1), dpi)).ToArray();
+        if (_letters is null || _textDpi != dpi)
+        {
+            _textDpi = dpi;
+            _letters = name.Select(ch => new FormattedText(
+                ch.ToString(), CultureInfo.InvariantCulture, FlowDirection.LeftToRight, NameFace, 24, Solid(SilverLight, 1), dpi)).ToArray();
+            _versionText = new FormattedText(_version, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, MonoFace, 10,
+                Solid(Color.FromRgb(0x6E, 0x74, 0x7E), 1), dpi);
+            _statusText = null;
+        }
+        var letters = _letters;
         var width = letters.Sum(l => l.WidthIncludingTrailingWhitespace) + tracking * (letters.Length - 1);
         var x = left + (CardWidth - width) / 2;
         for (var i = 0; i < letters.Length; i++)
@@ -254,11 +270,15 @@ public sealed class SplashSurface : FrameworkElement
         dc.DrawRectangle(Solid(_accent, 0.18), null, new Rect(lineLeft, top + 272, lineWidth, 2));
         dc.DrawRectangle(Solid(_accent, 1), null, new Rect(lineLeft, top + 272, lineWidth * _shownFraction, 2));
 
-        var status = new FormattedText(_status, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, MonoFace, 11,
-            Solid(Color.FromRgb(0x9A, 0xA0, 0xAA), 1), dpi);
+        if (_statusText is null || _statusTextFor != _status)
+        {
+            _statusTextFor = _status;
+            _statusText = new FormattedText(_status, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, MonoFace, 11,
+                Solid(Color.FromRgb(0x9A, 0xA0, 0xAA), 1), dpi);
+        }
+        var status = _statusText;
         dc.DrawText(status, new Point(left + (CardWidth - status.Width) / 2, top + 284));
-        var version = new FormattedText(_version, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, MonoFace, 10,
-            Solid(Color.FromRgb(0x6E, 0x74, 0x7E), 1), dpi);
+        var version = _versionText!;
         dc.DrawText(version, new Point(left + (CardWidth - version.Width) / 2, top + 304));
         dc.Pop();
     }

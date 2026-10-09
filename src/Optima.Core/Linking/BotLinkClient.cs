@@ -36,6 +36,9 @@ public sealed class BotLinkClient : IDisposable
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    private static string ClientVersion
+        => typeof(BotLinkClient).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
     private readonly HttpClient _http;
     private readonly ILogger<BotLinkClient> _logger;
 
@@ -89,7 +92,7 @@ public sealed class BotLinkClient : IDisposable
     /// </summary>
     public async Task<BotLinkCallResult<BotLinkClaimResponse>> ClaimAsync(
         string baseUrl, string code, long accountId, string inGameName, string? webhookUrl = null,
-        CancellationToken ct = default)
+        string? devicePublicKey = null, CancellationToken ct = default)
         => await PostAsync<BotLinkClaimRequest, BotLinkClaimResponse>(
             baseUrl,
             "v1/link/claim",
@@ -97,8 +100,9 @@ public sealed class BotLinkClient : IDisposable
                 code,
                 accountId,
                 inGameName,
-                typeof(BotLinkClient).Assembly.GetName().Version?.ToString(3) ?? "0.0.0",
-                webhookUrl),
+                ClientVersion,
+                webhookUrl,
+                devicePublicKey),
             ct).ConfigureAwait(false);
 
     /// <summary>

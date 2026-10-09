@@ -9,10 +9,10 @@
 #
 #   .\installer.ps1 -Publish -Source "C:\...\Optima Dev" -OutDir "C:\...\Optima Dev" -Label "-dev-20261002-2312"
 #
-# Produces <OutDir>\Optima-Setup-<version><Label>.exe. The setup is per-user: it
-# installs to %LOCALAPPDATA%\Programs\Optima without an administrator prompt,
-# adds Start Menu shortcuts and an optional sign-in autostart, and registers a
-# proper uninstaller in Add/Remove Programs.
+# Produces <OutDir>\Optima-Setup-<version><Label>.exe. The setup is per machine: it asks
+# for administrator rights once, installs to Program Files\Optima, adds Start Menu
+# shortcuts, installs the virtual display driver and registers a proper uninstaller in
+# Add/Remove Programs. Why per machine is at the top of installer.iss.
 #
 # The Inno Setup compiler is fetched once into tools\InnoSetup (portable mode,
 # nothing installed machine-wide); its presence is verified before use.
@@ -31,7 +31,15 @@ param(
     [string]$Label = "",
     # Publish configuration (used only with -Publish).
     [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64"
+    [string]$Runtime = "win-x64",
+    # Publish without Optima Shield (used only with -Publish).
+    [switch]$NoShield,
+    # A setup that is going on the releases page: republished from source, without Optima Shield,
+    # and signed for the in-app update (Optima-Setup-<version>.exe.sig beside it). Stops before
+    # building anything when the signing key is not on this machine.
+    [switch]$Release,
+    # The private key of the update signature. Never in a repository; see tools\Optima.SignUpdate.
+    [string]$SigningKey = (Join-Path $env:USERPROFILE ".optima\update-signing-key.pem")
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,10 +54,21 @@ function Resolve-FromRoot([string]$path) {
 $sourceDir = Resolve-FromRoot $Source
 $outDir = Resolve-FromRoot $OutDir
 
+if ($Release) {
+    # An unsigned release setup is one no installed Optima will take, and it would only be
+    # noticed after it was uploaded. So: no key, no build.
+    if (-not (Test-Path $SigningKey)) {
+        throw "the update signing key is not at $SigningKey. A release setup must be signed; restore the key from its backup (do NOT make a new one: installed copies only accept the old one)."
+    }
+    if ($Label) { throw "-Release builds the plain Optima-Setup-<version>.exe; -Label is for dev builds." }
+    $Publish = $true
+    $NoShield = $true
+}
+
 # --- The publish payload -----------------------------------------------------
 
 if ($Publish) {
-    $publishArgs = @{ Configuration = $Configuration; Runtime = $Runtime; Output = $sourceDir }
+    $publishArgs = @{ Configuration = $Configuration; Runtime = $Runtime; Output = $sourceDir; NoShield = $NoShield }
     & (Join-Path $root "publish.ps1") @publishArgs
     if ($LASTEXITCODE -ne 0) { throw "publish.ps1 failed (exit $LASTEXITCODE)" }
 }
@@ -101,6 +120,22 @@ try {
 
 $setup = Join-Path $outDir "Optima-Setup-$version$Label.exe"
 Write-Host "done: $setup"
+
+if ($Release) {
+    # Signed, and then checked the way an installed Optima will check it: against the public key
+    # compiled into this very source tree. A key file that does not belong to that key fails here.
+    $signer = Join-Path $root "tools\Optima.SignUpdate"
+    dotnet run --project $signer -c Release -- sign $setup $version $SigningKey
+    if ($LASTEXITCODE -ne 0) { throw "signing the setup failed (exit $LASTEXITCODE)" }
+    dotnet run --project $signer -c Release -- verify $setup $version
+    if ($LASTEXITCODE -ne 0) {
+        Remove-Item "$setup.sig" -ErrorAction SilentlyContinue
+        throw "the signature does not verify against the public key in UpdateSignature.cs: $SigningKey is not the key this build trusts."
+    }
+    Write-Host "release: upload BOTH files to the GitHub release tagged v$version"
+    Write-Host "  $setup"
+    Write-Host "  $setup.sig"
+}
 
 if ($Run) {
     Start-Process -FilePath $setup

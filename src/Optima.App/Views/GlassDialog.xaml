@@ -27,7 +27,7 @@
 
         <ctl:GlassPanel Grid.Row="1" Chamfer="{StaticResource Chamfer.Strip}" Padding="20,16,20,16"
                         Tint="{DynamicResource Color.Glass.Tint}"
-                        TopLine="{DynamicResource Brush.Strip.Top}"
+                        ctl:Flow.Open="True"
                         BottomLine="{DynamicResource Brush.Strip.Bottom}"
                         LeadingEdge="{Binding EdgeBrush, ElementName=Root}">
           <ctl:GlassPanel.Child>

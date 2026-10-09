@@ -56,7 +56,9 @@ public sealed class SqliteSessionStore : ISessionStore
             {
                 return;
             }
-            await InitializeCoreAsync(ct).ConfigureAwait(false);
+            // On the pool: Microsoft.Data.Sqlite's async methods run synchronously, and the first
+            // caller is the UI thread during startup.
+            await Task.Run(() => InitializeCoreAsync(ct), ct).ConfigureAwait(false);
         }
         finally
         {
@@ -262,7 +264,7 @@ public sealed class SqliteSessionStore : ISessionStore
 
     public async Task<long> SaveSessionAsync(SessionRecord record, CancellationToken ct = default)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
@@ -338,7 +340,7 @@ public sealed class SqliteSessionStore : ISessionStore
     private async Task<IReadOnlyList<SessionRecord>> QueryAsync(
         string sql, Action<SqliteCommand> bind, CancellationToken ct, bool withSamples = true)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
@@ -459,7 +461,7 @@ public sealed class SqliteSessionStore : ISessionStore
     public async Task<long?> AttachStatsAsync(CopsProfileDelta? delta, CopsSeasonStats? baseline,
         DateTimeOffset windowStart, CancellationToken ct = default)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
 
         long sessionId;
@@ -494,7 +496,7 @@ public sealed class SqliteSessionStore : ISessionStore
 
     public async Task<bool> UpdateStatsDeltaAsync(long sessionId, CopsProfileDelta delta, CancellationToken ct = default)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = "UPDATE sessions SET stats_delta = $delta WHERE id = $id";
@@ -507,7 +509,7 @@ public sealed class SqliteSessionStore : ISessionStore
 
     public async Task<SessionEndBoundary> GetSessionEndBoundaryAsync(long sessionId, CancellationToken ct = default)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         // Ids are AUTOINCREMENT, so the next id is the next run in time.
@@ -536,7 +538,7 @@ public sealed class SqliteSessionStore : ISessionStore
 
     public async Task<long> SaveMatchAsync(MatchRecord match, CancellationToken ct = default)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
@@ -551,7 +553,7 @@ public sealed class SqliteSessionStore : ISessionStore
 
     public async Task UpdateMatchAsync(MatchRecord match, CancellationToken ct = default)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText =
@@ -567,7 +569,7 @@ public sealed class SqliteSessionStore : ISessionStore
 
     public async Task DeleteMatchAsync(long matchId, CancellationToken ct = default)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM matches WHERE id = $id";
@@ -577,7 +579,7 @@ public sealed class SqliteSessionStore : ISessionStore
 
     public async Task<IReadOnlyList<MatchRecord>> GetMatchesAsync(int limit = 100, CancellationToken ct = default)
     {
-        await EnsureInitializedAsync(ct).ConfigureAwait(false);
+        await EnsureInitializedAsync(ct).ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         await using var connection = await OpenConnectionAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = $"SELECT {MatchColumns} FROM matches ORDER BY started_at DESC, id DESC LIMIT $limit";
@@ -629,6 +631,13 @@ public sealed class SqliteSessionStore : ISessionStore
         return reader.IsDBNull(ordinal) ? null : reader.GetInt64(ordinal);
     }
 
+    /// <summary>
+    /// Every read and write starts here, and awaits it with ForceYielding: that await is what puts
+    /// the caller on the pool, whether or not this had anything left to do. The history page calls
+    /// the store from the UI thread, and a statement that waits behind a writer would otherwise
+    /// hold that thread until the writer is done. A yield in here instead would only work when the
+    /// caller reached its await before the pool had finished this.
+    /// </summary>
     private async Task EnsureInitializedAsync(CancellationToken ct)
     {
         if (!_initialized)

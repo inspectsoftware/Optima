@@ -54,14 +54,13 @@
 
       <Grid Margin="12" ctl:GlassPanel.Backdrop="{Binding ElementName=Ambient}">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition x:Name="RailColumn" Width="200" />
+          <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="12" />
           <ColumnDefinition />
         </Grid.ColumnDefinitions>
 
-        <ctl:GlassPanel x:Name="Rail" Chamfer="{StaticResource Chamfer.Strip}" Padding="6,12,6,10"
+        <ctl:GlassPanel x:Name="Rail" Width="200" Chamfer="{StaticResource Chamfer.Strip}" Padding="6,12,6,10"
                         Tint="{DynamicResource Color.Glass.Tint}"
-                        TopLine="{DynamicResource Brush.Strip.Top}"
                         BottomLine="{DynamicResource Brush.Strip.Bottom}"
                         LeadingEdge="{DynamicResource Brush.Strip.Edge}">
           <ctl:GlassPanel.Child>
@@ -124,7 +123,17 @@
                 </Button>
               </Grid>
 
-              <ItemsControl ItemsSource="{Binding NavItems}" Margin="0,2,0,0">
+              <Grid x:Name="NavArea" Margin="0,2,0,0">
+              <!-- One marker for the whole rail, which glides to the row of the open page. -->
+              <ctl:ChamferBorder x:Name="NavMarker" Chamfer="0" VerticalAlignment="Top" Height="0" Opacity="0"
+                                 IsHitTestVisible="False"
+                                 Background="{DynamicResource Brush.Nav.Active}"
+                                 LeadingEdge="{DynamicResource Brush.Accent}">
+                <ctl:ChamferBorder.RenderTransform>
+                  <TranslateTransform x:Name="NavMarkerShift" />
+                </ctl:ChamferBorder.RenderTransform>
+              </ctl:ChamferBorder>
+              <ItemsControl x:Name="NavList" ItemsSource="{Binding NavItems}" Loaded="OnNavListLoaded">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <StackPanel>
@@ -185,6 +194,7 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
+              </Grid>
             </DockPanel>
           </ctl:GlassPanel.Child>
         </ctl:GlassPanel>
@@ -228,6 +238,26 @@
                       <TextBlock Text="{Binding DisplayName}" />
                       <TextBlock Text="  [ACTIVE]" Foreground="{DynamicResource Brush.Accent}"
                                  Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}" />
+                      <!-- Takes the account off this list. Only in the open list (the closed box
+                           shows the same template and is not the place for it), and not on the
+                           "no other accounts" line, which is not an account. -->
+                      <Button Content="&#x2715;" Padding="6,0" Margin="14,0,0,0" VerticalAlignment="Center"
+                              ToolTip="Remove this account from the list. Add it again any time in Settings, Player."
+                              Command="{Binding DataContext.RemoveAccountCommand, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                              CommandParameter="{Binding}">
+                        <Button.Style>
+                          <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}, FallbackValue={x:Null}}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                              </DataTrigger>
+                              <DataTrigger Binding="{Binding Key}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Button.Style>
+                      </Button>
                     </StackPanel>
                   </DataTemplate>
                 </ComboBox.ItemTemplate>
@@ -239,18 +269,14 @@
             </Grid>
           </Border>
 
-          <ContentControl x:Name="PageHost" Grid.Row="2" Margin="0,4,0,0">
-            <ContentControl.RenderTransform>
-              <TranslateTransform x:Name="PageShift" />
-            </ContentControl.RenderTransform>
-          </ContentControl>
+          <ContentControl x:Name="PageHost" Grid.Row="2" Margin="0,4,0,0" />
 
           <!-- What Optima did by itself, and what it is about to do, said over whatever page is open. -->
           <ItemsControl Grid.Row="2" ItemsSource="{Binding Toasts.Toasts}" Focusable="False"
                         HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,14" Width="400">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Border Margin="0,8,0,0" Background="{DynamicResource Brush.Deep}"
+                <Border Margin="0,8,0,0" Background="{DynamicResource Brush.Deep}" ctl:Flow.Arrive="14" ctl:Flow.Leave="{Binding Leaving}"
                         BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="1">
                   <Border Padding="12,10" BorderThickness="2,0,0,0">
                     <Border.Style>

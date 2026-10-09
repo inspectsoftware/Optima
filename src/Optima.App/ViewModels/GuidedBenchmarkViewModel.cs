@@ -20,6 +20,7 @@ public sealed partial class GuidedBenchmarkViewModel : ObservableObject
     private readonly ProfileService _profiles;
     private readonly ITweakService _tweaks;
     private readonly ISessionStore _sessions;
+    private readonly Optima.Monitoring.Metrics.EtwMetricsProviderClient _capture;
     private readonly ILogger<GuidedBenchmarkViewModel> _logger;
 
     private GuidedBenchmarkPlan? _plan;
@@ -31,12 +32,14 @@ public sealed partial class GuidedBenchmarkViewModel : ObservableObject
         ProfileService profiles,
         ITweakService tweaks,
         ISessionStore sessions,
+        Optima.Monitoring.Metrics.EtwMetricsProviderClient capture,
         ILogger<GuidedBenchmarkViewModel> logger)
     {
         _orchestrator = orchestrator;
         _profiles = profiles;
         _tweaks = tweaks;
         _sessions = sessions;
+        _capture = capture;
         _logger = logger;
     }
 
@@ -128,6 +131,12 @@ public sealed partial class GuidedBenchmarkViewModel : ObservableObject
             Status = "session running · quit the game when the round is done";
 
             var runNumber = _plan.CompletedRuns + 1;
+            // A run is its fps data, so the helper is asked for at the click, as PLAY does, and not
+            // once the game is on screen.
+            if (!_orchestrator.IsSessionActive)
+            {
+                _ = _capture.EnsureHelperAsync();
+            }
             var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, LaunchKind.Benchmark, _cts.Token));
 
             var outcome = _plan.ReportResult(

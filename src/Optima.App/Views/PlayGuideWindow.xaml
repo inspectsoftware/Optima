@@ -41,7 +41,7 @@
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
               <ProgressBar Width="240" Height="8" VerticalAlignment="Center"
                            Minimum="0" Maximum="100"
-                           Value="{Binding GuideProgress, Mode=OneWay}" />
+                           ctl:Flow.Value="{Binding GuideProgress, Mode=OneWay}" />
               <TextBlock Text="{Binding GuideProgressText}" Style="{StaticResource Text.Micro}"
                          VerticalAlignment="Center" Margin="10,0,0,0"
                          Foreground="{DynamicResource Brush.TextMuted}" />
@@ -58,7 +58,7 @@
             <TextBlock Text="enabling Windows features" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
             <ProgressBar Width="140" Height="8" Margin="10,0,0,0" VerticalAlignment="Center"
                          Minimum="0" Maximum="100"
-                         Value="{Binding FixProgress, Mode=OneWay}" />
+                         ctl:Flow.Value="{Binding FixProgress, Mode=OneWay}" />
           </StackPanel>
         </Grid>
 
@@ -198,7 +198,7 @@
                   <StackPanel Margin="0,6,0,0" Visibility="{Binding DataContext.IsFixing, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
                     <ProgressBar Height="10"
                                  Minimum="0" Maximum="100"
-                                 Value="{Binding DataContext.FixProgress, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}" />
+                                 ctl:Flow.Value="{Binding DataContext.FixProgress, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}" />
                     <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0"
                                Foreground="{DynamicResource Brush.TextMuted}"
                                Text="DISM reports its own percentage; the bar moves in two halves, one per Windows feature." />
@@ -211,7 +211,6 @@
 
         <ctl:GlassPanel Grid.Row="3" Chamfer="{StaticResource Chamfer.Strip}" Padding="18,12" Margin="12,0,12,12"
                         Tint="{DynamicResource Color.Glass.Tint}"
-                        TopLine="{DynamicResource Brush.Strip.Top}"
                         BottomLine="{DynamicResource Brush.Strip.Bottom}"
                         LeadingEdge="{DynamicResource Brush.Strip.Edge}">
           <ctl:GlassPanel.Child>
@@ -234,7 +233,7 @@
                                   Visibility="{Binding IsFixing, Converter={StaticResource BoolToVis}}" />
                 <ProgressBar Width="220" Height="8" VerticalAlignment="Center"
                              Minimum="0" Maximum="100"
-                             Value="{Binding FixProgress, Mode=OneWay}"
+                             ctl:Flow.Value="{Binding FixProgress, Mode=OneWay}"
                              Visibility="{Binding IsFixing, Converter={StaticResource BoolToVis}}" />
               </StackPanel>
               <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Back" MinWidth="110"

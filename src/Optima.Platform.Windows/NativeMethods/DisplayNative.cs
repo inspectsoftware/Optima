@@ -104,6 +104,9 @@ internal static partial class DisplayNative
     internal const uint SDC_USE_SUPPLIED_DISPLAY_CONFIG = 0x20;
     internal const uint SDC_ALLOW_CHANGES = 0x400;
 
+    /// <summary>A mode entry that describes a desktop (size and position), as opposed to a signal.</summary>
+    internal const uint DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE = 1;
+
     internal const uint DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1;
     internal const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
 

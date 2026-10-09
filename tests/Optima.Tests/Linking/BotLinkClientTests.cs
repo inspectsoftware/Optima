@@ -232,4 +232,20 @@ public sealed class BotLinkClientTests
         Assert.False(result.Ok);
         Assert.Contains("HTTP 500", result.Message);
     }
+
+    [Fact]
+    public async Task AClaimCarriesTheDeviceKeyWhenThereIsOne()
+    {
+        string? body = null;
+        var handler = new FakeHandler(request =>
+        {
+            body = request.Content!.ReadAsStringAsync().Result;
+            return (HttpStatusCode.OK, LinkedJson);
+        });
+        using var client = Client(handler);
+
+        await client.ClaimAsync("http://127.0.0.1:5099", "OPT-7F3KQ", 246001782, "woozy", devicePublicKey: "a2V5");
+
+        Assert.Contains("\"devicePublicKey\":\"a2V5\"", body);
+    }
 }

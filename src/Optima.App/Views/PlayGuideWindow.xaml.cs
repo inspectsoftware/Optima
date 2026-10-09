@@ -13,6 +13,9 @@ public partial class PlayGuideWindow : Window
     public PlayGuideWindow()
     {
         InitializeComponent();
+        // Fixed size: on a small or scaled screen the Back/Next row must still be on it.
+        Height = Math.Min(Height, SystemParameters.WorkArea.Height);
+        Width = Math.Min(Width, SystemParameters.WorkArea.Width);
         DataContextChanged += (_, args) =>
         {
             if (args.NewValue is PlayGuideViewModel viewModel)

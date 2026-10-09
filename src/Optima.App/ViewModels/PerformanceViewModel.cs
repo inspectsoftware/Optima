@@ -50,6 +50,7 @@ public sealed partial class PerformanceViewModel : ObservableObject
     private readonly SettingsService _settings;
     private readonly IPerformanceMonitor _monitor;
     private readonly ILogger<PerformanceViewModel> _logger;
+    private readonly DispatcherTimer _networkStaleness;
 
     private DateTimeOffset _lastNetworkSample = DateTimeOffset.MinValue;
 
@@ -74,15 +75,17 @@ public sealed partial class PerformanceViewModel : ObservableObject
         network.SampleArrived += OnNetworkSample;
         _monitor.MetricsUpdated += OnMetrics;
 
-        var staleness = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        staleness.Tick += (_, _) =>
+        // Runs from a network sample until the line it wrote has gone stale, not for the life of
+        // the process: without samples the idle text is already there.
+        _networkStaleness = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _networkStaleness.Tick += (_, _) =>
         {
             if (DateTimeOffset.Now - _lastNetworkSample > NetworkStaleness)
             {
                 NetworkStatus = NetworkIdleText;
+                _networkStaleness.Stop();
             }
         };
-        staleness.Start();
     }
 
     // ── Live system load (1 s ticks from the hardware monitor) ──
@@ -112,7 +115,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
 
     [ObservableProperty] private string _tweaksStatus = string.Empty;
     [ObservableProperty] private bool _tweaksBusy;
-    [ObservableProperty] private bool _sessionHdrOff;
     [ObservableProperty] private bool _sessionGameBarOff;
     [ObservableProperty] private bool _sessionFseOff;
 
@@ -121,10 +123,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
 
     [ObservableProperty] private LaunchProfile? _selectedProfile;
     [ObservableProperty] private string _editName = string.Empty;
-    [ObservableProperty] private bool _editVirtualDisplay;
-    [ObservableProperty] private int _editWidth = 1920;
-    [ObservableProperty] private int _editHeight = 1080;
-    [ObservableProperty] private int _editRefreshRate = 240;
     [ObservableProperty] private PowerPlanKind _editPowerPlan = PowerPlanKind.Unchanged;
     [ObservableProperty] private ProcessPriorityLevel _editPriority = ProcessPriorityLevel.Unchanged;
     [ObservableProperty] private bool _editDisableThrottling;
@@ -138,23 +136,40 @@ public sealed partial class PerformanceViewModel : ObservableObject
         await ReloadTweaksAsync(ct);
 
         var settings = await _settings.GetSettingsAsync(ct);
-        SessionHdrOff = settings.SessionTweakHdrOff;
-        SessionGameBarOff = settings.SessionTweakGameBarOff;
-        SessionFseOff = settings.SessionTweakFseOff;
+        _loadingSessionTweaks = true;
+        try
+        {
+            SessionGameBarOff = settings.SessionTweakGameBarOff;
+            SessionFseOff = settings.SessionTweakFseOff;
+        }
+        finally
+        {
+            _loadingSessionTweaks = false;
+        }
     }
 
-    partial void OnSessionHdrOffChanged(bool value) => _ = PersistSessionTweakAsync();
-    partial void OnSessionGameBarOffChanged(bool value) => _ = PersistSessionTweakAsync();
-    partial void OnSessionFseOffChanged(bool value) => _ = PersistSessionTweakAsync();
+    // Showing the stored values is not a change to store.
+    private bool _loadingSessionTweaks;
 
-    private async Task PersistSessionTweakAsync()
+    // Each switch saves its own value only. Saving both wrote the one that had not been
+    // loaded yet as "off" whenever the other was clicked while the page was still loading.
+    partial void OnSessionGameBarOffChanged(bool value) => PersistSessionTweak(s => s with { SessionTweakGameBarOff = value });
+    partial void OnSessionFseOffChanged(bool value) => PersistSessionTweak(s => s with { SessionTweakFseOff = value });
+
+    private async void PersistSessionTweak(Func<AppSettings, AppSettings> change)
     {
-        await _settings.UpdateSettingsAsync(s => s with
+        if (_loadingSessionTweaks)
         {
-            SessionTweakHdrOff = SessionHdrOff,
-            SessionTweakGameBarOff = SessionGameBarOff,
-            SessionTweakFseOff = SessionFseOff,
-        });
+            return;
+        }
+        try
+        {
+            await _settings.UpdateSettingsAsync(change);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            TweaksStatus = "That switch could not be saved: " + ex.Message;
+        }
     }
 
     [RelayCommand]
@@ -163,8 +178,24 @@ public sealed partial class PerformanceViewModel : ObservableObject
         try
         {
             var states = await _tweaks.GetStatesAsync(ct);
+            var groups = states.GroupBy(s => s.Definition.Category).ToList();
+
+            // The page asks again each time it is opened. When the answer is the tweaks already
+            // listed, only their states are written: new rows would close every row the user had
+            // opened to read, and build the whole list again for nothing.
+            var rows = TweakGroups.SelectMany(g => g.Tweaks).ToList();
+            var current = groups.SelectMany(g => g).ToList();
+            if (rows.Select(r => r.Definition.Id).SequenceEqual(current.Select(s => s.Definition.Id)))
+            {
+                for (var i = 0; i < rows.Count; i++)
+                {
+                    rows[i].Status = current[i].Status;
+                }
+                return;
+            }
+
             TweakGroups.Clear();
-            foreach (var group in states.GroupBy(s => s.Definition.Category))
+            foreach (var group in groups)
             {
                 TweakGroups.Add(new TweakGroupViewModel(
                     group.Key.ToUpperInvariant(),
@@ -247,11 +278,9 @@ public sealed partial class PerformanceViewModel : ObservableObject
 
     private async Task ReloadProfilesAsync(CancellationToken ct = default)
     {
-        Profiles.Clear();
-        foreach (var profile in await _profiles.GetProfilesAsync(ct))
-        {
-            Profiles.Add(profile);
-        }
+        // Clearing the list deselects the profile, and the editor then loads the first one over
+        // whatever was being typed; an unchanged list is left alone so opening the page keeps both.
+        BoundRows.Replace(Profiles, await _profiles.GetProfilesAsync(ct));
         SelectedProfile ??= Profiles.FirstOrDefault();
     }
 
@@ -262,10 +291,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
             return;
         }
         EditName = value.IsBuiltIn ? value.Name + " (copy)" : value.Name;
-        EditVirtualDisplay = value.Display.VirtualDisplay;
-        EditWidth = value.Display.Width;
-        EditHeight = value.Display.Height;
-        EditRefreshRate = value.Display.RefreshRate;
         EditPowerPlan = value.Performance.PowerPlan;
         EditPriority = value.Performance.Priority;
         EditDisableThrottling = value.Performance.DisablePowerThrottling;
@@ -281,13 +306,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
             var profile = new LaunchProfile
             {
                 Name = EditName.Trim(),
-                Display = new DisplayProfile
-                {
-                    VirtualDisplay = EditVirtualDisplay,
-                    Width = EditWidth,
-                    Height = EditHeight,
-                    RefreshRate = EditRefreshRate,
-                },
                 Performance = new PerformanceProfile
                 {
                     PowerPlan = EditPowerPlan,
@@ -385,33 +403,36 @@ public sealed partial class PerformanceViewModel : ObservableObject
     {
         var inventory = await _systemInfo.GetInventoryAsync(ct);
 
-        HardwareRows.Clear();
-        HardwareRows.Add(new InfoRow("CPU", $"{inventory.CpuName} ({inventory.CpuCores}C/{inventory.CpuThreads}T)"));
+        var hardware = new List<InfoRow>
+        {
+            new("CPU", $"{inventory.CpuName} ({inventory.CpuCores}C/{inventory.CpuThreads}T)"),
+        };
         foreach (var gpu in inventory.Gpus)
         {
             var vram = gpu.VramBytes > 0 ? $", {gpu.VramBytes / (1024.0 * 1024 * 1024):F0} GB VRAM" : string.Empty;
-            HardwareRows.Add(new InfoRow($"GPU ({gpu.Vendor})", $"{gpu.Name}, driver {gpu.DriverVersion}{vram}"));
+            hardware.Add(new InfoRow($"GPU ({gpu.Vendor})", $"{gpu.Name}, driver {gpu.DriverVersion}{vram}"));
         }
-        HardwareRows.Add(new InfoRow("RAM", $"{inventory.TotalRamBytes / (1024.0 * 1024 * 1024):F0} GB"));
-        HardwareRows.Add(new InfoRow("Windows", inventory.WindowsVersion));
+        hardware.Add(new InfoRow("RAM", $"{inventory.TotalRamBytes / (1024.0 * 1024 * 1024):F0} GB"));
+        hardware.Add(new InfoRow("Windows", inventory.WindowsVersion));
+        BoundRows.Replace(HardwareRows, hardware);
 
         var virtualization = inventory.Virtualization;
-        VirtualizationRows.Clear();
-        VirtualizationRows.Add(new InfoRow("Firmware virtualization", Tri(virtualization.FirmwareVirtualizationEnabled)));
-        VirtualizationRows.Add(new InfoRow("Hypervisor running", Tri(virtualization.HypervisorPresent)));
-        VirtualizationRows.Add(new InfoRow("Hyper-V feature", Tri(virtualization.HyperVFeatureEnabled)));
-        VirtualizationRows.Add(new InfoRow("Virtual Machine Platform", Tri(virtualization.VirtualMachinePlatformEnabled)));
-        VirtualizationRows.Add(new InfoRow("Windows Hypervisor Platform", Tri(virtualization.WindowsHypervisorPlatformEnabled)));
+        BoundRows.Replace(VirtualizationRows,
+        [
+            new InfoRow("Firmware virtualization", Tri(virtualization.FirmwareVirtualizationEnabled)),
+            new InfoRow("Hypervisor running", Tri(virtualization.HypervisorPresent)),
+            new InfoRow("Hyper-V feature", Tri(virtualization.HyperVFeatureEnabled)),
+            new InfoRow("Virtual Machine Platform", Tri(virtualization.VirtualMachinePlatformEnabled)),
+            new InfoRow("Windows Hypervisor Platform", Tri(virtualization.WindowsHypervisorPlatformEnabled)),
+        ]);
 
         var overrides = (await _settings.GetSettingsAsync(ct)).DisplayOverrides;
-        Displays.Clear();
-        foreach (var display in inventory.Displays)
-        {
-            Displays.Add(new MonitorRow(
+        BoundRows.Replace(Displays, inventory.Displays
+            .Select(display => new MonitorRow(
                 display.DeviceName,
                 DisplayPresentation.CustomName(display, overrides) ?? display.FriendlyName,
-                display.CurrentMode.ToString()));
-        }
+                display.CurrentMode.ToString()))
+            .ToList());
     }
 
     private void OnNetworkSample(object? sender, NetworkQualitySample sample)
@@ -421,6 +442,7 @@ public sealed partial class PerformanceViewModel : ObservableObject
             _lastNetworkSample = DateTimeOffset.Now;
             var suffix = sample.IsReferenceHost ? " [ REF HOST ] link quality" : $" · {sample.Target}";
             NetworkStatus = $"{sample.PingMs:F0} ms · {sample.JitterMs:F1} ms jitter · {sample.PacketLossPct:F1}% loss{suffix}";
+            _networkStaleness.Start();
         });
     }
 
@@ -452,10 +474,6 @@ public sealed partial class PerformanceViewModel : ObservableObject
             {
                 parts.Add($"game ram {metrics.GameRamBytes / (1024.0 * 1024 * 1024):F1} GB");
             }
-            if (metrics.CurrentFps is { } fps)
-            {
-                parts.Add($"{fps:F0} fps");
-            }
             GameLoadText = string.Join(" · ", parts);
         });
     }
@@ -471,3 +489,25 @@ public sealed partial class PerformanceViewModel : ObservableObject
 public sealed record InfoRow(string Label, string Value);
 
 public sealed record MonitorRow(string DeviceName, string Name, string Mode);
+
+/// <summary>
+/// Refills a bound list only when what it holds has changed. Every page is asked to load again
+/// each time it is opened, and clearing a list throws away the visuals built for its rows along
+/// with what they held: the selection, the scroll position, a row left open.
+/// </summary>
+internal static class BoundRows
+{
+    public static void Replace<T>(ObservableCollection<T> target, IReadOnlyList<T> rows)
+    {
+        if (target.SequenceEqual(rows))
+        {
+            return;
+        }
+
+        target.Clear();
+        foreach (var row in rows)
+        {
+            target.Add(row);
+        }
+    }
+}

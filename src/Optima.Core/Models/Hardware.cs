@@ -44,7 +44,6 @@ public readonly record struct HardwareMetrics
 
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
     public double CpuUtilizationPercent { get; init; }
-    public double CpuFrequencyMhz { get; init; }
     public double GpuUtilizationPercent { get; init; }
     public ulong GpuMemoryUsedBytes { get; init; }
     public double? GpuTemperatureCelsius { get; init; }
@@ -53,6 +52,5 @@ public readonly record struct HardwareMetrics
     public ulong RamTotalBytes { get; init; }
     public double GameCpuPercent { get; init; }
     public ulong GameRamBytes { get; init; }
-    public double? CurrentFps { get; init; }
     public double? CurrentFrametimeMs { get; init; }
 }

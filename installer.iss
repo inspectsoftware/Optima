@@ -9,20 +9,27 @@
 ; <OutDir>\Optima-Setup-<version><Label>.exe. The local dev pipeline points both at the
 ; Desktop\Optima Dev folder and stamps Label with the build time.
 ;
-; Install model: per-user, so the wizard itself never asks for administrator rights:
-; files go to %LOCALAPPDATA%\Programs\Optima and registry writes are HKCU only. The
-; one step that does need them is the bundled virtual display driver, so a task
-; (checked by default) hands that to Optima's own elevated helper once the files are
-; in place: one UAC prompt. Declining it still leaves a working Optima, because the
-; Display page offers the same install later. Uninstall removes the files, the
-; shortcuts and Optima's own registry values, but never touches user data under
-; %LOCALAPPDATA%\Optima\ (config, profiles, sessions) or the installed driver.
+; Install model: per machine. Setup asks for administrator rights once and puts everything in
+; Program Files. That is where it has to be: Optima's helper runs as administrator, and a helper,
+; its libraries and the driver package in a folder the user's own programs can write to is
+; administrator rights for anything that drops a file there. In Program Files only an
+; administrator can change them. The same prompt covers the bundled virtual display driver, so
+; there is no second one. Optima itself is started as the person who ran the setup, never elevated.
+;
+; User data stays where it was, under %LOCALAPPDATA%\Optima\ (config, profiles, sessions): setup
+; and uninstall never touch it, and uninstall leaves the installed driver as well.
+;
+; Coming from 0.7.5 and earlier, which installed per user: the copy in
+; %LOCALAPPDATA%\Programs\Optima is removed by this setup, with its shortcuts and its entry in
+; Add/Remove Programs. The autostart entry is left for Optima to point at the new folder on its
+; first start.
 ;
 ; Upgrading: a setup run over an existing install keeps the folder it finds
 ; (UsePreviousAppDir) and empties it before laying the new payload down, so files the
-; new build no longer ships cannot linger beside it. Only the install folder is
-; cleared; the uninstaller is rewritten in place and the user's data, which lives
-; outside {app}, is never touched.
+; new build no longer ships cannot linger beside it.
+;
+; Updates from inside Optima run this setup with /SILENT /relaunch=1: no pages, and Optima is
+; started again at the end.
 
 #ifndef AppVersion
   ; Fallback for compiling outside installer.ps1 (e.g. from the Inno IDE) when
@@ -66,9 +73,12 @@ AppId={{f4474d52-ee70-458e-b99d-5c3eef769b1c}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Inspect Software
+; Administrator rights, so {autopf} is Program Files. 64-bit mode makes that the real
+; Program Files and not the (x86) one: the payload is a 64-bit program.
+PrivilegesRequired=admin
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 DefaultDirName={autopf}\{#AppName}
-; {autopf} resolves per-user to %LOCALAPPDATA%\Programs when the installer runs
-; as the unprivileged user (PrivilegesRequired=lowest).
 DisableProgramGroupPage=yes
 ; Fixed install location; the folder is not asked about.
 DisableDirPage=yes
@@ -81,31 +91,25 @@ SetupIconFile=src\Optima.App\Assets\optima.ico
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=lowest
 ; Names the build in Add/Remove Programs, so a machine carrying a local dev build says which one.
 UninstallDisplayName={#AppName} {#AppVersion}{#Label}
-; Let Setup ask Windows to close Optima when its files are being replaced
-; (upgrade in place). It is not relaunched afterwards.
-CloseApplicationsFilter=*.exe,*.dll
+; Setup does not close Optima for the player. A closed launcher is a session ended with nothing
+; put back; PrepareToInstall waits for Optima to go and stops with a message when it does not.
+CloseApplications=no
 RestartApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-; Start-with-Windows is written as the same HKCU Run value the app's own
-; Settings toggle manages (AutostartService), so installer and app never
-; disagree about the mechanism.
-Name: "autostart"; Description: "Start Optima automatically at sign-in (minimized to the tray)"; GroupDescription: "Startup:"
-; A virtual display is a machine-wide device, so this step alone needs Windows to
-; approve an administrator prompt. Checked by default: the Optima Virtualization
-; features only work once the driver is installed.
-Name: "vdddriver"; Description: "Install the Optima virtual display driver (Windows asks once for administrator approval)"; GroupDescription: "Virtual display:"
+; Checked by default: the virtual display only works once the driver is installed. Setup is
+; already running as administrator, so this asks for nothing more.
+Name: "vdddriver"; Description: "Install the Optima virtual display driver"; GroupDescription: "Virtual display:"
 
 [Files]
 ; The local dev pipeline keeps the setups it builds in an Installers subfolder of the payload; they
 ; are excluded, together with any setup left in the payload root, so a setup never embeds another
 ; setup. (createallsubdirs is deliberately absent: it would recreate that folder, empty, inside the
 ; installed app.)
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "Installers\*,Optima-Setup-*.exe"; Flags: recursesubdirs ignoreversion restartreplace
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "Installers\*,Optima-Setup-*.exe"; Flags: recursesubdirs ignoreversion
 
 [InstallDelete]
 ; Replace, do not merge. Inno's file list only adds and overwrites, so a build that renamed
@@ -119,14 +123,23 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "Installers\*,Optima-Setup
 ; uninstaller after this point, so the entry in Add/Remove Programs survives with the new
 ; version. (No Excludes here on purpose: [InstallDelete] does not support one, and it does
 ; not need it - the uninstaller is restored either way.)
-Type: filesandordirs; Name: "{app}\*"
+;
+; Only a folder that already holds Optima is cleared. The folder page is hidden, but /DIR= on
+; the command line still chooses the folder, and pointed at one with other things in it this
+; line would have emptied it.
+Type: filesandordirs; Name: "{app}\*"; Check: AppFolderHoldsOptima
 
 [Icons]
-Name: "{userprograms}\{#AppName}"; Filename: "{app}\Optima.exe"; WorkingDir: "{app}"
-Name: "{userdesktop}\{#AppName}"; Filename: "{app}\Optima.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\Optima.exe"; WorkingDir: "{app}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\Optima.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Optima.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; As the person who started the setup, in both entries: setup runs as administrator, and an
+; Optima started by it without this would be an elevated Optima.
+Filename: "{app}\Optima.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent runasoriginaluser
+; The update from inside Optima: a silent run has no last page to tick a box on, so it asks for
+; the restart on the command line.
+Filename: "{app}\Optima.exe"; Flags: nowait runasoriginaluser; Check: RelaunchRequested
 
 [Code]
 const
@@ -136,6 +149,19 @@ const
   BundledDriverFolder = 'drivers';
   ElevatedHelperFileName = 'Optima.Watchdog.exe';
   DriverTaskName = 'vdddriver';
+
+{ True when the install folder is an Optima install, which is the only kind of folder the
+  InstallDelete section may clear. A first install finds no folder, and has nothing to clear. }
+function AppFolderHoldsOptima(): Boolean;
+begin
+  Result := FileExists(ExpandConstant('{app}\Optima.exe'));
+end;
+
+{ True when Optima was the one that started this setup and wants to be started again. }
+function RelaunchRequested(): Boolean;
+begin
+  Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;
 
 { True when Optima currently holds its single-instance mutex. }
 function OptimaIsRunning(): Boolean;
@@ -156,17 +182,27 @@ begin
             Chr(123) + '{#AppGuid}' + Chr(125) + '_is1';
 end;
 
-{ Where the previous install lives, or an empty string when there is none.
+{ One value of the previous install's uninstall entry, or an empty string when there is no
+  previous install. Three places can hold one: this setup's own (machine-wide, 64-bit), the
+  machine-wide one an "all users" 0.7.5 wrote (32-bit), and the per-user one of 0.7.5 and
+  earlier. The last is only visible when the person at the keyboard is the administrator.
 
   Read from the registry rather than from the install folder, because this is asked on
   the welcome page and the app constant is not initialized that early: expanding it there
   raises "An attempt was made to expand the app constant before it was initialized" and
   takes the whole setup down with a runtime error. The registry answers the same question
   at any point in the run. }
-function PreviousInstallDir(): String;
+function PreviousInstallValue(Name: String): String;
 begin
   Result := '';
-  RegQueryStringValue(HKEY_CURRENT_USER, UninstallKey(), 'InstallLocation', Result);
+  if not RegQueryStringValue(HKLM64, UninstallKey(), Name, Result) then
+    if not RegQueryStringValue(HKLM32, UninstallKey(), Name, Result) then
+      RegQueryStringValue(HKEY_CURRENT_USER, UninstallKey(), Name, Result);
+end;
+
+function PreviousInstallDir(): String;
+begin
+  Result := PreviousInstallValue('InstallLocation');
 end;
 
 { True when a previous Optima install is on this PC, so this run replaces one rather
@@ -176,16 +212,15 @@ begin
   Result := PreviousInstallDir() <> '';
 end;
 
-{ The exact command line AutostartService writes, so installer and app never
-  disagree about the value's shape. Always quoted, like the app's own toggle. }
+{ The exact command line AutostartService writes. Always quoted, like the app's own toggle. }
 function AutostartCommandLine(): String;
 begin
   Result := '"' + ExpandConstant('{app}\Optima.exe') + '" --tray';
 end;
 
-{ True when the existing autostart Run value points at this very install, so
-  it is ours to manage. A value left by another (manually installed) copy is
-  never touched. Accepts the app's quoted form and an unquoted legacy form. }
+{ True when the existing autostart Run value points at this very install. Only the uninstaller
+  asks: the entry itself belongs to the app (its Settings page and first-run wizard write it),
+  and setup no longer offers it. }
 function AutostartPointsAtThisInstall(): Boolean;
 var
   Value: String;
@@ -220,16 +255,15 @@ end;
 { Say up front what an upgrade is about to do, so replacing an existing install is a
   stated part of the run rather than something noticed afterwards in the folder.
 
-  This only rewrites the welcome text; the replacement itself is [InstallDelete], which
-  runs whether or not a wizard is ever shown (a silent install has no pages). }
+  This only rewrites the welcome text; the replacement itself happens whether or not a
+  wizard is ever shown (a silent install has no pages). }
 procedure CurPageChanged(CurPageID: Integer);
 var
   Previous: String;
 begin
   if (CurPageID = wpWelcome) and IsUpgrade() then
   begin
-    Previous := '';
-    RegQueryStringValue(HKEY_CURRENT_USER, UninstallKey(), 'DisplayVersion', Previous);
+    Previous := PreviousInstallValue('DisplayVersion');
     if Previous <> '' then
       Previous := ' ' + Previous;
 
@@ -243,11 +277,10 @@ end;
 
 { Installs the bundled virtual display driver.
 
-  Setup runs as the unprivileged user, and creating a display device node is not
-  something a per-user process may do, so the elevated helper does the work: its
-  manifest makes Windows show one administrator prompt. The helper only stages the
-  package when a device with the driver's hardware id is already present, so running
-  a new setup over an existing install never adds a second virtual display. }
+  Setup is already running as administrator, so the helper is started directly and Windows
+  asks nothing further. The helper only stages the package when a device with the driver's
+  hardware id is already present, so running a new setup over an existing install never adds
+  a second virtual display. }
 procedure InstallBundledVirtualDisplayDriver();
 var
   ResultCode: Integer;
@@ -268,8 +301,8 @@ begin
   end;
 
   Log('Installing the bundled virtual display driver.');
-  if ShellExec('runas', HelperPath, '--install-driver "' + DriverFolder + '"',
-               ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  if Exec(HelperPath, '--install-driver "' + DriverFolder + '"',
+          ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
     if ResultCode = 0 then
     begin
@@ -287,12 +320,84 @@ begin
     Log('The elevated helper for the virtual display driver could not be started.');
 
   { Optional by design: Optima runs without the driver, and the Display page installs
-    it later with the same single administrator prompt. }
+    it later with one administrator prompt. }
   if not WizardSilent() then
     MsgBox('Optima could not install its virtual display driver automatically.' + #13#10 + #13#10 +
            'Install it from inside Optima instead: open the DISPLAY page and choose ' +
            '"Install driver". Everything else in Optima works without it.',
            mbInformation, MB_OK);
+end;
+
+// Optima Shield runs beside Optima while a session is up. Before its file is replaced or removed
+// it is asked to send its final report and exit. It would also exit by itself a few seconds after
+// Optima is gone; asking makes the wait short and the session's end clean.
+procedure StopShield(Dir: String);
+var
+  Code: Integer;
+  Exe: String;
+begin
+  if Dir = '' then
+    Exit;
+  Exe := AddBackslash(Dir) + 'Optima.Shield.exe';
+  if FileExists(Exe) then
+    Exec(Exe, '--stop', Dir, SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
+// The copy 0.7.5 and earlier installed for one person, in that person's own folder.
+//
+// It is removed as that person and not as the administrator this setup runs as. The two are
+// the same account on most PCs, but where a standard account borrowed an administrator's
+// password for the prompt they are not, and "the local app data folder" and "the current
+// user's registry" then mean the administrator's. Run as the original user, both mean the
+// player's.
+//
+// One PowerShell command, because every path in it has to be worked out on that side: the
+// folder (only when it holds Optima.exe, never a folder that is merely called Optima), the two
+// shortcuts, and the entry in Add/Remove Programs. The old uninstaller is deliberately not
+// used: it would take the autostart entry with it, and that entry is the player's choice,
+// which Optima points at the new folder on its first start.
+procedure RemovePerUserInstall();
+var
+  Code: Integer;
+  Script: String;
+begin
+  Script :=
+    '$d = Join-Path $env:LOCALAPPDATA ''Programs\Optima''; ' +
+    'if (Test-Path -LiteralPath (Join-Path $d ''Optima.exe'')) { ' +
+      '$s = Join-Path $d ''Optima.Shield.exe''; ' +
+      'if (Test-Path -LiteralPath $s) { Start-Process -FilePath $s -ArgumentList ''--stop'' -WindowStyle Hidden -Wait }; ' +
+      'Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue; ' +
+      'foreach ($f in ''Programs'', ''Desktop'') { ' +
+        'Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath($f)) ''Optima.lnk'') -Force -ErrorAction SilentlyContinue }; ' +
+      'Remove-Item -LiteralPath ''HKCU:\' + UninstallKey() + ''' -Recurse -Force -ErrorAction SilentlyContinue }';
+  if not ExecAsOriginalUser(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+       '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' + Script + '"',
+       '', SW_HIDE, ewWaitUntilTerminated, Code) then
+    Log('The per-user copy of an earlier Optima could not be looked for.')
+  else
+    Log(Format('Looked for a per-user copy of an earlier Optima (exit code %d).', [Code]));
+end;
+
+// The copy a 0.7.5 setup installed "for all users": Program Files (x86), recorded in the
+// 32-bit half of the registry. When this setup took that folder over as its own there is only
+// the old entry to remove, or Add/Remove Programs would list Optima twice. When it did not,
+// the old folder goes as well, under the same rule as everywhere: only a folder that holds
+// Optima.exe.
+procedure RemoveOldMachineInstall();
+var
+  Dir: String;
+begin
+  if not RegQueryStringValue(HKLM32, UninstallKey(), 'InstallLocation', Dir) then
+    Exit;
+  Dir := RemoveBackslashUnlessRoot(Dir);
+  if (Dir <> '') and (CompareText(Dir, RemoveBackslashUnlessRoot(ExpandConstant('{app}'))) <> 0)
+     and FileExists(AddBackslash(Dir) + 'Optima.exe') then
+  begin
+    StopShield(Dir);
+    DelTree(Dir, True, True, True);
+    Log('Removed the earlier all-users copy in ' + Dir + '.');
+  end;
+  RegDeleteKeyIncludingSubkeys(HKLM32, UninstallKey());
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -303,6 +408,8 @@ begin
       constant is initialized by this point, which it is not on the wizard's first page. }
     if IsUpgrade() then
       Log('Replacing an existing Optima install in ' + ExpandConstant('{app}') + '.');
+    RemovePerUserInstall();
+    RemoveOldMachineInstall();
   end;
 
   if CurStep = ssPostInstall then
@@ -312,18 +419,36 @@ begin
       pass /MERGETASKS=!vdddriver, and the checkbox does the same in the wizard. }
     if WizardIsTaskSelected(DriverTaskName) then
       InstallBundledVirtualDisplayDriver();
-
-    if WizardIsTaskSelected('autostart') then
-      RegWriteStringValue(HKEY_CURRENT_USER, RunKey, AutostartValueName, AutostartCommandLine())
-    else if AutostartPointsAtThisInstall() then
-      RegDeleteValue(HKEY_CURRENT_USER, RunKey, AutostartValueName);
   end;
+end;
+
+// Also the answer for a run with no pages (an update started from inside Optima, which closes
+// itself right after starting this): the wizard's own "still running" question is never asked
+// there. Optima gets fifteen seconds to be gone, and setup stops with a reason when it is not.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Waited: Integer;
+begin
+  Result := '';
+  Waited := 0;
+  while OptimaIsRunning() and (Waited < 30) do
+  begin
+    Sleep(500);
+    Waited := Waited + 1;
+  end;
+  if OptimaIsRunning() then
+  begin
+    Result := 'Optima is still running. Close it (also from the tray), then run this setup again.';
+    Exit;
+  end;
+  StopShield(PreviousInstallDir());
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then
   begin
+    StopShield(ExpandConstant('{app}'));
     if AutostartPointsAtThisInstall() then
       RegDeleteValue(HKEY_CURRENT_USER, RunKey, AutostartValueName);
   end;

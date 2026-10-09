@@ -33,8 +33,9 @@ try
 {
     await pipe.ConnectAsync(10_000);
 }
-catch (TimeoutException)
+catch (Exception ex) when (ex is TimeoutException or UnauthorizedAccessException or IOException)
 {
+    HelperLog.Write($"could not connect to the pipe: {ex.GetType().Name}: {ex.Message}");
     Console.Error.WriteLine("Could not connect to the bootstrapper pipe.");
     return 4;
 }
@@ -88,7 +89,20 @@ try
         await writeLock.WaitAsync();
         try
         {
-            await IpcFraming.WriteFrameAsync(pipe, new IpcEnvelope { Response = response });
+            try
+            {
+                await IpcFraming.WriteFrameAsync(pipe, new IpcEnvelope { Response = response });
+            }
+            catch (InvalidOperationException ex)
+            {
+                // An answer over the frame limit. The caller still has to hear something, or it
+                // waits on this request until the helper is gone.
+                HelperLog.Write($"{request.Command} answer not sent: {ex.Message}");
+                await IpcFraming.WriteFrameAsync(pipe, new IpcEnvelope
+                {
+                    Response = new IpcResponse { Success = false, Error = "The helper's answer was too large to send.", RequestId = request.RequestId },
+                });
+            }
         }
         finally
         {
@@ -103,6 +117,12 @@ try
 }
 catch (Exception ex) when (ex is IOException or EndOfStreamException or OperationCanceledException)
 {
+}
+catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
+{
+    // A frame this build cannot read. Leaving through here still runs the disposal below, which
+    // is what stops the trace session and the hardware reader.
+    HelperLog.Write($"unreadable request, helper exiting: {ex.Message}");
 }
 
 return 0;

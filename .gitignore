@@ -17,3 +17,10 @@ tools/innosetup-*.exe
 
 # Seeded design canvas (regenerated from design/*.dc.html by the design skill)
 design/optima-liquid-glass.html
+
+# Optima Shield is built from a private repository and arrives here as a file. It is never committed.
+vendor/shield/*.exe
+
+# Local archives and tool folders
+*.rar
+.freebuff/

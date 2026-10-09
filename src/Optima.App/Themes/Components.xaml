@@ -8,7 +8,6 @@
         <ControlTemplate TargetType="HeaderedContentControl">
           <ctl:GlassPanel Chamfer="{StaticResource Chamfer.Strip}" Padding="18,12,16,14"
                           Tint="{DynamicResource Color.Glass.Tint}"
-                          TopLine="{DynamicResource Brush.Strip.Top}"
                           BottomLine="{DynamicResource Brush.Strip.Bottom}"
                           LeadingEdge="{DynamicResource Brush.Strip.Edge}">
             <ctl:GlassPanel.Child>
@@ -118,7 +117,7 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ctl:AsciiBar">
-          <ProgressBar Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+          <ProgressBar ctl:Flow.Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
                        Maximum="{Binding Maximum, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
                        Foreground="{TemplateBinding Foreground}"
                        IsTabStop="False" Focusable="False" />

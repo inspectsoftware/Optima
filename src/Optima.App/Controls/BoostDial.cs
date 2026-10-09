@@ -47,8 +47,17 @@ public sealed class BoostDial : FrameworkElement
         Focusable = true;
         Cursor = Cursors.Hand;
         FocusVisualStyle = null;
-        Loaded += (_, _) => Hook();
-        Unloaded += (_, _) => Unhook();
+        Loaded += (_, _) =>
+        {
+            Motion.Changed -= Hook;
+            Motion.Changed += Hook;
+            Hook();
+        };
+        Unloaded += (_, _) =>
+        {
+            Motion.Changed -= Hook;
+            Unhook();
+        };
         IsVisibleChanged += (_, _) =>
         {
             if (IsVisible)
@@ -86,7 +95,9 @@ public sealed class BoostDial : FrameworkElement
     {
         var dial = (BoostDial)d;
         var on = (bool)e.NewValue;
-        if (dial._animateNextChange && dial.IsLoaded && Motion.Enabled)
+        // Only a hooked dial plays the run: nothing else would advance it, and a click is ignored
+        // for as long as one is in flight.
+        if (dial._animateNextChange && dial._hooked && Motion.Enabled)
         {
             dial._mode = on ? BoostDialMode.Enabling : BoostDialMode.Disabling;
             dial._modeStartedMs = dial._clock.Elapsed.TotalMilliseconds;
@@ -99,9 +110,14 @@ public sealed class BoostDial : FrameworkElement
         dial.InvalidateVisual();
     }
 
+    /// <summary>
+    /// Hooked only while motion is on. A subscriber keeps the frame tick running, and with BOOST
+    /// open the dial was the one thing ticking every frame of a window that was unfocused,
+    /// minimized or behind a game.
+    /// </summary>
     private void Hook()
     {
-        if (!_hooked && IsLoaded && IsVisible)
+        if (!_hooked && IsLoaded && IsVisible && Motion.Enabled)
         {
             CompositionTarget.Rendering += OnRendering;
             _hooked = true;
@@ -110,10 +126,18 @@ public sealed class BoostDial : FrameworkElement
 
     private void Unhook()
     {
-        if (_hooked)
+        if (!_hooked)
         {
-            CompositionTarget.Rendering -= OnRendering;
-            _hooked = false;
+            return;
+        }
+        CompositionTarget.Rendering -= OnRendering;
+        _hooked = false;
+        // The hook only comes back with motion on, so a run in flight ends where it was going
+        // instead of waiting for a frame that may never come.
+        if (_mode is BoostDialMode.Enabling or BoostDialMode.Disabling)
+        {
+            _mode = _mode == BoostDialMode.Enabling ? BoostDialMode.On : BoostDialMode.Off;
+            InvalidateVisual();
         }
     }
 
@@ -132,9 +156,17 @@ public sealed class BoostDial : FrameworkElement
             return;
         }
 
-        // At rest only the glow breathes and the light sweeps; a fraction of the frames is plenty,
-        // and none at all while motion is off.
-        if (!Motion.Enabled || _clock.Elapsed - _lastRestingFrame < RestingFrame)
+        // With motion off nothing here moves: one still frame, and the frame tick is let go until
+        // motion is back.
+        if (!Motion.Enabled)
+        {
+            Unhook();
+            InvalidateVisual();
+            return;
+        }
+
+        // At rest only the glow breathes and the light sweeps; a fraction of the frames is plenty.
+        if (_clock.Elapsed - _lastRestingFrame < RestingFrame)
         {
             return;
         }

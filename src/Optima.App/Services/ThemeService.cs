@@ -13,7 +13,9 @@ namespace Optima.App.Services;
 public sealed class ThemeService : IDisposable
 {
     private readonly SettingsService _settings;
-    private string _appliedTheme = "";
+    // App.xaml merges the dark palette itself, so a dark start has nothing to swap in; starting
+    // from "" made every start load that same dictionary a second time.
+    private string _appliedTheme = "Dark";
     private string _appliedAccent = "";
 
     public ThemeService(SettingsService settings)
@@ -43,7 +45,9 @@ public sealed class ThemeService : IDisposable
         }
         else
         {
-            dispatcher.Invoke(() => Apply(settings));
+            // Posted, not waited for: the thread that finished a save has no reason to stand
+            // still until the window has repainted, and must never be what the UI thread waits on.
+            dispatcher.BeginInvoke(() => Apply(settings));
         }
     }
 

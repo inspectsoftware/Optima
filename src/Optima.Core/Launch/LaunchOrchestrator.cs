@@ -64,6 +64,12 @@ public sealed class LaunchOrchestrator
     private int _running;
 
     /// <summary>
+    /// Cancelled once, by <see cref="StopAsync"/>, when Optima is closing. Every session's token is
+    /// linked to it and it is never reset: nothing may start a session in a process that is leaving.
+    /// </summary>
+    private readonly CancellationTokenSource _stop = new();
+
+    /// <summary>
     /// The phase last reported. One session runs at a time, so a single field is enough for the
     /// catch-all to say where a failure it knows nothing else about happened.
     /// </summary>
@@ -135,11 +141,32 @@ public sealed class LaunchOrchestrator
 
     public bool IsSessionActive => Volatile.Read(ref _running) == 1;
 
+    /// <summary>
+    /// Ends the running session because Optima is closing, and refuses every later one. A session
+    /// whose game is up ends the way it does when the game exits: capture stops, the system is put
+    /// back and the session is saved. One that has not got that far is cancelled and restored.
+    /// </summary>
+    /// <returns>False when the session was still running after <paramref name="timeout"/>.</returns>
+    public async Task<bool> StopAsync(TimeSpan timeout)
+    {
+        // Not awaited, and on the pool: the callbacks run a good part of the session's ending
+        // inline, and neither the caller's thread nor the timeout may be held by that.
+        _ = _stop.CancelAsync();
+        var waited = Stopwatch.StartNew();
+        while (IsSessionActive && waited.Elapsed < timeout)
+        {
+            await Task.Delay(25).ConfigureAwait(false);
+        }
+        return !IsSessionActive;
+    }
+
     public Task<LaunchResult> RunSessionAsync(LaunchProfile profile, CancellationToken ct = default)
         => RunSessionAsync(profile, LaunchKind.Play, ct);
 
-    public Task<LaunchResult> RunSessionAsync(LaunchProfile profile, LaunchKind kind, CancellationToken ct = default)
-        => RunGatedAsync(profile, async (context, token) =>
+    public Task<LaunchResult> RunSessionAsync(LaunchProfile requested, LaunchKind kind, CancellationToken ct = default)
+    {
+        var profile = WithSettingsDisplay(requested);
+        return RunGatedAsync(profile, async (context, token) =>
         {
             Report(LaunchPhase.Validating, "Checking Google Play Games and Critical Ops…");
             var platform = await _detector.DetectPlatformAsync(token).ConfigureAwait(false);
@@ -207,10 +234,13 @@ public sealed class LaunchOrchestrator
             return await MonitorAndCompleteAsync(
                 profile, game.PackageId, emulatorPid.Value, context, kind, captureAllowed: true, token).ConfigureAwait(false);
         }, ct);
+    }
 
     public Task<LaunchResult> AttachToRunningGameAsync(
-        LaunchProfile profile, int emulatorPid, bool captureAllowed, CancellationToken ct = default)
-        => RunGatedAsync(profile, async (context, token) =>
+        LaunchProfile requested, int emulatorPid, bool captureAllowed, CancellationToken ct = default)
+    {
+        var profile = WithSettingsDisplay(requested);
+        return RunGatedAsync(profile, async (context, token) =>
         {
             Report(LaunchPhase.Validating, "Game detected. Applying the selected profile…");
             var game = await _detector.DetectTargetGameAsync(token).ConfigureAwait(false);
@@ -221,12 +251,31 @@ public sealed class LaunchOrchestrator
             return await MonitorAndCompleteAsync(
                 profile, game?.PackageId ?? "unknown", emulatorPid, context, LaunchKind.Watch, captureAllowed, token).ConfigureAwait(false);
         }, ct);
+    }
+
+    /// <summary>
+    /// The profile with the display the session will really use. Whether the game runs on the
+    /// virtual display, and at which mode, is one choice on the Display page for every profile;
+    /// what a profile itself still says about the display only counts until that choice exists
+    /// (a first start that has not got to it yet, or a host without settings).
+    /// </summary>
+    private LaunchProfile WithSettingsDisplay(LaunchProfile profile)
+        => _settings?.Current is { VirtualDisplayEnabled: not null } settings
+            ? profile with { Display = settings.EffectiveDisplay }
+            : profile;
 
     private async Task<LaunchResult> RunGatedAsync(
         LaunchProfile profile,
         Func<SessionContext, CancellationToken, Task<LaunchResult>> body,
         CancellationToken ct)
     {
+        // Before the gate: the session that Optima's exit has just ended leaves the game running,
+        // and watch mode must not answer that by attaching to it again.
+        if (_stop.IsCancellationRequested)
+        {
+            return Fail("CANCELLED", "Optima is closing.", "No session was started.");
+        }
+
         if (Interlocked.CompareExchange(ref _running, 1, 0) != 0)
         {
             return Fail("SESSION_ACTIVE", "A session is already running.",
@@ -237,7 +286,8 @@ public sealed class LaunchOrchestrator
         var context = new SessionContext { Snapshot = new SystemStateSnapshot { ProfileName = profile.Name } };
         try
         {
-            return WithWarnings(context, await body(context, ct).ConfigureAwait(false));
+            using var session = CancellationTokenSource.CreateLinkedTokenSource(ct, _stop.Token);
+            return WithWarnings(context, await body(context, session.Token).ConfigureAwait(false));
         }
         catch (OperationCanceledException)
         {
@@ -326,33 +376,56 @@ public sealed class LaunchOrchestrator
 
         if (profile.Display.VirtualDisplay)
         {
-            Report(LaunchPhase.ConfiguringDisplay, $"Configuring virtual display {profile.Display.Mode}…");
-
-            context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = true };
-            await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
-
-            await _virtualDisplay.InitializeAsync(ct).ConfigureAwait(false);
-
-            var wasActive = await _virtualDisplay.IsDisplayActiveAsync(ct).ConfigureAwait(false);
-            if (!wasActive)
+            try
             {
-                await RunEssentialAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
-                context.Snapshot = context.Snapshot with { VirtualDisplayEnabledByUs = true };
+                await ConfigureVirtualDisplayAsync(profile.Display, context, ct).ConfigureAwait(false);
+            }
+            catch (OptimaException ex) when (ex.Error.Code == "VDD_NOT_INSTALLED")
+            {
+                // The choice says "virtual display" and the driver is not on this PC (never
+                // installed, or uninstalled since). That is no reason to refuse to start the game:
+                // it runs on the real screen, and the session says what it went without.
+                _logger.LogWarning("The virtual display is switched on but its driver is not installed; the game runs on the real screen");
+                context.Warnings.Add(new LaunchWarning(ex.Error.Code,
+                    "The virtual display driver is not installed",
+                    "The game ran on your real screen. Install the driver on the Display page, or switch the virtual display off there."));
+                context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = false };
                 await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
             }
+        }
+    }
 
-            await _virtualDisplay.SetModeAsync(profile.Display.Mode, ct).ConfigureAwait(false);
-            _logger.LogInformation("Resolution applied: {Mode} on virtual display", profile.Display.Mode);
+    private async Task ConfigureVirtualDisplayAsync(DisplayProfile display, SessionContext context, CancellationToken ct)
+    {
+        Report(LaunchPhase.ConfiguringDisplay, $"Configuring virtual display {display.Mode}…");
 
-            var topology = await _displayService.CaptureTopologyAsync(ct).ConfigureAwait(false);
-            context.Snapshot = context.Snapshot with { DisplayTopology = topology };
+        context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = true };
+        await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+
+        await _virtualDisplay.InitializeAsync(ct).ConfigureAwait(false);
+
+        var wasActive = await _virtualDisplay.IsDisplayActiveAsync(ct).ConfigureAwait(false);
+        if (!wasActive)
+        {
+            await RunEssentialAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
+            context.Snapshot = context.Snapshot with { VirtualDisplayEnabledByUs = true };
             await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+        }
 
-            if (profile.Display.MakePrimary
-                && await _virtualDisplay.GetDisplayInfoAsync(ct).ConfigureAwait(false) is { } displayInfo)
-            {
-                await _displayService.MakePrimaryAsync(displayInfo.DeviceName, ct).ConfigureAwait(false);
-            }
+        await _virtualDisplay.SetModeAsync(display.Mode, ct).ConfigureAwait(false);
+        _logger.LogInformation("Resolution applied: {Mode} on virtual display", display.Mode);
+
+        var topology = await _displayService.CaptureTopologyAsync(ct).ConfigureAwait(false);
+        context.Snapshot = context.Snapshot with { DisplayTopology = topology };
+        await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+
+        if (display.MakePrimary
+            && await _virtualDisplay.GetDisplayInfoAsync(ct).ConfigureAwait(false) is { } displayInfo)
+        {
+            // Not worth a launch: the display is up at its mode either way, and the game can be
+            // moved onto it by hand. The session says that it was not made the main screen.
+            await RunOptionalAsync(context, "DISPLAY_PRIMARY_FAILED", "The virtual display was not made the main screen",
+                () => _displayService.MakePrimaryAsync(displayInfo.DeviceName, ct)).ConfigureAwait(false);
         }
     }
 
@@ -414,20 +487,26 @@ public sealed class LaunchOrchestrator
             _logger.LogWarning(ex, "Network quality monitoring unavailable for this session");
         }
 
-        await MonitorGameAsync(performance, procSnapshot, ct).ConfigureAwait(false);
-        stopwatch.Stop();
-        _logger.LogInformation("Game exited after {Duration}", stopwatch.Elapsed);
+        try
+        {
+            await MonitorGameAsync(performance, procSnapshot, ct).ConfigureAwait(false);
+            stopwatch.Stop();
+            _logger.LogInformation("Game exited after {Duration}", stopwatch.Elapsed);
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested)
+        {
+            // Optima is closing with the game still up. The session ends here the way it does when
+            // the game exits, so what it measured is saved and the system is put back. A cancel
+            // restores too, but throws the record away.
+            stopwatch.Stop();
+            _logger.LogInformation("Optima is closing after {Duration}; ending the session with the game still running", stopwatch.Elapsed);
+        }
 
         Report(LaunchPhase.Restoring, "Restoring system settings…");
         // A session whose capture never started must save empty stats, not whatever the
         // provider still holds from a previous session.
         var captured = context.MetricsStarted;
-        if (context.MetricsStarted)
-        {
-            await _metrics.StopAsync().ConfigureAwait(false);
-            context.MetricsStarted = false;
-        }
-        var networkStats = await StopNetworkAsync().ConfigureAwait(false);
+        var networkStats = await StopMonitoringAsync(context).ConfigureAwait(false);
         await _recovery.RestoreAsync(context.Snapshot, CancellationToken.None).ConfigureAwait(false);
 
         var session = new SessionRecord
@@ -504,7 +583,7 @@ public sealed class LaunchOrchestrator
         }
     }
 
-    private async Task StopMonitoringAsync(SessionContext context)
+    private async Task<NetworkQualityStats?> StopMonitoringAsync(SessionContext context)
     {
         if (context.MetricsStarted)
         {
@@ -514,11 +593,14 @@ public sealed class LaunchOrchestrator
             }
             catch (Exception ex)
             {
+                // Every failure, a cancellation too: a helper that does not answer the stop in time
+                // surfaces as one, and let through it would turn a finished session into a cancelled
+                // one and drop its record. The provider then reports what it sampled live.
                 _logger.LogWarning(ex, "Frametime capture did not stop cleanly");
             }
             context.MetricsStarted = false;
         }
-        await StopNetworkAsync().ConfigureAwait(false);
+        return await StopNetworkAsync().ConfigureAwait(false);
     }
 
     private async Task<NetworkQualityStats?> StopNetworkAsync()

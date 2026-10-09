@@ -18,6 +18,8 @@ public static class EtwPresentProbe
         using var session = new TraceEventSession("Optima-PresentProbe")
         {
             StopOnDispose = true,
+            // Not the library's 64 MB default; see EtwFrametimeCollector.Start.
+            BufferSizeMB = 8,
         };
         // No process filter on purpose (that is the question the probe answers), but only the
         // present events: everything else the DXGI provider emits would be dropped anyway.

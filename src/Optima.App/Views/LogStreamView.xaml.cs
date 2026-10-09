@@ -9,6 +9,7 @@ namespace Optima.App.Views;
 public partial class LogStreamView : UserControl
 {
     private LogStreamViewModel? _observed;
+    private bool _scrollQueued;
 
     public LogStreamView()
     {
@@ -81,16 +82,19 @@ public partial class LogStreamView : UserControl
 
     private void ScrollToEnd()
     {
-        if (LogList.Items.Count == 0)
+        if (_scrollQueued || LogList.Items.Count == 0)
         {
             return;
         }
         // Defer out of the collection-changed notification: calling ScrollIntoView while the
         // virtualizing panel is still processing the add/remove batch races its internal index
         // bookkeeping and has thrown ArgumentOutOfRangeException from BringContainerIntoView.
-        // Loaded priority also coalesces the flood of entries that arrives when a page opens.
+        // One scroll is queued at a time, so the flood of entries that arrives when a page opens
+        // ends in a single scroll to the last of them.
+        _scrollQueued = true;
         LogList.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
         {
+            _scrollQueued = false;
             try
             {
                 if (LogList.Items.Count > 0)

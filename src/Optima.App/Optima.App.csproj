@@ -7,6 +7,8 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\optima.ico</ApplicationIcon>
+    <!-- No program can make Optima load code at start through an environment variable. -->
+    <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets\optima.ico" />
@@ -22,9 +24,9 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageReference Include="Serilog" Version="4.2.0" />
-    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
   </ItemGroup>
@@ -47,6 +49,16 @@
     <None Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <!-- The UPDATE LOG page renders this at runtime. -->
     <None Include="..\..\CHANGELOG.md" Link="CHANGELOG.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Optima Shield, the protected play module. It is built from a private repository and is not
+         in this one: an official build has the file in vendor/shield, a build from source does not,
+         and then runs without protected play and says so. A release that is to go out without it
+         is built with -p:IncludeShield=false (publish.ps1 -NoShield), which makes it the same kind
+         of build as one from source. -->
+    <None Include="..\..\vendor\shield\Optima.Shield.exe" Condition="'$(IncludeShield)' != 'false' And Exists('..\..\vendor\shield\Optima.Shield.exe')" Link="Optima.Shield.exe" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- So that an install which lost the file can say "it was removed" and not "this build has none". -->
+  <ItemGroup Condition="'$(IncludeShield)' != 'false' And Exists('..\..\vendor\shield\Optima.Shield.exe')">
+    <AssemblyMetadata Include="ShieldBundled" Value="true" />
   </ItemGroup>
 
   <!-- Ship the elevated helper (and its dependencies) alongside the app executable.

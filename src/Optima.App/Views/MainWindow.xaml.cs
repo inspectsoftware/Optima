@@ -3,7 +3,10 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
+using Optima.Core.Theming;
 using Optima.App.Controls;
 using Optima.App.Services;
 using Optima.App.ViewModels;
@@ -20,13 +23,16 @@ public partial class MainWindow : Window
     /// singletons, so a page that has been visited once keeps its visual tree (and its scroll
     /// position and focus) instead of being rebuilt from a DataTemplate on every rail click.
     /// </summary>
-    private readonly Dictionary<object, System.Windows.Controls.UserControl> _pageViews = [];
+    private readonly Dictionary<object, UserControl> _pageViews = [];
 
     private bool _backdropActive;
 
     public MainWindow()
     {
         InitializeComponent();
+        // Never opened larger than the screen it opens on: centered, that put the title bar above the top edge.
+        Height = Math.Max(MinHeight, Math.Min(Height, SystemParameters.WorkArea.Height));
+        Width = Math.Max(MinWidth, Math.Min(Width, SystemParameters.WorkArea.Width));
         StateChanged += (_, _) =>
         {
             ApplyMaximizedCompensation();
@@ -42,8 +48,10 @@ public partial class MainWindow : Window
 
         MouseMove += OnPointerMoved;
         MouseLeave += (_, _) => GlassPanel.ClearLights();
-        Activated += (_, _) => Motion.SetForeground(true);
-        Deactivated += (_, _) => Motion.SetForeground(false);
+        // The app's, not this window's: with one of Optima's own dialogs in front the app is still
+        // the one being used, and the dialog's backdrop and controls move like everything else.
+        Application.Current.Activated += (_, _) => Motion.SetForeground(IsVisible);
+        Application.Current.Deactivated += (_, _) => Motion.SetForeground(false);
         IsVisibleChanged += (_, _) =>
         {
             if (!IsVisible)
@@ -65,7 +73,7 @@ public partial class MainWindow : Window
             }
             if (args.NewValue is MainViewModel vm)
             {
-                ApplyRail(vm.RailCollapsed);
+                ApplyRail(vm.RailCollapsed, glide: false);
                 ShowPage(vm.CurrentPage);
             }
         };
@@ -81,7 +89,9 @@ public partial class MainWindow : Window
         }
         if (e.PropertyName == nameof(MainViewModel.RailCollapsed))
         {
-            ApplyRail(vm.RailCollapsed);
+            ApplyRail(vm.RailCollapsed, glide: true);
+            // The rows change height and the section headings go; the marker follows once that is laid out.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => PlaceNavMarker(glide: false));
         }
         else if (e.PropertyName == nameof(MainViewModel.CurrentPage))
         {
@@ -111,10 +121,95 @@ public partial class MainWindow : Window
             return;
         }
         PageHost.Content = view;
-        AnimatePageIn();
+
+        // Laid out now, not on the next frame, so that the page's sections exist to be brought in
+        // and are never shown standing still first.
+        PageHost.UpdateLayout();
+        var order = 0;
+        foreach (var part in Parts(view))
+        {
+            Motion.Rise(part, order++);
+        }
+        PlaceNavMarker(glide: true);
+        Ambient.Pour(page.GetType().Name);
     }
 
-    private static System.Windows.Controls.UserControl? CreatePageView(object page) => page switch
+    /// <summary>
+    /// What arrives one after another when a page opens: the sections in the page's own column,
+    /// which is the first panel down from the view that holds more than one thing.
+    /// </summary>
+    private static IEnumerable<UIElement> Parts(UserControl view)
+    {
+        object? node = view.Content;
+        for (var depth = 0; depth < 6; depth++)
+        {
+            switch (node)
+            {
+                case Panel { Children.Count: > 1 } column:
+                    return column.Children.Cast<UIElement>().Where(child => child.Visibility == Visibility.Visible).ToList();
+                case Panel { Children.Count: 1 } single:
+                    node = single.Children[0];
+                    break;
+                case Decorator decorator:
+                    node = decorator.Child;
+                    break;
+                case ContentControl content:
+                    node = content.Content;
+                    break;
+                default:
+                    return [view];
+            }
+        }
+        return [view];
+    }
+
+    private double _navMarkerTop = double.NaN;
+
+    private void OnNavListLoaded(object sender, RoutedEventArgs e) => PlaceNavMarker(glide: false);
+
+    /// <summary>Sends the rail's marker to the row of the open page.</summary>
+    private void PlaceNavMarker(bool glide)
+    {
+        var active = (DataContext as MainViewModel)?.NavItems.FirstOrDefault(item => item.IsActive);
+        var row = active is null ? null : FirstButton(NavList.ItemContainerGenerator.ContainerFromItem(active));
+        if (row is null || !row.IsVisible || row.ActualHeight <= 0)
+        {
+            NavMarker.Opacity = 0;
+            _navMarkerTop = double.NaN;
+            return;
+        }
+
+        // The row's template keeps a pixel clear above and below; so does the marker.
+        var top = row.TransformToAncestor(NavArea).Transform(new Point(0, 0)).Y + 1;
+        NavMarker.Height = Math.Max(0, row.ActualHeight - 2);
+        if (top == _navMarkerTop)
+        {
+            return;
+        }
+        var seconds = glide && !double.IsNaN(_navMarkerTop) ? Motion.Seconds(MotionSpec.MoveMs) : 0;
+        _navMarkerTop = top;
+        NavMarker.Opacity = 1;
+        NavMarkerShift.BeginAnimation(TranslateTransform.YProperty,
+            new DoubleAnimation(top, TimeSpan.FromSeconds(seconds)) { EasingFunction = Motion.Ease });
+    }
+
+    private static Button? FirstButton(DependencyObject? root)
+    {
+        if (root is null or Button)
+        {
+            return root as Button;
+        }
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            if (FirstButton(VisualTreeHelper.GetChild(root, i)) is { } found)
+            {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private static UserControl? CreatePageView(object page) => page switch
     {
         HomeViewModel => new HomeView(),
         PlayViewModel => new PlayView(),
@@ -132,9 +227,13 @@ public partial class MainWindow : Window
         _ => null,
     };
 
-    private void ApplyRail(bool collapsed)
+    private void ApplyRail(bool collapsed, bool glide)
     {
-        RailColumn.Width = new GridLength(collapsed ? RailCollapsedWidth : RailWidth);
+        Rail.BeginAnimation(WidthProperty,
+            new DoubleAnimation(collapsed ? RailCollapsedWidth : RailWidth, TimeSpan.FromSeconds(glide ? Motion.Seconds(MotionSpec.MoveMs) : 0))
+            {
+                EasingFunction = Motion.Ease,
+            });
     }
 
     private void OnPointerMoved(object sender, MouseEventArgs e)
@@ -153,7 +252,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnAccountSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private void OnAccountSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (DataContext is MainViewModel main
             && e.AddedItems.Count > 0
@@ -161,23 +260,6 @@ public partial class MainWindow : Window
         {
             _ = main.SwitchAccountCommand.ExecuteAsync(account);
         }
-    }
-
-    private void AnimatePageIn()
-    {
-        if (!Motion.Enabled)
-        {
-            PageHost.Opacity = 1;
-            PageShift.Y = 0;
-            return;
-        }
-
-        // Short and cheap: the fade used to run for 220 ms over the whole page area, which kept the
-        // compositor busy for a fifth of a second after every rail click.
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var duration = TimeSpan.FromMilliseconds(140);
-        PageHost.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
-        PageShift.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, new DoubleAnimation(6, 0, duration) { EasingFunction = ease });
     }
 
     private void ApplyWindowDressing(string theme)
@@ -205,7 +287,7 @@ public partial class MainWindow : Window
         var backdrop = DWMSBT_TRANSIENTWINDOW;
         _backdropActive = DwmSetWindowAttribute(handle, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int)) == 0;
 
-        RootBorder.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty,
+        RootBorder.SetResourceReference(Border.BackgroundProperty,
             _backdropActive ? "Brush.WindowGround" : "Brush.Background");
     }
 

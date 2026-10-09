@@ -92,6 +92,18 @@ public static class AppServices
         // The desktop side of the OptimaBot link handshake: the app redeems the code the user typed with
         // the Critical Ops account it already has, and the bot is the only party that sees both halves.
         services.AddSingleton<Optima.Core.Linking.BotLinkClient>();
+        // Protected play: Optima Shield, a separate program beside Optima.exe. This only starts it
+        // and reads what it says. Its files are in the real per-user folder whatever folder this app
+        // was told to use, because that is where the module itself looks.
+        services.AddSingleton(sp => new Optima.Core.Protection.ShieldLoader(
+            sp.GetRequiredService<IElevationBroker>(),
+            AppContext.BaseDirectory,
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Optima"),
+            Optima.App.Services.ShieldProcess.Run,
+            Optima.App.Services.ShieldProcess.AccountIsAdministrator,
+            () => DateTimeOffset.UtcNow,
+            sp.GetRequiredService<ILogger<Optima.Core.Protection.ShieldLoader>>(),
+            Optima.App.Services.ShieldProcess.Bundled));
         services.AddSingleton(sp => new Optima.Core.Launch.CrashAutoRelaunchService(
             sp.GetRequiredService<SettingsService>(),
             profile => sp.GetRequiredService<PlayViewModel>().RelaunchAfterCrashAsync(profile),
@@ -129,6 +141,15 @@ public static class AppServices
             System.IO.Path.Combine(paths.Root, "boost-coreparking.json"),
             sp.GetRequiredService<ILogger<Optima.Core.Launch.GameExtrasService>>()));
         services.AddSingleton<Optima.Core.News.CopsNewsService>();
+        // The update check: one request to GitHub's releases at start, and the signed setup on request.
+        services.AddSingleton(sp => new Optima.Core.Updates.UpdateService(
+            paths, sp.GetRequiredService<ILogger<Optima.Core.Updates.UpdateService>>()));
+        services.AddSingleton(sp => new UpdateViewModel(
+            sp.GetRequiredService<Optima.Core.Updates.UpdateService>(),
+            sp.GetRequiredService<SettingsService>(),
+            () => sp.GetRequiredService<LaunchOrchestrator>().IsSessionActive
+                || sp.GetRequiredService<GamePresenceService>().Current != GamePresence.NotRunning,
+            sp.GetRequiredService<ILogger<UpdateViewModel>>()));
         services.AddSingleton<Optima.App.Services.FirstRunFixService>();
         services.AddSingleton<Optima.App.Services.RepairService>();
         // The automatic enrichment and the Sessions page's manual refresh resolve the player the exact
@@ -154,7 +175,9 @@ public static class AppServices
             sp.GetRequiredService<ISessionStore>(),
             sp.GetRequiredService<SettingsService>(),
             (ign, accountId, ct) => FetchPlayerProfile(sp, ign, accountId, ct),
-            sp.GetRequiredService<ILogger<Optima.Core.Stats.SessionStatsRefresher>>()));
+            sp.GetRequiredService<ILogger<Optima.Core.Stats.SessionStatsRefresher>>(),
+            () => sp.GetRequiredService<LaunchOrchestrator>().IsSessionActive
+                || sp.GetRequiredService<GamePresenceService>().Current != GamePresence.NotRunning));
 
         services.AddSingleton<IPerformanceMonitor, HardwareMonitor>();
         services.AddSingleton<EtwMetricsProviderClient>();

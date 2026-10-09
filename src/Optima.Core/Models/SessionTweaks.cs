@@ -11,16 +11,6 @@ public static class SessionTweakCatalog
     [
         new()
         {
-            Id = "session-hdr-off",
-            Name = "HDR off for the session",
-            Category = "session",
-            WhatItChanges = "Switches the Windows display from HDR back to SDR while the game runs (the Windows AdvancedColorInfo state, not a registry value).",
-            PotentialBenefit = "HDR pipeline adds display latency on some panels; SDR can shave a frame or two of end-to-end delay.",
-            PotentialDownside = "The desktop loses HDR until the session ends; fullscreen HDR games look different for the duration.",
-            Values = [],
-        },
-        new()
-        {
             Id = "session-gamebar-off",
             Name = "Xbox Game Bar off for the session",
             Category = "session",

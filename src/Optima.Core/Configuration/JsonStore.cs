@@ -31,7 +31,7 @@ public sealed class JsonStore
     {
         if (!File.Exists(path))
         {
-            return null;
+            return RecoverMissing<T>(path);
         }
 
         try
@@ -76,17 +76,53 @@ public sealed class JsonStore
     {
         if (!File.Exists(path))
         {
+            return RecoverMissing<T>(path);
+        }
+
+        // This is the read the start waits on, and a scanner holding the file for a moment is the
+        // same passing thing here as it is for a save. Unretried, it was the app refusing to start.
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options);
+            }
+            catch (JsonException ex)
+            {
+                return QuarantineOnCorrupt<T>(path, ex);
+            }
+            catch (Exception ex) when (attempt < 3 && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(100 * attempt);
+            }
+        }
+    }
+
+    /// <summary>
+    /// No file, but a backup of it. A replace is two renames, and a process that ends between them
+    /// leaves exactly this: the last good generation under the backup's name and nothing under the
+    /// file's own. Read as "no file", that was every setting and profile silently back to defaults.
+    /// A file removed on purpose has no backup; <see cref="Delete"/> takes it first.
+    /// </summary>
+    private T? RecoverMissing<T>(string path) where T : class
+    {
+        var backup = path + ".bak";
+        var recovered = ReadBackup<T>(backup);
+        if (recovered is null)
+        {
             return null;
         }
 
         try
         {
-            return JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options);
+            File.Copy(backup, path, overwrite: false);
         }
-        catch (JsonException ex)
+        catch (Exception copy) when (copy is IOException or UnauthorizedAccessException)
         {
-            return QuarantineOnCorrupt<T>(path, ex);
+            _logger.LogDebug(copy, "Could not put the backup back in place at {Path}", path);
         }
+        _logger.LogWarning("{Path} was missing; recovered from the backup of the previous save", path);
+        return recovered;
     }
 
     public async Task SaveAsync<T>(string path, T value, CancellationToken ct = default)
@@ -96,18 +132,39 @@ public sealed class JsonStore
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var tmp = path + ".tmp";
-            await using (var stream = File.Create(tmp))
+            // The dispose is awaited off the caller's context too. A small file fits the stream's
+            // buffer, so the flush in the dispose was the first await to wait, and the rename and
+            // the gate's release then ran on the UI thread whenever that was the caller.
+            var stream = File.Create(tmp);
+            await using (stream.ConfigureAwait(false))
             {
                 await JsonSerializer.SerializeAsync(stream, value, Options, ct).ConfigureAwait(false);
+                // Onto the disk before the rename. The rename is journaled and the contents are
+                // not: after a power cut or a blue screen the new name could point at an empty file.
+                stream.Flush(flushToDisk: true);
             }
 
-            if (File.Exists(path))
+            // A scanner or the indexer can hold the file or its backup open for a moment right
+            // after the previous save. That passes by itself, and a save that gave up on it took
+            // the app down from whichever command had asked for it.
+            for (var attempt = 1; ; attempt++)
             {
-                File.Replace(tmp, path, destinationBackupFileName: path + ".bak");
-            }
-            else
-            {
-                File.Move(tmp, path);
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Replace(tmp, path, destinationBackupFileName: path + ".bak");
+                    }
+                    else
+                    {
+                        File.Move(tmp, path);
+                    }
+                    break;
+                }
+                catch (Exception ex) when (attempt < 3 && ex is IOException or UnauthorizedAccessException)
+                {
+                    await Task.Delay(100 * attempt, ct).ConfigureAwait(false);
+                }
             }
         }
         finally
@@ -120,12 +177,18 @@ public sealed class JsonStore
     {
         try
         {
+            // The backup goes with it, and goes first. Left behind, it is an older generation that
+            // a later read would hand back as recovered: for the recovery snapshot, another session's.
+            if (File.Exists(path + ".bak"))
+            {
+                File.Delete(path + ".bak");
+            }
             if (File.Exists(path))
             {
                 File.Delete(path);
             }
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             _logger.LogWarning(ex, "Could not delete {Path}", path);
         }
@@ -179,7 +242,7 @@ public sealed class JsonStore
         {
             File.Move(path, path + ".corrupt-" + DateTimeOffset.UtcNow.ToUnixTimeSeconds(), overwrite: true);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             _logger.LogWarning(ex, "Could not quarantine corrupt file {Path}", path);
         }

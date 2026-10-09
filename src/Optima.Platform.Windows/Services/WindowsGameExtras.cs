@@ -70,17 +70,33 @@ public sealed class WindowsGameExtras : IGameExtras
 
     public void SetGpuHighPerformance(string executablePath, bool enabled)
     {
-        if (enabled)
+        using var key = Registry.CurrentUser.CreateSubKey(GpuPreferencesKey);
+        var updated = WithGpuPreference(key.GetValue(executablePath) as string, enabled);
+        if (updated.Length == 0)
         {
-            using var key = Registry.CurrentUser.CreateSubKey(GpuPreferencesKey);
-            key.SetValue(executablePath, HighPerformance, RegistryValueKind.String);
-            _logger.LogInformation("Graphics preference set to High performance for {Path}", executablePath);
+            key.DeleteValue(executablePath, throwOnMissingValue: false);
         }
-        else if (IsGpuHighPerformance(executablePath))
+        else
         {
-            using var key = Registry.CurrentUser.OpenSubKey(GpuPreferencesKey, writable: true);
-            key?.DeleteValue(executablePath, throwOnMissingValue: false);
-            _logger.LogInformation("Graphics preference cleared for {Path}", executablePath);
+            key.SetValue(executablePath, updated, RegistryValueKind.String);
         }
+        _logger.LogInformation("Graphics preference {Action} for {Path}", enabled ? "set to High performance" : "cleared", executablePath);
+    }
+
+    /// <summary>
+    /// The value holds other per-app choices beside the adapter (windowed optimizations, Auto HDR),
+    /// so only the adapter entry is replaced or taken out.
+    /// </summary>
+    public static string WithGpuPreference(string? data, bool highPerformance)
+    {
+        var entries = (data ?? string.Empty)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(entry => !entry.StartsWith("GpuPreference=", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (highPerformance)
+        {
+            entries.Add(HighPerformance.TrimEnd(';'));
+        }
+        return entries.Count == 0 ? string.Empty : string.Join(';', entries) + ";";
     }
 }

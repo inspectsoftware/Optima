@@ -35,6 +35,7 @@ public sealed class GameExtrasService : IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CoreParkingSnapshot? _parking;
     private bool _coresAlreadyAwake;
+    private bool _gpuWasEnabled;
     private bool _started;
 
     public GameExtrasService(
@@ -150,12 +151,15 @@ public sealed class GameExtrasService : IDisposable
             var gpuApplied = false;
             if (gamePath is { Length: > 0 })
             {
-                if (gpuEnabled != _extras.IsGpuHighPerformance(gamePath))
+                // Removed only when the switch was seen going off in this run. A preference that is
+                // there while the switch has been off all along is the player's own, set in Windows.
+                if (gpuEnabled ? !_extras.IsGpuHighPerformance(gamePath) : _gpuWasEnabled && _extras.IsGpuHighPerformance(gamePath))
                 {
                     _extras.SetGpuHighPerformance(gamePath, gpuEnabled);
                 }
                 gpuApplied = gpuEnabled;
             }
+            _gpuWasEnabled = gpuEnabled;
 
             Status = new GameExtrasStatus(coresEnabled, _parking is not null, _coresAlreadyAwake, gpuEnabled, gpuApplied, gamePath);
             StatusChanged?.Invoke(Status);

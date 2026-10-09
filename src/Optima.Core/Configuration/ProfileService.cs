@@ -40,25 +40,15 @@ public sealed class ProfileService
                 Priority = ProcessPriorityLevel.AboveNormal,
             },
         },
+        // One Competitive where there were two named after a resolution. Which display the game
+        // runs on, and at what mode, is one choice on the Display page now and no longer part of
+        // a profile (DisplayChoice moves the old selection over).
         new LaunchProfile
         {
-            Name = "Competitive 1080p240",
-            Description = "Latency-first: 1920x1080 @ 240 Hz virtual display, high process priority, power throttling off, high-performance power plan.",
+            Name = DisplayChoice.Competitive,
+            Description = "Latency-first: high process priority, power throttling off, high-performance power plan.",
             IsBuiltIn = true,
-            Display = new DisplayProfile { VirtualDisplay = true, Width = 1920, Height = 1080, RefreshRate = 240 },
-            Performance = new PerformanceProfile
-            {
-                PowerPlan = PowerPlanKind.HighPerformance,
-                Priority = ProcessPriorityLevel.High,
-                DisablePowerThrottling = true,
-            },
-        },
-        new LaunchProfile
-        {
-            Name = "Competitive 1440p165",
-            Description = "2560x1440 @ 165 Hz virtual display with the same latency-first system tuning.",
-            IsBuiltIn = true,
-            Display = new DisplayProfile { VirtualDisplay = true, Width = 2560, Height = 1440, RefreshRate = 165 },
+            Display = new DisplayProfile { VirtualDisplay = false },
             Performance = new PerformanceProfile
             {
                 PowerPlan = PowerPlanKind.HighPerformance,
@@ -125,6 +115,12 @@ public sealed class ProfileService
         var profile = await _store.ReadExternalAsync<LaunchProfile>(sourcePath, ct).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"'{sourcePath}' does not contain a valid profile.");
         var imported = profile with { IsBuiltIn = false };
+        // An export of a built-in profile carries the built-in's name, which no saved profile may
+        // have. Without a new name every such file was refused as "not a valid profile".
+        if (BuiltInProfiles.Any(b => string.Equals(b.Name, imported.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            imported = imported with { Name = imported.Name + " (imported)" };
+        }
         await SaveProfileAsync(imported, ct).ConfigureAwait(false);
         return imported;
     }
