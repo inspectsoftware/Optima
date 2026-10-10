@@ -60,6 +60,19 @@ internal static class DeviceInstaller
     private static extern bool UpdateDriverForPlugAndPlayDevices(
         IntPtr hwndParent, string hardwareId, string fullInfPath, uint installFlags, out bool rebootRequired);
 
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    private static extern int CM_Locate_DevNodeW(out uint devInst, string deviceId, uint flags);
+
+    [DllImport("cfgmgr32.dll")]
+    private static extern int CM_Enable_DevNode(uint devInst, uint flags);
+
+    /// <summary>Enables a device by instance id. Returns the CONFIGRET, 0 on success.</summary>
+    internal static int EnableDevice(string instanceId)
+    {
+        var located = CM_Locate_DevNodeW(out var devInst, instanceId, 0);
+        return located != 0 ? located : CM_Enable_DevNode(devInst, 0);
+    }
+
     internal static (bool Success, bool RebootRequired, string Error) CreateRootDevice(string hardwareId, string infPath)
     {
         var classGuid = DisplayClassGuid;

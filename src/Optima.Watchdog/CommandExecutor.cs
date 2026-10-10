@@ -75,8 +75,16 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail("The device is not a recognized virtual display device.");
                 }
 
-                var verb = request.Command == IpcCommand.EnableDevice ? "/enable-device" : "/disable-device";
-                var (exitCode, output) = await RunProcessAsync("pnputil.exe", $"{verb} \"{instanceId}\"", ct);
+                if (request.Command == IpcCommand.EnableDevice)
+                {
+                    // Not pnputil: it answers 1167 "The device is not connected" for a root device
+                    // that was already disabled when Windows started, which is every first launch
+                    // after a restart, because the install leaves the device disabled.
+                    var cr = DeviceInstaller.EnableDevice(instanceId);
+                    return cr == 0 ? ok(null) : fail($"Configuration Manager could not enable the device (CR 0x{cr:X}).");
+                }
+
+                var (exitCode, output) = await RunProcessAsync("pnputil.exe", $"/disable-device \"{instanceId}\"", ct);
                 return exitCode == 0 ? ok(null) : fail($"pnputil exited with {exitCode}: {Truncate(output)}");
             }
 
