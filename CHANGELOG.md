@@ -4,6 +4,11 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-23 - 0.8.1: Play works again after a Windows restart
+
+- Fixed: the first PLAY after a Windows restart failed at the display step with DEVICE_TOGGLE_FAILED ("The device is not connected"). Every launch after a restart was affected while the virtual display was switched on.
+- Why: Windows refused to switch on the virtual display device when it had been off since the PC started. Optima's helper now switches it on a way Windows accepts in that state. Switching it off is unchanged.
+
 ## 2026-10-09 - 0.8.0: everything since 0.7.5
 
 - This is the full list of what changed between 0.7.5 and 0.8.0, by area. The entries marked "Indev" further down are the same changes as they were made, build by build.
