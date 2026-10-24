@@ -27,6 +27,10 @@ public sealed partial class PlayerStatsViewModel : ObservableObject
     private (string Ign, long? Id) _fetchedFor = ("", null);
     private bool _loading;
 
+    // A forced load that arrived while another was still running, such as a second player tracked
+    // before the first one's profile came back. The running load is for the player before it.
+    private bool _reloadPending;
+
     public PlayerStatsViewModel(CopsApiClient api, SettingsService settings)
     {
         _api = api;
@@ -87,6 +91,7 @@ public sealed partial class PlayerStatsViewModel : ObservableObject
     {
         if (_loading)
         {
+            _reloadPending |= force;
             return;
         }
         _loading = true;
@@ -130,6 +135,13 @@ public sealed partial class PlayerStatsViewModel : ObservableObject
         {
             IsRefreshing = false;
             _loading = false;
+            // Turned away above, that load would be lost, and the panel kept showing the previous
+            // player under the new one's name until the cache ran out.
+            if (_reloadPending)
+            {
+                _reloadPending = false;
+                _ = LoadAsync(force: true);
+            }
         }
     }
 

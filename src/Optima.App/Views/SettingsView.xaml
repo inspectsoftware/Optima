@@ -3,25 +3,249 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="clr-namespace:Optima.App.Controls">
   <UserControl.Resources>
-    <Style x:Key="RowLabel" TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
-      <Setter Property="VerticalAlignment" Value="Center" />
-      <Setter Property="Margin" Value="0,6,12,6" />
+    <!-- A card of rows: a small caps title, then each row under a hairline. -->
+    <Style x:Key="Card" TargetType="HeaderedContentControl">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Margin" Value="0,0,0,16" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="HeaderedContentControl">
+            <Border Background="{DynamicResource Brush.Surface}" BorderBrush="{DynamicResource Brush.Hairline}"
+                    BorderThickness="1" SnapsToDevicePixels="True">
+              <StackPanel>
+                <TextBlock Text="{TemplateBinding Header}" Style="{StaticResource Text.Micro}"
+                           Foreground="{DynamicResource Brush.TextSecondary}" Margin="20,14,20,12" />
+                <ContentPresenter />
+              </StackPanel>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
-    <!-- The hint inside the empty PLAYER box. -->
-    <Style x:Key="Placeholder" TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
+    <Style TargetType="ctl:SettingRow">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ctl:SettingRow">
+            <Border BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="0,1,0,0" Padding="20,13"
+                    SnapsToDevicePixels="True">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <StackPanel x:Name="Text" VerticalAlignment="Center" Margin="0,0,24,0">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{TemplateBinding Header}" Style="{StaticResource Text.Base}" FontSize="14" />
+                    <!-- The longer story, for whoever wants it, without putting it on the page. -->
+                    <Border x:Name="InfoGlyph" Background="Transparent" Margin="7,0,0,0" VerticalAlignment="Center"
+                            Tag="{TemplateBinding Info}" ToolTipService.InitialShowDelay="150" ToolTipService.ShowDuration="60000">
+                      <ctl:Icon Symbol="{StaticResource Icon.Info}" Size="14" Foreground="{DynamicResource Brush.TextMuted}" />
+                      <Border.ToolTip>
+                        <ToolTip>
+                          <TextBlock Text="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ToolTip}}"
+                                     TextWrapping="Wrap" MaxWidth="360" />
+                        </ToolTip>
+                      </Border.ToolTip>
+                    </Border>
+                  </StackPanel>
+                  <TextBlock x:Name="Hint" Text="{TemplateBinding Hint}" Style="{StaticResource Text.Base}" FontSize="12"
+                             Foreground="{DynamicResource Brush.TextMuted}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0" />
+                </StackPanel>
+                <ContentPresenter x:Name="Control" Grid.Column="1" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="Info" Value="{x:Null}">
+                <Setter TargetName="InfoGlyph" Property="Visibility" Value="Collapsed" />
+              </Trigger>
+              <Trigger Property="Hint" Value="">
+                <Setter TargetName="Hint" Property="Visibility" Value="Collapsed" />
+              </Trigger>
+              <Trigger Property="Stacked" Value="True">
+                <Setter TargetName="Text" Property="Margin" Value="0,0,0,10" />
+                <Setter TargetName="Control" Property="Grid.Row" Value="1" />
+                <Setter TargetName="Control" Property="Grid.Column" Value="0" />
+                <Setter TargetName="Control" Property="Grid.ColumnSpan" Value="2" />
+              </Trigger>
+              <!-- A narrow window: the control goes under the label, from the left, as a wrapped line would. -->
+              <Trigger Property="Wrapped" Value="True">
+                <Setter TargetName="Text" Property="Margin" Value="0,0,0,10" />
+                <Setter TargetName="Control" Property="Grid.Row" Value="1" />
+                <Setter TargetName="Control" Property="Grid.Column" Value="0" />
+                <Setter TargetName="Control" Property="Grid.ColumnSpan" Value="2" />
+                <Setter TargetName="Control" Property="HorizontalAlignment" Value="Left" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- A few options side by side, the chosen one filled with the accent. -->
+    <Style x:Key="Segmented" TargetType="ListBox">
+      <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource AncestorType=ctl:SettingRow}}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.HairlineStrong}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBox">
+            <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+              <ItemsPresenter />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="ItemsPanel">
+        <Setter.Value>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="ItemContainerStyle">
+        <Setter.Value>
+          <Style TargetType="ListBoxItem">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+            <Setter Property="FontFamily" Value="{StaticResource Font.Body}" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource Focus.Ring}" />
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                  <Border x:Name="Root" Background="Transparent" Height="32" Padding="14,0">
+                    <ContentPresenter VerticalAlignment="Center" />
+                  </Border>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                      <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
+                      <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                      <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Accent}" />
+                      <Setter Property="Foreground" Value="{DynamicResource Brush.OnAccent}" />
+                      <Setter Property="FontWeight" Value="SemiBold" />
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- A switch or a box has no text of its own; a screen reader names it by its row's label. -->
+    <Style x:Key="RowSwitch" TargetType="CheckBox" BasedOn="{StaticResource Switch}">
+      <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource AncestorType=ctl:SettingRow}}" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+
+    <Style x:Key="RowBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource AncestorType=ctl:SettingRow}}" />
+      <Setter Property="Width" Value="260" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="9,2" />
+    </Style>
+
+    <Style x:Key="RowButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+
+    <!-- The left column: one entry per section, the open one marked. -->
+    <Style x:Key="SectionItem" TargetType="ListBoxItem">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{StaticResource Focus.Ring}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Border x:Name="Root" Background="Transparent" Height="44" Padding="14,0" Margin="0,0,0,2">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Rectangle x:Name="Mark" Width="6" Height="6" Fill="{DynamicResource Brush.HairlineStrong}"
+                           RenderTransformOrigin="0.5,0.5" VerticalAlignment="Center">
+                  <Rectangle.RenderTransform>
+                    <RotateTransform Angle="45" />
+                  </Rectangle.RenderTransform>
+                </Rectangle>
+                <TextBlock x:Name="Label" Grid.Column="1" Text="{Binding Label}" Style="{StaticResource Text.Base}" FontSize="14"
+                           Foreground="{DynamicResource Brush.TextSecondary}" Margin="12,0" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding Count}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Glass.Surface1}" />
+                <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Brush.Text}" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.SurfaceRaised}" />
+                <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Brush.Text}" />
+                <Setter TargetName="Mark" Property="Fill" Value="{DynamicResource Brush.Accent}" />
+              </Trigger>
+              <!-- Nothing in this section matches the find box. -->
+              <DataTrigger Binding="{Binding Count}" Value="0">
+                <Setter TargetName="Root" Property="Opacity" Value="0.4" />
+              </DataTrigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- No scroll viewer of its own: one would take the mouse wheel over the list, and the page under it would not scroll. -->
+    <Style x:Key="SectionList" TargetType="ListBox">
+      <Setter Property="ItemContainerStyle" Value="{StaticResource SectionItem}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBox">
+            <ItemsPresenter />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="SectionTitle" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="SectionBlurb" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="TextTrimming" Value="None" />
+      <Setter Property="Margin" Value="0,4,0,16" />
+    </Style>
+
+    <!-- The hint inside an empty box. Tag carries the box's text; the hint shows while it is empty. -->
+    <Style x:Key="Placeholder" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
       <Setter Property="IsHitTestVisible" Value="False" />
       <Setter Property="VerticalAlignment" Value="Center" />
-      <Setter Property="Margin" Value="11,0,0,0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
       <Setter Property="Visibility" Value="Collapsed" />
       <Style.Triggers>
-        <DataTrigger Binding="{Binding PlayerQuery}" Value="">
+        <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="">
           <Setter Property="Visibility" Value="Visible" />
         </DataTrigger>
       </Style.Triggers>
     </Style>
 
-    <Style x:Key="NoSavedPlayers" TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
+    <Style x:Key="NoSavedPlayers" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
       <Setter Property="Visibility" Value="Collapsed" />
       <Style.Triggers>
         <DataTrigger Binding="{Binding SavedPlayers.Count}" Value="0">
@@ -48,7 +272,7 @@
           <StackPanel Grid.Column="1" Margin="16,0,16,0" VerticalAlignment="Center">
             <WrapPanel>
               <TextBlock Text="{Binding TrackedName}" Style="{StaticResource Text.Base}" FontSize="18" FontWeight="SemiBold"
-                         Margin="0,0,10,0" TextTrimming="CharacterEllipsis" />
+                         Margin="0,0,10,0" />
               <TextBlock Text="{Binding TrackedIdText}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
             </WrapPanel>
             <TextBlock Text="{Binding TrackedSummary}" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextSecondary}"
@@ -59,14 +283,14 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition />
               </Grid.ColumnDefinitions>
-              <Ellipse x:Name="Dot" Width="6" Height="6" Fill="{DynamicResource Brush.Ok}" VerticalAlignment="Center" />
-              <TextBlock x:Name="Status" Grid.Column="1" Text="{Binding TrackedStatus}" Style="{StaticResource Text.Label}"
-                         Foreground="{DynamicResource Brush.Ok}" TextWrapping="Wrap" Margin="8,0,0,0" />
+              <Ellipse x:Name="Dot" Width="6" Height="6" Fill="{DynamicResource Brush.Ok}" VerticalAlignment="Top" Margin="0,5,0,0" />
+              <TextBlock x:Name="Status" Grid.Column="1" Text="{Binding TrackedStatus}" Style="{StaticResource Text.Base}" FontSize="12"
+                         Foreground="{DynamicResource Brush.Ok}" TextWrapping="Wrap" TextTrimming="None" Margin="8,0,0,0" />
             </Grid>
           </StackPanel>
-          <Button x:Name="Save" Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Save to Optima" Padding="16,8"
-                  VerticalAlignment="Center" Command="{Binding SaveTrackedCommand}"
-                  ToolTip="Keeps this player in Optima, so tracking them again is one click here or in the title bar" />
+          <Button x:Name="Save" Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Save to Optima" Padding="16,0"
+                  MinHeight="40" VerticalAlignment="Center" Command="{Binding SaveTrackedCommand}"
+                  ToolTip="Keeps this player in Optima: one click tracks them again, here or in the title bar" />
         </Grid>
       </Border>
       <DataTemplate.Triggers>
@@ -85,16 +309,17 @@
       <Border x:Name="Chip" BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="1"
               Background="{DynamicResource Brush.Tile}" Margin="0,0,8,8" SnapsToDevicePixels="True">
         <StackPanel Orientation="Horizontal">
-          <Button Style="{StaticResource GhostButton}" Padding="12,0" MinHeight="34"
+          <Button Style="{StaticResource GhostButton}" Padding="12,0" MinHeight="36"
                   Command="{Binding DataContext.UseSavedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                  CommandParameter="{Binding}" ToolTip="Track this player">
+                  CommandParameter="{Binding}" ToolTip="Track this player" AutomationProperties.Name="{Binding DisplayName}">
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Base}" FontSize="{StaticResource Type.Label}" />
-              <TextBlock Text="{Binding AccountId}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Base}" />
+              <TextBlock x:Name="Id" Text="{Binding AccountId}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Border Width="1" Background="{DynamicResource Brush.Hairline}" />
           <Button Style="{StaticResource GhostButton}" Content="×" Width="34" FontSize="14"
+                  AutomationProperties.Name="{Binding DisplayName, StringFormat=Remove {0}}"
                   Command="{Binding DataContext.RemoveSavedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   CommandParameter="{Binding}" ToolTip="Remove from Optima" />
         </StackPanel>
@@ -103,341 +328,341 @@
         <DataTrigger Binding="{Binding IsActive}" Value="True">
           <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
         </DataTrigger>
+        <!-- Saved by ID alone (the stats API was down): the name shown is already the ID, so it is not said twice. -->
+        <MultiDataTrigger>
+          <MultiDataTrigger.Conditions>
+            <Condition Binding="{Binding Ign}" Value="" />
+            <Condition Binding="{Binding Label}" Value="{x:Null}" />
+          </MultiDataTrigger.Conditions>
+          <Setter TargetName="Id" Property="Visibility" Value="Collapsed" />
+        </MultiDataTrigger>
       </DataTemplate.Triggers>
     </DataTemplate>
   </UserControl.Resources>
 
   <Grid>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Style="{StaticResource PageRoot}" MaxWidth="1100" HorizontalAlignment="Left">
-      <TextBlock Text="Settings" Style="{StaticResource Text.PageTitle}" />
-      <TextBlock Text="%LOCALAPPDATA%\Optima" Style="{StaticResource Text.PageSubtitle}" />
+      <!-- The right column fills the window up to a readable width, and the page stays on the left. -->
+      <Grid Margin="{StaticResource Pad.Page}">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="220" />
+          <ColumnDefinition Width="24" />
+          <ColumnDefinition MaxWidth="876" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.ColumnSpan="3" VerticalAlignment="Bottom" HorizontalAlignment="Left">
+          <TextBlock Text="Settings" Style="{StaticResource Text.PageTitle}" />
+          <TextBlock Text="%LOCALAPPDATA%\Optima" Style="{StaticResource Text.PageSubtitle}" Margin="0,4,0,0" />
+        </StackPanel>
+
+        <!-- Find a setting: every section narrows to the rows whose label or hint has the words. -->
+        <Grid Grid.Column="2" Width="320" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+          <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" AutomationProperties.Name="Find a setting"
+                   Padding="18,6,9,6" FontFamily="{StaticResource Font.Body}" FontSize="13" />
+          <ctl:Icon Symbol="{StaticResource Icon.Search}" Size="16" Foreground="{DynamicResource Brush.TextMuted}"
+                    HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0,0,0" IsHitTestVisible="False" />
+          <TextBlock Text="find a setting" Tag="{Binding SearchText}" Style="{StaticResource Placeholder}" Margin="39,0,0,0" />
+        </Grid>
+
+        <ListBox Grid.Row="1" Margin="0,24,0,0" VerticalAlignment="Top" AutomationProperties.Name="Settings sections"
+                 ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection}" Style="{StaticResource SectionList}" />
+
+        <!-- Room at the bottom, so the save bar never covers the last row. -->
+        <StackPanel x:Name="SectionPages" Grid.Row="1" Grid.Column="2" Margin="0,24,0,72">
+          <TextBlock x:Name="NoMatches" Style="{StaticResource SectionBlurb}" Visibility="Collapsed"
+                     Text="No setting matches that. Try another word, or clear the box to see every section." />
+
+          <!-- PLAYER -->
+          <StackPanel Tag="player">
+            <TextBlock Text="Player" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="{Binding Sections[0].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <HeaderedContentControl Style="{StaticResource Card}" Header="TRACKED PLAYER">
+              <StackPanel>
+                <ctl:SettingRow Header="In-game name or account ID" Stacked="True" Hint="Track sets who Optima follows.">
+                  <StackPanel>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <TextBox Text="{Binding PlayerQuery, UpdateSourceTrigger=PropertyChanged}" MinHeight="44"
+                               AutomationProperties.Name="In-game name or account ID"
+                               FontFamily="{StaticResource Font.Body}" FontSize="14">
+                        <TextBox.InputBindings>
+                          <KeyBinding Key="Return" Command="{Binding TrackCommand}" />
+                        </TextBox.InputBindings>
+                      </TextBox>
+                      <TextBlock Text="e.g. Kestrel or 48211907" Tag="{Binding PlayerQuery}" Style="{StaticResource Placeholder}"
+                                 FontSize="14" Margin="21,0,0,0" />
+                      <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Content="Track" Padding="24,0" MinHeight="44"
+                              Margin="10,0,0,0" Command="{Binding TrackCommand}" />
+                    </Grid>
+                    <TextBlock Text="{Binding TrackMessage}" Style="{StaticResource Text.Base}" FontSize="12"
+                               Foreground="{DynamicResource Brush.Warn}" TextWrapping="Wrap" TextTrimming="None" Margin="0,8,0,0"
+                               Visibility="{Binding TrackMessage, Converter={StaticResource EmptyToCollapsed}}" />
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TrackedCard}" Margin="0,12,0,0" Focusable="False"
+                                    Visibility="{Binding HasTrackedPlayer, Converter={StaticResource BoolToVis}}" />
+                  </StackPanel>
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Saved in Optima" Stacked="True" Hint="Click a name to track that player."
+                                Info="Saved players are also in the switcher at the top of the window. Stats come from Critical Force's public profile API: an ID is exact and survives a rename, a name is looked up as typed.">
+                  <StackPanel>
+                    <ItemsControl ItemsSource="{Binding SavedPlayers}" ItemTemplate="{StaticResource SavedChip}" Focusable="False">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                    <TextBlock Text="Nobody saved yet. Track a player, then Save to Optima." Style="{StaticResource NoSavedPlayers}" />
+                  </StackPanel>
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+          </StackPanel>
+
+          <!-- APPEARANCE -->
+          <StackPanel Tag="appearance">
+            <TextBlock Text="Appearance" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="{Binding Sections[1].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <HeaderedContentControl Style="{StaticResource Card}" Header="LOOK">
+              <StackPanel>
+                <ctl:SettingRow Header="Theme" Hint="Dark or light surfaces.">
+                  <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding Theme}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Accent" Hint="Buttons, markers and highlights."
+                                Info="Pick a preset or type your own colour as #RRGGBB. The square at the end shows what applies when you save.">
+                  <StackPanel Orientation="Horizontal">
+                    <ItemsControl ItemsSource="{Binding AccentPresets}" VerticalAlignment="Center" Focusable="False">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Button Command="{Binding DataContext.SelectAccentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                  CommandParameter="{Binding}" Cursor="Hand" ToolTip="{Binding Name}" Margin="0,0,6,0"
+                                  AutomationProperties.Name="{Binding Name}">
+                            <Button.Template>
+                              <ControlTemplate TargetType="Button">
+                                <Border x:Name="Ring" Width="28" Height="28" BorderThickness="2" BorderBrush="Transparent" Padding="2">
+                                  <Border x:Name="Swatch" Background="{Binding Hex, Converter={StaticResource HexToBrush}}"
+                                          BorderBrush="{DynamicResource Brush.Glass.Highlight}" BorderThickness="1" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                  <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Swatch" Property="BorderBrush" Value="{DynamicResource Brush.Text}" />
+                                  </Trigger>
+                                  <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource Brush.Text}" />
+                                  </DataTrigger>
+                                </ControlTemplate.Triggers>
+                              </ControlTemplate>
+                            </Button.Template>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBox Text="{Binding AccentColor, UpdateSourceTrigger=PropertyChanged}" Width="92" Margin="6,0,0,0"
+                             VerticalAlignment="Center" ToolTip="Your own accent as #RRGGBB" AutomationProperties.Name="Accent hex" />
+                    <Border Width="24" Height="24" Margin="8,0,0,0" VerticalAlignment="Center"
+                            Background="{Binding AccentColor, Converter={StaticResource HexToBrush}}"
+                            BorderBrush="{DynamicResource Brush.Glass.Border}" BorderThickness="1" />
+                  </StackPanel>
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Animations" Hint="Nothing moves while a game runs, whatever is chosen."
+                                Info="As Windows follows Settings, Accessibility, Visual effects. Off makes everything arrive at once.">
+                  <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding AnimationOptions}" SelectedItem="{Binding Animations}" />
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+          </StackPanel>
+
+          <!-- DISCORD -->
+          <StackPanel Tag="discord">
+            <TextBlock Text="Discord" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="{Binding Sections[2].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <HeaderedContentControl Style="{StaticResource Card}" Header="PRESENCE">
+              <StackPanel>
+                <ctl:SettingRow Header="Game activity" Hint="Show Critical Ops on your profile while you play.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding DiscordPresenceEnabled}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Launcher activity" Hint="Also show Optima while you browse it.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding DiscordPresenceInLauncher}"
+                            IsEnabled="{Binding DiscordPresenceEnabled}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Card fields" Hint="{Binding DiscordOptionsSummary}"
+                                Info="Pick which facts the card carries: your name, rank, emblem, ranked record, rating and the session timer, and which line Discord shows as your status. Nothing is sent while game activity is off.">
+                  <Button Style="{StaticResource RowButton}" Content="Choose…" Command="{Binding ChooseDiscordPresenceCommand}"
+                          IsEnabled="{Binding DiscordPresenceEnabled}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Application ID" Hint="Optima's own app. Clear it to keep presence off."
+                                Info="Change it only to use your own Discord application. Presence goes to the Discord app on this PC; the only request over the network asks discord.com which artwork the application has.">
+                  <TextBox Style="{StaticResource RowBox}" Text="{Binding DiscordApplicationId, UpdateSourceTrigger=PropertyChanged}" />
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+            <HeaderedContentControl Style="{StaticResource Card}" Header="OPTIMABOT">
+              <StackPanel>
+                <ctl:SettingRow Header="Bot link" Hint="{Binding DiscordBotLinkSummary}"
+                                Info="Run /link with OptimaBot in Discord, then type the code it sends you into the window this button opens. Optima links the tracked player, so your own card needs no name and carries a linked badge. To undo it, run the bot's unlink command.">
+                  <Button Style="{StaticResource RowButton}" Content="Link account…" Command="{Binding LinkDiscordCommand}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Tracker webhook" Hint="Optional. New matches post to this channel."
+                                Info="Paste a Discord channel webhook (channel settings, Integrations, Webhooks) and OptimaBot posts your new matches and rank changes there as a report image. Clear it to link without tracking. Send test posts a sample through the bot, so the channel can be checked before a match.">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBox Style="{StaticResource RowBox}" Text="{Binding DiscordBotWebhookUrl, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Style="{StaticResource RowButton}" Content="Send test" Margin="8,0,0,0" Command="{Binding TestTrackerCommand}" />
+                  </StackPanel>
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+          </StackPanel>
+
+          <!-- OVERLAY -->
+          <StackPanel Tag="overlay">
+            <TextBlock Text="Overlay" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="{Binding Sections[3].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <HeaderedContentControl Style="{StaticResource Card}" Header="OVERLAY">
+              <StackPanel>
+                <ctl:SettingRow Header="FPS overlay" Hint="Show fps over the game.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding OverlayEnabled}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Corner" Hint="Where the readout sits.">
+                  <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding CornerOptions}"
+                           DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding OverlayCorner}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Opacity" Hint="How solid the readout is.">
+                  <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding OpacityOptions}"
+                           DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding OverlayOpacity}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Network line" Hint="Ping, jitter and loss under the fps.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding OverlayShowNetwork}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Reference host" Hint="Pinged when no game server answers.">
+                  <TextBox Style="{StaticResource RowBox}" Text="{Binding NetworkReferenceHost, UpdateSourceTrigger=PropertyChanged}" />
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+          </StackPanel>
+
+          <!-- GAME AND WATCHDOG -->
+          <StackPanel Tag="game">
+            <TextBlock Text="Game &amp; watchdog" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="{Binding Sections[4].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <HeaderedContentControl Style="{StaticResource Card}" Header="WATCHDOG">
+              <StackPanel>
+                <ctl:SettingRow Header="Auto-attach" Hint="Apply the profile when the game starts outside Optima."
+                                Info="The whole profile applies, the virtual display included, so the screen can change when the game is detected. Everything is put back when the game exits.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding EnableWatchMode}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Crash relaunch" Hint="Relaunch once if the game dies in its first five minutes."
+                                Info="A normal quit is never relaunched: only a game that dies on its own early in a session is started again, once, with the same profile.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding AutoRelaunchOnCrash}" />
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+          </StackPanel>
+
+          <!-- GENERAL -->
+          <StackPanel Tag="general">
+            <TextBlock Text="General" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="{Binding Sections[5].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <HeaderedContentControl Style="{StaticResource Card}" Header="APP">
+              <StackPanel>
+                <ctl:SettingRow Header="Keep in tray" Hint="Closing the window keeps Optima running.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding KeepInTrayOnClose}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Start with Windows" Hint="Start minimised to the tray at sign-in.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding StartWithWindows}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Check for updates" Hint="One request to GitHub at every start.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding CheckForUpdatesAtStart}" />
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+            <HeaderedContentControl Style="{StaticResource Card}" Header="CAPTURE">
+              <StackPanel>
+                <ctl:SettingRow Header="Display provider" Hint="Which virtual display driver to use.">
+                  <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding ProviderOptions}" SelectedItem="{Binding Provider}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Frametime capture" Hint="FPS through event tracing; needs the helper.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding EnableFrametimeCapture}" />
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+          </StackPanel>
+
+          <!-- ADVANCED -->
+          <StackPanel Tag="advanced">
+            <TextBlock Text="Advanced" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="{Binding Sections[6].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <HeaderedContentControl Style="{StaticResource Card}" Header="PATHS">
+              <StackPanel>
+                <ctl:SettingRow Header="Play Games folder" Hint="Leave empty to detect it."
+                                Info="A fallback for unusual installs, so a Google Play Games update can be followed without a new Optima.">
+                  <TextBox Style="{StaticResource RowBox}" Text="{Binding ManualInstallPath, UpdateSourceTrigger=PropertyChanged}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="VDD settings file" Hint="Default C:\VirtualDisplayDriver\vdd_settings.xml">
+                  <TextBox Style="{StaticResource RowBox}" Text="{Binding VddSettingsPath, UpdateSourceTrigger=PropertyChanged}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Custom launch command" Hint="Placeholders {uri} and {package}."
+                                Info="The last way to start the game, tried when the others fail.">
+                  <TextBox Style="{StaticResource RowBox}" Text="{Binding CustomLaunchCommand, UpdateSourceTrigger=PropertyChanged}" />
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+            <HeaderedContentControl Style="{StaticResource Card}" Header="DEBUGGING">
+              <StackPanel>
+                <ctl:SettingRow Header="Log level" Hint="Lowest level written to the log.">
+                  <ComboBox ItemsSource="{Binding LogLevelOptions}" SelectedItem="{Binding LogLevel}" Width="160"
+                            AutomationProperties.Name="Log level" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Developer mode" Hint="Show the Developer page (Alt+D).">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding DeveloperMode}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Mock fps provider" Hint="Synthetic fps data, after a restart.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding UseMockMetricsProvider}" />
+                </ctl:SettingRow>
+              </StackPanel>
+            </HeaderedContentControl>
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
+
+    <!-- Pinned save bar: the one save control on the page. It appears whenever anything
+         differs from the last save, and confirms in place with [ OK ] before fading out. -->
+    <Border x:Name="SaveBar" VerticalAlignment="Bottom" ctl:Flow.Arrive="14"
+            Background="{DynamicResource Brush.Surface}"
+            BorderBrush="{DynamicResource Brush.Accent}" BorderThickness="0,1,0,0"
+            Padding="24,12" Visibility="{Binding SaveBarVisible, Converter={StaticResource BoolToVis}}">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition />
-          <ColumnDefinition Width="12" />
-          <ColumnDefinition />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-
-        <StackPanel>
-          <HeaderedContentControl Style="{StaticResource Section}" Header="APPEARANCE">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition />
-              </Grid.ColumnDefinitions>
-              <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
-              </Grid.RowDefinitions>
-
-              <TextBlock Text="theme" Style="{StaticResource RowLabel}" />
-              <ComboBox Grid.Column="1" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding Theme}"
-                        Width="200" HorizontalAlignment="Left" Margin="0,5" />
-
-              <TextBlock Grid.Row="1" Text="accent" Style="{StaticResource RowLabel}" />
-              <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,5">
-                <ItemsControl ItemsSource="{Binding AccentPresets}" VerticalAlignment="Center">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <StackPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                      <Button Command="{Binding DataContext.SelectAccentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                              CommandParameter="{Binding}" Cursor="Hand"
-                              ToolTip="{Binding Name}" Margin="0,0,8,0">
-                        <Button.Template>
-                          <ControlTemplate TargetType="Button">
-                            <Border x:Name="Swatch" Width="22" Height="22"
-                                    Background="{Binding Hex, Converter={StaticResource HexToBrush}}"
-                                    BorderBrush="{DynamicResource Brush.Glass.Highlight}" BorderThickness="1" />
-                            <ControlTemplate.Triggers>
-                              <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Swatch" Property="BorderBrush" Value="{DynamicResource Brush.Text}" />
-                                <Setter TargetName="Swatch" Property="BorderThickness" Value="2" />
-                              </Trigger>
-                            </ControlTemplate.Triggers>
-                          </ControlTemplate>
-                        </Button.Template>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBox Text="{Binding AccentColor, UpdateSourceTrigger=PropertyChanged}" Width="92"
-                         Margin="4,0,0,0" VerticalAlignment="Center"
-                         ToolTip="Custom accent as #RRGGBB" />
-                <Border Width="22" Height="22" Margin="8,0,0,0" VerticalAlignment="Center"
-                        Background="{Binding AccentColor, Converter={StaticResource HexToBrush}}"
-                        BorderBrush="{DynamicResource Brush.Glass.Border}" BorderThickness="1"
-                        ToolTip="Preview of the accent that will apply on save" />
-              </StackPanel>
-
-              <TextBlock Grid.Row="2" Text="animations" Style="{StaticResource RowLabel}" />
-              <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AnimationOptions}" SelectedItem="{Binding Animations}"
-                        Width="200" HorizontalAlignment="Left" Margin="0,5" />
-
-              <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource Text.Micro}" Margin="0,2,0,4" TextWrapping="Wrap"
-                         Text="Theme and accent apply the moment you save. Animations follow the Windows setting by default (Settings, Accessibility, Visual effects). Off makes everything arrive at once. Nothing is animated while a game is running." />
-            </Grid>
-          </HeaderedContentControl>
-
-          <HeaderedContentControl Style="{StaticResource Section}" Header="DISCORD">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition />
-              </Grid.ColumnDefinitions>
-              <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
-              </Grid.RowDefinitions>
-
-              <TextBlock Text="game activity" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Column="1" IsChecked="{Binding DiscordPresenceEnabled}"
-                        VerticalAlignment="Center" Margin="0,5"
-                        Content="show Critical Ops activity while the game runs" />
-
-              <TextBlock Grid.Row="1" Text="launcher activity" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="1" Grid.Column="1" IsChecked="{Binding DiscordPresenceInLauncher}"
-                        IsEnabled="{Binding DiscordPresenceEnabled}"
-                        VerticalAlignment="Center" Margin="0,5"
-                        Content="also show presence while browsing the launcher" />
-
-              <TextBlock Grid.Row="2" Text="card fields" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,5">
-                <StackPanel Orientation="Horizontal">
-                  <Button Style="{StaticResource SecondaryButton}" Content="choose what is shown…" Padding="12,6"
-                          Command="{Binding ChooseDiscordPresenceCommand}"
-                          IsEnabled="{Binding DiscordPresenceEnabled}" />
-                  <TextBlock Text="{Binding DiscordOptionsSummary}" Style="{StaticResource Text.Label}"
-                             VerticalAlignment="Center" Margin="12,0,0,0" />
-                </StackPanel>
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Pick exactly which facts the card carries: your name, rank, emblem, ranked record, rating and the session timer, plus which line Discord shows as your status. Start from a preset or tick each field yourself. Nothing is sent while the game and the launcher card are off." />
-              </StackPanel>
-
-              <TextBlock Grid.Row="3" Text="application id" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,5">
-                <TextBox Text="{Binding DiscordApplicationId, UpdateSourceTrigger=PropertyChanged}" Width="240" HorizontalAlignment="Left" />
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Prefilled with Optima's own Discord application. Change it only to use your own; clear it to keep presence off. Presence goes to your local Discord client; the only request over the network asks discord.com which artwork the application has." />
-              </StackPanel>
-
-              <TextBlock Grid.Row="4" Text="bot account link" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,5">
-                <StackPanel Orientation="Horizontal">
-                  <Button Style="{StaticResource SecondaryButton}" Content="link account…" Padding="12,6"
-                          Command="{Binding LinkDiscordCommand}" />
-                  <TextBlock Text="{Binding DiscordBotLinkSummary}" Style="{StaticResource Text.Label}"
-                             VerticalAlignment="Center" Margin="12,0,0,0" />
-                </StackPanel>
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Run /link with OptimaBot in Discord, then type the code it sends you into the window this button opens. Optima links the account above, so your own card needs no name and carries a linked badge. To undo it, run the bot's unlink command where the bot is hosted." />
-              </StackPanel>
-
-              <TextBlock Grid.Row="6" Text="tracker webhook" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,5">
-                <WrapPanel>
-                  <TextBox Text="{Binding DiscordBotWebhookUrl, UpdateSourceTrigger=PropertyChanged}" Width="420"
-                           VerticalAlignment="Center" />
-                  <Button Style="{StaticResource SecondaryButton}" Content="send test image" Padding="12,6" Margin="8,0,0,0"
-                          VerticalAlignment="Center"
-                          Command="{Binding TestTrackerCommand}"
-                          ToolTip="Sends one sample report through the bot to the webhook above, so you can see it arrive before a real match does." />
-                </WrapPanel>
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Optional. Paste a Discord channel webhook (channel settings, Integrations, Webhooks) and OptimaBot posts your new matches and rank changes there as a report image. Clear it to link without tracking. The test button sends a sample image through the bot, so the channel and the URL can be checked before a match happens." />
-              </StackPanel>
-            </Grid>
-          </HeaderedContentControl>
-
-          <HeaderedContentControl Style="{StaticResource Section}" Header="OVERLAY AND WATCHDOG">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition />
-              </Grid.ColumnDefinitions>
-              <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
-              </Grid.RowDefinitions>
-
-              <TextBlock Text="fps overlay" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Column="1" IsChecked="{Binding OverlayEnabled}" VerticalAlignment="Center" Margin="0,5"
-                        Content="show fps over the game (Alt+F10 toggles it any time)" />
-
-              <TextBlock Grid.Row="1" Text="overlay corner" Style="{StaticResource RowLabel}" />
-              <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding CornerOptions}" SelectedItem="{Binding OverlayCorner}"
-                        Width="200" HorizontalAlignment="Left" Margin="0,5" />
-
-              <TextBlock Grid.Row="2" Text="overlay opacity" Style="{StaticResource RowLabel}" />
-              <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding OpacityOptions}" SelectedItem="{Binding OverlayOpacity}"
-                        Width="200" HorizontalAlignment="Left" Margin="0,5" />
-
-              <TextBlock Grid.Row="3" Text="network line" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding OverlayShowNetwork}" VerticalAlignment="Center" Margin="0,5"
-                        Content="show ping, jitter and loss below the fps readout" />
-
-              <TextBlock Grid.Row="4" Text="reference host" Style="{StaticResource RowLabel}" />
-              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding NetworkReferenceHost}" Width="200"
-                       HorizontalAlignment="Left" Margin="0,5"
-                       ToolTip="pinged for link quality when no game endpoint answers ICMP" />
-
-              <TextBlock Grid.Row="5" Text="crash relaunch" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Row="5" Grid.Column="1" Margin="0,5">
-                <CheckBox IsChecked="{Binding AutoRelaunchOnCrash}" VerticalAlignment="Center"
-                          Content="relaunch once if the game dies within five minutes" />
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="25,3,0,0" TextWrapping="Wrap"
-                           Text="A normal quit is never relaunched: only a game process that dies on its own early in a session triggers one automatic relaunch of the same profile. Off by default." />
-              </StackPanel>
-
-              <TextBlock Grid.Row="6" Text="watchdog auto-attach" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Row="6" Grid.Column="1" Margin="0,5">
-                <CheckBox IsChecked="{Binding EnableWatchMode}" VerticalAlignment="Center"
-                          Content="apply the profile when the game starts outside Optima" />
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="25,3,0,0" TextWrapping="Wrap"
-                           Text="Applies the full profile including the virtual display, so the screen can visibly reconfigure when the game is detected. Everything is restored when the game exits." />
-              </StackPanel>
-            </Grid>
-          </HeaderedContentControl>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <TextBlock Text="{Binding SaveBarMark}" Style="{StaticResource Text.Micro}" FontSize="12"
+                     Foreground="{Binding SaveBarMark, Converter={StaticResource SaveMarkBrush}}"
+                     VerticalAlignment="Center" Margin="0,0,8,0" />
+          <TextBlock Text="{Binding SaveBarText}" Style="{StaticResource Text.Micro}" FontSize="12"
+                     Foreground="{Binding SaveBarMark, Converter={StaticResource SaveMarkBrush}}"
+                     VerticalAlignment="Center" />
         </StackPanel>
-
-        <StackPanel Grid.Column="2">
-          <HeaderedContentControl Style="{StaticResource Section}" Header="PLAYER">
-            <StackPanel>
-              <TextBlock Text="In-game name or account ID" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox Text="{Binding PlayerQuery, UpdateSourceTrigger=PropertyChanged}" MinHeight="38">
-                  <TextBox.InputBindings>
-                    <KeyBinding Key="Return" Command="{Binding TrackCommand}" />
-                  </TextBox.InputBindings>
-                </TextBox>
-                <TextBlock Text="e.g. Kestrel or 48211907" Style="{StaticResource Placeholder}" />
-                <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Content="Track" Padding="22,8" Margin="10,0,0,0"
-                        Command="{Binding TrackCommand}" />
-              </Grid>
-              <TextBlock Text="{Binding TrackMessage}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.Warn}"
-                         TextWrapping="Wrap" Margin="0,8,0,0"
-                         Visibility="{Binding TrackMessage, Converter={StaticResource EmptyToCollapsed}}" />
-              <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TrackedCard}" Margin="0,14,0,0"
-                              Visibility="{Binding HasTrackedPlayer, Converter={StaticResource BoolToVis}}" />
-              <TextBlock Text="Saved in Optima" Style="{StaticResource Text.Label}" Margin="0,16,0,8" />
-              <ItemsControl ItemsSource="{Binding SavedPlayers}" ItemTemplate="{StaticResource SavedChip}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <WrapPanel />
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-              </ItemsControl>
-              <TextBlock Text="Nobody saved yet. Track a player, then save them to Optima." Style="{StaticResource NoSavedPlayers}" />
-              <TextBlock Style="{StaticResource Text.Micro}" Margin="0,10,0,0" TextWrapping="Wrap"
-                         Text="Stats come from Critical Force's public profile API. An ID is exact and survives a rename; a name is looked up as typed." />
-            </StackPanel>
-          </HeaderedContentControl>
-
-          <HeaderedContentControl Style="{StaticResource Section}" Header="GENERAL">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition />
-              </Grid.ColumnDefinitions>
-              <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
-              </Grid.RowDefinitions>
-
-              <TextBlock Text="display provider" Style="{StaticResource RowLabel}" />
-              <ComboBox Grid.Column="1" ItemsSource="{Binding ProviderOptions}" SelectedItem="{Binding Provider}"
-                        Width="200" HorizontalAlignment="Left" Margin="0,5" />
-
-              <TextBlock Grid.Row="1" Text="frametime capture" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="1" Grid.Column="1" IsChecked="{Binding EnableFrametimeCapture}" VerticalAlignment="Center" Margin="0,5"
-                        Content="collect FPS via event tracing (elevated helper)" />
-
-              <TextBlock Grid.Row="2" Text="minimum log level" Style="{StaticResource RowLabel}" />
-              <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding LogLevelOptions}" SelectedItem="{Binding LogLevel}"
-                        Width="200" HorizontalAlignment="Left" Margin="0,5" />
-
-              <TextBlock Grid.Row="3" Text="developer mode" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding DeveloperMode}" VerticalAlignment="Center" Margin="0,5"
-                        Content="show the Developer page (Alt+D)" />
-
-              <TextBlock Grid.Row="4" Text="keep in tray" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding KeepInTrayOnClose}" VerticalAlignment="Center" Margin="0,5"
-                        Content="closing the window keeps Optima in the tray" />
-
-              <TextBlock Grid.Row="5" Text="start with Windows" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="5" Grid.Column="1" IsChecked="{Binding StartWithWindows}" VerticalAlignment="Center" Margin="0,5"
-                        Content="launch the Watchdog minimized to the tray at sign-in" />
-
-              <TextBlock Grid.Row="6" Text="updates" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="6" Grid.Column="1" IsChecked="{Binding CheckForUpdatesAtStart}" VerticalAlignment="Center" Margin="0,5"
-                        Content="check for a newer Optima at every start (one request to GitHub)" />
-
-              <TextBlock Grid.Row="7" Text="mock fps provider" Style="{StaticResource RowLabel}" />
-              <CheckBox Grid.Row="7" Grid.Column="1" IsChecked="{Binding UseMockMetricsProvider}" VerticalAlignment="Center" Margin="0,5"
-                        Content="developer: synthetic fps data (applies after restart)" />
-
-            </Grid>
-          </HeaderedContentControl>
-
-          <HeaderedContentControl Style="{StaticResource Section}" Header="PATH OVERRIDES">
-            <StackPanel>
-              <TextBlock Style="{StaticResource Text.Micro}" Margin="0,0,0,8" TextWrapping="Wrap"
-                         Text="Leave empty for automatic detection. Fallbacks for unusual installations, so a Google Play Games update can be accommodated without a new build." />
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="150" />
-                  <ColumnDefinition />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                  <RowDefinition /><RowDefinition /><RowDefinition />
-                </Grid.RowDefinitions>
-
-                <TextBlock Text="play games folder" Style="{StaticResource RowLabel}" />
-                <TextBox Grid.Column="1" Text="{Binding ManualInstallPath}" Margin="0,5" />
-
-                <TextBlock Grid.Row="1" Text="vdd settings xml" Style="{StaticResource RowLabel}" />
-                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding VddSettingsPath}" Margin="0,5"
-                         ToolTip="default: C:\VirtualDisplayDriver\vdd_settings.xml" />
-
-                <TextBlock Grid.Row="2" Text="custom launch command" Style="{StaticResource RowLabel}" />
-                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CustomLaunchCommand}" Margin="0,5"
-                         ToolTip="last launch strategy. placeholders: {uri} and {package}" />
-
-              </Grid>
-            </StackPanel>
-          </HeaderedContentControl>
+        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                    Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}">
+          <Button Style="{StaticResource SecondaryButton}" Padding="16,0" MinHeight="40" Content="Undo"
+                  Command="{Binding UndoCommand}" Margin="0,0,10,0" />
+          <Button Style="{StaticResource PrimaryButton}" Padding="26,0" MinHeight="40" Content="Save settings"
+                  Command="{Binding SaveCommand}" />
         </StackPanel>
       </Grid>
-
-    </StackPanel>
-  </ScrollViewer>
-
-  <!-- Pinned save bar: the one save control on the page. It appears whenever anything
-       differs from the last save, and confirms in place with [ OK ] before fading out. -->
-  <Border x:Name="SaveBar" VerticalAlignment="Bottom" ctl:Flow.Arrive="14"
-          Background="{DynamicResource Brush.Surface}"
-          BorderBrush="{DynamicResource Brush.Accent}" BorderThickness="0,1,0,0"
-          Padding="22,10" Visibility="{Binding SaveBarVisible, Converter={StaticResource BoolToVis}}">
-    <Grid>
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition />
-        <ColumnDefinition Width="Auto" />
-      </Grid.ColumnDefinitions>
-      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-        <TextBlock Text="{Binding SaveBarMark}" FontSize="{StaticResource Type.Label}"
-                   Foreground="{Binding SaveBarMark, Converter={StaticResource SaveMarkBrush}}"
-                   VerticalAlignment="Center" Margin="0,0,10,0" />
-        <TextBlock Text="{Binding SaveBarText}" Style="{StaticResource Text.Label}"
-                   VerticalAlignment="Center" />
-      </StackPanel>
-      <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Padding="28,10" MinWidth="200" MinHeight="40"
-              Content="Save settings" Command="{Binding SaveCommand}"
-              Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVis}}" />
-    </Grid>
-  </Border>
+    </Border>
   </Grid>
 </UserControl>
