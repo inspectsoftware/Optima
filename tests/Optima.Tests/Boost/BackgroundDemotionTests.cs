@@ -169,6 +169,9 @@ public sealed class BackgroundDemotionTests : IDisposable
             child.Refresh();
             Assert.Equal(ProcessPriorityClass.BelowNormal, child.PriorityClass);
             Assert.Equal(ProcessPriorityLevel.AboveNormal, snapshot.OriginalPriority);
+            // What tells this process apart from a later one given the same id.
+            Assert.NotNull(snapshot.StartTime);
+            Assert.Equal(ProcessQuery.GetStartTime(child.SafeHandle), snapshot.StartTime);
 
             await new WindowsProcessOptimizer(NullLogger<WindowsProcessOptimizer>.Instance).RestoreAsync(snapshot);
             child.Refresh();

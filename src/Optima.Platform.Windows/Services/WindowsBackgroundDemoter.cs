@@ -63,6 +63,7 @@ public sealed class WindowsBackgroundDemoter : IBackgroundDemoter
                             OriginalPriority = WindowsProcessOptimizer.FromPriorityClass(original),
                             OriginalAffinityMask = 0,
                             PowerThrottlingWasEnabled = ProcessNative.IsPowerThrottlingEnabled(process.Handle),
+                            StartTime = ProcessQuery.GetStartTime(process.SafeHandle),
                         };
                         process.PriorityClass = ProcessPriorityClass.BelowNormal;
                         // Recorded before the second step: a priority lowered here has to be put

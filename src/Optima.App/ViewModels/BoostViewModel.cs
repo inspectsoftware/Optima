@@ -797,6 +797,13 @@ public sealed partial class BoostViewModel : ObservableObject
                 if (!_cpu.TryGetValue(process.ProcessId, out var entry))
                 {
                     entry = (ProcessQuery.Open(process.ProcessId), null);
+                    // The id may be another process's by now: the page lets go of its handles when it
+                    // goes off screen, and the service lists a process until the game leaves.
+                    if (entry.Handle is { } opened && process.StartTime is { } started && ProcessQuery.GetStartTime(opened) != started)
+                    {
+                        opened.Dispose();
+                        entry = (null, null);
+                    }
                 }
                 if (entry.Handle is { } ended && ProcessQuery.HasExited(ended))
                 {
