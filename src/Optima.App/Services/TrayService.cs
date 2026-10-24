@@ -41,6 +41,7 @@ public sealed class TrayService : IDisposable
     private readonly SettingsService _settings;
     private readonly AppShutdown _shutdown;
     private readonly MenuItem _watchModeItem;
+    private readonly Task _windowShown;
     private HwndSource? _source;
     private LaunchOrchestrator? _orchestrator;
     private bool _keepInTrayOnClose;
@@ -50,11 +51,13 @@ public sealed class TrayService : IDisposable
 
     public event Action<string>? NavigateRequested;
 
-    public TrayService(Window window, SettingsService settings, AppShutdown shutdown)
+    /// <param name="windowShown">Done once startup has put the window on screen; until then the tray never shows it.</param>
+    public TrayService(Window window, SettingsService settings, AppShutdown shutdown, Task windowShown)
     {
         _window = window;
         _settings = settings;
         _shutdown = shutdown;
+        _windowShown = windowShown;
         _handle = new WindowInteropHelper(window).EnsureHandle();
         _source = HwndSource.FromHwnd(_handle);
         _source?.AddHook(OnWindowMessage);
@@ -148,6 +151,13 @@ public sealed class TrayService : IDisposable
 
     private void RestoreWindow()
     {
+        // The icon is up while the splash still holds the window back. Showing the window is the
+        // splash handover's job until it is done, and it brings the window up anyway: shown from
+        // here, the window stood beside the card.
+        if (!_windowShown.IsCompleted)
+        {
+            return;
+        }
         _window.Show();
         if (_window.WindowState == WindowState.Minimized)
         {

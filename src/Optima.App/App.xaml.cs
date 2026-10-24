@@ -213,7 +213,7 @@ public partial class App : Application
         // An update ends with the setup replacing this process: out without the exit questions.
         _services.GetRequiredService<UpdateViewModel>().ExitForUpdate = () => _shutdown.ShutdownNow(0);
 
-        _tray = new TrayService(window, _services.GetRequiredService<SettingsService>(), _shutdown);
+        _tray = new TrayService(window, _services.GetRequiredService<SettingsService>(), _shutdown, _windowShown.Task);
         var orchestrator = _orchestrator = _services.GetRequiredService<LaunchOrchestrator>();
         _tray.AttachOrchestrator(orchestrator);
         orchestrator.ProgressChanged += (_, progress) => Dispatcher.BeginInvoke(() =>
@@ -736,7 +736,9 @@ public partial class App : Application
                 _ = dispatcher.BeginInvoke(() =>
                 {
                     var window = MainWindow;
-                    if (window is null)
+                    // Until startup has shown the window, showing it is the splash handover's job,
+                    // and the handover brings it up anyway: shown from here, it stood beside the card.
+                    if (window is null || !_windowShown.Task.IsCompleted)
                     {
                         return;
                     }
