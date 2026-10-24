@@ -741,6 +741,33 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task Attach_AfterThePlayerSaidNoThisRun_DoesNotAskAgainOverTheGame()
+    {
+        // The No came earlier in this run, at PLAY or at an earlier game watch mode found.
+        var elevation = new FakeElevationBroker { LastStartFailure = ElevationStartFailure.Declined };
+        var orchestrator = CreateOrchestrator(elevation: elevation);
+
+        var first = await orchestrator.AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false);
+        var later = await orchestrator.AttachToRunningGameAsync(CompetitiveProfile, 4243, captureAllowed: false);
+
+        Assert.True(first.Success);
+        Assert.True(later.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.DoesNotContain("enable", _virtualDisplay.Log);
+    }
+
+    [Fact]
+    public async Task Play_AfterANoThisRun_MayStillAsk()
+    {
+        var elevation = new FakeElevationBroker { LastStartFailure = ElevationStartFailure.Declined, ConnectOnPrompt = true };
+
+        var result = await CreateOrchestrator(elevation: elevation).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, elevation.Prompts);
+    }
+
+    [Fact]
     public async Task Attach_TheHelperIsAlreadyRunning_TheDisplayComesOn()
     {
         var elevation = new FakeElevationBroker { IsConnected = true };
