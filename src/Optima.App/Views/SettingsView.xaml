@@ -43,17 +43,22 @@
                 <StackPanel x:Name="Text" VerticalAlignment="Center" Margin="0,0,24,0">
                   <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{TemplateBinding Header}" Style="{StaticResource Text.Base}" FontSize="14" />
-                    <!-- The longer story, for whoever wants it, without putting it on the page. -->
-                    <Border x:Name="InfoGlyph" Background="Transparent" Margin="7,0,0,0" VerticalAlignment="Center"
-                            Tag="{TemplateBinding Info}" ToolTipService.InitialShowDelay="150" ToolTipService.ShowDuration="60000">
+                    <!-- The longer story, for whoever wants it, without putting it on the page. A Label so it
+                         is a tab stop that opens the tip on keyboard focus, and so a screen reader has an
+                         element to read the text from: the old page said all of it inline. -->
+                    <Label x:Name="InfoGlyph" Background="Transparent" Padding="0" Margin="7,0,0,0" VerticalAlignment="Center"
+                           Focusable="True" IsTabStop="True" FocusVisualStyle="{StaticResource Focus.Ring}"
+                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource TemplatedParent}, StringFormat=About {0}}"
+                           AutomationProperties.HelpText="{TemplateBinding Info}"
+                           Tag="{TemplateBinding Info}" ToolTipService.InitialShowDelay="150" ToolTipService.ShowDuration="60000">
                       <ctl:Icon Symbol="{StaticResource Icon.Info}" Size="14" Foreground="{DynamicResource Brush.TextMuted}" />
-                      <Border.ToolTip>
+                      <Label.ToolTip>
                         <ToolTip>
                           <TextBlock Text="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ToolTip}}"
                                      TextWrapping="Wrap" MaxWidth="360" />
                         </ToolTip>
-                      </Border.ToolTip>
-                    </Border>
+                      </Label.ToolTip>
+                    </Label>
                   </StackPanel>
                   <TextBlock x:Name="Hint" Text="{TemplateBinding Hint}" Style="{StaticResource Text.Base}" FontSize="12"
                              Foreground="{DynamicResource Brush.TextMuted}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0" />
