@@ -385,6 +385,12 @@ public sealed partial class SettingsViewModel : ObservableObject
             TrackedName = lookup.Profile!.Name;
             TrackedInitial = TrackedName.Length > 0 ? TrackedName[..1].ToUpperInvariant() : string.Empty;
             TrackedSummary = TrackedPlayerQuery.Summary(lookup.Profile);
+            // As Track says it: an id the API answers with an empty, default-named account is probably wrong.
+            if (CopsApiClient.LooksLikePlaceholderProfile(lookup.Profile))
+            {
+                TrackedStatus = lookup.Detail;
+                TrackedStatusOk = false;
+            }
         }
         else if (lookup.Status == CopsLookupStatus.Error)
         {
