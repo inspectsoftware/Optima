@@ -43,6 +43,7 @@ public sealed class GameExtrasService : IDisposable
     private CoreParkingSnapshot? _parking;
     private bool _coresAlreadyAwake;
     private bool _started;
+    private volatile bool _disposed;
 
     public GameExtrasService(
         IGameExtras extras,
@@ -165,6 +166,12 @@ public sealed class GameExtrasService : IDisposable
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            // Optima is closing and has already put everything back. Written now, a preference
+            // would have no ledger and stay in Windows for good.
+            if (_disposed)
+            {
+                return;
+            }
             var settings = _settings();
             var coresEnabled = settings?.BoostKeepCoresAwake ?? false;
             var gpuEnabled = settings?.BoostGpuHighPerformance ?? false;
@@ -274,29 +281,45 @@ public sealed class GameExtrasService : IDisposable
         {
             _presence.PresenceChanged -= OnPresenceChanged;
         }
-        // Boost does not outlive Optima, and neither does what it asked of Windows.
+        // A sync caught between saving the ledger and writing the preference would otherwise have
+        // the ledger taken from under it and then write a preference nothing ever removes, and the
+        // choice it replaced would be lost. So this waits for that sync, briefly, and no sync
+        // after it writes anything.
+        _disposed = true;
+        var held = _gate.Wait(TimeSpan.FromSeconds(2));
         try
         {
-            RemoveWrittenGpuPreference();
-        }
-        catch (Exception ex)
-        {
-            // Stays in the ledger; the next start takes it away.
-            _logger.LogDebug(ex, "The graphics preference could not be removed on exit");
-        }
-        if (_parking is not null)
-        {
+            // Boost does not outlive Optima, and neither does what it asked of Windows.
             try
             {
-                _extras.RestoreCoreParking(_parking);
-                _store.Delete(_ledgerPath);
+                RemoveWrittenGpuPreference();
             }
             catch (Exception ex)
             {
-                // Stays in the ledger; the next start puts it back.
-                _logger.LogDebug(ex, "Core parking could not be restored on exit");
+                // Stays in the ledger; the next start takes it away.
+                _logger.LogDebug(ex, "The graphics preference could not be removed on exit");
             }
-            _parking = null;
+            if (_parking is not null)
+            {
+                try
+                {
+                    _extras.RestoreCoreParking(_parking);
+                    _store.Delete(_ledgerPath);
+                }
+                catch (Exception ex)
+                {
+                    // Stays in the ledger; the next start puts it back.
+                    _logger.LogDebug(ex, "Core parking could not be restored on exit");
+                }
+                _parking = null;
+            }
+        }
+        finally
+        {
+            if (held)
+            {
+                _gate.Release();
+            }
         }
     }
 }

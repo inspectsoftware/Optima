@@ -38,8 +38,12 @@ public sealed class GameExtrasTests : IDisposable
         public string? GetGpuPreference(string executablePath)
             => HighPerformance.Contains(executablePath) ? "2" : Other.GetValueOrDefault(executablePath);
 
+        /// <summary>Runs before a preference is written, with the preference about to be written.</summary>
+        public Action<string?>? BeforeSet { get; set; }
+
         public void SetGpuPreference(string executablePath, string? preference)
         {
+            BeforeSet?.Invoke(preference);
             HighPerformance.Remove(executablePath);
             Other.Remove(executablePath);
             if (preference == "2")
@@ -298,6 +302,36 @@ public sealed class GameExtrasTests : IDisposable
         Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
         service.Dispose();
         Assert.Equal("1", _extras.GetGpuPreference(_extras.PathOfGame!));
+    }
+
+    [Fact]
+    public async Task ClosingOptimaWhileASyncWritesThePreference_StillPutsBackThePlayersChoice()
+    {
+        _extras.Other[_extras.PathOfGame!] = "1";
+        var service = Create();
+        _presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        using var writing = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        _extras.BeforeSet = preference =>
+        {
+            if (preference == "2")
+            {
+                writing.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        // The sync has saved the ledger and is about to write high performance when Optima closes.
+        var sync = Task.Run(() => service.SyncAsync());
+        Assert.True(writing.Wait(TimeSpan.FromSeconds(10)));
+        var exit = Task.Run(service.Dispose);
+        await Task.WhenAny(exit, Task.Delay(300));
+        release.Set();
+        await sync;
+        await exit;
+
+        Assert.Equal("1", _extras.GetGpuPreference(_extras.PathOfGame!));
+        Assert.False(File.Exists(Path.Combine(_folder, "boost-gpu.json")));
     }
 
     [Fact]
