@@ -152,6 +152,9 @@ public sealed class BoostDial : FrameworkElement
     private bool _hooked;
     // Whether the still Off picture has been drawn since it last changed.
     private bool _drewStill;
+    // The focus ring is for focus that came from the keyboard, as WPF's own focus visual is. A
+    // click focuses the dial as well, and the ring then stayed round it until focus moved on.
+    private bool _focusRing;
 
     // The lettering is laid out once per label and drawn every frame; rebuilt when the window lands on another DPI.
     private double _textDpi;
@@ -326,7 +329,9 @@ public sealed class BoostDial : FrameworkElement
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
+        _focusRing = false;
         Focus();
+        InvalidateVisual();
         Toggle();
         e.Handled = true;
     }
@@ -334,6 +339,11 @@ public sealed class BoostDial : FrameworkElement
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (!_focusRing)
+        {
+            _focusRing = true;
+            InvalidateVisual();
+        }
         if (e.Key is Key.Space or Key.Enter)
         {
             // One press is one flip. Held down, the key repeats about thirty times a second, and
@@ -361,6 +371,7 @@ public sealed class BoostDial : FrameworkElement
     protected override void OnIsKeyboardFocusedChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnIsKeyboardFocusedChanged(e);
+        _focusRing = IsKeyboardFocused && InputManager.Current.MostRecentInputDevice is KeyboardDevice;
         InvalidateVisual();
     }
 
@@ -423,7 +434,7 @@ public sealed class BoostDial : FrameworkElement
         DrawNameplate(dc, frame);
         DrawEmbers(dc, frame);
 
-        if (IsKeyboardFocused)
+        if (IsKeyboardFocused && _focusRing)
         {
             // The ring sits on the dark rim between the backplate and the plates in either theme,
             // so it is always light: the light theme's text colour vanished against it.
