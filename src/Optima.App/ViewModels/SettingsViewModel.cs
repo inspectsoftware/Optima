@@ -387,7 +387,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 _ = FillTrackedSummaryAsync(identity);
             }
         }
-        IsTrackedSaved = SavedPlayers.Any(a => a.IsActive);
+        IsTrackedSaved = SavedPlayers.Any(a => a.Holds(_trackedIgn, _trackedAccountId));
     }
 
     private void ShowTracked(string ign, long? accountId, CopsPlayerProfile? profile, string status, bool ok)
@@ -401,7 +401,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         TrackedSummary = profile is null ? string.Empty : TrackedPlayerQuery.Summary(profile);
         TrackedStatus = status;
         TrackedStatusOk = ok;
-        IsTrackedSaved = SavedPlayers.Any(a => a.Matches(ign, accountId));
+        // Saved only once the entry holds the whole identity: one saved while the API was down, with
+        // just the name or the id, keeps Save on so that saving again completes it.
+        IsTrackedSaved = SavedPlayers.Any(a => a.Holds(ign, accountId));
     }
 
     /// <summary>Looks the stored player up for the card's level and rank line. Quietly: the card works without it.</summary>

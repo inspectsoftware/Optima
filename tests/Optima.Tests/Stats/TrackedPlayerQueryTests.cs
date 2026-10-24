@@ -147,6 +147,27 @@ public sealed class TrackedPlayerQueryTests
     }
 
     [Theory]
+    [InlineData("Kestrel", 48211907L, "Kestrel", 48211907L, true)]
+    [InlineData("", 48211907L, "Kestrel", 48211907L, false)]
+    [InlineData("osprey", null, "Osprey", 777L, false)]
+    [InlineData("OldName", 7L, "NewName", 7L, false)]
+    [InlineData("", 48211907L, "", 48211907L, true)]
+    [InlineData("osprey", null, "osprey", null, true)]
+    [InlineData("frosty", 7L, "frosty", 8L, false)]
+    public void ASavedEntryHoldsThePlayerOnlyWithTheWholeIdentity(string ign, long? id, string trackedIgn, long? trackedId, bool expected)
+        => Assert.Equal(expected, new PlayerAccount { Ign = ign, AccountId = id }.Holds(trackedIgn, trackedId));
+
+    [Fact]
+    public void SavingTheFoundPlayerCompletesAnEntrySavedWhileTheApiWasDown()
+    {
+        var saved = new List<PlayerAccount> { new() { Key = "k", AccountId = 48211907 } };
+
+        var updated = Assert.Single(TrackedPlayerQuery.WithSaved(saved, "Kestrel", 48211907));
+
+        Assert.Equal(("k", "Kestrel", (long?)48211907), (updated.Key, updated.Ign, updated.AccountId));
+    }
+
+    [Theory]
     [InlineData("frosty", 7L, "FROSTY", 7L, true)]
     [InlineData("OldName", 7L, "NewName", 7L, true)]
     [InlineData("frosty", 7L, "frosty", 8L, false)]
