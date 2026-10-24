@@ -254,10 +254,9 @@ public sealed class SessionStatsRefresher
         {
             ct.ThrowIfCancellationRequested();
             profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, ct).ConfigureAwait(false);
-            var newest = DeltaFor(summaries, 0, profile?.Snapshot);
-            // Another player's reading never matches the newest session, however long the API is given.
-            var pending = profile is null
-                || (!OtherPlayer(summaries[0].StatsBaseline, profile.Snapshot) && (newest is null || newest.IsZero));
+            // A newest session with no start snapshot, or another player's reading, never moves,
+            // however long the API is given.
+            var pending = profile is null || NewestAwaitsTheApi(summaries, profile.Snapshot);
             if (!pending || attempt == tries)
             {
                 break;

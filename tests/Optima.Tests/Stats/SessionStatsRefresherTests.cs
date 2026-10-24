@@ -282,6 +282,20 @@ public sealed class SessionStatsRefresherTests : IDisposable
     }
 
     [Fact]
+    public async Task TheMatchesRefreshDoesNotWaitForANewestSessionWithoutASnapshot()
+    {
+        await IdentifyPlayerAsync();
+        SeedSession(baseline: null, started: DateTimeOffset.Now.AddMinutes(-10));
+        SeedSession(Baseline(100), DateTimeOffset.Now.AddMinutes(-60));
+        _profile = ProfileAfter(new CopsModeStats(140, 80, 20, 10, 5));
+
+        var result = await CreateRefresher().RefreshRecentMatchesAsync(attempts: 3, retryDelay: TimeSpan.FromSeconds(5));
+
+        Assert.Single(_queries);
+        Assert.Contains("no snapshot", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TheMatchesRefreshDoesNotSayPressAgainForANewestSessionOfAnotherPlayer()
     {
         // Both sessions were recorded for player 1, and the older one moved by a ranked win;
