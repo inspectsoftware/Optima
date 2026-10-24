@@ -727,7 +727,7 @@ public sealed partial class BoostViewModel : ObservableObject
 
     /// <summary>
     /// Starts and stops the live readout with the page: the view calls this as it comes on screen and
-    /// as it goes (another page, the tray). The samples ride on the hardware monitor's tick, which
+    /// as it goes (another page, the tray, a minimized window). The samples ride on the hardware monitor's tick, which
     /// itself only runs while the window is visible and not minimized, so nothing is read for a page
     /// nobody can see.
     /// </summary>
