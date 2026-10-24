@@ -691,7 +691,8 @@
               </DockPanel>
               <Border Style="{StaticResource Boost.Well}">
                 <DockPanel>
-                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding CoresCellsText}" Style="{StaticResource Text.Micro}" FontSize="10" Margin="0,6,0,0" />
+                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding CoresCellsText}" Style="{StaticResource Text.Micro}" FontSize="10" Margin="0,6,0,0"
+                             TextWrapping="Wrap" TextTrimming="None" />
                   <ItemsControl ItemsSource="{Binding CoreCells}" Focusable="False">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate>
@@ -730,7 +731,9 @@
                 <Label DockPanel.Dock="Right" Style="{StaticResource Boost.Pill}" Content="{Binding GpuStateText}" />
                 <TextBlock Text="Graphics adapter" Style="{StaticResource Boost.Name}" />
               </DockPanel>
-              <Border Style="{StaticResource Boost.Well}">
+              <!-- Grows past the other wells' height: a laptop with two graphics adapters and a virtual
+                   display already lists three, and the preference line under them must not be cut off. -->
+              <Border Style="{StaticResource Boost.Well}" Height="Auto" MinHeight="104">
                 <StackPanel VerticalAlignment="Center">
                   <ItemsControl ItemsSource="{Binding AdapterRows}" Focusable="False">
                     <ItemsControl.ItemTemplate>
