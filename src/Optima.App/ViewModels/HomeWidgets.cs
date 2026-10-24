@@ -23,7 +23,6 @@ public static class HomeWidgetCatalog
         new("performance", "Performance", "HOME"),
         new("launch", "Launch", "HOME"),
         new("player", "Player", "HOME"),
-        new("friends", "Tracked players", "HOME"),
         new("sessions", "Recent sessions", "SESSIONS"),
         new("trends", "Profile trends", "SESSIONS"),
         new("display", "Displays", "DISPLAY"),
@@ -34,7 +33,7 @@ public static class HomeWidgetCatalog
 
     /// <summary>What HOME has always shown, in force until the player edits the layout once.</summary>
     public static IReadOnlyList<string> Default { get; } =
-        ["status", "system", "performance", "launch", "player", "friends"];
+        ["status", "system", "performance", "launch", "player"];
 
     public static HomeWidgetDefinition? Find(string id)
         => All.FirstOrDefault(definition => string.Equals(definition.Id, id, StringComparison.OrdinalIgnoreCase));

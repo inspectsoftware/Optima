@@ -16,7 +16,6 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly IPerformanceMonitor _monitor;
     private readonly CopsNewsService _news;
     private readonly SettingsService _settings;
-    private readonly Services.PlayerSwitcherService _players;
 
     public HomeViewModel(
         StatusViewModel status,
@@ -31,7 +30,6 @@ public sealed partial class HomeViewModel : ObservableObject
         IPerformanceMonitor monitor,
         CopsNewsService news,
         SettingsService settings,
-        Services.PlayerSwitcherService players,
         UpdateViewModel updates)
     {
         Updates = updates;
@@ -47,16 +45,10 @@ public sealed partial class HomeViewModel : ObservableObject
         _monitor = monitor;
         _news = news;
         _settings = settings;
-        _players = players;
         _monitor.MetricsUpdated += OnMetrics;
-        // The friends strip must follow Settings edits immediately, not only on next visit.
         _settings.SettingsChanged += OnSettingsChanged;
         BuildWidgetCatalog();
     }
-
-    /// <summary>Signature of the tracked list the strip is built from; a save that does not touch it changes nothing.</summary>
-    private string _friendsSignature = string.Empty;
-    private bool _friendsRefreshFailed;
 
     // ---------------------------------------------------------------- HOME widget board
 
@@ -179,7 +171,10 @@ public sealed partial class HomeViewModel : ObservableObject
         }
     }
 
-    /// <summary>The saved layout, or the default one for a profile that has never edited it.</summary>
+    /// <summary>
+    /// The saved layout, or the default one for a profile that has never edited it. Ids the catalog no
+    /// longer has, such as the old tracked-players strip ("friends"), are dropped here.
+    /// </summary>
     private IReadOnlyList<string> SavedLayout(AppSettings settings)
         => settings.HomeWidgets is null
             ? HomeWidgetCatalog.Default
@@ -282,20 +277,7 @@ public sealed partial class HomeViewModel : ObservableObject
         {
             ApplyWidgetLayout(layout);
         }
-
-        // Every toggle in the app saves settings, and this refresh costs a profile lookup per tracked
-        // player, so it only runs for a change it can actually show — or to retry a failed attempt.
-        var signature = FriendsSignature(settings);
-        if (!_friendsRefreshFailed && string.Equals(signature, _friendsSignature, StringComparison.Ordinal))
-        {
-            return;
-        }
-        _friendsSignature = signature;
-        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => _ = RefreshFriendsCommand.ExecuteAsync(null));
     }
-
-    private static string FriendsSignature(AppSettings settings)
-        => string.Join('\n', settings.TrackedPlayers.Select(t => t.Key + "|" + t.Ign + "|" + t.AccountId));
 
     public StatusViewModel Status { get; }
     public PlayViewModel Play { get; }
@@ -309,35 +291,6 @@ public sealed partial class HomeViewModel : ObservableObject
     public CompViewModel Comp { get; }
     public NewsViewModel NewsPage { get; }
     public ChecksViewModel Checks { get; }
-
-    /// <summary>Friends and clanmates tracked alongside the main account.</summary>
-    public ObservableCollection<Optima.Core.Stats.TrackedPlayerRow> Friends { get; } = [];
-
-    [ObservableProperty] private string _friendsStatus = string.Empty;
-    [ObservableProperty] private bool _hasFriends;
-
-    [RelayCommand]
-    private async Task RefreshFriendsAsync()
-    {
-        try
-        {
-            var rows = await _players.GetTrackedRowsAsync();
-            Friends.Clear();
-            foreach (var row in rows)
-            {
-                Friends.Add(row);
-            }
-            _friendsRefreshFailed = false;
-            HasFriends = Friends.Count > 0;
-            FriendsStatus = Friends.Count == 0 ? "Add friends or clanmates from the PLAYER panel in Settings." : string.Empty;
-        }
-        catch (Exception)
-        {
-            // Remembered so the next settings save retries instead of leaving the strip empty.
-            _friendsRefreshFailed = true;
-            FriendsStatus = "Could not reach the stats API.";
-        }
-    }
 
     [ObservableProperty] private string _gpuText = "---";
     [ObservableProperty] private string _cpuText = "---";
@@ -362,14 +315,11 @@ public sealed partial class HomeViewModel : ObservableObject
     {
         var settings = await _settings.GetSettingsAsync(ct);
         ApplyWidgetLayout(SavedLayout(settings));
-        // The strip below is loaded from this list, so the first settings save has nothing to redo.
-        _friendsSignature = FriendsSignature(settings);
 
         _ = Task.Run(() => CheckGameVersionAsync(ct), CancellationToken.None);
         // Every start, tray starts included: this is the one place Optima asks whether it is current.
         _ = Updates.CheckAtStartAsync();
         _ = Player.InitializeAsync(ct);
-        _ = RefreshFriendsCommand.ExecuteAsync(null);
 
         var inventory = await _systemInfo.GetInventoryAsync(ct);
         var gpu = inventory.Gpus

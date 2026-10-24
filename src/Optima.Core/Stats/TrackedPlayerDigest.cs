@@ -1,28 +1,5 @@
 namespace Optima.Core.Stats;
 
-using Optima.Core.Models;
-
-/// <summary>One row of the HOME friends strip.</summary>
-public sealed record TrackedPlayerRow(
-    string DisplayName,
-    string Ign,
-    long? AccountId,
-    int Level,
-    long RankedWins,
-    long RankedLosses,
-    bool IsMain,
-    bool NotFound,
-    bool IsError,
-    string? ClanName = null,
-    string? ClanTag = null)
-{
-    public string RecordText => NotFound ? "not found" : $"{RankedWins}W-{RankedLosses}L";
-    public string LevelText => Level > 0 ? $"lv {Level}" : "";
-    public string ClanText => ClanName is null ? "" : ClanTag is null ? ClanName : $"[{ClanTag}] {ClanName}";
-    public double WinRate => RankedWins + RankedLosses > 0 ? (double)RankedWins / (RankedWins + RankedLosses) : 0;
-    public string WinRateText => RankedWins + RankedLosses == 0 ? "-" : $"{WinRate:P0}";
-}
-
 /// <summary>Aggregates for the SESSIONS weekly digest.</summary>
 public sealed record WeeklyDigest(
     DateTimeOffset WeekStart,
@@ -42,48 +19,9 @@ public sealed record WeeklyDigest(
     public string WinRateText => DecidedMatches == 0 ? "-" : $"{(double)Wins / DecidedMatches:P0}";
 }
 
-/// <summary>
-/// Digests over tracked friends and over the session history: the pure shape of the HOME
-/// friends strip and the SESSIONS weekly card + CSV export.
-/// </summary>
+/// <summary>Digests over the session history: the SESSIONS weekly card and the CSV export.</summary>
 public static class TrackedPlayerDigest
 {
-    /// <summary>Resolves every tracked account and orders the strip: main first, then most ranked wins.</summary>
-    public static IReadOnlyList<TrackedPlayerRow> BuildRows(
-        IEnumerable<(PlayerAccount Account, CopsLookupResult Lookup)> lookups)
-    {
-        return lookups
-            .Select(pair =>
-            {
-                var (account, lookup) = pair;
-                if (!lookup.IsFound)
-                {
-                    return new TrackedPlayerRow(
-                        account.DisplayName, account.Ign, account.AccountId,
-                        0, 0, 0,
-                        IsMain: false,
-                        NotFound: lookup.Status == CopsLookupStatus.NotFound,
-                        IsError: lookup.Status == CopsLookupStatus.Error);
-                }
-                var season = lookup.Profile!.CurrentSeason;
-                return new TrackedPlayerRow(
-                    account.DisplayName,
-                    lookup.Profile.Name,
-                    lookup.Profile.UserId,
-                    lookup.Profile.Level,
-                    (int)(season?.Ranked.Wins ?? 0),
-                    (int)(season?.Ranked.Losses ?? 0),
-                    IsMain: false,
-                    NotFound: false,
-                    IsError: false,
-                    lookup.Profile.ClanName,
-                    lookup.Profile.ClanTag);
-            })
-            .OrderByDescending(r => r.RankedWins)
-            .ThenBy(r => r.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
     /// <summary>Sessions started within the last seven days, aggregated.</summary>
     public static WeeklyDigest BuildWeekly(IReadOnlyList<Models.SessionRecord> sessions, DateTimeOffset now)
     {
