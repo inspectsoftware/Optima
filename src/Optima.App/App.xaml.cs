@@ -178,6 +178,7 @@ public partial class App : Application
             // Never activated, so the window would otherwise count as foreground and keep
             // the ambient drift ticking on a window nobody can see.
             Motion.SetForeground(false);
+            _windowShown.TrySetResult();
         }
         if (e.Args.Any(a => string.Equals(a, "--glass-lab", StringComparison.OrdinalIgnoreCase)))
         {
@@ -349,7 +350,7 @@ public partial class App : Application
             Dispatcher.BeginInvoke(() => Motion.SetGameRunning(running));
         };
 
-        _ = ReportStartupAsync(mainViewModel.InitializeAsync());
+        _ = ReportStartupAsync(mainViewModel.InitializeAsync(_windowShown.Task));
         _startupComplete = true;
     }
 
@@ -358,6 +359,11 @@ public partial class App : Application
 
     // However the splash fares, the window is on screen by then.
     private static readonly TimeSpan SplashPatience = TimeSpan.FromSeconds(4);
+
+    // Done once the main window is on screen, or at once for a tray start, where it is not going to
+    // be; the prompts startup raises wait for it. Never run inline: a prompt is modal, and run
+    // inside the handover it would hold the splash over itself until it was answered.
+    private readonly TaskCompletionSource _windowShown = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
     /// Brings the main window on screen out of the splash. The card grows to the window's place and
@@ -391,6 +397,7 @@ public partial class App : Application
         }
         window.Show();
         StartupTrace.Mark("window shown");
+        _windowShown.TrySetResult();
         _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => StartupTrace.Mark("first idle"));
         if (splash is null)
         {
