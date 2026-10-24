@@ -33,9 +33,17 @@ public sealed class PlayerSwitcherService
         }, ct);
     }
 
+    /// <summary>
+    /// Raised the moment a switch is asked for, before it is written: a Track lookup still running on
+    /// the PLAYER card leaves a later choice alone, and a write held up by a busy config.json would
+    /// tell it too late.
+    /// </summary>
+    public event Action? Switching;
+
     /// <summary>Makes a saved account the tracked player and returns its display name.</summary>
     public async Task<string> SwitchToAsync(PlayerAccount account, CancellationToken ct = default)
     {
+        Switching?.Invoke();
         await _settings.UpdateSettingsAsync(s => s with
         {
             PlayerIgn = account.Ign,

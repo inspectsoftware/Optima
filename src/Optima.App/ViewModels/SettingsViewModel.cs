@@ -66,6 +66,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shield = shield;
         // The tracked player and the saved list also change from the title-bar switcher.
         _settings.SettingsChanged += OnSettingsChanged;
+        _players.Switching += () => Interlocked.Increment(ref _trackedChanges);
         SelectedSection = Sections[0];
         // The stored accent is usually the default this field starts with, and then no change ever rings its swatch.
         OnAccentColorChanged(AccentColor);
@@ -213,8 +214,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     private string _trackedIgn = string.Empty;
     private long? _trackedAccountId;
 
-    // Counts the changes of the tracked player as they arrive, so a Track lookup can tell that the
-    // player was changed another way while it ran: the x, a chip or the title-bar switcher.
+    // Counts the changes of the tracked player made another way than Track (the x, a chip or the
+    // title-bar switcher), at the moment they are made, so a Track lookup can tell that one came
+    // while it ran. Counted as their settings write landed, a write held up by a busy config.json
+    // came too late to stop the lookup, or too late for a Track pressed after it.
     private int _trackedChanges;
 
     // Who the card is showing, so a settings save that leaves the player alone does not look them up again.
@@ -261,7 +264,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         IsTracking = true;
         TrackMessage = string.Empty;
-        var changes = _trackedChanges;
+        var changes = Volatile.Read(ref _trackedChanges);
         CopsLookupResult lookup;
         try
         {
@@ -278,7 +281,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         // The player was stopped or switched while the lookup ran. That choice came later, so it
         // stands; the typed text stays in the box to be tracked again.
-        if (changes != _trackedChanges)
+        if (changes != Volatile.Read(ref _trackedChanges))
         {
             return;
         }
@@ -351,6 +354,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private async Task StopTrackingAsync()
     {
         TrackMessage = string.Empty;
+        Interlocked.Increment(ref _trackedChanges);
         try
         {
             await _settings.UpdateSettingsAsync(s => s with { PlayerIgn = string.Empty, PlayerAccountId = null });
@@ -409,10 +413,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>The PLAYER card and the saved chips as the settings have them.</summary>
     private void LoadPlayer(AppSettings settings)
     {
-        if (settings.PlayerIgn.Trim() != _trackedIgn || settings.PlayerAccountId != _trackedAccountId)
-        {
-            _trackedChanges++;
-        }
         _trackedIgn = settings.PlayerIgn.Trim();
         _trackedAccountId = settings.PlayerAccountId;
 
