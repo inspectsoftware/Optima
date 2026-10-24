@@ -469,7 +469,8 @@ public sealed partial class BoostViewModel : ObservableObject
         }
         try
         {
-            // Text that is not a number yet (the box is mid-edit) keeps the stored threshold.
+            // A number outside the range is saved at the nearest end of it; text that is not a
+            // number keeps the stored threshold.
             var freeBelow = ParseThreshold(CleanerFreeBelowMb);
             var standbyAbove = ParseThreshold(CleanerStandbyAboveMb);
             await _settings.UpdateSettingsAsync(s => s with
@@ -484,11 +485,18 @@ public sealed partial class BoostViewModel : ObservableObject
         {
             _logger.LogWarning(ex, "Saving the memory cleaner settings failed");
         }
+        // The boxes and the card's summary show the thresholds in force, not text the cleaner ignores.
+        if (_settings.Current is { } saved)
+        {
+            _loading = true;
+            CleanerFreeBelowMb = saved.BoostStandbyFreeBelowMb.ToString(CultureInfo.InvariantCulture);
+            CleanerStandbyAboveMb = saved.BoostStandbyAboveMb.ToString(CultureInfo.InvariantCulture);
+            _loading = false;
+        }
 
         static int? ParseThreshold(string text)
             => int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
-                && value is >= StandbyCleanerPolicy.MinThresholdMb and <= StandbyCleanerPolicy.MaxThresholdMb
-                ? value
+                ? StandbyCleanerPolicy.ClampThreshold(value)
                 : null;
     }
 
