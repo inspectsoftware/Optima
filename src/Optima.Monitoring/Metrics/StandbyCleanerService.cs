@@ -193,13 +193,16 @@ public sealed class StandbyCleanerService : IDisposable
             ipcEvent.Data.GetValueOrDefault("lastPurgeAt"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at)
             ? at
             : (DateTimeOffset?)null;
+        // The readout names the helper's own last purge, if it has made one. A "purge now" since
+        // then is newer and stays the last purge, with what it freed.
+        var older = Status.LastPurgeAt is { } known && (lastPurge is not { } named || named < known);
         Publish(Status with
         {
             FreeMb = ParseLong(ipcEvent.Data.GetValueOrDefault("freeMb")),
             StandbyMb = ParseLong(ipcEvent.Data.GetValueOrDefault("standbyMb")),
             Purges = (int)(ParseLong(ipcEvent.Data.GetValueOrDefault("purges")) ?? Status.Purges),
-            LastFreedMb = ParseLong(ipcEvent.Data.GetValueOrDefault("lastFreedMb")) ?? Status.LastFreedMb,
-            LastPurgeAt = lastPurge ?? Status.LastPurgeAt,
+            LastFreedMb = older ? Status.LastFreedMb : ParseLong(ipcEvent.Data.GetValueOrDefault("lastFreedMb")) ?? Status.LastFreedMb,
+            LastPurgeAt = older ? Status.LastPurgeAt : lastPurge ?? Status.LastPurgeAt,
         });
     }
 

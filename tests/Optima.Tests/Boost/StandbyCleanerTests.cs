@@ -46,10 +46,13 @@ public sealed class StandbyCleanerTests
             return Task.FromResult(true);
         }
 
+        /// <summary>What every request answers with.</summary>
+        public Dictionary<string, string> Reply { get; set; } = [];
+
         public Task<IpcResponse> SendAsync(IpcRequest request, CancellationToken ct = default)
         {
             Sent.Add(request);
-            return Task.FromResult(new IpcResponse { Success = true });
+            return Task.FromResult(new IpcResponse { Success = true, Data = Reply });
         }
 
         public void Raise(IpcEvent ipcEvent) => EventReceived?.Invoke(this, ipcEvent);
@@ -165,5 +168,37 @@ public sealed class StandbyCleanerTests
 
         Assert.Equal(1042, cleaner.Status.Tally.TotalFreedMb);
         Assert.Equal(2, cleaner.Status.Tally.Recent.Count);
+    }
+
+    [Fact]
+    public async Task PurgeNow_StaysTheLastPurge_ThroughTheHelpersNextReadouts()
+    {
+        _broker.IsConnected = true;
+        using var cleaner = Create();
+        cleaner.Start();
+        // Start's own first sync publishes too; it is let finish so it cannot land between readouts.
+        Assert.True(SpinWait.SpinUntil(() => cleaner.Status.State == StandbyCleanerState.WaitingForGame, 5000));
+        var helperPurge = DateTimeOffset.Now.AddMinutes(-10).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+        void Readout(string freedMb, string at) => _broker.Raise(new IpcEvent
+        {
+            Kind = "memoryStatus",
+            Data = new Dictionary<string, string>
+            {
+                ["freeMb"] = "900", ["standbyMb"] = "3000", ["purges"] = "1", ["lastFreedMb"] = freedMb, ["lastPurgeAt"] = at,
+            },
+        });
+        Readout("742", helperPurge);
+        _broker.Reply = new Dictionary<string, string> { ["freedMb"] = "300" };
+        await cleaner.PurgeNowAsync();
+        var purgedNow = cleaner.Status.LastPurgeAt;
+
+        // The helper still names its own, older purge, and after a restart of its cleaner, none.
+        Readout("742", helperPurge);
+        Readout("0", string.Empty);
+
+        Assert.Equal(purgedNow, cleaner.Status.LastPurgeAt);
+        Assert.Equal(300, cleaner.Status.LastFreedMb);
+        Assert.Equal(1042, cleaner.Status.Tally.TotalFreedMb);
+        Assert.Equal(2, cleaner.Status.Tally.Purges);
     }
 }
