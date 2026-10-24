@@ -299,6 +299,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     // change, the same way a switch made from the title bar does.
     private void OnSettingsChanged(object? sender, AppSettings settings)
     {
+        // Not opened yet: InitializeAsync loads the card when the page is first shown. This view model
+        // is built at start-up, so every save in the app lands here, and a lookup for a card nobody
+        // has opened is a request to the stats API for nothing.
+        if (_savedValues.Count == 0)
+        {
+            return;
+        }
+
         // Raised on whatever thread finished the save; the card is bound to the UI.
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
         if (dispatcher is not null && !dispatcher.CheckAccess())
