@@ -957,10 +957,12 @@ public sealed partial class BoostViewModel : ObservableObject
             ? $"all {processors} logical processors awake"
             : $"{processors} logical processors · which are parked is not read";
 
+        // By maker, not memory: Windows reports an adapter's memory in 32 bits, so every card with
+        // 4 GB or more reads as 4 GB.
         AdapterRows = _adapters is null ? [] : [.. _adapters.Select(a => new AdapterRow(
             a.Name,
             _adapters.Count == 1 ? "the only adapter"
-                : a.VramBytes >= 1UL << 30 ? (a.VramBytes / Gb).ToString("0", CultureInfo.InvariantCulture) + " GB" : a.Vendor.ToString()))];
+                : a.Vendor == GpuVendor.Unknown ? string.Empty : a.Vendor.ToString()))];
         GpuPreferenceSet = BoostOn && extras.GpuApplied;
         GpuPreferenceText = GpuPreferenceSet && extras.GamePath is { Length: > 0 } path
             ? "High performance for " + System.IO.Path.GetFileName(path)
