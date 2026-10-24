@@ -418,11 +418,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         IsTrackedSaved = HoldsTracked(_trackedIgn, _trackedAccountId);
     }
 
-    /// <summary>Whether a saved entry already holds everything Save would store for this player.</summary>
+    /// <summary>
+    /// Whether a saved entry already holds everything Save would store for this player. The spelling
+    /// counts only once the API has answered with the game's own: a name typed while it was down, or
+    /// in the setup wizard, is the same player in any case.
+    /// </summary>
     private bool HoldsTracked(string ign, long? accountId)
     {
         var (savedIgn, savedId) = _found ?? (ign, accountId);
-        return SavedPlayers.Any(a => a.Holds(savedIgn, savedId));
+        return SavedPlayers.Any(a => a.Holds(savedIgn, savedId, exactName: _found is not null));
     }
 
     private void ShowTracked(string ign, long? accountId, CopsPlayerProfile? profile, string status, bool ok)

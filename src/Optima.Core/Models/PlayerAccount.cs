@@ -30,12 +30,15 @@ public sealed record PlayerAccount
             : Ign.Trim().Length > 0 && string.Equals(Ign.Trim(), ign?.Trim(), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Whether this is the same player and already holds all of that identity: its id, and its name as
-    /// the game spells it. An entry saved while the stats API was down has only the name or only the
-    /// id; it is still the same player, but saving the found player again fills in what is missing.
+    /// Whether this is the same player and already holds all of that identity: its id, and its name.
+    /// An entry saved while the stats API was down has only the name or only the id; it is still the
+    /// same player, but saving the found player again fills in what is missing. The spelling has to
+    /// agree only with <paramref name="exactName"/>, for a name the API answered with: a name typed in
+    /// another case is the same player, and saving it would only rewrite the game's spelling.
     /// </summary>
-    public bool Holds(string ign, long? accountId)
+    public bool Holds(string ign, long? accountId, bool exactName)
         => Matches(ign, accountId)
             && (accountId is null || AccountId == accountId)
-            && (ign.Trim().Length == 0 || string.Equals(Ign.Trim(), ign.Trim(), StringComparison.Ordinal));
+            && (ign.Trim().Length == 0 || string.Equals(Ign.Trim(), ign.Trim(),
+                exactName ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase));
 }

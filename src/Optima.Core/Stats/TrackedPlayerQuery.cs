@@ -89,7 +89,7 @@ public static class TrackedPlayerQuery
     public static long? IdForName(string storedIgn, long? storedId, string typedIgn)
         => string.Equals(storedIgn.Trim(), typedIgn.Trim(), StringComparison.OrdinalIgnoreCase) ? storedId : null;
 
-    /// <summary>The saved list with this identity in it: an entry for the same player is replaced, not doubled.</summary>
+    /// <summary>The saved list with this identity in it: an entry for the same player is updated, not doubled.</summary>
     public static IReadOnlyList<PlayerAccount> WithSaved(IReadOnlyList<PlayerAccount> saved, string ign, long? accountId)
     {
         var account = new PlayerAccount { Ign = ign.Trim(), AccountId = accountId };
@@ -98,7 +98,13 @@ public static class TrackedPlayerQuery
         if (existing >= 0)
         {
             // The key stays, so the title-bar switcher's row is the same row; the label is kept too.
-            list[existing] = account with { Key = list[existing].Key, Label = list[existing].Label };
+            // So is a name or id the save does not carry: one made while the stats API was down has
+            // only one of them, and must not cost the entry the other.
+            list[existing] = list[existing] with
+            {
+                Ign = account.Ign.Length > 0 ? account.Ign : list[existing].Ign,
+                AccountId = accountId ?? list[existing].AccountId,
+            };
         }
         else
         {

@@ -155,7 +155,34 @@ public sealed class TrackedPlayerQueryTests
     [InlineData("osprey", null, "osprey", null, true)]
     [InlineData("frosty", 7L, "frosty", 8L, false)]
     public void ASavedEntryHoldsThePlayerOnlyWithTheWholeIdentity(string ign, long? id, string trackedIgn, long? trackedId, bool expected)
-        => Assert.Equal(expected, new PlayerAccount { Ign = ign, AccountId = id }.Holds(trackedIgn, trackedId));
+        => Assert.Equal(expected, new PlayerAccount { Ign = ign, AccountId = id }.Holds(trackedIgn, trackedId, exactName: true));
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void ANameInAnotherCaseIsHeldUnlessItIsTheGamesSpelling(bool exactName, bool expected)
+        => Assert.Equal(expected, new PlayerAccount { Ign = "Kestrel", AccountId = 48211907 }.Holds("kestrel", null, exactName));
+
+    [Fact]
+    public void SavingWithOnlyTheNameKeepsTheSavedId()
+    {
+        // Saved with the API up; saved again with it down, by a name typed in another case.
+        var saved = new List<PlayerAccount> { new() { Key = "k", Ign = "Kestrel", AccountId = 48211907 } };
+
+        var updated = Assert.Single(TrackedPlayerQuery.WithSaved(saved, "kestrel", null));
+
+        Assert.Equal(("k", (long?)48211907), (updated.Key, updated.AccountId));
+    }
+
+    [Fact]
+    public void SavingWithOnlyTheIdKeepsTheSavedName()
+    {
+        var saved = new List<PlayerAccount> { new() { Key = "k", Ign = "Kestrel", AccountId = 48211907 } };
+
+        var updated = Assert.Single(TrackedPlayerQuery.WithSaved(saved, "", 48211907));
+
+        Assert.Equal("Kestrel", updated.Ign);
+    }
 
     [Fact]
     public void SavingTheFoundPlayerCompletesAnEntrySavedWhileTheApiWasDown()
