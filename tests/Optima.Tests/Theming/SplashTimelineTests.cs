@@ -90,4 +90,18 @@ public sealed class SplashTimelineTests
 
         Assert.Equal(0, SplashTimeline.At(4000 + SplashTimeline.RevealMs, grown, SplashTimeline.RevealMs).Fade, 6);
     }
+
+    [Fact]
+    public void TheBeats_EndExactly_WhereTheSurfaceLooksForTheirEnd()
+    {
+        // The surface calls a beat over once a frame drawn shows Grow >= 1 or Fade <= 0. An end that
+        // only came within rounding of those would keep the window waiting for the full patience,
+        // and leave the splash open over it for good.
+        foreach (var after in new[] { 0.0, 16, 1000 })
+        {
+            var grown = SplashTimeline.GrowMs + after;
+            Assert.True(SplashTimeline.At(4000, grown).Grow >= 1);
+            Assert.True(SplashTimeline.At(4000, grown, SplashTimeline.RevealMs + after).Fade <= 0);
+        }
+    }
 }
