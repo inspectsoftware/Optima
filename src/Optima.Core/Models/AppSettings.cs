@@ -23,8 +23,10 @@ public sealed record AppSettings
 
     /// <summary>
     /// BOOST's master switch (the dial). The switches below say which features it arms; none of
-    /// them does anything while this is off.
+    /// them does anything while this is off. Never written to or read from the file: every start
+    /// of Optima begins with Boost off, whatever it was when the last one closed.
     /// </summary>
+    [JsonIgnore]
     public bool BoostEnabled { get; init; }
 
     /// <summary>

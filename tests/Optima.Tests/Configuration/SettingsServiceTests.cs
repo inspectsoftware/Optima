@@ -118,6 +118,26 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.True((await CreateService().GetSettingsAsync()).EnableWatchMode);
     }
 
+    [Fact]
+    public async Task BoostIsOffAtEveryStart_EvenWhenItWasOnAtExit()
+    {
+        var service = CreateService();
+        await service.UpdateSettingsAsync(s => s with { BoostEnabled = true, BoostKeepCoresAwake = true });
+
+        // On for the rest of this run, and the switch is a change like any other.
+        Assert.True((await service.GetSettingsAsync()).BoostEnabled);
+        Assert.DoesNotContain("boostEnabled", await File.ReadAllTextAsync(_paths.ConfigFile), StringComparison.OrdinalIgnoreCase);
+
+        // A file from a build that still wrote the switch is read with it off as well.
+        var written = await File.ReadAllTextAsync(_paths.ConfigFile);
+        var open = written.IndexOf('{');
+        await File.WriteAllTextAsync(_paths.ConfigFile, written[..(open + 1)] + "\"boostEnabled\":true," + written[(open + 1)..]);
+        var next = await CreateService().GetSettingsAsync();
+
+        Assert.False(next.BoostEnabled);
+        Assert.True(next.BoostKeepCoresAwake);
+    }
+
     public void Dispose()
     {
         try
