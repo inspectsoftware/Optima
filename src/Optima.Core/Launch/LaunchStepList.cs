@@ -29,6 +29,9 @@ public sealed class LaunchStepList
     private readonly StepState[] _states = new StepState[Restore + 1];
     private readonly string?[] _details = new string?[Restore + 1];
 
+    /// <summary>The game has been seen running in this session: the display step or the watch has begun.</summary>
+    private bool _gameSeenRunning;
+
     public IReadOnlyList<StepState> States => _states;
 
     /// <summary>What each row says beside its title; null for the row's own line.</summary>
@@ -38,6 +41,7 @@ public sealed class LaunchStepList
     {
         Array.Clear(_states);
         Array.Clear(_details);
+        _gameSeenRunning = false;
     }
 
     public void Apply(LaunchProgress progress)
@@ -47,7 +51,7 @@ public sealed class LaunchStepList
             case LaunchPhase.Idle:
                 return;
             case LaunchPhase.Completed:
-                Complete();
+                Complete(cancelled: progress.Skipped);
                 return;
             case LaunchPhase.Failed:
                 Fail();
@@ -58,6 +62,8 @@ public sealed class LaunchStepList
                 Reset();
                 break;
         }
+
+        _gameSeenRunning |= progress.Phase is LaunchPhase.ConfiguringDisplay or LaunchPhase.Monitoring;
 
         if (progress is { Phase: LaunchPhase.ConfiguringDisplay, Skipped: true })
         {
@@ -118,17 +124,25 @@ public sealed class LaunchStepList
     /// <summary>
     /// The session ended and everything was put back. A skipped step stays skipped, and a step the
     /// session never got to stays to come: a cancel ends it there, before a display that waits for
-    /// the game has come on.
+    /// the game has come on. Nor is the step a cancel stopped in ticked off: a game that was still
+    /// being waited for never ran, and a display still coming on never came on. A game that was
+    /// already running did run, and keeps its tick.
     /// </summary>
-    public void Complete()
+    public void Complete(bool cancelled = false)
     {
-        for (var i = 0; i < _states.Length; i++)
+        for (var i = 0; i < Restore; i++)
         {
-            if (_states[i] is StepState.Live or StepState.Done || i == Restore)
+            if (cancelled && _states[i] == StepState.Live && !(i == Game && _gameSeenRunning))
+            {
+                _states[i] = StepState.Skipped;
+                _details[i] = "cancelled";
+            }
+            else if (_states[i] is StepState.Live or StepState.Done)
             {
                 _states[i] = StepState.Done;
             }
         }
+        _states[Restore] = StepState.Done;
         _details[Restore] = "everything restored";
     }
 

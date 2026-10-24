@@ -23,7 +23,9 @@ public enum LaunchPhase
 
 /// <param name="Skipped">
 /// The step the phase names was given up on and the session carries on without it. Reported after
-/// the phase itself, so the step list can show the step as not done rather than done.
+/// the phase itself, so the step list can show the step as not done rather than done. On
+/// <see cref="LaunchPhase.Completed"/> it means the session was cancelled, and the step it was in
+/// the middle of never finished.
 /// </param>
 public sealed record LaunchProgress(LaunchPhase Phase, string Message, bool Skipped = false);
 
@@ -65,6 +67,7 @@ public sealed class LaunchOrchestrator
     private readonly SettingsService? _settings;
     private readonly ILaunchSupport? _support;
     private readonly IElevationBroker? _elevation;
+    private readonly IDriverInstaller? _driver;
     private readonly ILogger<LaunchOrchestrator> _logger;
 
     private int _running;
@@ -92,6 +95,13 @@ public sealed class LaunchOrchestrator
     /// </summary>
     public TimeSpan PriorityKeeperInterval { get; set; } = DefaultPriorityKeeperInterval;
 
+    /// <summary>
+    /// How long the display step waits, once the game is up, for an administrator prompt the player
+    /// has not answered yet. The game is neither tuned nor watched for its exit while it waits. The
+    /// property exists so a test can shorten the wait.
+    /// </summary>
+    public TimeSpan DisplayHelperWait { get; set; } = TimeSpan.FromSeconds(20);
+
     /// <summary>Mutable per-session state, so the catch paths always restore the latest snapshot.</summary>
     private sealed class SessionContext
     {
@@ -104,6 +114,9 @@ public sealed class LaunchOrchestrator
         /// when the session asked for none.
         /// </summary>
         public Task<bool>? DisplayHelper { get; set; }
+
+        /// <summary>The driver was not installed, so <see cref="DisplayHelper"/> asked nobody and answered no.</summary>
+        public bool DriverMissing { get; set; }
     }
 
     public LaunchOrchestrator(
@@ -123,10 +136,12 @@ public sealed class LaunchOrchestrator
         ILogger<LaunchOrchestrator> logger,
         SettingsService? settings = null,
         ILaunchSupport? support = null,
-        IElevationBroker? elevation = null)
+        IElevationBroker? elevation = null,
+        IDriverInstaller? driver = null)
     {
         _support = support;
         _elevation = elevation;
+        _driver = driver;
         _detector = detector;
         _launchers = launchers.OrderBy(l => l.Order).ToList();
         _virtualDisplay = virtualDisplay;
@@ -205,9 +220,9 @@ public sealed class LaunchOrchestrator
             // on once the game is up. The helper's administrator prompt belongs here, before the game
             // covers the screen, where it meets the other requests from the PLAY click and is one
             // prompt with them. Not waited for: the launch goes on while the player answers it.
-            if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false })
+            if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
             {
-                context.DisplayHelper = _elevation.EnsureStartedAsync();
+                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context);
             }
 
             await PreflightAsync(token).ConfigureAwait(false);
@@ -319,7 +334,7 @@ public sealed class LaunchOrchestrator
             _logger.LogWarning("Session cancelled, restoring system state");
             await StopMonitoringAsync(context).ConfigureAwait(false);
             await _recovery.RestoreAsync(context.Snapshot, CancellationToken.None).ConfigureAwait(false);
-            Report(LaunchPhase.Completed, "Cancelled. Settings restored.");
+            Report(LaunchPhase.Completed, "Cancelled. Settings restored.", skipped: true);
             return WithWarnings(context,
                 Fail("CANCELLED", "The session was cancelled.", "All temporary settings were restored."));
         }
@@ -429,7 +444,7 @@ public sealed class LaunchOrchestrator
                 context.Warnings.Add(new LaunchWarning(ex.Error.Code,
                     "The virtual display driver is not installed",
                     "The game ran on your real screen. Install the driver on the Display page, or switch the virtual display off there."));
-                context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = false };
+                context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = false, VirtualDisplayEnabledByUs = false };
                 await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
             }
         }).ConfigureAwait(false);
@@ -440,14 +455,63 @@ public sealed class LaunchOrchestrator
         }
     }
 
+    /// <summary>
+    /// Asks for the helper only when the display will need it. A provider that needs no administrator
+    /// rights (the developer's stand-in) needs no prompt. Nor does a PC without the driver: there is
+    /// nothing for the helper to switch on, and a no to a prompt that was never needed would then be
+    /// blamed for a display that could not have come on anyway.
+    /// </summary>
+    private async Task<bool> AskForDisplayHelperAsync(IElevationBroker elevation, SessionContext context)
+    {
+        if (!(await _virtualDisplay.GetCapabilitiesAsync().ConfigureAwait(false)).RequiresElevation)
+        {
+            return true;
+        }
+        if (_driver is not null && await _driver.GetStateAsync().ConfigureAwait(false) != DriverState.Installed)
+        {
+            context.DriverMissing = true;
+            return false;
+        }
+        return await elevation.EnsureStartedAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for the answer to the helper's prompt, but not for long: the game is already running.
+    /// A prompt still open after <see cref="DisplayHelperWait"/> is given up on for this session, so
+    /// the game is tuned and watched, and a yes that comes later only starts the helper for whoever
+    /// asks next instead of switching the display on behind a game that may have closed by then.
+    /// </summary>
+    private async Task<bool> WaitForDisplayHelperAsync(Task<bool> helper, CancellationToken ct)
+    {
+        try
+        {
+            return await helper.WaitAsync(DisplayHelperWait, ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            throw OptimaException.From("ELEVATION_DECLINED",
+                "The administrator prompt was still open after the game had started.",
+                "The virtual display needs Optima's helper, and the running game was not held up any longer " +
+                "waiting for it. The display stayed off for this session and the game ran on your real screen.",
+                null,
+                "Approve the administrator prompt when you press PLAY");
+        }
+    }
+
     private async Task ConfigureVirtualDisplayAsync(DisplayProfile display, SessionContext context, CancellationToken ct)
     {
         Report(LaunchPhase.ConfiguringDisplay, $"Configuring virtual display {display.Mode}…");
 
         // A no to the prompt before the launch is not answered by asking again now, over the game:
         // every step of the driver below may need the helper, so none of them is tried.
-        if (context.DisplayHelper is { } helper && !await helper.WaitAsync(ct).ConfigureAwait(false))
+        if (context.DisplayHelper is { } helper && !await WaitForDisplayHelperAsync(helper, ct).ConfigureAwait(false))
         {
+            if (context.DriverMissing)
+            {
+                throw OptimaException.From("VDD_NOT_INSTALLED",
+                    "No virtual display driver device was found.",
+                    "The Virtual Display Driver does not appear in Device Manager.");
+            }
             throw OptimaException.From("ELEVATION_DECLINED",
                 "Administrator access is needed to switch the virtual display.",
                 "The administrator prompt at the start of the session did not start Optima's helper, so the " +
@@ -464,9 +528,14 @@ public sealed class LaunchOrchestrator
         var wasActive = await _virtualDisplay.IsDisplayActiveAsync(ct).ConfigureAwait(false);
         if (!wasActive)
         {
-            await RunWithRepairAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
+            // Written down before the device is switched on, not after. The helper switches it on in
+            // its own process, and an Optima killed while the enable waits for the display would
+            // otherwise leave a snapshot that says nothing was switched on, so the next start's
+            // restore would leave the display on for good. Switching off a device that never came
+            // on does nothing.
             context.Snapshot = context.Snapshot with { VirtualDisplayEnabledByUs = true };
             await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+            await RunWithRepairAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
         }
 
         await _virtualDisplay.SetModeAsync(display.Mode, ct).ConfigureAwait(false);

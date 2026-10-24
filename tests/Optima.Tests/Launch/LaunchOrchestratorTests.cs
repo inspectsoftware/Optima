@@ -39,10 +39,11 @@ public sealed class LaunchOrchestratorTests : IDisposable
         NullLogger<RecoveryService>.Instance);
 
     private LaunchOrchestrator CreateOrchestrator(
-        SettingsService? settings = null, FakeLaunchSupport? support = null, FakeElevationBroker? elevation = null) => new(
+        SettingsService? settings = null, FakeLaunchSupport? support = null, FakeElevationBroker? elevation = null,
+        FakeDriverInstaller? driver = null) => new(
         _detector, [_launcher], _virtualDisplay, _displayService, _power,
         _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
-        NullLogger<LaunchOrchestrator>.Instance, settings, support, elevation);
+        NullLogger<LaunchOrchestrator>.Instance, settings, support, elevation, driver);
 
     private static OptimaException NoDisplay() => OptimaException.From(
         "VDD_NO_DISPLAY", "The virtual display did not appear.", "Windows never attached its display to the desktop.");
@@ -268,6 +269,24 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task RunSession_OptimaKilledWhileTheDisplayComesOn_TheNextStartSwitchesItOff()
+    {
+        SystemStateSnapshot? onDisk = null;
+        var recovery = CreateRecovery();
+        _virtualDisplay.OnEnable = () => onDisk = recovery.GetPendingAsync().GetAwaiter().GetResult();
+
+        Assert.True((await CreateOrchestrator().RunSessionAsync(CompetitiveProfile)).Success);
+
+        // What the pending file said while the device was being switched on, restored by the next
+        // start's fresh provider over a display the dead session left on.
+        Assert.True(onDisk!.VirtualDisplayEnabledByUs);
+        var afterKill = new FakeVirtualDisplay { Active = true };
+        await new RecoveryService(_paths, _store, _displayService, _power, afterKill, _processOptimizer,
+            NullLogger<RecoveryService>.Instance).RestoreAsync(onDisk);
+        Assert.False(afterKill.Active);
+    }
+
+    [Fact]
     public async Task RunSession_TheDisplaysAdministratorPromptComesBeforeTheGameStarts()
     {
         var elevation = new FakeElevationBroker { ConnectOnPrompt = true };
@@ -312,6 +331,59 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.True(result.Success);
         Assert.Equal(0, elevation.Prompts);
         Assert.Contains("enable", _virtualDisplay.Log);
+    }
+
+    [Fact]
+    public async Task RunSession_ThePromptIsStillOpenOnceTheGameIsUp_TheGameIsNotHeldUpForIt()
+    {
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var elevation = new FakeElevationBroker { Answer = answer.Task };
+        var orchestrator = CreateOrchestrator(elevation: elevation);
+        orchestrator.DisplayHelperWait = TimeSpan.FromMilliseconds(50);
+
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile).WaitAsync(TimeSpan.FromSeconds(10));
+
+        // The game was tuned and watched to its exit, and the display stayed off and says why.
+        Assert.True(result.Success);
+        Assert.Equal("ELEVATION_DECLINED", Assert.Single(result.Warnings).Code);
+        Assert.Equal([4242], _processOptimizer.Applied);
+        Assert.Single(_sessionStore.Saved);
+        Assert.False(orchestrator.IsSessionActive);
+        // A yes after the game has gone does not switch the display on.
+        answer.SetResult(true);
+        Assert.Empty(_virtualDisplay.Log);
+    }
+
+    [Fact]
+    public async Task RunSession_TheDriverIsNotInstalled_NothingIsAskedAndTheMissingDriverIsTheReason()
+    {
+        // The prompt would be answered with No; it must not even be put up.
+        var elevation = new FakeElevationBroker();
+        var driver = new FakeDriverInstaller { State = DriverState.NotInstalledPackageAvailable };
+
+        var result = await CreateOrchestrator(elevation: elevation, driver: driver).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Equal("VDD_NOT_INSTALLED", Assert.Single(result.Warnings).Code);
+        Assert.Empty(_virtualDisplay.Log);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_AProviderThatNeedsNoAdministrator_IsNeitherAskedForNorStopped()
+    {
+        // The developer's stand-in, which runs without the driver and without the helper.
+        _virtualDisplay.RequiresElevation = false;
+        var elevation = new FakeElevationBroker();
+        var driver = new FakeDriverInstaller { State = DriverState.NotInstalledNoPackage };
+
+        var result = await CreateOrchestrator(elevation: elevation, driver: driver).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Empty(result.Warnings);
     }
 
     [Fact]
@@ -837,6 +909,8 @@ public sealed class LaunchOrchestratorTests : IDisposable
     {
         _processMonitor.GameStillLoading = true;
         var orchestrator = CreateOrchestrator();
+        LaunchProgress? last = null;
+        orchestrator.ProgressChanged += (_, progress) => last = progress;
 
         var session = orchestrator.RunSessionAsync(CompetitiveProfile);
         await WaitForAsync(() => _launcher.LaunchCalls == 1);
@@ -849,6 +923,8 @@ public sealed class LaunchOrchestratorTests : IDisposable
         // Nothing was played, so there is nothing to record; the half-applied profile came off, and
         // the virtual display, which waits for the game, was never switched on.
         Assert.Equal("CANCELLED", result.Error?.Code);
+        // The end is reported as a cancel, so the step list does not tick off the wait for the game.
+        Assert.Equal(new LaunchProgress(LaunchPhase.Completed, "Cancelled. Settings restored.", Skipped: true), last);
         Assert.Empty(_sessionStore.Saved);
         Assert.Single(_power.Log, entry => entry == "restore");
         Assert.Empty(_virtualDisplay.Log);
