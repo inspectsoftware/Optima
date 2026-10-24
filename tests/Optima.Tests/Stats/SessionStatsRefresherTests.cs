@@ -105,6 +105,22 @@ public sealed class SessionStatsRefresherTests : IDisposable
     }
 
     [Fact]
+    public async Task ASessionIsNotMeasuredAgainstAnotherPlayersProfile()
+    {
+        // The session was recorded for player 1; Settings now tracks player 4242.
+        await IdentifyPlayerAsync("friend");
+        var id = SeedSession(Baseline() with { UserId = 1 });
+        _profile = ProfileAfter(new CopsModeStats(4000, 3100, 900, 210, 150));
+
+        var result = await CreateRefresher().RefreshAsync(id, attempts: 3, retryDelay: TimeSpan.Zero);
+
+        Assert.False(result.Updated);
+        Assert.Contains("different player", result.Message, StringComparison.Ordinal);
+        Assert.Empty(_store.UpdatedDeltas);
+        Assert.Empty(_store.Matches);
+    }
+
+    [Fact]
     public async Task GivesUpAfterTheConfiguredAttemptsAndSaysSo()
     {
         await IdentifyPlayerAsync();
