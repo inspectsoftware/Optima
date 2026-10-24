@@ -13,15 +13,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
 
-/// <summary>State of one row in the launch step list.</summary>
-public enum StepState
-{
-    Todo,
-    Live,
-    Done,
-    Failed,
-}
-
 /// <summary>One launch step shown on the session page.</summary>
 public sealed partial class LaunchStep : ObservableObject
 {
@@ -29,24 +20,19 @@ public sealed partial class LaunchStep : ObservableObject
     {
         Title = title;
         _detail = detail;
-        _defaultDetail = detail;
+        DefaultDetail = detail;
     }
 
-    private readonly string _defaultDetail;
-
     public string Title { get; }
+
+    /// <summary>What the row says before the session has anything to say about it.</summary>
+    public string DefaultDetail { get; }
 
     [ObservableProperty]
     private string _detail;
 
     [ObservableProperty]
     private StepState _state;
-
-    public void Reset()
-    {
-        State = StepState.Todo;
-        Detail = _defaultDetail;
-    }
 }
 
 /// <summary>A profile as a selectable chip on the launch surface.</summary>
@@ -212,14 +198,17 @@ public sealed partial class PlayViewModel : ObservableObject
 
     public ObservableCollection<ProfileChip> ProfileChips { get; } = [];
 
+    /// <summary>In <see cref="LaunchStepList"/>'s order, which decides what each row shows.</summary>
     public ObservableCollection<LaunchStep> Steps { get; } =
     [
         new("Launcher resolved", "checking the install"),
         new("Profile applied", "power plan, priority, throttling"),
-        new("Virtual display", "as the Display page says"),
         new("Game running", "waiting for the game window"),
+        new("Virtual display", "once the game is running"),
         new("Restore on exit", "pending"),
     ];
+
+    private readonly LaunchStepList _stepList = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedProfileSummary))]
@@ -466,90 +455,54 @@ public sealed partial class PlayViewModel : ObservableObject
         {
             Phase = progress.Phase;
             PhaseText = progress.Message;
-            ApplyPhase(progress.Phase, progress.Message);
+            ApplyPhase(progress);
         });
     }
 
     private void ResetSteps()
     {
-        foreach (var step in Steps)
-        {
-            step.Reset();
-        }
+        _stepList.Reset();
+        ShowSteps();
         SessionProgress = 0;
     }
 
-    private void ApplyPhase(LaunchPhase phase, string message)
+    private void ApplyPhase(LaunchProgress progress)
     {
-        switch (phase)
-        {
-            case LaunchPhase.Idle:
-                return;
-            case LaunchPhase.Completed:
-                MarkAllDone();
-                return;
-            case LaunchPhase.Failed:
-                MarkLiveFailed();
-                return;
-        }
-
-        var index = phase switch
-        {
-            LaunchPhase.Validating => 0,
-            LaunchPhase.ApplyingPerformanceProfile => 1,
-            LaunchPhase.ConfiguringDisplay => 2,
-            LaunchPhase.StartingPlatform or LaunchPhase.WaitingForGame or LaunchPhase.Monitoring => 3,
-            LaunchPhase.Restoring => 4,
-            _ => -1,
-        };
-        if (index < 0)
-        {
-            return;
-        }
-        for (var i = 0; i < Steps.Count; i++)
-        {
-            if (i < index)
-            {
-                Steps[i].State = StepState.Done;
-            }
-            else if (i == index)
-            {
-                Steps[i].State = StepState.Live;
-                Steps[i].Detail = phase == LaunchPhase.Monitoring ? "running" : message;
-            }
-        }
-        SessionProgress = phase switch
+        _stepList.Apply(progress);
+        ShowSteps();
+        SessionProgress = progress.Phase switch
         {
             LaunchPhase.Validating => 0.12,
-            LaunchPhase.ApplyingPerformanceProfile => 0.32,
-            LaunchPhase.ConfiguringDisplay => 0.52,
-            LaunchPhase.StartingPlatform => 0.7,
-            LaunchPhase.WaitingForGame => 0.82,
+            LaunchPhase.ApplyingPerformanceProfile => 0.3,
+            LaunchPhase.StartingPlatform => 0.5,
+            LaunchPhase.WaitingForGame => 0.66,
+            LaunchPhase.ConfiguringDisplay => 0.8,
             LaunchPhase.Monitoring => 0.9,
             LaunchPhase.Restoring => 0.96,
+            LaunchPhase.Completed => 1,
             _ => SessionProgress,
         };
     }
 
     private void MarkAllDone()
     {
-        foreach (var step in Steps)
-        {
-            step.State = StepState.Done;
-        }
-        Steps[^1].Detail = "everything restored";
+        _stepList.Complete();
+        ShowSteps();
         SessionProgress = 1;
     }
 
     private void MarkLiveFailed()
     {
-        // A failure is reported twice (by the phase and by the result); the second report finds no
-        // live step and must not blame the first one.
-        if (Steps.Any(s => s.State == StepState.Failed))
+        _stepList.Fail();
+        ShowSteps();
+    }
+
+    private void ShowSteps()
+    {
+        for (var i = 0; i < Steps.Count; i++)
         {
-            return;
+            Steps[i].State = _stepList.States[i];
+            Steps[i].Detail = _stepList.Details[i] ?? Steps[i].DefaultDetail;
         }
-        var live = Steps.FirstOrDefault(s => s.State == StepState.Live) ?? Steps[0];
-        live.State = StepState.Failed;
     }
 }

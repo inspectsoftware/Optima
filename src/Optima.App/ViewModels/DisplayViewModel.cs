@@ -161,7 +161,7 @@ public sealed partial class DisplayViewModel : ObservableObject
     public string ChoiceNote => !UseVirtualDisplay
         ? "Off: Critical Ops runs on your own screen."
         : DriverInstalled
-            ? "Turned on when the game starts and off again when it ends. Nothing about your screens is kept changed."
+            ? "Turned on once Critical Ops is running, and off again when it closes or its process ends. Nothing about your screens is kept changed."
             : "The driver is not installed, so the game will run on your own screen until it is.";
 
     private DisplayMode ChosenMode

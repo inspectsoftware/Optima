@@ -140,16 +140,27 @@ internal sealed class FakeProcessMonitor : IProcessMonitor
     /// <summary>Keeps the wait for the game to start going until the session is cancelled, as a game that is still loading does.</summary>
     public bool GameStillLoading { get; set; }
 
+    /// <summary>How many waits for the game to start have returned.</summary>
+    public int GameStartWaits { get; private set; }
+
+    /// <summary>Thrown by the wait for the game to exit, as a monitor that breaks mid-session does.</summary>
+    public Exception? ExitError { get; set; }
+
     public async Task<int?> WaitForGameStartAsync(TimeSpan timeout, CancellationToken ct = default)
     {
         if (GameStillLoading)
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, ct).ConfigureAwait(false);
         }
+        GameStartWaits++;
         return GameStartPid;
     }
     public async Task WaitForGameExitAsync(CancellationToken ct = default)
     {
+        if (ExitError is not null)
+        {
+            throw ExitError;
+        }
         if (ExitAfter <= TimeSpan.Zero)
         {
             return;
@@ -276,9 +287,13 @@ internal sealed class FakeElevationBroker : IElevationBroker
 
     public event EventHandler<IpcEvent>? EventReceived { add { } remove { } }
 
+    /// <summary>Run when the helper is asked to start, so a test can look at what had happened by then.</summary>
+    public Action? OnPrompt { get; set; }
+
     public Task<bool> EnsureStartedAsync(CancellationToken ct = default)
     {
         Prompts++;
+        OnPrompt?.Invoke();
         IsConnected |= ConnectOnPrompt;
         return Task.FromResult(IsConnected);
     }
@@ -418,6 +433,12 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
     /// <summary>Thrown by the next enables, one per call, before they start working.</summary>
     public Queue<Exception> EnableErrors { get; } = new();
 
+    /// <summary>Thrown by the mode change, which comes after the display is already on.</summary>
+    public Exception? ModeError { get; set; }
+
+    /// <summary>Run when an enable starts, so a test can look at what the session has done by then.</summary>
+    public Action? OnEnable { get; set; }
+
     public string Name => "FakeVdd";
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(true);
     public Task<DriverCapabilities> GetCapabilitiesAsync(CancellationToken ct = default) => Task.FromResult(new DriverCapabilities());
@@ -430,6 +451,7 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
     public Task EnableDisplayAsync(CancellationToken ct = default)
     {
         Log.Add("enable");
+        OnEnable?.Invoke();
         if (EnableErrors.TryDequeue(out var once))
         {
             return Task.FromException(once);
@@ -452,7 +474,7 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
     public Task SetModeAsync(DisplayMode mode, CancellationToken ct = default)
     {
         Log.Add($"mode:{mode}");
-        return Task.CompletedTask;
+        return ModeError is null ? Task.CompletedTask : Task.FromException(ModeError);
     }
     public Task<IReadOnlyList<DisplayMode>> GetSupportedModesAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<DisplayMode>>([]);
