@@ -78,11 +78,18 @@ public sealed class SettingsService
             {
                 return current;
             }
-            // Kept only once it is on disk: a save that failed must leave the same update to be
-            // tried again, not judged "nothing changed" against a value that was never written.
-            await _store.SaveAsync(_paths.ConfigFile, updated, ct).ConfigureAwait(false);
+            // The Boost master switch is not in the file (Boost starts off at every launch), so an
+            // update that changes only the switch is kept in memory alone. Written, it rewrote the
+            // file at every flip, and a save that failed left the switch where it was while the
+            // page showed it flipped.
+            if (_unsaved || !(updated with { BoostEnabled = current.BoostEnabled }).Equals(current))
+            {
+                // Kept only once it is on disk: a save that failed must leave the same update to be
+                // tried again, not judged "nothing changed" against a value that was never written.
+                await _store.SaveAsync(_paths.ConfigFile, updated, ct).ConfigureAwait(false);
+                _unsaved = false;
+            }
             _settings = updated;
-            _unsaved = false;
         }
         finally
         {

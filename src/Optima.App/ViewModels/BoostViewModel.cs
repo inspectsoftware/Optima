@@ -146,6 +146,8 @@ public sealed partial class BoostViewModel : ObservableObject
         {
             _logger.LogWarning(ex, "Switching Boost failed");
         }
+        // The dial shows the switch the services act on, also when the switch itself failed.
+        BoostOn = _settings.Current?.BoostEnabled ?? false;
         ShowAll();
     }
 

@@ -138,6 +138,30 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.True(next.BoostKeepCoresAwake);
     }
 
+    [Fact]
+    public async Task TheBoostSwitchLivesInMemory_SoAFileThatCannotBeWrittenDoesNotHoldItBack()
+    {
+        var service = CreateService();
+        await service.UpdateSettingsAsync(s => s with { BoostKeepCoresAwake = true });
+        var written = File.GetLastWriteTimeUtc(_paths.ConfigFile);
+        var raised = 0;
+        service.SettingsChanged += (_, _) => raised++;
+
+        // Held open without sharing, the file cannot be replaced; the switch is not in it anyway.
+        using (new FileStream(_paths.ConfigFile, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            await service.UpdateSettingsAsync(s => s with { BoostEnabled = true });
+            Assert.True(service.Current!.BoostEffective().BoostKeepCoresAwake);
+
+            await service.UpdateSettingsAsync(s => s with { BoostEnabled = false });
+            Assert.False(service.Current!.BoostEffective().BoostKeepCoresAwake);
+        }
+
+        Assert.Equal(2, raised);
+        Assert.Equal(written, File.GetLastWriteTimeUtc(_paths.ConfigFile));
+        Assert.True((await CreateService().GetSettingsAsync()).BoostKeepCoresAwake);
+    }
+
     public void Dispose()
     {
         try
