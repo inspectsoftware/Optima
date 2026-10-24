@@ -23,7 +23,9 @@ public enum LaunchPhase
 
 /// <param name="Skipped">
 /// The step the phase names was given up on and the session carries on without it. Reported after
-/// the phase itself, so the step list can show the step as not done rather than done.
+/// the phase itself, so the step list can show the step as not done rather than done. On
+/// <see cref="LaunchPhase.Completed"/> it means the session was cancelled, and the step it was in
+/// the middle of never finished.
 /// </param>
 public sealed record LaunchProgress(LaunchPhase Phase, string Message, bool Skipped = false);
 
@@ -319,7 +321,7 @@ public sealed class LaunchOrchestrator
             _logger.LogWarning("Session cancelled, restoring system state");
             await StopMonitoringAsync(context).ConfigureAwait(false);
             await _recovery.RestoreAsync(context.Snapshot, CancellationToken.None).ConfigureAwait(false);
-            Report(LaunchPhase.Completed, "Cancelled. Settings restored.");
+            Report(LaunchPhase.Completed, "Cancelled. Settings restored.", skipped: true);
             return WithWarnings(context,
                 Fail("CANCELLED", "The session was cancelled.", "All temporary settings were restored."));
         }

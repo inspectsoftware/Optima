@@ -117,15 +117,36 @@ public sealed class LaunchStepListTests
         Assert.DoesNotContain(StepState.Live, steps.States);
     }
 
+    private static readonly LaunchProgress Cancelled = P(LaunchPhase.Completed, "Cancelled. Settings restored.", skipped: true);
+
     [Fact]
-    public void ACancelBeforeTheGameIsUp_DoesNotTickOffTheDisplay()
+    public void ACancelBeforeTheGameIsUp_TicksOffNeitherTheGameNorTheDisplay()
     {
         // The cancel path reports Completed straight after the phase it stopped in.
-        var steps = Run([.. UpToTheGame, P(LaunchPhase.Completed, "Cancelled. Settings restored.")]);
+        var steps = Run([.. UpToTheGame, Cancelled]);
 
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Todo, StepState.Done], steps.States);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Skipped, StepState.Todo, StepState.Done], steps.States);
+        Assert.Equal("cancelled", steps.Details[Game]);
         Assert.Null(steps.Details[Display]);
         Assert.Equal("everything restored", steps.Details[Restore]);
+    }
+
+    [Fact]
+    public void ACancelWhileTheDisplayComesOn_DoesNotTickItOff()
+    {
+        var steps = Run([.. UpToTheGame, P(LaunchPhase.ConfiguringDisplay, "Configuring virtual display 1920x1080 @ 240 Hz…"), Cancelled]);
+
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Skipped, StepState.Done], steps.States);
+        Assert.Equal("cancelled", steps.Details[Display]);
+    }
+
+    [Fact]
+    public void ACancelWhileTheGameRuns_KeepsTheGamesTick()
+    {
+        var steps = Run([.. UpToTheGame, P(LaunchPhase.Monitoring, "Critical Ops is running."), Cancelled]);
+
+        Assert.Equal(StepState.Done, steps.States[Game]);
+        Assert.Equal("running", steps.Details[Game]);
     }
 
     [Fact]

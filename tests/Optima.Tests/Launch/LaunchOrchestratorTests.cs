@@ -855,6 +855,8 @@ public sealed class LaunchOrchestratorTests : IDisposable
     {
         _processMonitor.GameStillLoading = true;
         var orchestrator = CreateOrchestrator();
+        LaunchProgress? last = null;
+        orchestrator.ProgressChanged += (_, progress) => last = progress;
 
         var session = orchestrator.RunSessionAsync(CompetitiveProfile);
         await WaitForAsync(() => _launcher.LaunchCalls == 1);
@@ -867,6 +869,8 @@ public sealed class LaunchOrchestratorTests : IDisposable
         // Nothing was played, so there is nothing to record; the half-applied profile came off, and
         // the virtual display, which waits for the game, was never switched on.
         Assert.Equal("CANCELLED", result.Error?.Code);
+        // The end is reported as a cancel, so the step list does not tick off the wait for the game.
+        Assert.Equal(new LaunchProgress(LaunchPhase.Completed, "Cancelled. Settings restored.", Skipped: true), last);
         Assert.Empty(_sessionStore.Saved);
         Assert.Single(_power.Log, entry => entry == "restore");
         Assert.Empty(_virtualDisplay.Log);
