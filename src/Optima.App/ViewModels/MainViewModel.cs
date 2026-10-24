@@ -207,13 +207,13 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
             _logger.LogError(ex, "Removing a saved account failed");
-            Toasts.Show("Account not removed", "The settings could not be saved: " + ex.Message, Services.ToastKind.Warn);
+            Toasts.Show("Player not removed", "The settings could not be saved: " + ex.Message, Services.ToastKind.Warn);
         }
     }
 
     /// <summary>Placeholder shown in the switcher when there is nothing else to switch to.</summary>
     public static readonly PlayerAccount NoOtherAccountPlaceholder =
-        new() { Key = string.Empty, Ign = "No other accounts added" };
+        new() { Key = string.Empty, Ign = "No other saved players" };
 
     private async Task ReloadSavedAccountsAsync()
     {
