@@ -42,15 +42,15 @@ public sealed partial class BoostViewModel : ObservableObject
     private bool _subscribed;
 
     // The live readout: the latest hardware sample and the demoted programs' processor shares,
-    // both taken only while the page is on screen.
+    // both taken only while the page is on screen. The shares are null until the first sample.
     private volatile bool _live;
     private HardwareMetrics? _metrics;
-    private IReadOnlyList<(ProcessStateSnapshot Process, double? Cpu)> _heldBack = [];
+    private IReadOnlyList<(ProcessStateSnapshot Process, double? Cpu)>? _heldBack;
     private IReadOnlyList<GpuInfo>? _adapters;
 
     // Open handles to the demoted processes and their processor time at the last sample, used on
     // the hardware monitor's thread. A handle stays open while its process is demoted, so its id
-    // cannot be handed to another process in between; null where Windows refused one.
+    // cannot be handed to another process in between; null once the process has ended.
     private readonly object _cpuGate = new();
     private readonly Dictionary<int, (SafeProcessHandle? Handle, TimeSpan? Cpu)> _cpu = [];
     private long _sampledAt;
@@ -733,7 +733,7 @@ public sealed partial class BoostViewModel : ObservableObject
             }
             _cpu.Clear();
         }
-        _heldBack = [];
+        _heldBack = null;
         // The line claims the last 60 seconds, so it starts again rather than join two visits.
         GameShareHistory.Clear();
     }
@@ -760,9 +760,11 @@ public sealed partial class BoostViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Each demoted process's share of the processor since the last sample. Null for a process seen
-    /// for the first time, which has nothing to compare against yet, and for one Windows will not
-    /// open (it runs elevated or protected); an exited one simply stops using any.
+    /// Each demoted process that is still running, with its share of the processor since the last
+    /// sample; null for one seen for the first time, which has nothing to compare against yet. The
+    /// service keeps a process on its list until the game leaves, whether it still runs or not, and
+    /// browsers end processes all the time: one that has ended is not held back any more and is left
+    /// out. So is one that cannot be opened, because Optima opened every one of them to demote it.
     /// </summary>
     private List<(ProcessStateSnapshot Process, double? Cpu)> SampleHeldBack(IReadOnlyList<ProcessStateSnapshot> demoted)
     {
@@ -786,11 +788,21 @@ public sealed partial class BoostViewModel : ObservableObject
                 {
                     entry = (ProcessQuery.Open(process.ProcessId), null);
                 }
+                if (entry.Handle is { } ended && ProcessQuery.HasExited(ended))
+                {
+                    ended.Dispose();
+                    entry = (null, null);
+                }
+                // One that has ended stays in the table without a handle, so its id is not opened
+                // again as whatever process Windows hands that id to next.
                 var now = entry.Handle is { } handle ? ProcessQuery.GetTotalProcessorTime(handle) : null;
-                result.Add((process, now is { } cpu && entry.Cpu is { } before
-                    ? BoostReadout.CpuPercent(cpu - before, elapsed, Environment.ProcessorCount)
-                    : null));
                 _cpu[process.ProcessId] = (entry.Handle, now);
+                if (entry.Handle is not null)
+                {
+                    result.Add((process, now is { } cpu && entry.Cpu is { } before
+                        ? BoostReadout.CpuPercent(cpu - before, elapsed, Environment.ProcessorCount)
+                        : null));
+                }
             }
             return result;
         }
@@ -850,8 +862,10 @@ public sealed partial class BoostViewModel : ObservableObject
             _ => $"ENGAGED · {working} of {BoostFeatureCount} working · Critical Ops on screen",
         };
 
-        // The demoted programs, one row per program, the busiest first.
-        var programs = _heldBack
+        // The demoted programs, one row per program, the busiest first. The sample counts only the
+        // processes still running; until the first one, the service's own count stands in.
+        var heldCount = _heldBack?.Count ?? demotion.ProcessCount;
+        var programs = (_heldBack ?? [])
             .GroupBy(p => p.Process.ProcessName, StringComparer.OrdinalIgnoreCase)
             .Select(g => (Name: g.Key, Count: g.Count(), Cpu: g.Any(p => p.Cpu is not null) ? g.Sum(p => p.Cpu ?? 0) : (double?)null))
             .OrderByDescending(p => p.Cpu ?? -1)
@@ -866,7 +880,7 @@ public sealed partial class BoostViewModel : ObservableObject
             : !DemotionEnabled ? "Switched off. Background programs run as usual."
             : !BoostOn ? "Boost is off, so nothing is held back."
             : !demotion.GameOnScreen ? "Nothing is held back until Critical Ops is on screen."
-            : demotion.ProcessCount == 0 ? "None of the listed programs is running."
+            : heldCount == 0 ? "None of the listed programs is running."
             : "Reading what they use. The first figures arrive within two seconds.";
 
         // Resource flow: the processor and memory, split.
@@ -963,9 +977,9 @@ public sealed partial class BoostViewModel : ObservableObject
             !DemotionEnabled ? new BoostTile("PROGRAMS HELD BACK", Dash, string.Empty, "switched off · they run as usual", 0, false)
                 : !BoostOn ? new BoostTile("PROGRAMS HELD BACK", Dash, string.Empty, "Boost is off", 0, false)
                 : !demotion.GameOnScreen ? new BoostTile("PROGRAMS HELD BACK", Dash, string.Empty, "waiting for Critical Ops", 0, false)
-                : new BoostTile("PROGRAMS HELD BACK", demotion.ProcessCount.ToString(CultureInfo.InvariantCulture),
-                    demotion.ProcessCount == 1 ? "process" : "processes",
-                    demotion.ProcessCount == 0 ? "none of the listed programs is running"
+                : new BoostTile("PROGRAMS HELD BACK", heldCount.ToString(CultureInfo.InvariantCulture),
+                    heldCount == 1 ? "process" : "processes",
+                    heldCount == 0 ? "none of the listed programs is running"
                     : heldBackRead ? Percent(heldBackCpu, "0.0") + " of the processor left to them"
                     : "reading what they use", heldBackCpu, true),
 

@@ -5,6 +5,7 @@ using Optima.Core.Configuration;
 using Optima.Core.Launch;
 using Optima.Core.Models;
 using Optima.Core.Monitoring;
+using Optima.Platform.Windows.NativeMethods;
 using Optima.Platform.Windows.Services;
 using Optima.Tests.Launch;
 using Xunit;
@@ -177,6 +178,27 @@ public sealed class BackgroundDemotionTests : IDisposable
         {
             child.Kill(entireProcessTree: true);
         }
+    }
+
+    [Fact]
+    public void AProcessThatHasEnded_IsToldApartFromOneThatRuns()
+    {
+        // The service lists a demoted process until the game leaves, ended or not; the BOOST page
+        // asks the handle it keeps whether the process still runs.
+        using var child = Process.Start(new ProcessStartInfo("cmd.exe", "/c exit 0")
+        {
+            CreateNoWindow = true,
+            UseShellExecute = false,
+        })!;
+        // The Process object keeps its own handle, so the id stays this child's after it ends.
+        child.WaitForExit();
+        using var ended = ProcessQuery.Open(child.Id);
+        using var running = ProcessQuery.Open(Environment.ProcessId);
+
+        Assert.NotNull(ended);
+        Assert.NotNull(running);
+        Assert.True(ProcessQuery.HasExited(ended));
+        Assert.False(ProcessQuery.HasExited(running));
     }
 
     [Fact]

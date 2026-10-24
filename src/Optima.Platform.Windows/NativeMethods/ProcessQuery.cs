@@ -3,7 +3,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Optima.Platform.Windows.NativeMethods;
 
-/// <summary>Per-process queries on a handle that is opened once and kept: start time, CPU time and working set.</summary>
+/// <summary>Per-process queries on a handle that is opened once and kept: start time, CPU time, working set and whether it has ended.</summary>
 public static class ProcessQuery
 {
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -13,6 +13,11 @@ public static class ProcessQuery
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetProcessTimes(SafeProcessHandle process, out long creation, out long exit, out long kernel, out long user);
+
+    private const uint STILL_ACTIVE = 259;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetExitCodeProcess(SafeProcessHandle process, out uint exitCode);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PROCESS_MEMORY_COUNTERS
@@ -52,6 +57,13 @@ public static class ProcessQuery
         => GetProcessTimes(process, out _, out _, out var kernel, out var user)
             ? TimeSpan.FromTicks(kernel + user)
             : null;
+
+    /// <summary>
+    /// Whether the process behind a kept handle has ended. The handle itself stays valid after it
+    /// does, so the other queries go on answering with the process's final figures.
+    /// </summary>
+    public static bool HasExited(SafeProcessHandle process)
+        => GetExitCodeProcess(process, out var code) && code != STILL_ACTIVE;
 
     public static ulong? GetWorkingSetBytes(SafeProcessHandle process)
     {
