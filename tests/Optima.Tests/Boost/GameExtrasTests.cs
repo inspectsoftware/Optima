@@ -68,14 +68,14 @@ public sealed class GameExtrasTests : IDisposable
 
     private string Ledger => Path.Combine(_folder, "boost-coreparking.json");
 
-    private GameExtrasService Create()
+    private GameExtrasService Create(SettingsService? stored = null)
         => new(_extras, _monitor, _presence, () => _settings,
             path =>
             {
                 _settings = _settings with { BoostGamePath = path };
                 return Task.CompletedTask;
             },
-            _store, Ledger, NullLogger<GameExtrasService>.Instance);
+            _store, Ledger, NullLogger<GameExtrasService>.Instance, stored);
 
     public void Dispose()
     {
@@ -208,6 +208,38 @@ public sealed class GameExtrasTests : IDisposable
         Assert.DoesNotContain(_extras.PathOfGame!, _extras.HighPerformance);
         Assert.False(service.Status.GpuApplied);
         Assert.False(File.Exists(Path.Combine(_folder, "boost-gpu.json")));
+    }
+
+    [Fact]
+    public async Task APreferenceLeftByAnOlderReleaseWithoutALedger_IsTakenAwayOnce()
+    {
+        // As 0.8.1 left it: Boost saved on, the graphics switch ticked, the game seen, and no ledger.
+        var paths = new AppPaths(_folder);
+        paths.EnsureCreated();
+        File.WriteAllText(paths.ConfigFile,
+            "{\"boostEnabled\":true,\"boostGpuHighPerformance\":true,\"boostGamePath\":"
+            + System.Text.Json.JsonSerializer.Serialize(_extras.PathOfGame) + "}");
+        _extras.HighPerformance.Add(_extras.PathOfGame!);
+        var stored = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
+        _settings = (await stored.GetSettingsAsync()).BoostEffective();
+        var service = Create(stored);
+
+        await service.AdoptOlderReleasePreferenceAsync();
+        await service.SyncAsync();
+        service.Dispose();
+
+        Assert.DoesNotContain(_extras.PathOfGame!, _extras.HighPerformance);
+        Assert.True(stored.Current!.BoostGpuLeftoverChecked);
+
+        // Only once: a preference the player sets in Windows afterwards is theirs.
+        _extras.HighPerformance.Add(_extras.PathOfGame!);
+        var nextStart = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
+        var next = Create(nextStart);
+        await next.AdoptOlderReleasePreferenceAsync();
+        await next.SyncAsync();
+        next.Dispose();
+
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
     }
 
     [Fact]

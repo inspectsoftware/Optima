@@ -83,6 +83,12 @@ public sealed record AppSettings
     /// </summary>
     public string? BoostGamePath { get; init; }
 
+    /// <summary>
+    /// True once a start has looked for a graphics preference that 0.8.0 or 0.8.1 left in Windows
+    /// without a ledger, so that it is looked for only once (see GameExtrasService).
+    /// </summary>
+    public bool BoostGpuLeftoverChecked { get; init; }
+
     public string Theme { get; init; } = "Dark";
 
     public string AccentColor { get; init; } = "#E8B45A";

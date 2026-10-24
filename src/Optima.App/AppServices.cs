@@ -139,7 +139,8 @@ public static class AppServices
             path => sp.GetRequiredService<SettingsService>().UpdateSettingsAsync(s => s with { BoostGamePath = path }),
             sp.GetRequiredService<JsonStore>(),
             System.IO.Path.Combine(paths.Root, "boost-coreparking.json"),
-            sp.GetRequiredService<ILogger<Optima.Core.Launch.GameExtrasService>>()));
+            sp.GetRequiredService<ILogger<Optima.Core.Launch.GameExtrasService>>(),
+            sp.GetRequiredService<SettingsService>()));
         services.AddSingleton<Optima.Core.News.CopsNewsService>();
         // The update check: one request to GitHub's releases at start, and the signed setup on request.
         services.AddSingleton(sp => new Optima.Core.Updates.UpdateService(

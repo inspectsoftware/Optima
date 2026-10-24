@@ -37,6 +37,7 @@ public sealed class GameExtrasService : IDisposable
     private readonly JsonStore _store;
     private readonly string _ledgerPath;
     private readonly string _gpuLedgerPath;
+    private readonly SettingsService? _storedSettings;
     private readonly ILogger<GameExtrasService> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CoreParkingSnapshot? _parking;
@@ -51,7 +52,8 @@ public sealed class GameExtrasService : IDisposable
         Func<string, Task> rememberGamePath,
         JsonStore store,
         string ledgerPath,
-        ILogger<GameExtrasService> logger)
+        ILogger<GameExtrasService> logger,
+        SettingsService? storedSettings = null)
     {
         _extras = extras;
         _monitor = monitor;
@@ -62,6 +64,7 @@ public sealed class GameExtrasService : IDisposable
         _ledgerPath = ledgerPath;
         // The graphics ledger sits beside the core parking one.
         _gpuLedgerPath = Path.Combine(Path.GetDirectoryName(ledgerPath) ?? string.Empty, "boost-gpu.json");
+        _storedSettings = storedSettings;
         _logger = logger;
     }
 
@@ -79,9 +82,57 @@ public sealed class GameExtrasService : IDisposable
         _presence.PresenceChanged += OnPresenceChanged;
         _ = Task.Run(async () =>
         {
+            await AdoptOlderReleasePreferenceAsync().ConfigureAwait(false);
             await RestoreLeftoverAsync().ConfigureAwait(false);
             await SyncAsync().ConfigureAwait(false);
         });
+    }
+
+    /// <summary>
+    /// 0.8.0 and 0.8.1 wrote the graphics preference with no ledger and kept Boost on from one start
+    /// to the next, so a player who closed one of them with Boost on still has the preference in
+    /// Windows, and nothing here would ever take it away. Once, at the first start of a build with
+    /// the ledger, a high-performance preference for the game they last saw, with the graphics switch
+    /// still ticked, is taken to be that one and put in the ledger, and Boost starting off removes it.
+    /// One the player set in Windows with the switch ticked is taken for Boost's too, which is how
+    /// 0.8.x treated it as well: it removed it at switch-off.
+    /// </summary>
+    public async Task AdoptOlderReleasePreferenceAsync(CancellationToken ct = default)
+    {
+        if (_storedSettings is null)
+        {
+            return;
+        }
+        try
+        {
+            // The stored switch, not the effective one: Boost itself starts off.
+            var stored = await _storedSettings.GetSettingsAsync(ct).ConfigureAwait(false);
+            if (stored.BoostGpuLeftoverChecked)
+            {
+                return;
+            }
+            await _gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (stored is { BoostGpuHighPerformance: true, BoostGamePath: { Length: > 0 } path }
+                    && _store.Load<GpuPreferenceLedger>(_gpuLedgerPath) is null
+                    && IsHighPerformance(path))
+                {
+                    await _store.SaveAsync(_gpuLedgerPath, new GpuPreferenceLedger(path), ct).ConfigureAwait(false);
+                    _logger.LogInformation("The graphics preference an older Optima set for {Path} is now Boost's to remove", path);
+                }
+            }
+            finally
+            {
+                _gate.Release();
+            }
+            await _storedSettings.UpdateSettingsAsync(s => s with { BoostGpuLeftoverChecked = true }, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Looked for again at the next start.
+            _logger.LogWarning(ex, "Could not look for a graphics preference left by an older Optima");
+        }
     }
 
     private void OnPresenceChanged(PresenceChange change)
