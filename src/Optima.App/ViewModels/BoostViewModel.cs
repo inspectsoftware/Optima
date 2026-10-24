@@ -430,22 +430,25 @@ public sealed partial class BoostViewModel : ObservableObject
             TimerDetailText = StandbyText;
             return;
         }
+        // Windows' clock is the finest any program asks for, which is not necessarily the tick
+        // Optima or the game gets: since Windows 10 2004 each program gets what it asked for itself.
+        var clock = $"Windows' clock is at {now} ms, the finest any program asks for.";
         if (!status.Enabled)
         {
             TimerStateText = "OFF";
-            TimerDetailText = $"Not holding anything. Windows is at {now} ms for Optima right now.";
+            TimerDetailText = "Not holding anything. " + clock;
         }
         else if (!status.Holding)
         {
             TimerStateText = "ARMED";
-            TimerDetailText = $"Waiting for the game. Windows is at {now} ms for Optima right now.";
+            TimerDetailText = "Waiting for the game. " + clock;
         }
         else
         {
             TimerStateText = "HOLDING";
             var asked = status.RequestedMs.ToString("0.###", CultureInfo.InvariantCulture);
             var applied = status.AppliedMs?.ToString("0.###", CultureInfo.InvariantCulture) ?? "?";
-            TimerDetailText = $"Asked for {asked} ms, Windows applied {applied} ms · "
+            TimerDetailText = $"Asked for {asked} ms; Windows' clock is at {applied} ms · "
                 + (status.ReachesGame ? "this reaches the game" : "on this Windows it stays inside Optima");
         }
     }
@@ -951,8 +954,16 @@ public sealed partial class BoostViewModel : ObservableObject
         string[] rungNames = ["Unchanged", "Normal", "Above", "High"];
         Rungs = [.. GamePriorityOptions.Select((option, i) => new LadderRung(rungNames[i], 18 + 12 * i, option == GamePriority, holding && option == GamePriority))];
 
+        // The timer. Windows' clock is the finest that any program asks for, often another program's.
+        // Shown as Optima's, it credited Boost with a gain another program was making, at nearly
+        // full bar with Boost off; it is given as a note instead.
+        var tickNow = BoostReadout.TimerTickMs(timer.Holding, timer.RequestedMs, timer.CurrentMs, timer.ReachesGame);
+        var otherProgram = timer.CurrentMs > 0 && timer.CurrentMs < tickNow * 0.9
+            ? $" · another program asks for {Ms(timer.CurrentMs)} ms"
+            : string.Empty;
+
         // The timer combs: Windows' default tick above, what is held (or what Windows gives Optima now) below.
-        var combMs = timer.Holding && timer.AppliedMs is { } heldMs ? heldMs : timer.CurrentMs;
+        var combMs = timer.Holding || timer.CurrentMs > 0 ? tickNow : 0;
         TimerHeldLive = timer.Holding;
         TimerHeldText = combMs <= 0 ? "now " + Dash : (timer.Holding ? "held " : "now ") + Ms(combMs) + " ms";
         TimerHeldTick = new Rect(0, 0, combMs > 0 ? Math.Min(1, combMs / CombSpanMs) : 1, 1);
@@ -1005,14 +1016,14 @@ public sealed partial class BoostViewModel : ObservableObject
                     : cleaner.State == StandbyCleanerState.WaitingForHelper ? "the helper is not running"
                     : "waiting for Critical Ops", 0, false),
 
-            timer.Holding && timer.AppliedMs is { } applied
-                ? new BoostTile("TIMER RESOLUTION", Ms(applied), "ms",
-                    $"{BoostReadout.FinerBy(applied).ToString("0.#", CultureInfo.InvariantCulture)}× finer than Windows' 15.6 ms"
-                        + (timer.ReachesGame ? string.Empty : " · inside Optima only"),
-                    100 * (1 - applied / BoostReadout.WindowsTickMs), true)
+            timer.Holding
+                ? new BoostTile("TIMER RESOLUTION", Ms(tickNow), "ms",
+                    $"{BoostReadout.FinerBy(tickNow).ToString("0.#", CultureInfo.InvariantCulture)}× finer than Windows' 15.6 ms"
+                        + (timer.ReachesGame ? string.Empty : " · inside Optima only") + otherProgram,
+                    100 * (1 - tickNow / BoostReadout.WindowsTickMs), true)
                 : timer.CurrentMs > 0
-                    ? new BoostTile("TIMER RESOLUTION", Ms(timer.CurrentMs), "ms", "Windows' tick for Optima now · nothing held",
-                        100 * (1 - timer.CurrentMs / BoostReadout.WindowsTickMs), false)
+                    ? new BoostTile("TIMER RESOLUTION", Ms(tickNow), "ms",
+                        (timer.ReachesGame ? "Windows' tick now" : "Windows' default tick") + " · nothing held" + otherProgram, 0, false)
                     : new BoostTile("TIMER RESOLUTION", Dash, string.Empty, "not read yet", 0, false),
 
             awake
@@ -1038,7 +1049,8 @@ public sealed partial class BoostViewModel : ObservableObject
 
         static FlowSegment Part(double share, string label) => new(new GridLength(Math.Max(0, share), GridUnitType.Star), label);
         static string Percent(double value, string format) => value.ToString(format, CultureInfo.InvariantCulture) + "%";
-        static string Ms(double ms) => ms.ToString("0.0##", CultureInfo.InvariantCulture);
+        // Windows' default tick is 15.625 ms, written 15.6 everywhere on the page.
+        static string Ms(double ms) => (ms >= BoostReadout.WindowsTickMs ? Math.Round(ms, 1) : ms).ToString("0.0##", CultureInfo.InvariantCulture);
         static string MbOrGb(long mb) => mb >= 1024
             ? (mb / 1024.0).ToString("0.0", CultureInfo.InvariantCulture) + " GB"
             : mb.ToString("N0", CultureInfo.InvariantCulture) + " MB";
