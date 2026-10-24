@@ -45,6 +45,7 @@ public sealed class StandbyCleanerService : IDisposable
     private readonly Func<AppSettings?> _settings;
     private readonly ILogger<StandbyCleanerService> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _statusLock = new();
     private bool _started;
     private bool _running;
 
@@ -99,7 +100,7 @@ public sealed class StandbyCleanerService : IDisposable
             if (!enabled)
             {
                 await StopCoreAsync(ct).ConfigureAwait(false);
-                Publish(Status with { State = StandbyCleanerState.Off });
+                Publish(s => s with { State = StandbyCleanerState.Off });
                 return;
             }
 
@@ -111,14 +112,14 @@ public sealed class StandbyCleanerService : IDisposable
             if (_presence.Current != GamePresence.InGame)
             {
                 await StopCoreAsync(ct).ConfigureAwait(false);
-                Publish(Status with { State = StandbyCleanerState.WaitingForGame });
+                Publish(s => s with { State = StandbyCleanerState.WaitingForGame });
                 return;
             }
 
             if (!_broker.IsConnected)
             {
                 _running = false;
-                Publish(Status with { State = StandbyCleanerState.WaitingForHelper });
+                Publish(s => s with { State = StandbyCleanerState.WaitingForHelper });
                 return;
             }
 
@@ -137,7 +138,7 @@ public sealed class StandbyCleanerService : IDisposable
             {
                 _logger.LogWarning("Memory cleaner did not start: {Error}", response.Error);
             }
-            Publish(Status with { State = response.Success ? StandbyCleanerState.Running : StandbyCleanerState.WaitingForHelper });
+            Publish(s => s with { State = response.Success ? StandbyCleanerState.Running : StandbyCleanerState.WaitingForHelper });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -163,11 +164,11 @@ public sealed class StandbyCleanerService : IDisposable
             return null;
         }
         var freed = ParseLong(response.Data.GetValueOrDefault("freedMb")) ?? 0;
-        Publish(Status with
+        Publish(s => s with
         {
             FreeMb = ParseLong(response.Data.GetValueOrDefault("freeMb")),
             StandbyMb = ParseLong(response.Data.GetValueOrDefault("standbyMb")),
-            Purges = Status.Purges + 1,
+            Purges = s.Purges + 1,
             LastFreedMb = freed,
             LastPurgeAt = DateTimeOffset.Now,
         });
@@ -193,26 +194,40 @@ public sealed class StandbyCleanerService : IDisposable
             ipcEvent.Data.GetValueOrDefault("lastPurgeAt"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at)
             ? at
             : (DateTimeOffset?)null;
-        // The readout names the helper's own last purge, if it has made one. A "purge now" since
-        // then is newer and stays the last purge, with what it freed.
-        var older = Status.LastPurgeAt is { } known && (lastPurge is not { } named || named < known);
-        Publish(Status with
+        Publish(s =>
         {
-            FreeMb = ParseLong(ipcEvent.Data.GetValueOrDefault("freeMb")),
-            StandbyMb = ParseLong(ipcEvent.Data.GetValueOrDefault("standbyMb")),
-            Purges = (int)(ParseLong(ipcEvent.Data.GetValueOrDefault("purges")) ?? Status.Purges),
-            LastFreedMb = older ? Status.LastFreedMb : ParseLong(ipcEvent.Data.GetValueOrDefault("lastFreedMb")) ?? Status.LastFreedMb,
-            LastPurgeAt = older ? Status.LastPurgeAt : lastPurge ?? Status.LastPurgeAt,
+            // The readout names the helper's own last purge, if it has made one. A "purge now" since
+            // then is newer and stays the last purge, with what it freed.
+            var older = s.LastPurgeAt is { } known && (lastPurge is not { } named || named < known);
+            return s with
+            {
+                FreeMb = ParseLong(ipcEvent.Data.GetValueOrDefault("freeMb")),
+                StandbyMb = ParseLong(ipcEvent.Data.GetValueOrDefault("standbyMb")),
+                Purges = (int)(ParseLong(ipcEvent.Data.GetValueOrDefault("purges")) ?? s.Purges),
+                LastFreedMb = older ? s.LastFreedMb : ParseLong(ipcEvent.Data.GetValueOrDefault("lastFreedMb")) ?? s.LastFreedMb,
+                LastPurgeAt = older ? s.LastPurgeAt : lastPurge ?? s.LastPurgeAt,
+            };
         });
     }
 
     private static long? ParseLong(string? text)
         => long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : null;
 
-    private void Publish(StandbyCleanerStatus status)
+    /// <summary>
+    /// Applies one change to the status. The helper's readouts arrive on the pipe's thread while a sync
+    /// runs on the pool, and each change is read and written as one step: done apart, a sync that read
+    /// the status just before a readout wrote it back without the readout's numbers.
+    /// </summary>
+    private void Publish(Func<StandbyCleanerStatus, StandbyCleanerStatus> change)
     {
-        status = status with { Tally = status.Tally.Add(Status.LastPurgeAt, status.LastPurgeAt, status.LastFreedMb) };
-        Status = status;
+        StandbyCleanerStatus status;
+        lock (_statusLock)
+        {
+            var before = Status;
+            status = change(before);
+            status = status with { Tally = status.Tally.Add(before.LastPurgeAt, status.LastPurgeAt, status.LastFreedMb) };
+            Status = status;
+        }
         StatusChanged?.Invoke(status);
     }
 

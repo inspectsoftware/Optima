@@ -148,6 +148,28 @@ public sealed class StandbyCleanerTests
     }
 
     [Fact]
+    public async Task AReadoutThatLandsDuringASync_IsNeverWrittenOver()
+    {
+        // A sync reads the status and writes back a new state; a readout arriving between the two
+        // used to be lost. Raced many times so a lost readout cannot slip through by luck.
+        for (var round = 0; round < 300; round++)
+        {
+            using var cleaner = Create();
+            cleaner.Start();
+            var sync = Task.Run(() => cleaner.SyncAsync(allowPrompt: false));
+            _broker.Raise(new IpcEvent
+            {
+                Kind = "memoryStatus",
+                Data = new Dictionary<string, string> { ["freeMb"] = "731", ["standbyMb"] = "5120", ["purges"] = "2" },
+            });
+            await sync;
+
+            Assert.Equal(731, cleaner.Status.FreeMb);
+            Assert.Equal(2, cleaner.Status.Purges);
+        }
+    }
+
+    [Fact]
     public void FreedMemoryIsTotalledOverTheRun_EachPurgeOnce()
     {
         using var cleaner = Create();
