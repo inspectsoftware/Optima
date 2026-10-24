@@ -35,6 +35,14 @@ public sealed class BoostDial : FrameworkElement
         nameof(ArmedMask), typeof(int), typeof(BoostDial),
         new FrameworkPropertyMetadata(0b11_1111, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    /// <summary>
+    /// Whether Critical Ops is on screen while Boost is on. Until it is, the nameplate reads ARMED
+    /// instead of ENGAGED, the same words the page's header uses for the two states.
+    /// </summary>
+    public static readonly DependencyProperty IsEngagedProperty = DependencyProperty.Register(
+        nameof(IsEngaged), typeof(bool), typeof(BoostDial),
+        new FrameworkPropertyMetadata(true, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public static readonly DependencyProperty CommandProperty = DependencyProperty.Register(
         nameof(Command), typeof(ICommand), typeof(BoostDial), new PropertyMetadata(null));
 
@@ -158,8 +166,9 @@ public sealed class BoostDial : FrameworkElement
 
     // The lettering is laid out once per label and drawn every frame; rebuilt when the window lands on another DPI.
     private double _textDpi;
-    private readonly Geometry?[] _titles = new Geometry?[4];
-    private readonly Geometry?[] _subs = new Geometry?[4];
+    // One slot per label, and a fifth for the engaged label while only armed.
+    private readonly Geometry?[] _titles = new Geometry?[5];
+    private readonly Geometry?[] _subs = new Geometry?[5];
 
     public BoostDial()
     {
@@ -208,6 +217,12 @@ public sealed class BoostDial : FrameworkElement
     {
         get => (int)GetValue(ArmedMaskProperty);
         set => SetValue(ArmedMaskProperty, value);
+    }
+
+    public bool IsEngaged
+    {
+        get => (bool)GetValue(IsEngagedProperty);
+        set => SetValue(IsEngagedProperty, value);
     }
 
     public ICommand? Command
@@ -729,14 +744,17 @@ public sealed class BoostDial : FrameworkElement
             Array.Clear(_titles);
             Array.Clear(_subs);
         }
-        var i = (int)label;
+        // Running, but with nothing to work on yet: the header says ARMED · waiting for Critical
+        // Ops, and a nameplate reading ENGAGED beside it said the opposite.
+        var armed = label == BoostDialLabel.Engaged && !IsEngaged;
+        var i = armed ? 4 : (int)label;
         if (_titles[i] is { } laidTitle && _subs[i] is { } laidSub)
         {
             return (laidTitle, laidSub);
         }
         var body = TryFindResource("Font.Body") as FontFamily ?? new FontFamily("Segoe UI");
         var mono = TryFindResource("Font.Mono") as FontFamily ?? new FontFamily("Consolas");
-        var (word, line) = label switch
+        var (word, line) = armed ? ("ARMED", "click to stop") : label switch
         {
             BoostDialLabel.Igniting => ("IGNITING", "spinning up"),
             BoostDialLabel.Engaged => ("ENGAGED", "click to stop"),

@@ -269,6 +269,7 @@
               <StackPanel HorizontalAlignment="Center">
                 <ctl:BoostDial Width="380" Height="380"
                                IsOn="{Binding BoostOn, Mode=OneWay}"
+                               IsEngaged="{Binding BoostEngaged, Mode=OneWay}"
                                FeatureCount="{Binding BoostFeatureCount, Mode=OneWay}"
                                ArmedMask="{Binding ArmedMask, Mode=OneWay}"
                                Command="{Binding ToggleBoostCommand}"

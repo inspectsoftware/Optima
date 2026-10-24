@@ -646,7 +646,12 @@ public sealed partial class BoostViewModel : ObservableObject
     private static readonly HashSet<string> WorkingStates = ["HOLDING", "RUNNING", "ACTIVE", "WATCHING", "AWAKE", "SET"];
 
     /// <summary>OFF, ARMED (on, waiting for the game) or ENGAGED (on, with the game on screen): the header's light.</summary>
-    [ObservableProperty] private string _boostPhase = "OFF";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BoostEngaged))]
+    private string _boostPhase = "OFF";
+
+    /// <summary>Boost on with Critical Ops on screen, which the dial's nameplate reads as ENGAGED.</summary>
+    public bool BoostEngaged => BoostPhase == "ENGAGED";
     [ObservableProperty] private string _headerStatusText = string.Empty;
     [ObservableProperty] private string _coresStateText = "OFF";
     [ObservableProperty] private string _gpuStateText = "OFF";
