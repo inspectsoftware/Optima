@@ -10,7 +10,7 @@ namespace Optima.App.Services;
 /// Runs the launch splash on a UI thread of its own. Startup does all its work on the main thread,
 /// and a splash sharing that thread can only animate in the gaps; on its own thread it plays every
 /// frame from the first one, however busy startup is. The main thread talks to it through the
-/// three calls here and never touches the window directly.
+/// calls here and never touches the window directly.
 /// </summary>
 public sealed class SplashHost
 {
@@ -20,9 +20,14 @@ public sealed class SplashHost
     // when building it failed; every call below then does nothing.
     private SplashWindow? _window;
 
+    // Done once the splash thread stops, for whatever reason: a step waiting on a splash that is
+    // gone must not wait for ever.
+    private readonly TaskCompletionSource _gone = new();
+
     private SplashHost(Dispatcher dispatcher)
     {
         _dispatcher = dispatcher;
+        dispatcher.ShutdownStarted += (_, _) => _gone.TrySetResult();
     }
 
     /// <summary>
@@ -98,18 +103,27 @@ public sealed class SplashHost
 
     public void SetAccent(Color accent) => Post(() => _window?.SetAccent(accent));
 
-    /// <summary>Opens the splash into the main window's bounds and closes it. Safe to call once the main window is shown.</summary>
-    public Task OpenIntoAsync(Rect target)
+    /// <summary>
+    /// Grows the splash over the main window's bounds, once the intro has played. The task completes
+    /// when they are covered, or at once when the splash is gone; either way the window can then be shown.
+    /// </summary>
+    public Task GrowIntoAsync(Rect target) => Run(window => window.GrowIntoAsync(target));
+
+    /// <summary>Fades the splash off the main window and closes it. The task completes when it is gone.</summary>
+    public Task RevealAsync() => Run(window => window.RevealAsync());
+
+    /// <summary>Takes the splash down at once, for a startup that failed.</summary>
+    public void Close() => Post(() => _window?.CloseNow());
+
+    private Task Run(Func<SplashWindow, Task> step)
     {
         if (_dispatcher.HasShutdownStarted)
         {
             return Task.CompletedTask;
         }
-        return _dispatcher.InvokeAsync(() => _window?.OpenIntoAsync(target) ?? Task.CompletedTask).Task.Unwrap();
+        var done = _dispatcher.InvokeAsync(() => _window is { } window ? step(window) : Task.CompletedTask).Task.Unwrap();
+        return Task.WhenAny(done, _gone.Task);
     }
-
-    /// <summary>Takes the splash down at once, for a startup that failed.</summary>
-    public void Close() => Post(() => _window?.CloseNow());
 
     private void Post(Action action)
     {

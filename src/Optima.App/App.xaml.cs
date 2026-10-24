@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Optima.App.Logging;
 using Optima.App.Services;
@@ -170,16 +171,7 @@ public partial class App : Application
         var startInTray = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase));
         if (!startInTray)
         {
-            window.Show();
-            StartupTrace.Mark("window shown");
-            _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => StartupTrace.Mark("first idle"));
-            // The splash sits on top; its centre square opens onto the window that is already
-            // rendered underneath, so there is no flash of empty desktop.
-            _splash?.SetStatus("ready", 1);
-            var bounds = window.WindowState == WindowState.Maximized
-                ? new Rect(SystemParameters.WorkArea.Location, SystemParameters.WorkArea.Size)
-                : new Rect(window.Left, window.Top, window.ActualWidth, window.ActualHeight);
-            _ = _splash?.OpenIntoAsync(bounds).ContinueWith(_ => StartupTrace.Mark("splash gone"), TaskScheduler.Default);
+            ShowBehindSplash(window);
         }
         else
         {
@@ -192,10 +184,11 @@ public partial class App : Application
             new GlassLabWindow().Show();
         }
 
-        // The window paints here. Everything below used to run before its first frame, because a
-        // frame is only drawn once this method gives the thread back. Loaded priority is below
-        // rendering and above input, so the frame comes first and no click or key is handled
-        // before the hotkeys, the tray and the close handling exist.
+        // Without a splash the window is shown by now and paints here. Everything below used to run
+        // before its first frame, because a frame is only drawn once this method gives the thread
+        // back. Loaded priority is below rendering and above input, so the frame comes first and no
+        // click or key is handled before the hotkeys, the tray and the close handling exist. With a
+        // splash, the window is shown later, once the splash has covered its place.
         await Dispatcher.Yield(DispatcherPriority.Loaded);
         // A first frame that failed has been reported and the app is closing: start nothing more.
         if (_fatal)
@@ -362,6 +355,64 @@ public partial class App : Application
 
     // From here on a failed file or database action is that action's failure, not the app's.
     private bool _startupComplete;
+
+    // However the splash fares, the window is on screen by then.
+    private static readonly TimeSpan SplashPatience = TimeSpan.FromSeconds(4);
+
+    /// <summary>
+    /// Brings the main window on screen out of the splash. The card grows to the window's place and
+    /// covers it, the window is shown underneath, and once the window has drawn its first frame the
+    /// splash fades off it: at no point is the window beside the card, or the desktop showing where
+    /// the window is about to be. Startup goes on with its services meanwhile and does not wait for
+    /// any of it. Async void on purpose: a window that fails to show is a failed start, and that has
+    /// to reach the handler that reports one.
+    /// </summary>
+    private async void ShowBehindSplash(MainWindow window)
+    {
+        var firstFrame = new TaskCompletionSource();
+        window.ContentRendered += (_, _) => firstFrame.TrySetResult();
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        var splash = _splash;
+        if (splash is not null)
+        {
+            splash.SetStatus("ready", 1);
+            var covered = splash.GrowIntoAsync(PlacementOf(window));
+            if (await Task.WhenAny(covered, Task.Delay(SplashPatience)) != covered)
+            {
+                Log.Warning("The splash did not hand over in time; the window is shown without it");
+            }
+            // A start that failed meanwhile has closed the splash and is taking the app down, and an
+            // exit from the tray has closed the window.
+            if (_fatal || closed)
+            {
+                return;
+            }
+        }
+        window.Show();
+        StartupTrace.Mark("window shown");
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => StartupTrace.Mark("first idle"));
+        if (splash is null)
+        {
+            return;
+        }
+        await Task.WhenAny(firstFrame.Task, Task.Delay(SplashPatience));
+        await splash.RevealAsync();
+        StartupTrace.Mark("splash gone");
+    }
+
+    /// <summary>
+    /// Where the main window will be once it is shown, in the units of its Left and Top. Read before
+    /// it is shown: the handle gives the window its centred place (measured: showing it afterwards
+    /// does not move it), and a window that opens maximized fills the work area.
+    /// </summary>
+    private static Rect PlacementOf(Window window)
+    {
+        new WindowInteropHelper(window).EnsureHandle();
+        return window.WindowState == WindowState.Maximized
+            ? new Rect(SystemParameters.WorkArea.Location, SystemParameters.WorkArea.Size)
+            : new Rect(window.Left, window.Top, window.Width, window.Height);
+    }
 
     /// <summary>Writes the startup timeline once the pages have their data and the splash has had time to leave.</summary>
     private static async Task ReportStartupAsync(Task initialization)
