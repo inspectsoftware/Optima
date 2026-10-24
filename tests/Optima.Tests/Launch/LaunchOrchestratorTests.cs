@@ -704,6 +704,41 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task Attach_TheHelperIsNotRunning_NoPromptGoesUpOverTheGame()
+    {
+        // A prompt that would stay open: before the fix the session waited on it with the game up.
+        var elevation = new FakeElevationBroker { Answer = new TaskCompletionSource<bool>().Task };
+        var phases = new List<LaunchPhase>();
+        var orchestrator = CreateOrchestrator(elevation: elevation);
+        orchestrator.ProgressChanged += (_, progress) => phases.Add(progress.Phase);
+
+        var result = await orchestrator.AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        // Nothing of the driver is touched, since any of it could put the prompt up, and the game is
+        // tuned and watched as usual.
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Equal("ELEVATION_DECLINED", Assert.Single(result.Warnings).Code);
+        Assert.Empty(_virtualDisplay.Log);
+        Assert.Equal([4242], _processOptimizer.Applied);
+        Assert.Contains(LaunchPhase.Monitoring, phases);
+    }
+
+    [Fact]
+    public async Task Attach_TheHelperIsAlreadyRunning_TheDisplayComesOn()
+    {
+        var elevation = new FakeElevationBroker { IsConnected = true };
+
+        var result = await CreateOrchestrator(elevation: elevation).AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
     public async Task Attach_CaptureNotAllowed_RecordsSessionWithoutMetrics()
     {
         _metrics.Available = true;

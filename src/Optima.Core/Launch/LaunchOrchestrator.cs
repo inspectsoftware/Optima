@@ -117,6 +117,12 @@ public sealed class LaunchOrchestrator
 
         /// <summary>The driver was not installed, so <see cref="DisplayHelper"/> asked nobody and answered no.</summary>
         public bool DriverMissing { get; set; }
+
+        /// <summary>
+        /// Watch mode found the helper not running and, since it never prompts over a game that is
+        /// already up, did not ask for it: <see cref="DisplayHelper"/> answered no without a prompt.
+        /// </summary>
+        public bool HelperNotAsked { get; set; }
     }
 
     public LaunchOrchestrator(
@@ -283,6 +289,14 @@ public sealed class LaunchOrchestrator
         {
             Report(LaunchPhase.Validating, "Game detected. Applying the selected profile…");
             var game = await _detector.DetectTargetGameAsync(token).ConfigureAwait(false);
+
+            // The game is already on screen, so an administrator prompt now would come up over it and
+            // hold the session until it is answered. Watch mode never asks: the display only comes on
+            // when the helper is already running from earlier use.
+            if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
+            {
+                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context, prompt: false);
+            }
 
             await _recovery.SavePendingAsync(context.Snapshot, token).ConfigureAwait(false);
             await ApplyEnvironmentAsync(profile, context, token).ConfigureAwait(false);
@@ -461,7 +475,7 @@ public sealed class LaunchOrchestrator
     /// nothing for the helper to switch on, and a no to a prompt that was never needed would then be
     /// blamed for a display that could not have come on anyway.
     /// </summary>
-    private async Task<bool> AskForDisplayHelperAsync(IElevationBroker elevation, SessionContext context)
+    private async Task<bool> AskForDisplayHelperAsync(IElevationBroker elevation, SessionContext context, bool prompt = true)
     {
         if (!(await _virtualDisplay.GetCapabilitiesAsync().ConfigureAwait(false)).RequiresElevation)
         {
@@ -470,6 +484,11 @@ public sealed class LaunchOrchestrator
         if (_driver is not null && await _driver.GetStateAsync().ConfigureAwait(false) != DriverState.Installed)
         {
             context.DriverMissing = true;
+            return false;
+        }
+        if (!prompt)
+        {
+            context.HelperNotAsked = true;
             return false;
         }
         return await elevation.EnsureStartedAsync().ConfigureAwait(false);
@@ -511,6 +530,15 @@ public sealed class LaunchOrchestrator
                 throw OptimaException.From("VDD_NOT_INSTALLED",
                     "No virtual display driver device was found.",
                     "The Virtual Display Driver does not appear in Device Manager.");
+            }
+            if (context.HelperNotAsked)
+            {
+                throw OptimaException.From("ELEVATION_DECLINED",
+                    "Administrator access is needed to switch the virtual display.",
+                    "Optima's helper was not running, and watch mode does not put an administrator prompt over a " +
+                    "game that is already up. The virtual display stayed off and the game ran on your real screen.",
+                    null,
+                    "Start the game with PLAY in Optima and approve the administrator prompt");
             }
             throw OptimaException.From("ELEVATION_DECLINED",
                 "Administrator access is needed to switch the virtual display.",
