@@ -109,4 +109,36 @@ public sealed class WindowsProcessOptimizerTests
             Kill(child);
         }
     }
+
+    [Fact]
+    public async Task Restore_LeavesALaterProcessWithTheSameNameAndIdAlone()
+    {
+        // A demoted cmd ended and Windows gave its id to another cmd: same id and name, later start.
+        using var child = StartIdleChild();
+        try
+        {
+            var started = ProcessQuery.GetStartTime(child.SafeHandle)!.Value;
+            var endedOne = new ProcessStateSnapshot
+            {
+                ProcessId = child.Id,
+                ProcessName = "cmd",
+                OriginalPriority = ProcessPriorityLevel.AboveNormal,
+                StartTime = started.AddMinutes(-5),
+            };
+            var optimizer = new WindowsProcessOptimizer(NullLogger<WindowsProcessOptimizer>.Instance);
+
+            await optimizer.RestoreAsync(endedOne);
+            child.Refresh();
+            Assert.Equal(ProcessPriorityClass.Normal, child.PriorityClass);
+
+            // The process the snapshot was taken of is still put back.
+            await optimizer.RestoreAsync(endedOne with { StartTime = started });
+            child.Refresh();
+            Assert.Equal(ProcessPriorityClass.AboveNormal, child.PriorityClass);
+        }
+        finally
+        {
+            Kill(child);
+        }
+    }
 }

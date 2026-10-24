@@ -704,6 +704,56 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task Attach_APromptLeftOpen_HoldsTheGameNoLongerThanPlayDoes()
+    {
+        // A prompt that stays open: before the fix the session waited on it with the game up.
+        var elevation = new FakeElevationBroker { Answer = new TaskCompletionSource<bool>().Task };
+        var phases = new List<LaunchPhase>();
+        var orchestrator = CreateOrchestrator(elevation: elevation);
+        orchestrator.DisplayHelperWait = TimeSpan.FromMilliseconds(100);
+        orchestrator.ProgressChanged += (_, progress) => phases.Add(progress.Phase);
+
+        var result = await orchestrator.AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        // Asked once, given up on after the wait, nothing of the driver touched, and the game is
+        // tuned and watched as usual.
+        Assert.True(result.Success);
+        Assert.Equal(1, elevation.Prompts);
+        Assert.Equal("ELEVATION_DECLINED", Assert.Single(result.Warnings).Code);
+        Assert.Empty(_virtualDisplay.Log);
+        Assert.Equal([4242], _processOptimizer.Applied);
+        Assert.Contains(LaunchPhase.Monitoring, phases);
+    }
+
+    [Fact]
+    public async Task Attach_TheHelperIsNotRunning_AYesSwitchesTheDisplayOn()
+    {
+        // The display follows the game also when watch mode found it: the prompt is the price of that.
+        var elevation = new FakeElevationBroker { ConnectOnPrompt = true };
+
+        var result = await CreateOrchestrator(elevation: elevation).AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false);
+
+        Assert.True(result.Success);
+        Assert.Equal(1, elevation.Prompts);
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task Attach_TheHelperIsAlreadyRunning_TheDisplayComesOn()
+    {
+        var elevation = new FakeElevationBroker { IsConnected = true };
+
+        var result = await CreateOrchestrator(elevation: elevation).AttachToRunningGameAsync(CompetitiveProfile, 4242, captureAllowed: false);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
     public async Task Attach_CaptureNotAllowed_RecordsSessionWithoutMetrics()
     {
         _metrics.Available = true;

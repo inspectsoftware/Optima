@@ -161,6 +161,22 @@ public sealed class GameExtrasTests : IDisposable
     }
 
     [Fact]
+    public async Task APreferenceThePlayerSetInWindows_IsLeftAloneWhenTheSwitchGoesOnAndOff()
+    {
+        _settings = _settings with { BoostGpuHighPerformance = false, BoostGamePath = _extras.PathOfGame };
+        _extras.HighPerformance.Add(_extras.PathOfGame!);
+        using var service = Create();
+
+        // Already high performance, so Boost writes nothing and keeps no ledger of it.
+        _settings = _settings with { BoostGpuHighPerformance = true };
+        await service.SyncAsync();
+        _settings = _settings with { BoostGpuHighPerformance = false };
+        await service.SyncAsync();
+
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+    }
+
+    [Fact]
     public async Task APreferenceBoostWrote_IsTakenAwayAtTheNextStart_WhichBeginsWithBoostOff()
     {
         // Run 1 ends with Boost on and without its own clean-up (killed, or a crash).
@@ -186,6 +202,27 @@ public sealed class GameExtrasTests : IDisposable
         Assert.DoesNotContain(_extras.PathOfGame!, _extras.HighPerformance);
         Assert.False(service.Status.GpuApplied);
         Assert.False(File.Exists(Path.Combine(_folder, "boost-gpu.json")));
+    }
+
+    [Fact]
+    public async Task APreferenceWrittenForAnEarlierGamePath_IsTakenAwayWhenTheGameMoves()
+    {
+        const string oldPath = @"C:\Old\Emulator\HD-Player.exe";
+        _settings = _settings with { BoostGamePath = oldPath };
+        var service = Create();
+        await service.SyncAsync();
+        Assert.Contains(oldPath, _extras.HighPerformance);
+
+        // The game is seen at its new path: the preference follows it.
+        _presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        await service.SyncAsync();
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+        Assert.DoesNotContain(oldPath, _extras.HighPerformance);
+
+        _settings = _settings with { BoostGpuHighPerformance = false };
+        await service.SyncAsync();
+        service.Dispose();
+        Assert.Empty(_extras.HighPerformance);
     }
 
     [Fact]

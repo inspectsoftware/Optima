@@ -284,6 +284,16 @@ public sealed class LaunchOrchestrator
             Report(LaunchPhase.Validating, "Game detected. Applying the selected profile…");
             var game = await _detector.DetectTargetGameAsync(token).ConfigureAwait(false);
 
+            // The display follows the game, so a game found running still gets it, and with the helper
+            // not running that means one administrator prompt over the game. Asked here, like PLAY
+            // does before the launch, so the display step waits for the answer only as long as PLAY
+            // does and the game is tuned and watched either way; left to the driver, the prompt held
+            // the session for as long as it stayed open.
+            if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
+            {
+                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context);
+            }
+
             await _recovery.SavePendingAsync(context.Snapshot, token).ConfigureAwait(false);
             await ApplyEnvironmentAsync(profile, context, token).ConfigureAwait(false);
             await ApplyVirtualDisplayAsync(profile.Display, context, token).ConfigureAwait(false);

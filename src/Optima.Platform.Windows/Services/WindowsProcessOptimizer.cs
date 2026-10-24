@@ -175,6 +175,13 @@ public sealed class WindowsProcessOptimizer : IProcessOptimizer
                     {
                         return;
                     }
+                    // A demoted process carries its start time, which also tells it from a later
+                    // process of the same name that Windows gave its id to, as browsers start them
+                    // all the time.
+                    if (snapshot.StartTime is { } started && ProcessQuery.GetStartTime(process.SafeHandle) != started)
+                    {
+                        return;
+                    }
 
                     process.PriorityClass = ToPriorityClass(snapshot.OriginalPriority);
                     if (snapshot.OriginalAffinityMask != 0)
