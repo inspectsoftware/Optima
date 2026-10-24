@@ -324,7 +324,12 @@ public sealed class BoostDial : FrameworkElement
         base.OnKeyDown(e);
         if (e.Key is Key.Space or Key.Enter)
         {
-            Toggle();
+            // One press is one flip. Held down, the key repeats about thirty times a second, and
+            // each repeat that found the last switch finished flipped Boost again.
+            if (!e.IsRepeat)
+            {
+                Toggle();
+            }
             e.Handled = true;
         }
     }
