@@ -90,6 +90,8 @@
 
     <!-- A few options side by side, the chosen one filled with the accent. -->
     <Style x:Key="Segmented" TargetType="ListBox">
+      <EventSetter Event="PreviewMouseLeftButtonDown" Handler="KeepChoice" />
+      <EventSetter Event="PreviewKeyDown" Handler="KeepChoice" />
       <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource AncestorType=ctl:SettingRow}}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Brush.HairlineStrong}" />
       <Setter Property="BorderThickness" Value="1" />
@@ -208,6 +210,8 @@
 
     <!-- No scroll viewer of its own: one would take the mouse wheel over the list, and the page under it would not scroll. -->
     <Style x:Key="SectionList" TargetType="ListBox">
+      <EventSetter Event="PreviewMouseLeftButtonDown" Handler="KeepChoice" />
+      <EventSetter Event="PreviewKeyDown" Handler="KeepChoice" />
       <Setter Property="ItemContainerStyle" Value="{StaticResource SectionItem}" />
       <Setter Property="Template">
         <Setter.Value>

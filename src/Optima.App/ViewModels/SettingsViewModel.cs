@@ -97,6 +97,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         if (value is null)
         {
+            // Null is the search showing every match. Without a search it is Ctrl+click on the open
+            // section, which clears a list's choice and left no page on screen, so that section stays open.
+            if (SearchText.Trim().Length == 0)
+            {
+                SelectedSection = _lastSection ?? Sections[0];
+            }
             return;
         }
         _lastSection = value;
@@ -145,6 +151,42 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private string _theme = "Dark";
     [ObservableProperty] private string _accentColor = AccentMath.DefaultAccentHex;
+
+    // The segmented choices are single-select lists, and Ctrl+click or Ctrl+Space on the chosen
+    // segment clears it. An empty choice is not a setting: it was saved as null, a null display
+    // provider broke every virtual display call, and Off animations came back as System. The
+    // choice stays what it was instead.
+    partial void OnThemeChanged(string? oldValue, string newValue)
+    {
+        if (newValue is null)
+        {
+            Theme = oldValue ?? "Dark";
+        }
+    }
+
+    partial void OnAnimationsChanged(string? oldValue, string newValue)
+    {
+        if (newValue is null)
+        {
+            Animations = oldValue ?? AnimationLabels[0];
+        }
+    }
+
+    partial void OnOverlayCornerChanged(string? oldValue, string newValue)
+    {
+        if (newValue is null)
+        {
+            OverlayCorner = oldValue ?? "TopRight";
+        }
+    }
+
+    partial void OnProviderChanged(string? oldValue, string newValue)
+    {
+        if (newValue is null)
+        {
+            Provider = oldValue ?? "Auto";
+        }
+    }
 
     partial void OnAccentColorChanged(string value)
     {
