@@ -81,6 +81,14 @@ public static class TrackedPlayerQuery
         return new TrackDecision(TrackOutcome.NotFound, string.Empty, null);
     }
 
+    /// <summary>
+    /// The account id to keep when only a name is typed, as the setup wizard asks for it. The stored id
+    /// belongs to the stored name and every lookup tries the id first, so a different name drops it:
+    /// otherwise the old player went on being tracked by id under the new name.
+    /// </summary>
+    public static long? IdForName(string storedIgn, long? storedId, string typedIgn)
+        => string.Equals(storedIgn.Trim(), typedIgn.Trim(), StringComparison.OrdinalIgnoreCase) ? storedId : null;
+
     /// <summary>The saved list with this identity in it: an entry for the same player is replaced, not doubled.</summary>
     public static IReadOnlyList<PlayerAccount> WithSaved(IReadOnlyList<PlayerAccount> saved, string ign, long? accountId)
     {

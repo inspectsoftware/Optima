@@ -114,6 +114,15 @@ public sealed class TrackedPlayerQueryTests
         Assert.EndsWith("profile?usernames=frosty", handler.LastUrl);
     }
 
+    [Theory]
+    [InlineData("Kestrel", 48211907L, "Kestrel", 48211907L)]
+    [InlineData("Kestrel", 48211907L, " kestrel ", 48211907L)]
+    [InlineData("Kestrel", 48211907L, "Falcon", null)]
+    [InlineData("Kestrel", 48211907L, "", null)]
+    [InlineData("", 48211907L, "", 48211907L)]
+    public void ANameTypedForSomeoneElseDropsTheStoredId(string storedIgn, long? storedId, string typed, long? expected)
+        => Assert.Equal(expected, TrackedPlayerQuery.IdForName(storedIgn, storedId, typed));
+
     [Fact]
     public void SavingTheSamePlayerAgainReplacesTheEntry()
     {
