@@ -95,6 +95,13 @@ public sealed class LaunchOrchestrator
     /// </summary>
     public TimeSpan PriorityKeeperInterval { get; set; } = DefaultPriorityKeeperInterval;
 
+    /// <summary>
+    /// How long the display step waits, once the game is up, for an administrator prompt the player
+    /// has not answered yet. The game is neither tuned nor watched for its exit while it waits. The
+    /// property exists so a test can shorten the wait.
+    /// </summary>
+    public TimeSpan DisplayHelperWait { get; set; } = TimeSpan.FromSeconds(20);
+
     /// <summary>Mutable per-session state, so the catch paths always restore the latest snapshot.</summary>
     private sealed class SessionContext
     {
@@ -468,13 +475,36 @@ public sealed class LaunchOrchestrator
         return await elevation.EnsureStartedAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Waits for the answer to the helper's prompt, but not for long: the game is already running.
+    /// A prompt still open after <see cref="DisplayHelperWait"/> is given up on for this session, so
+    /// the game is tuned and watched, and a yes that comes later only starts the helper for whoever
+    /// asks next instead of switching the display on behind a game that may have closed by then.
+    /// </summary>
+    private async Task<bool> WaitForDisplayHelperAsync(Task<bool> helper, CancellationToken ct)
+    {
+        try
+        {
+            return await helper.WaitAsync(DisplayHelperWait, ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            throw OptimaException.From("ELEVATION_DECLINED",
+                "The administrator prompt was still open after the game had started.",
+                "The virtual display needs Optima's helper, and the running game was not held up any longer " +
+                "waiting for it. The display stayed off for this session and the game ran on your real screen.",
+                null,
+                "Approve the administrator prompt when you press PLAY");
+        }
+    }
+
     private async Task ConfigureVirtualDisplayAsync(DisplayProfile display, SessionContext context, CancellationToken ct)
     {
         Report(LaunchPhase.ConfiguringDisplay, $"Configuring virtual display {display.Mode}…");
 
         // A no to the prompt before the launch is not answered by asking again now, over the game:
         // every step of the driver below may need the helper, so none of them is tried.
-        if (context.DisplayHelper is { } helper && !await helper.WaitAsync(ct).ConfigureAwait(false))
+        if (context.DisplayHelper is { } helper && !await WaitForDisplayHelperAsync(helper, ct).ConfigureAwait(false))
         {
             if (context.DriverMissing)
             {

@@ -290,10 +290,17 @@ internal sealed class FakeElevationBroker : IElevationBroker
     /// <summary>Run when the helper is asked to start, so a test can look at what had happened by then.</summary>
     public Action? OnPrompt { get; set; }
 
+    /// <summary>The prompt stays open until this finishes with the player's answer.</summary>
+    public Task<bool>? Answer { get; set; }
+
     public Task<bool> EnsureStartedAsync(CancellationToken ct = default)
     {
         Prompts++;
         OnPrompt?.Invoke();
+        if (Answer is not null)
+        {
+            return Answer.WaitAsync(ct);
+        }
         IsConnected |= ConnectOnPrompt;
         return Task.FromResult(IsConnected);
     }

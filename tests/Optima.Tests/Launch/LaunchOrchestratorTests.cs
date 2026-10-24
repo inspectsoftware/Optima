@@ -334,6 +334,27 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task RunSession_ThePromptIsStillOpenOnceTheGameIsUp_TheGameIsNotHeldUpForIt()
+    {
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var elevation = new FakeElevationBroker { Answer = answer.Task };
+        var orchestrator = CreateOrchestrator(elevation: elevation);
+        orchestrator.DisplayHelperWait = TimeSpan.FromMilliseconds(50);
+
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile).WaitAsync(TimeSpan.FromSeconds(10));
+
+        // The game was tuned and watched to its exit, and the display stayed off and says why.
+        Assert.True(result.Success);
+        Assert.Equal("ELEVATION_DECLINED", Assert.Single(result.Warnings).Code);
+        Assert.Equal([4242], _processOptimizer.Applied);
+        Assert.Single(_sessionStore.Saved);
+        Assert.False(orchestrator.IsSessionActive);
+        // A yes after the game has gone does not switch the display on.
+        answer.SetResult(true);
+        Assert.Empty(_virtualDisplay.Log);
+    }
+
+    [Fact]
     public async Task RunSession_TheDriverIsNotInstalled_NothingIsAskedAndTheMissingDriverIsTheReason()
     {
         // The prompt would be answered with No; it must not even be put up.
