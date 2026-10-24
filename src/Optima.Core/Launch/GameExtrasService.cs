@@ -165,6 +165,10 @@ public sealed class GameExtrasService : IDisposable
             {
                 if (gpuEnabled && !_extras.IsGpuHighPerformance(gamePath))
                 {
+                    // The ledger holds one path, so the one it holds now (the game at an earlier
+                    // path, before an emulator update or reinstall) is taken away before it is
+                    // replaced. Otherwise nothing would ever remove that preference.
+                    RemoveWrittenGpuPreference();
                     // Into the ledger first: a preference written with no ledger would be taken
                     // for the player's own and left in Windows for good.
                     await _store.SaveAsync(_gpuLedgerPath, new GpuPreferenceLedger(gamePath), ct).ConfigureAwait(false);

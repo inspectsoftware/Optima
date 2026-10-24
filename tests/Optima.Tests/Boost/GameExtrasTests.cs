@@ -205,6 +205,27 @@ public sealed class GameExtrasTests : IDisposable
     }
 
     [Fact]
+    public async Task APreferenceWrittenForAnEarlierGamePath_IsTakenAwayWhenTheGameMoves()
+    {
+        const string oldPath = @"C:\Old\Emulator\HD-Player.exe";
+        _settings = _settings with { BoostGamePath = oldPath };
+        var service = Create();
+        await service.SyncAsync();
+        Assert.Contains(oldPath, _extras.HighPerformance);
+
+        // The game is seen at its new path: the preference follows it.
+        _presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        await service.SyncAsync();
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+        Assert.DoesNotContain(oldPath, _extras.HighPerformance);
+
+        _settings = _settings with { BoostGpuHighPerformance = false };
+        await service.SyncAsync();
+        service.Dispose();
+        Assert.Empty(_extras.HighPerformance);
+    }
+
+    [Fact]
     public async Task ClosingOptima_TakesAwayThePreferenceBoostWrote_ButNotThePlayersOwn()
     {
         var service = Create();
