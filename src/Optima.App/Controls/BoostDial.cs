@@ -408,8 +408,9 @@ public sealed class BoostDial : FrameworkElement
 
         if (IsKeyboardFocused)
         {
-            var text = TryFindResource("Brush.Text") as Brush ?? Brushes.White;
-            dc.DrawEllipse(null, new Pen(text, 2) { DashStyle = new DashStyle([2, 3], 0) }, Center, 161, 161);
+            // The ring sits on the dark rim between the backplate and the plates in either theme,
+            // so it is always light: the light theme's text colour vanished against it.
+            dc.DrawEllipse(null, new Pen(Chalk, 2) { DashStyle = new DashStyle([2, 3], 0) }, Center, 161, 161);
         }
         dc.Pop();
     }
