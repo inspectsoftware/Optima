@@ -756,6 +756,12 @@ public sealed partial class SettingsViewModel : ObservableObject
         var settings = await _settings.GetSettingsAsync(ct);
         Theme = settings.Theme;
         AccentColor = settings.AccentColor;
+        // A card without its stats line (tracked while the stats API was down, or its lookup failed)
+        // asks again whenever the page opens; otherwise it kept its warning until Optima restarted.
+        if (TrackedSummary.Length == 0)
+        {
+            _cardFor = null;
+        }
         LoadPlayer(settings);
         DiscordPresenceEnabled = settings.DiscordPresenceEnabled;
         DiscordPresenceInLauncher = settings.DiscordPresenceInLauncher;
