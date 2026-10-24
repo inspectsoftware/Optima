@@ -370,13 +370,19 @@ public sealed partial class MainViewModel : ObservableObject
         _ => null,
     };
 
-    public async Task InitializeAsync()
+    /// <param name="windowShown">
+    /// Done once the window is on screen, or at once when it is not going to be. The prompts below
+    /// wait for it: raised while the splash still had the screen, a prompt came up over the card,
+    /// and the window shown after it was not held behind it.
+    /// </param>
+    public async Task InitializeAsync(Task windowShown)
     {
         try
         {
             var pending = await _recovery.GetPendingAsync();
             if (pending is not null)
             {
+                await windowShown;
                 var restore = GlassDialog.Confirm(
                     Application.Current.MainWindow,
                     "Restore previous system settings?",
@@ -406,6 +412,7 @@ public sealed partial class MainViewModel : ObservableObject
 
             if (!settings.FirstRunCompleted)
             {
+                await windowShown;
                 var wizard = new SetupWizardWindow { Owner = Application.Current.MainWindow };
                 var wizardViewModel = new SetupWizardViewModel(Status, Debug.Checks, _settings, _firstRunFix);
                 wizard.DataContext = wizardViewModel;

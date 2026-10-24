@@ -37,10 +37,11 @@ public sealed class SplashWindow : Window
     public void SetAccent(Color accent) => _surface.SetAccent(accent);
 
     /// <summary>
-    /// The handover. Waits until the intro has played in full, then covers the main window's bounds
-    /// (one resize, not one per frame) and lets the centre square open onto the app underneath.
+    /// The handover, first half. Waits until the intro has played in full, then takes in the main
+    /// window's bounds (one resize, not one per frame) and grows the card over them, turning to the
+    /// window's ground. Completes once the card covers them: the window can be shown underneath from then on.
     /// </summary>
-    public async Task OpenIntoAsync(Rect target)
+    public async Task GrowIntoAsync(Rect target, Color windowGround)
     {
         var wait = _surface.IntroRemainingMs;
         if (wait > 0)
@@ -50,16 +51,20 @@ public sealed class SplashWindow : Window
 
         var card = new Rect(Left, Top, ActualWidth, ActualHeight);
         var cover = Rect.Union(card, target);
-        if (cover.Width > 0 && cover.Height > 0)
-        {
-            Left = cover.Left;
-            Top = cover.Top;
-            Width = cover.Width;
-            Height = cover.Height;
-            await _surface.OpenAsync(
-                new Rect(card.Left - cover.Left, card.Top - cover.Top, card.Width, card.Height),
-                new Rect(target.Left - cover.Left, target.Top - cover.Top, target.Width, target.Height)).ConfigureAwait(true);
-        }
+        Left = cover.Left;
+        Top = cover.Top;
+        Width = cover.Width;
+        Height = cover.Height;
+        await _surface.GrowAsync(
+            new Rect(card.Left - cover.Left, card.Top - cover.Top, card.Width, card.Height),
+            new Rect(target.Left - cover.Left, target.Top - cover.Top, target.Width, target.Height),
+            windowGround).ConfigureAwait(true);
+    }
+
+    /// <summary>The handover, second half: fades off the main window, which is drawn underneath by now, and closes.</summary>
+    public async Task RevealAsync()
+    {
+        await _surface.RevealAsync().ConfigureAwait(true);
         CloseNow();
     }
 

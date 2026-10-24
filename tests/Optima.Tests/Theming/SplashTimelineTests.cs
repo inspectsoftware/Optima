@@ -23,6 +23,7 @@ public sealed class SplashTimelineTests
         Assert.Equal(0, end.SweepOpacity, 6);
         Assert.All(end.LetterOpacity, opacity => Assert.Equal(1, opacity, 6));
         Assert.Equal(1, end.TextOpacity, 6);
+        Assert.Equal(0, end.Grow, 6);
         Assert.Equal(1, end.Fade, 6);
     }
 
@@ -56,17 +57,51 @@ public sealed class SplashTimelineTests
     }
 
     [Fact]
-    public void Opening_ClearsTheStage_AndEndsWithNothingLeft()
+    public void Growing_CoversTheWindowWithSolidGround_AndClearsTheStage()
     {
-        var start = SplashTimeline.At(4000, 0);
-        Assert.Equal(0, start.Open, 6);
-        Assert.Equal(1, start.Fade, 6);
+        // Until the window is drawn underneath, nothing of the card may let the desktop through.
+        for (var g = 0.0; g <= SplashTimeline.GrowMs + 1000; g += 25)
+        {
+            Assert.Equal(1, SplashTimeline.At(4000 + g, g).Fade, 6);
+        }
 
-        var end = SplashTimeline.At(4000 + SplashTimeline.OpenMs, SplashTimeline.OpenMs);
-        Assert.Equal(1, end.Open, 6);
-        Assert.Equal(0, end.Fade, 6);
-        Assert.Equal(0, end.SquareFill, 6);
-        Assert.All(end.Blades, blade => Assert.Equal(0, blade.Opacity, 6));
-        Assert.All(end.LetterOpacity, opacity => Assert.Equal(0, opacity, 6));
+        Assert.Equal(0, SplashTimeline.At(4000, 0).Grow, 6);
+        var grown = SplashTimeline.At(4000 + SplashTimeline.GrowMs, SplashTimeline.GrowMs);
+        Assert.Equal(1, grown.Grow, 6);
+        Assert.Equal(0, grown.SquareOpacity, 6);
+        Assert.Equal(0, grown.TextOpacity, 6);
+        Assert.All(grown.Blades, blade => Assert.Equal(0, blade.Opacity, 6));
+        Assert.All(grown.LetterOpacity, opacity => Assert.Equal(0, opacity, 6));
+    }
+
+    [Fact]
+    public void TheReveal_FadesTheGrownCardAway_WithoutMovingIt()
+    {
+        var grown = SplashTimeline.GrowMs + 200;
+
+        var start = SplashTimeline.At(4000, grown, 0);
+        Assert.Equal(1, start.Fade, 6);
+        // Slow to start: the window's first frame may reach the screen a moment after it was drawn.
+        Assert.True(SplashTimeline.At(4016, grown + 16, 16).Fade > 0.99);
+
+        var mid = SplashTimeline.At(4000 + SplashTimeline.RevealMs / 2, grown, SplashTimeline.RevealMs / 2);
+        Assert.InRange(mid.Fade, 0.01, 0.99);
+        Assert.Equal(1, mid.Grow, 6);
+
+        Assert.Equal(0, SplashTimeline.At(4000 + SplashTimeline.RevealMs, grown, SplashTimeline.RevealMs).Fade, 6);
+    }
+
+    [Fact]
+    public void TheBeats_EndExactly_WhereTheSurfaceLooksForTheirEnd()
+    {
+        // The surface calls a beat over once a frame drawn shows Grow >= 1 or Fade <= 0. An end that
+        // only came within rounding of those would keep the window waiting for the full patience,
+        // and leave the splash open over it for good.
+        foreach (var after in new[] { 0.0, 16, 1000 })
+        {
+            var grown = SplashTimeline.GrowMs + after;
+            Assert.True(SplashTimeline.At(4000, grown).Grow >= 1);
+            Assert.True(SplashTimeline.At(4000, grown, SplashTimeline.RevealMs + after).Fade <= 0);
+        }
     }
 }

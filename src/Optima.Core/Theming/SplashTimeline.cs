@@ -7,8 +7,8 @@ public readonly record struct SplashBlade(double Offset, double Opacity, double 
 
 /// <summary>
 /// One moment of the launch splash. Distances are in the logo's own units (the source artwork is
-/// 1254 units square); rotations are in degrees. <see cref="Open"/> runs 0 to 1 while the centre
-/// square opens into the main window.
+/// 1254 units square); rotations are in degrees. <see cref="Grow"/> runs 0 to 1 while the card grows
+/// to the main window's bounds, and <see cref="Fade"/> runs 1 to 0 while it then lets the window through.
 /// </summary>
 public sealed record SplashFrame(
     double SquareScale,
@@ -22,20 +22,22 @@ public sealed record SplashFrame(
     IReadOnlyList<double> LetterOpacity,
     IReadOnlyList<double> LetterRise,
     double TextOpacity,
-    double Open,
-    double SquareFill,
+    double Grow,
     double Fade);
 
 /// <summary>
 /// The launch splash as a pure function of time. The mark is four blades around a square: the
-/// square appears, the blades fly in clockwise and lock, the name is set, and when the app is ready
-/// the square opens into the main window. Kept apart from the drawing so the beats can be tested.
+/// square appears, the blades fly in clockwise and lock, the name is set. When the app is ready the
+/// card grows to the main window's place and covers it, the mark and the name leaving as it grows;
+/// the window is shown underneath, and once it has drawn the splash fades off it. Kept apart from
+/// the drawing so the beats can be tested.
 /// </summary>
 public static class SplashTimeline
 {
     /// <summary>The intro always plays in full, however fast startup was.</summary>
     public const double IntroMs = 1600;
-    public const double OpenMs = 450;
+    public const double GrowMs = 450;
+    public const double RevealMs = 300;
     public const int Letters = 6;
 
     private const double BladeFirstMs = 200;
@@ -44,8 +46,9 @@ public static class SplashTimeline
     private const double BladeDistance = 420;
 
     /// <param name="t">Milliseconds since the splash appeared.</param>
-    /// <param name="openT">Milliseconds since the app became ready, or null while it is still starting.</param>
-    public static SplashFrame At(double t, double? openT = null)
+    /// <param name="growT">Milliseconds since the card started to grow to the main window, or null while the app is still starting.</param>
+    /// <param name="revealT">Milliseconds since the main window was drawn under the grown card, or null until then.</param>
+    public static SplashFrame At(double t, double? growT = null, double? revealT = null)
     {
         var squareIn = Clamp(t / 250);
         var blades = new SplashBlade[4];
@@ -82,30 +85,33 @@ public static class SplashTimeline
             LetterOpacity: letterOpacity,
             LetterRise: letterRise,
             TextOpacity: Clamp((t - 1400) / 200),
-            Open: 0,
-            SquareFill: 1,
+            Grow: 0,
             Fade: 1);
 
-        if (openT is not { } o)
+        if (growT is not { } g)
         {
             return frame;
         }
 
-        var open = EaseInOut(Clamp(o / OpenMs));
-        var textGone = 1 - Clamp(o / 150);
+        var grow = EaseInOut(Clamp(g / GrowMs));
+        var textGone = 1 - Clamp(g / 150);
+        var markGone = 1 - Clamp(grow * 1.6);
         for (var i = 0; i < blades.Length; i++)
         {
             // Out the way they came.
-            blades[i] = new SplashBlade(blades[i].Offset + 520 * open, blades[i].Opacity * (1 - Clamp(open * 1.6)), 0);
+            blades[i] = new SplashBlade(blades[i].Offset + 520 * grow, blades[i].Opacity * markGone, 0);
         }
         return frame with
         {
+            SquareOpacity = frame.SquareOpacity * markGone,
             LetterOpacity = letterOpacity.Select(v => v * textGone).ToArray(),
             TextOpacity = frame.TextOpacity * textGone,
             SweepOpacity = 0,
-            Open = open,
-            SquareFill = 1 - Clamp(o / 200),
-            Fade = 1 - Clamp((o / OpenMs - 0.55) / 0.45),
+            Grow = grow,
+            // Solid until the window is drawn underneath: a card that let anything through before
+            // then would show the desktop where the window is about to be. Slow to start, so a
+            // window whose first frame reaches the screen a moment late is still covered.
+            Fade = revealT is { } r ? 1 - EaseInOut(Clamp(r / RevealMs)) : 1,
         };
     }
 }

@@ -8,7 +8,7 @@ namespace Optima.App.Controls;
 
 /// <summary>
 /// Everything the launch splash shows, drawn in one element: the card, the mark assembling from its
-/// five parts, the name, and the centre square opening into the main window. It runs on the splash's
+/// five parts, the name, and the card growing into the main window's place. It runs on the splash's
 /// own thread, so it uses no application resources (those belong to the main thread) and builds its
 /// brushes itself. <see cref="SplashTimeline"/> decides what each moment looks like.
 /// </summary>
@@ -51,10 +51,21 @@ public sealed class SplashSurface : FrameworkElement
     private string _status = "starting";
     private double _statusFraction;
     private double _shownFraction;
-    private double? _openStartedMs;
+    private double? _growStartedMs;
+    private double? _revealStartedMs;
     private Rect _cardStart = new(0, 0, CardWidth, CardHeight);
     private Rect _target = new(0, 0, CardWidth, CardHeight);
-    private TaskCompletionSource? _opened;
+    // What the card's ground turns into as it grows: the main window's. In the light theme a card
+    // that stayed dark put a black slab the size of the window on screen before the window came through.
+    private Color _windowGround = Ground;
+    private TaskCompletionSource? _covered;
+    private TaskCompletionSource? _revealed;
+
+    // What the last frame drawn showed. A beat is over only once a frame showing its end has been
+    // drawn, not when the clock says so: the main window is shown under the card the moment the
+    // grow is reported done.
+    private double _drawnGrow;
+    private double _drawnFade = 1;
 
     // Text is laid out once and drawn every frame: the name and the version never change, the
     // status only when startup names a new stage. Rebuilt when the window lands on another DPI.
@@ -84,6 +95,9 @@ public sealed class SplashSurface : FrameworkElement
     /// <summary>Milliseconds until the intro has played in full.</summary>
     public double IntroRemainingMs => _animate ? Math.Max(0, SplashTimeline.IntroMs - _clock.Elapsed.TotalMilliseconds) : 0;
 
+    // A still splash stands at the end of its intro, and its beats are over as soon as they begin.
+    private double Now => FrozenAtMs ?? (_animate ? _clock.Elapsed.TotalMilliseconds : SplashTimeline.IntroMs);
+
     public void SetStatus(string text, double fraction)
     {
         _status = text;
@@ -98,26 +112,46 @@ public sealed class SplashSurface : FrameworkElement
     }
 
     /// <summary>
-    /// Starts the last beat. <paramref name="cardStart"/> is where the card sits now and
-    /// <paramref name="target"/> is the main window, both in this element's coordinates. The task
-    /// completes when nothing of the splash is left on screen.
+    /// Grows the card over the main window's place. <paramref name="cardStart"/> is where the card
+    /// sits now and <paramref name="target"/> is the main window, both in this element's coordinates;
+    /// <paramref name="windowGround"/> is the main window's ground. The task completes once a frame
+    /// covering the target in full has been drawn.
     /// </summary>
-    public Task OpenAsync(Rect cardStart, Rect target)
+    public Task GrowAsync(Rect cardStart, Rect target, Color windowGround)
     {
         _cardStart = cardStart;
         _target = target;
+        _windowGround = windowGround;
+        _covered = new TaskCompletionSource();
+        _growStartedMs = _animate ? Now : Now - SplashTimeline.GrowMs;
+        InvalidateVisual();
+        return _covered.Task;
+    }
+
+    /// <summary>Fades the grown card off the window drawn underneath it. The task completes once nothing of it is left on screen.</summary>
+    public Task RevealAsync()
+    {
         if (!_animate)
         {
             return Task.CompletedTask;
         }
-        _opened = new TaskCompletionSource();
-        _openStartedMs = _clock.Elapsed.TotalMilliseconds;
+        _revealed = new TaskCompletionSource();
+        _revealStartedMs = Now;
         InvalidateVisual();
-        return _opened.Task;
+        return _revealed.Task;
     }
 
     private void OnRendering(object? sender, EventArgs e)
     {
+        // The frame drawn last time is on screen by now.
+        if (_drawnGrow >= 1)
+        {
+            _covered?.TrySetResult();
+        }
+        if (_drawnFade <= 0)
+        {
+            _revealed?.TrySetResult();
+        }
         if (!_animate)
         {
             return;
@@ -126,34 +160,26 @@ public sealed class SplashSurface : FrameworkElement
         {
             _clock.Start();
         }
-        if (_openStartedMs is { } started && _clock.Elapsed.TotalMilliseconds - started >= SplashTimeline.OpenMs)
-        {
-            _opened?.TrySetResult();
-        }
         InvalidateVisual();
     }
 
     protected override void OnRender(DrawingContext dc)
     {
-        var now = FrozenAtMs ?? (_animate ? _clock.Elapsed.TotalMilliseconds : SplashTimeline.IntroMs);
-        var frame = SplashTimeline.At(now, _openStartedMs is { } started ? now - started : null);
-        var open = frame.Open;
-        var card = Lerp(_cardStart, _target, open);
+        var now = Now;
+        var frame = SplashTimeline.At(
+            now, _growStartedMs is { } grew ? now - grew : null, _revealStartedMs is { } revealed ? now - revealed : null);
+        _drawnGrow = frame.Grow;
+        _drawnFade = frame.Fade;
+        var grow = frame.Grow;
+        var card = Lerp(_cardStart, _target, grow);
         var markCenter = new Point(_cardStart.X + MarkCenterInCard.X, _cardStart.Y + MarkCenterInCard.Y);
         var unit = MarkSize * frame.MarkScale;
 
         dc.PushOpacity(frame.Fade);
 
-        // The card, with the centre square cut out of it once it starts to open: what shows through
-        // the hole is the real main window underneath.
-        var squareAtRest = new Rect(
-            markCenter.X - SquareHalf * unit, markCenter.Y - SquareHalf * unit, 2 * SquareHalf * unit, 2 * SquareHalf * unit);
-        Geometry cardShape = new RectangleGeometry(card, 10 * (1 - open), 10 * (1 - open));
-        if (open > 0)
-        {
-            cardShape = new CombinedGeometry(GeometryCombineMode.Exclude, cardShape, new RectangleGeometry(Lerp(squareAtRest, _target, open)));
-        }
-        dc.DrawGeometry(Solid(Ground, 1), new Pen(Solid(_accent, 0.2 * (1 - open)), 1), cardShape);
+        // The card. Solid all the way as it grows: until the main window is drawn underneath, it is
+        // what stands in the window's place.
+        dc.DrawRoundedRectangle(Solid(Mix(Ground, _windowGround, grow), 1), new Pen(Solid(_accent, 0.2 * (1 - grow)), 1), card, 10 * (1 - grow), 10 * (1 - grow));
 
         // The mark.
         dc.PushTransform(new TranslateTransform(markCenter.X, markCenter.Y));
@@ -185,7 +211,7 @@ public sealed class SplashSurface : FrameworkElement
             dc.Pop();
         }
 
-        if (frame.SquareFill > 0.004 && frame.SquareOpacity > 0.004)
+        if (frame.SquareOpacity > 0.004)
         {
             var half = SquareHalf * frame.SquareScale;
             var square = new RectangleGeometry(new Rect(-half, -half, 2 * half, 2 * half))
@@ -193,7 +219,7 @@ public sealed class SplashSurface : FrameworkElement
                 Transform = new RotateTransform(frame.SquareRotation),
             };
             markShape.Children.Add(square);
-            dc.PushOpacity(frame.SquareOpacity * frame.SquareFill);
+            dc.PushOpacity(frame.SquareOpacity);
             dc.DrawGeometry(_silver, null, square);
             dc.Pop();
         }
@@ -304,6 +330,11 @@ public sealed class SplashSurface : FrameworkElement
         from.Y + (to.Y - from.Y) * amount,
         Math.Max(0, from.Width + (to.Width - from.Width) * amount),
         Math.Max(0, from.Height + (to.Height - from.Height) * amount));
+
+    private static Color Mix(Color from, Color to, double amount) => Color.FromRgb(
+        (byte)Math.Round(from.R + (to.R - from.R) * amount),
+        (byte)Math.Round(from.G + (to.G - from.G) * amount),
+        (byte)Math.Round(from.B + (to.B - from.B) * amount));
 
     private static SolidColorBrush Solid(Color color, double opacity)
     {
