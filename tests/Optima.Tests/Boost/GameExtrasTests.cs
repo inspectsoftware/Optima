@@ -224,6 +224,9 @@ public sealed class GameExtrasTests : IDisposable
             "{\"boostEnabled\":true,\"boostGpuHighPerformance\":true,\"boostGamePath\":"
             + System.Text.Json.JsonSerializer.Serialize(_extras.PathOfGame) + "}");
         _extras.HighPerformance.Add(_extras.PathOfGame!);
+        // Something in this build saves the settings before the look; the old switch survives it.
+        await new SettingsService(paths, _store, NullLogger<SettingsService>.Instance)
+            .UpdateSettingsAsync(s => s with { Theme = "Light" });
         var stored = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
         _settings = (await stored.GetSettingsAsync()).BoostEffective();
         var service = Create(stored);
@@ -234,6 +237,7 @@ public sealed class GameExtrasTests : IDisposable
 
         Assert.DoesNotContain(_extras.PathOfGame!, _extras.HighPerformance);
         Assert.True(stored.Current!.BoostGpuLeftoverChecked);
+        Assert.DoesNotContain("boostEnabled", File.ReadAllText(paths.ConfigFile), StringComparison.OrdinalIgnoreCase);
 
         // Only once: a preference the player sets in Windows afterwards is theirs.
         _extras.HighPerformance.Add(_extras.PathOfGame!);
@@ -244,6 +248,29 @@ public sealed class GameExtrasTests : IDisposable
         next.Dispose();
 
         Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+    }
+
+    [Fact]
+    public async Task AnOlderReleaseClosedWithBoostOff_LeavesTheHighPerformanceThePlayerSetInWindows()
+    {
+        // 0.8.x removed its own preference when Boost went off, and never touched the player's.
+        var paths = new AppPaths(_folder);
+        paths.EnsureCreated();
+        File.WriteAllText(paths.ConfigFile,
+            "{\"boostEnabled\":false,\"boostGpuHighPerformance\":true,\"boostGamePath\":"
+            + System.Text.Json.JsonSerializer.Serialize(_extras.PathOfGame) + "}");
+        _extras.HighPerformance.Add(_extras.PathOfGame!);
+        var stored = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
+        _settings = (await stored.GetSettingsAsync()).BoostEffective();
+        var service = Create(stored);
+
+        await service.AdoptOlderReleasePreferenceAsync();
+        await service.RestoreLeftoverAsync();
+        await service.SyncAsync();
+        service.Dispose();
+
+        Assert.Equal("2", _extras.GetGpuPreference(_extras.PathOfGame!));
+        Assert.True(stored.Current!.BoostGpuLeftoverChecked);
     }
 
     [Fact]

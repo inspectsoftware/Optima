@@ -95,8 +95,9 @@ public sealed class GameExtrasService : IDisposable
     /// Windows, and nothing here would ever take it away. Once, at the first start of a build with
     /// the ledger, a high-performance preference for the game they last saw, with the graphics switch
     /// still ticked, is taken to be that one and put in the ledger, and Boost starting off removes it.
-    /// One the player set in Windows with the switch ticked is taken for Boost's too, which is how
-    /// 0.8.x treated it as well: it removed it at switch-off.
+    /// Only when that release closed with Boost on: with it off, 0.8.x had removed its own already,
+    /// and one there is the player's, set in Windows, which 0.8.x left alone as well. One the player
+    /// set with Boost on is taken for Boost's, which is how 0.8.x treated it: it removed it at switch-off.
     /// </summary>
     public async Task AdoptOlderReleasePreferenceAsync(CancellationToken ct = default)
     {
@@ -115,7 +116,7 @@ public sealed class GameExtrasService : IDisposable
             await _gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                if (stored is { BoostGpuHighPerformance: true, BoostGamePath: { Length: > 0 } path }
+                if (stored is { OlderReleaseClosedWithBoostOn: true, BoostGpuHighPerformance: true, BoostGamePath: { Length: > 0 } path }
                     && _store.Load<GpuPreferenceLedger>(_gpuLedgerPath) is null
                     && IsHighPerformance(path))
                 {
@@ -127,7 +128,8 @@ public sealed class GameExtrasService : IDisposable
             {
                 _gate.Release();
             }
-            await _storedSettings.UpdateSettingsAsync(s => s with { BoostGpuLeftoverChecked = true }, ct).ConfigureAwait(false);
+            await _storedSettings.UpdateSettingsAsync(
+                s => s with { BoostGpuLeftoverChecked = true, OlderReleaseClosedWithBoostOn = false }, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
