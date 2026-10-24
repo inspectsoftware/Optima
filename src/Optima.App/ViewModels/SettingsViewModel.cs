@@ -325,6 +325,24 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private bool CanSaveTracked() => !IsTrackedSaved;
 
+    /// <summary>
+    /// The x on the tracked card: tracks nobody, so HOME, the session stats and Discord show no player.
+    /// Saved entries stay; a chip tracks one of them again.
+    /// </summary>
+    [RelayCommand]
+    private async Task StopTrackingAsync()
+    {
+        TrackMessage = string.Empty;
+        try
+        {
+            await _settings.UpdateSettingsAsync(s => s with { PlayerIgn = string.Empty, PlayerAccountId = null });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            TrackMessage = "The player could not be saved: " + ex.Message;
+        }
+    }
+
     /// <summary>A saved chip: makes that player the tracked one.</summary>
     [RelayCommand]
     private async Task UseSavedAsync(PlayerAccount? account)

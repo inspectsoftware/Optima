@@ -292,9 +292,15 @@
                          Foreground="{DynamicResource Brush.Ok}" TextWrapping="Wrap" TextTrimming="None" Margin="8,0,0,0" />
             </Grid>
           </StackPanel>
-          <Button x:Name="Save" Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Save to Optima" Padding="16,0"
-                  MinHeight="40" VerticalAlignment="Center" Command="{Binding SaveTrackedCommand}"
-                  ToolTip="Keeps this player in Optima: one click tracks them again, here or in the title bar" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="Save" Style="{StaticResource SecondaryButton}" Content="Save to Optima" Padding="16,0"
+                    MinHeight="40" Command="{Binding SaveTrackedCommand}"
+                    ToolTip="Keeps this player in Optima: one click tracks them again, here or in the title bar" />
+            <!-- The way back to tracking nobody, which emptying the old name and ID boxes used to be. -->
+            <Button Style="{StaticResource GhostButton}" Content="×" Width="40" MinHeight="40" FontSize="14" Margin="6,0,0,0"
+                    Command="{Binding StopTrackingCommand}" AutomationProperties.Name="Stop tracking"
+                    ToolTip="Stop tracking: HOME, sessions and Discord follow nobody until a player is tracked again" />
+          </StackPanel>
         </Grid>
       </Border>
       <DataTemplate.Triggers>
