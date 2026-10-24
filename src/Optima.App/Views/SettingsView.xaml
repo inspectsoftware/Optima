@@ -363,7 +363,7 @@
           <TextBlock Text="%LOCALAPPDATA%\Optima" Style="{StaticResource Text.PageSubtitle}" Margin="0,4,0,0" />
         </StackPanel>
 
-        <!-- Find a setting: every section narrows to the rows whose label or hint has the words. -->
+        <!-- Find a setting: every section narrows to the rows whose label, hint, note, card or section has the words. -->
         <Grid Grid.Column="2" Width="320" HorizontalAlignment="Right" VerticalAlignment="Bottom">
           <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" AutomationProperties.Name="Find a setting"
                    Padding="18,6,9,6" FontFamily="{StaticResource Font.Body}" FontSize="13" />
@@ -439,7 +439,7 @@
                   <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding Theme}" />
                 </ctl:SettingRow>
                 <ctl:SettingRow Header="Accent" Hint="Buttons, markers and highlights."
-                                Info="Pick a preset or type your own colour as #RRGGBB. The square at the end shows what applies when you save.">
+                                Info="Pick a preset or type your own colour as a hex code, #RRGGBB. The square at the end shows what applies when you save.">
                   <StackPanel Orientation="Horizontal">
                     <ItemsControl ItemsSource="{Binding AccentPresets}" VerticalAlignment="Center" Focusable="False">
                       <ItemsControl.ItemsPanel>

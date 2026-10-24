@@ -80,7 +80,8 @@ public partial class SettingsView : UserControl
                 var shown = 0;
                 foreach (var row in ((Panel)card.Content).Children.OfType<SettingRow>())
                 {
-                    var match = SettingsSearch.Matches(query, (string)row.Header, row.Hint);
+                    // The card and section names too: "discord" or "watchdog" names a whole section, and no row says it.
+                    var match = SettingsSearch.Matches(query, (string)row.Header, row.Hint, row.Info, (string)card.Header, section.Label);
                     row.Visibility = match ? Visibility.Visible : Visibility.Collapsed;
                     shown += match ? 1 : 0;
                 }

@@ -7,7 +7,8 @@ namespace Optima.App.Controls;
 /// One row of the SETTINGS page: the label (Header) and a one-line hint on the left, the control
 /// (Content) on the right. A longer explanation goes in Info, behind a small glyph beside the label,
 /// so the page reads as a list of labels rather than a wall of text. Stacked puts the control under
-/// the label instead, for content too wide to sit beside it. The page's search reads Header and Hint.
+/// the label instead, for content too wide to sit beside it. The page's search reads Header, Hint and
+/// Info, and the names of the row's card and section.
 /// </summary>
 public sealed class SettingRow : HeaderedContentControl
 {
