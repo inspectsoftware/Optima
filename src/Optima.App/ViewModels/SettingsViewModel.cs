@@ -833,7 +833,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         var settings = await _settings.GetSettingsAsync(ct);
-        Theme = settings.Theme;
+        // A null left in an older settings file reads as the default, which is what the app runs
+        // with. Assigned as null, the guards above would keep whatever the page showed before, an
+        // unsaved choice, and the save bar would then call it saved.
+        Theme = settings.Theme ?? "Dark";
         AccentColor = settings.AccentColor;
         // A card without its stats line (tracked while the stats API was down, or its lookup failed)
         // asks again whenever the page opens; otherwise it kept its warning until Optima restarted.
@@ -856,7 +859,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _discordBotLinkedAt = settings.DiscordBotLinkedAt;
         _discordBotLinkEnrolled = settings.DiscordBotLinkEnrolled;
         UpdateDiscordLinkSummary();
-        Provider = settings.VirtualDisplayProvider;
+        Provider = settings.VirtualDisplayProvider ?? "Auto";
         EnableFrametimeCapture = settings.EnableFrametimeCapture;
         LogLevel = settings.MinimumLogLevel;
         DeveloperMode = settings.DeveloperMode;
@@ -865,7 +868,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         Animations = AnimationLabels[Math.Max(0, Optima.Core.Theming.MotionPolicy.Modes.ToList().FindIndex(mode => string.Equals(mode, settings.EffectiveAnimations, StringComparison.OrdinalIgnoreCase)))];
         StartWithWindows = settings.StartWithWindows;
         OverlayEnabled = settings.OverlayEnabled;
-        OverlayCorner = settings.OverlayCorner;
+        OverlayCorner = settings.OverlayCorner ?? "TopRight";
         OverlayOpacity = settings.OverlayOpacity;
         OverlayShowNetwork = settings.OverlayShowNetwork;
         NetworkReferenceHost = settings.NetworkReferenceHost;
