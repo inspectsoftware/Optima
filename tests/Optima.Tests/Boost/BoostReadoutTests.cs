@@ -24,6 +24,15 @@ public sealed class BoostReadoutTests
     public void TimerFactorIsAgainstWindowsDefaultTick(double ms, double expected)
         => Assert.Equal(expected, BoostReadout.FinerBy(ms), 6);
 
+    [Theory]
+    [InlineData(false, 1.0, 0.5, false, 15.625)] // another program's 0.5 ms is not Optima's tick
+    [InlineData(false, 1.0, 0.5, true, 0.5)]     // where every program gets the finest request, it is
+    [InlineData(true, 1.0, 0.5, false, 1.0)]     // holding, it is what Optima asked for, not the clock
+    [InlineData(true, 1.0, 0.5, true, 1.0)]
+    [InlineData(false, 1.0, 0, true, 15.625)]    // the clock not read yet
+    public void TheTimerTickShownIsOptimasOwn_NotWindowsClock(bool holding, double requestedMs, double clockMs, bool reachesEveryProgram, double expected)
+        => Assert.Equal(expected, BoostReadout.TimerTickMs(holding, requestedMs, clockMs, reachesEveryProgram), 6);
+
     [Fact]
     public void ProcessorSharesAddUpToTheWholeMachine()
     {

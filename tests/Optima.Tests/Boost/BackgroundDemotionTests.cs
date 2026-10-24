@@ -26,6 +26,8 @@ public sealed class BackgroundDemotionTests : IDisposable
             return Task.FromResult<IReadOnlyList<ProcessStateSnapshot>>(
                 Running.Where(p => !alreadyDemoted.Contains(p.ProcessId)).ToList());
         }
+
+        public bool IsStillRunning(ProcessStateSnapshot demoted) => Running.Any(p => p.ProcessId == demoted.ProcessId);
     }
 
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "optima-demotion-" + Guid.NewGuid().ToString("N"));
@@ -95,6 +97,28 @@ public sealed class BackgroundDemotionTests : IDisposable
         Assert.Equal([1, 2], held.Select(p => p.ProcessId).Order());
         Assert.All(held, p => Assert.Equal("chrome", p.ProcessName));
         Assert.Empty(service.Status.Demoted);
+    }
+
+    [Fact]
+    public async Task AProcessThatEndsMidGame_LeavesTheCount_AndANewOneWithItsIdIsDemoted()
+    {
+        _demoter.Running.AddRange([Chrome(1), Chrome(2), Chrome(3)]);
+        GameOnScreen();
+        using var service = Create();
+        await service.SyncAsync();
+
+        _demoter.Running.RemoveAll(p => p.ProcessId is 2 or 3);
+        await service.SyncAsync();
+
+        Assert.Equal([1], service.Status.Demoted.Select(p => p.ProcessId));
+        Assert.Equal(1, service.Status.ProcessCount);
+        Assert.Equal([1], (await _store.LoadAsync<List<ProcessStateSnapshot>>(Ledger))!.Select(p => p.ProcessId));
+
+        // Windows hands an ended process's id to the next one it starts.
+        _demoter.Running.Add(Chrome(2));
+        await service.SyncAsync();
+
+        Assert.Equal([1, 2], service.Status.Demoted.Select(p => p.ProcessId).Order());
     }
 
     [Fact]
@@ -169,6 +193,11 @@ public sealed class BackgroundDemotionTests : IDisposable
             child.Refresh();
             Assert.Equal(ProcessPriorityClass.BelowNormal, child.PriorityClass);
             Assert.Equal(ProcessPriorityLevel.AboveNormal, snapshot.OriginalPriority);
+            // What tells this process apart from a later one given the same id.
+            Assert.NotNull(snapshot.StartTime);
+            Assert.Equal(ProcessQuery.GetStartTime(child.SafeHandle), snapshot.StartTime);
+            Assert.True(demoter.IsStillRunning(snapshot));
+            Assert.False(demoter.IsStillRunning(snapshot with { StartTime = snapshot.StartTime.Value.AddMinutes(-1) }));
 
             await new WindowsProcessOptimizer(NullLogger<WindowsProcessOptimizer>.Instance).RestoreAsync(snapshot);
             child.Refresh();
@@ -183,8 +212,8 @@ public sealed class BackgroundDemotionTests : IDisposable
     [Fact]
     public void AProcessThatHasEnded_IsToldApartFromOneThatRuns()
     {
-        // The service lists a demoted process until the game leaves, ended or not; the BOOST page
-        // asks the handle it keeps whether the process still runs.
+        // The BOOST page asks the handle it keeps whether a demoted process still runs, and the
+        // service asks at each pass.
         using var child = Process.Start(new ProcessStartInfo("cmd.exe", "/c exit 0")
         {
             CreateNoWindow = true,
@@ -199,6 +228,8 @@ public sealed class BackgroundDemotionTests : IDisposable
         Assert.NotNull(running);
         Assert.True(ProcessQuery.HasExited(ended));
         Assert.False(ProcessQuery.HasExited(running));
+        Assert.False(new WindowsBackgroundDemoter(NullLogger<WindowsBackgroundDemoter>.Instance)
+            .IsStillRunning(new ProcessStateSnapshot { ProcessId = child.Id, ProcessName = "cmd" }));
     }
 
     [Fact]

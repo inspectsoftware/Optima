@@ -8,7 +8,10 @@ public interface ITimerResolution
     /// <summary>Whether GlobalTimerResolutionRequests is set in the registry (it takes effect after a restart).</summary>
     bool GlobalRequestsEnabled { get; }
 
-    /// <summary>The resolution in effect for this process right now, in milliseconds.</summary>
+    /// <summary>
+    /// Windows' clock right now, in milliseconds: the finest resolution any process asks for. Since
+    /// Windows 10 2004 that is not the tick of a process that did not ask for it itself.
+    /// </summary>
     double CurrentMs { get; }
 
     /// <summary>Asks Windows for a resolution and keeps asking until released. Returns what Windows applied, or null when it refused.</summary>

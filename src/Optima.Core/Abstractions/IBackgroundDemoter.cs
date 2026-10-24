@@ -16,4 +16,7 @@ public interface IBackgroundDemoter
     /// </summary>
     Task<IReadOnlyList<ProcessStateSnapshot>> DemoteAsync(
         IReadOnlyList<string> processNames, IReadOnlySet<int> alreadyDemoted, CancellationToken ct = default);
+
+    /// <summary>Whether a process this demoted still runs: the same process, not a later one given its id.</summary>
+    bool IsStillRunning(ProcessStateSnapshot demoted);
 }

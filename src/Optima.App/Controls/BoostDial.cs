@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Input;
 using System.Windows.Media;
 using Optima.App.Services;
@@ -34,6 +37,14 @@ public sealed class BoostDial : FrameworkElement
     public static readonly DependencyProperty ArmedMaskProperty = DependencyProperty.Register(
         nameof(ArmedMask), typeof(int), typeof(BoostDial),
         new FrameworkPropertyMetadata(0b11_1111, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    /// <summary>
+    /// Whether Critical Ops is on screen while Boost is on. Until it is, the nameplate reads ARMED
+    /// instead of ENGAGED, the same words the page's header uses for the two states.
+    /// </summary>
+    public static readonly DependencyProperty IsEngagedProperty = DependencyProperty.Register(
+        nameof(IsEngaged), typeof(bool), typeof(BoostDial),
+        new FrameworkPropertyMetadata(true, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty CommandProperty = DependencyProperty.Register(
         nameof(Command), typeof(ICommand), typeof(BoostDial), new PropertyMetadata(null));
@@ -150,11 +161,17 @@ public sealed class BoostDial : FrameworkElement
     private double _ranMs;
     private bool _animateNextChange;
     private bool _hooked;
+    // Whether the still Off picture has been drawn since it last changed.
+    private bool _drewStill;
+    // The focus ring is for focus that came from the keyboard, as WPF's own focus visual is. A
+    // click focuses the dial as well, and the ring then stayed round it until focus moved on.
+    private bool _focusRing;
 
     // The lettering is laid out once per label and drawn every frame; rebuilt when the window lands on another DPI.
     private double _textDpi;
-    private readonly Geometry?[] _titles = new Geometry?[4];
-    private readonly Geometry?[] _subs = new Geometry?[4];
+    // One slot per label, and a fifth for the engaged label while only armed.
+    private readonly Geometry?[] _titles = new Geometry?[5];
+    private readonly Geometry?[] _subs = new Geometry?[5];
 
     public BoostDial()
     {
@@ -205,6 +222,12 @@ public sealed class BoostDial : FrameworkElement
         set => SetValue(ArmedMaskProperty, value);
     }
 
+    public bool IsEngaged
+    {
+        get => (bool)GetValue(IsEngagedProperty);
+        set => SetValue(IsEngagedProperty, value);
+    }
+
     public ICommand? Command
     {
         get => (ICommand?)GetValue(CommandProperty);
@@ -237,6 +260,12 @@ public sealed class BoostDial : FrameworkElement
         dial._heldMs = 0;
         dial._animateNextChange = false;
         dial.InvalidateVisual();
+        // A screen reader that is reading the switch hears it change.
+        if (UIElementAutomationPeer.FromElement(dial) is BoostDialAutomationPeer peer)
+        {
+            peer.RaisePropertyChangedEvent(TogglePatternIdentifiers.ToggleStateProperty,
+                on ? ToggleState.Off : ToggleState.On, on ? ToggleState.On : ToggleState.Off);
+        }
     }
 
     /// <summary>
@@ -294,7 +323,17 @@ public sealed class BoostDial : FrameworkElement
                 _modeStartedMs += length;
             }
         }
-        // Something is always turning, flickering or settling, so every frame is drawn.
+        // While engaged or changing over something is always turning, flickering or settling, so
+        // every frame is drawn. Off, the machine is a still picture once the pilot flame has
+        // settled, and drawing it again every frame cost about half a core on the page Boost now
+        // opens to. One more frame is drawn after the last change, so the cool-down and the flame
+        // land exactly where they rest; a hover, a tick or a switch redraws by itself.
+        var still = _mode == BoostDialMode.Off && !_hover.Moving(_clock.Elapsed.TotalSeconds);
+        if (still && _drewStill)
+        {
+            return;
+        }
+        _drewStill = still;
         InvalidateVisual();
     }
 
@@ -314,7 +353,9 @@ public sealed class BoostDial : FrameworkElement
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
+        _focusRing = false;
         Focus();
+        InvalidateVisual();
         Toggle();
         e.Handled = true;
     }
@@ -322,9 +363,19 @@ public sealed class BoostDial : FrameworkElement
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        if (!_focusRing)
+        {
+            _focusRing = true;
+            InvalidateVisual();
+        }
         if (e.Key is Key.Space or Key.Enter)
         {
-            Toggle();
+            // One press is one flip. Held down, the key repeats about thirty times a second, and
+            // each repeat that found the last switch finished flipped Boost again.
+            if (!e.IsRepeat)
+            {
+                Toggle();
+            }
             e.Handled = true;
         }
     }
@@ -344,7 +395,36 @@ public sealed class BoostDial : FrameworkElement
     protected override void OnIsKeyboardFocusedChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnIsKeyboardFocusedChanged(e);
+        _focusRing = IsKeyboardFocused && InputManager.Current.MostRecentInputDevice is KeyboardDevice;
         InvalidateVisual();
+    }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new BoostDialAutomationPeer(this);
+
+    /// <summary>
+    /// The dial as screen readers and UI Automation see it: a toggle button, named by the view's
+    /// AutomationProperties.Name and on while Boost is on. A FrameworkElement has no peer of its
+    /// own, so the master switch was left out of the automation tree altogether.
+    /// </summary>
+    private sealed class BoostDialAutomationPeer(BoostDial dial) : FrameworkElementAutomationPeer(dial), IToggleProvider
+    {
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Button;
+
+        protected override string GetClassNameCore() => nameof(BoostDial);
+
+        public override object? GetPattern(PatternInterface patternInterface)
+            => patternInterface == PatternInterface.Toggle ? this : base.GetPattern(patternInterface);
+
+        public ToggleState ToggleState => ((BoostDial)Owner).IsOn ? ToggleState.On : ToggleState.Off;
+
+        public void Toggle()
+        {
+            if (!IsEnabled())
+            {
+                throw new ElementNotEnabledException();
+            }
+            ((BoostDial)Owner).Toggle();
+        }
     }
 
     protected override Size MeasureOverride(Size availableSize)
@@ -406,7 +486,7 @@ public sealed class BoostDial : FrameworkElement
         DrawNameplate(dc, frame);
         DrawEmbers(dc, frame);
 
-        if (IsKeyboardFocused)
+        if (IsKeyboardFocused && _focusRing)
         {
             // The ring sits on the dark rim between the backplate and the plates in either theme,
             // so it is always light: the light theme's text colour vanished against it.
@@ -701,14 +781,17 @@ public sealed class BoostDial : FrameworkElement
             Array.Clear(_titles);
             Array.Clear(_subs);
         }
-        var i = (int)label;
+        // Running, but with nothing to work on yet: the header says ARMED · waiting for Critical
+        // Ops, and a nameplate reading ENGAGED beside it said the opposite.
+        var armed = label == BoostDialLabel.Engaged && !IsEngaged;
+        var i = armed ? 4 : (int)label;
         if (_titles[i] is { } laidTitle && _subs[i] is { } laidSub)
         {
             return (laidTitle, laidSub);
         }
         var body = TryFindResource("Font.Body") as FontFamily ?? new FontFamily("Segoe UI");
         var mono = TryFindResource("Font.Mono") as FontFamily ?? new FontFamily("Consolas");
-        var (word, line) = label switch
+        var (word, line) = armed ? ("ARMED", "click to stop") : label switch
         {
             BoostDialLabel.Igniting => ("IGNITING", "spinning up"),
             BoostDialLabel.Engaged => ("ENGAGED", "click to stop"),

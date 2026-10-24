@@ -63,6 +63,7 @@ public sealed class WindowsBackgroundDemoter : IBackgroundDemoter
                             OriginalPriority = WindowsProcessOptimizer.FromPriorityClass(original),
                             OriginalAffinityMask = 0,
                             PowerThrottlingWasEnabled = ProcessNative.IsPowerThrottlingEnabled(process.Handle),
+                            StartTime = ProcessQuery.GetStartTime(process.SafeHandle),
                         };
                         process.PriorityClass = ProcessPriorityClass.BelowNormal;
                         // Recorded before the second step: a priority lowered here has to be put
@@ -85,6 +86,13 @@ public sealed class WindowsBackgroundDemoter : IBackgroundDemoter
             }
             return demoted;
         }, ct);
+
+    public bool IsStillRunning(ProcessStateSnapshot demoted)
+    {
+        using var handle = ProcessQuery.Open(demoted.ProcessId);
+        return handle is not null && !ProcessQuery.HasExited(handle)
+            && (demoted.StartTime is not { } started || ProcessQuery.GetStartTime(handle) == started);
+    }
 
     /// <summary>"Chrome.exe " and "chrome" are the same entry.</summary>
     private static string NormalizeName(string name)

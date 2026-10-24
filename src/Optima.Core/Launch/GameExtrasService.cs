@@ -20,7 +20,9 @@ public sealed record GameExtrasStatus(
 /// length of a match, and asking Windows to run the game on the high-performance graphics adapter.
 /// The first is held only while the game is on screen and put back afterwards (also after a crash,
 /// from a ledger on disk). The second is a standing Windows preference, read when the game starts,
-/// so it is written once the game's executable is known and removed when the switch goes off.
+/// so it is written once the game's executable is known and removed when the switch goes off. It
+/// has a ledger of its own: Windows keeps the preference after Optima closes, and Boost starts off
+/// at the next launch, so without one nothing would ever take it away again.
 /// </summary>
 public sealed class GameExtrasService : IDisposable
 {
@@ -31,6 +33,7 @@ public sealed class GameExtrasService : IDisposable
     private readonly Func<string, Task> _rememberGamePath;
     private readonly JsonStore _store;
     private readonly string _ledgerPath;
+    private readonly string _gpuLedgerPath;
     private readonly ILogger<GameExtrasService> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CoreParkingSnapshot? _parking;
@@ -55,6 +58,8 @@ public sealed class GameExtrasService : IDisposable
         _rememberGamePath = rememberGamePath;
         _store = store;
         _ledgerPath = ledgerPath;
+        // The graphics ledger sits beside the core parking one.
+        _gpuLedgerPath = Path.Combine(Path.GetDirectoryName(ledgerPath) ?? string.Empty, "boost-gpu.json");
         _logger = logger;
     }
 
@@ -148,14 +153,30 @@ public sealed class GameExtrasService : IDisposable
                 }
             }
 
+            // A preference Boost wrote, in this run or an earlier one, goes as soon as the switch
+            // is off. Boost starts off at every launch, so this is also what takes away the one a
+            // run left behind when it closed with Boost on.
+            if (!gpuEnabled)
+            {
+                RemoveWrittenGpuPreference();
+            }
+
             var gpuApplied = false;
             if (gamePath is { Length: > 0 })
             {
-                // Removed only when the switch was seen going off in this run. A preference that is
-                // there while the switch has been off all along is the player's own, set in Windows.
-                if (gpuEnabled ? !_extras.IsGpuHighPerformance(gamePath) : _gpuWasEnabled && _extras.IsGpuHighPerformance(gamePath))
+                if (gpuEnabled && !_extras.IsGpuHighPerformance(gamePath))
                 {
-                    _extras.SetGpuHighPerformance(gamePath, gpuEnabled);
+                    // Into the ledger first: a preference written with no ledger would be taken
+                    // for the player's own and left in Windows for good.
+                    await _store.SaveAsync(_gpuLedgerPath, new GpuPreferenceLedger(gamePath), ct).ConfigureAwait(false);
+                    _extras.SetGpuHighPerformance(gamePath, true);
+                }
+                // Also removed when the switch was seen going off in this run. A preference that is
+                // there while the switch has been off all along, and that Boost did not write, is
+                // the player's own, set in Windows.
+                else if (!gpuEnabled && _gpuWasEnabled && _extras.IsGpuHighPerformance(gamePath))
+                {
+                    _extras.SetGpuHighPerformance(gamePath, false);
                 }
                 gpuApplied = gpuEnabled;
             }
@@ -174,11 +195,35 @@ public sealed class GameExtrasService : IDisposable
         }
     }
 
+    /// <summary>Takes away the graphics preference the ledger says Boost wrote, then the ledger.</summary>
+    private void RemoveWrittenGpuPreference()
+    {
+        if (_store.Load<GpuPreferenceLedger>(_gpuLedgerPath) is not { ExecutablePath: { Length: > 0 } path })
+        {
+            return;
+        }
+        if (_extras.IsGpuHighPerformance(path))
+        {
+            _extras.SetGpuHighPerformance(path, false);
+        }
+        _store.Delete(_gpuLedgerPath);
+    }
+
     public void Dispose()
     {
         if (_started)
         {
             _presence.PresenceChanged -= OnPresenceChanged;
+        }
+        // Boost does not outlive Optima, and neither does what it asked of Windows.
+        try
+        {
+            RemoveWrittenGpuPreference();
+        }
+        catch (Exception ex)
+        {
+            // Stays in the ledger; the next start takes it away.
+            _logger.LogDebug(ex, "The graphics preference could not be removed on exit");
         }
         if (_parking is not null)
         {
@@ -196,3 +241,6 @@ public sealed class GameExtrasService : IDisposable
         }
     }
 }
+
+/// <summary>The game executable Boost gave the high-performance graphics preference to.</summary>
+public sealed record GpuPreferenceLedger(string ExecutablePath);

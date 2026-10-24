@@ -30,6 +30,15 @@ public static class BoostReadout
     public static double FinerBy(double resolutionMs) => resolutionMs > 0 ? WindowsTickMs / resolutionMs : 1;
 
     /// <summary>
+    /// The timer tick the page shows as Optima's. Windows' clock is the finest resolution any program
+    /// asks for, often another program's, and where a request stays inside the program that made it
+    /// that is not the tick of a program that did not ask. So it is what Optima holds when it holds
+    /// one, Windows' clock where requests reach every program, and otherwise Windows' default.
+    /// </summary>
+    public static double TimerTickMs(bool holding, double requestedMs, double clockMs, bool reachesEveryProgram)
+        => holding ? requestedMs : reachesEveryProgram && clockMs > 0 ? clockMs : WindowsTickMs;
+
+    /// <summary>
     /// The processor's busy time split into the game, the programs Boost holds back and everything
     /// else, with the rest idle. The game's share is taken first and the held-back share from what
     /// is left, so neither can push the bar past the processor's total.

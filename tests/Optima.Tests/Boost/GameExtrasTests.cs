@@ -160,6 +160,49 @@ public sealed class GameExtrasTests : IDisposable
         Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
     }
 
+    [Fact]
+    public async Task APreferenceBoostWrote_IsTakenAwayAtTheNextStart_WhichBeginsWithBoostOff()
+    {
+        // Run 1 ends with Boost on and without its own clean-up (killed, or a crash).
+        var paths = new AppPaths(_folder);
+        paths.EnsureCreated();
+        var run1 = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
+        await run1.UpdateSettingsAsync(s => s with { BoostEnabled = true, BoostGpuHighPerformance = true });
+        _settings = run1.Current!.BoostEffective();
+        _presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        await Create().SyncAsync();
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+
+        // Run 2 reads the tick back but not the switch, so the feature reads off: what Boost wrote goes.
+        _presence.ApplyState(GameRuntimeState.NotRunning, DateTimeOffset.UtcNow);
+        var run2 = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
+        var reloaded = await run2.GetSettingsAsync();
+        Assert.False(reloaded.BoostEnabled);
+        Assert.True(reloaded.BoostGpuHighPerformance);
+        _settings = reloaded.BoostEffective();
+        using var service = Create();
+        await service.SyncAsync();
+
+        Assert.DoesNotContain(_extras.PathOfGame!, _extras.HighPerformance);
+        Assert.False(service.Status.GpuApplied);
+        Assert.False(File.Exists(Path.Combine(_folder, "boost-gpu.json")));
+    }
+
+    [Fact]
+    public async Task ClosingOptima_TakesAwayThePreferenceBoostWrote_ButNotThePlayersOwn()
+    {
+        var service = Create();
+        _presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        await service.SyncAsync();
+        const string playersOwn = @"C:\Games\other.exe";
+        _extras.HighPerformance.Add(playersOwn);
+
+        service.Dispose();
+
+        Assert.DoesNotContain(_extras.PathOfGame!, _extras.HighPerformance);
+        Assert.Contains(playersOwn, _extras.HighPerformance);
+    }
+
     [Theory]
     [InlineData(null, true, "GpuPreference=2;")]
     [InlineData("GpuPreference=1;", true, "GpuPreference=2;")]

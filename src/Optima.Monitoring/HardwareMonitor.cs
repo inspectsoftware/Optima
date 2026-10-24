@@ -70,11 +70,21 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             // Off the caller's thread: the first start loads NVML, and the caller is the UI thread
             // just after the window appears.
             await Task.Run(InitializeCountersOnce, ct).ConfigureAwait(false);
+            // The baselines the first sample, one interval on, measures against: the processor's and
+            // the game's together. Without the game's, the first sample after every start (a restore
+            // from minimized or from the tray) read the game at 0% while it ran.
             ProcessNative.GetSystemTimes(out _prevIdle, out _prevKernel, out _prevUser);
             lock (_stateLock)
             {
                 _prevProcessCpu.Clear();
-                _prevProcessSample = DateTimeOffset.MinValue;
+                foreach (var (pid, handle) in _gameProcesses)
+                {
+                    if (ProcessQuery.GetTotalProcessorTime(handle) is { } cpu)
+                    {
+                        _prevProcessCpu[pid] = cpu;
+                    }
+                }
+                _prevProcessSample = DateTimeOffset.UtcNow;
             }
 
             _cts = new CancellationTokenSource();
@@ -132,6 +142,9 @@ public sealed class HardwareMonitor : IPerformanceMonitor
     {
         while (!ct.IsCancellationRequested)
         {
+            // The wait comes first: a sample taken straight after the baselines measured an instant,
+            // which reads as 0% for the processor and the game alike.
+            await Task.Delay(Interval, ct).ConfigureAwait(false);
             try
             {
                 var metrics = Sample();
@@ -142,7 +155,6 @@ public sealed class HardwareMonitor : IPerformanceMonitor
             {
                 _logger.LogWarning(ex, "Hardware sampling tick failed");
             }
-            await Task.Delay(Interval, ct).ConfigureAwait(false);
         }
     }
 

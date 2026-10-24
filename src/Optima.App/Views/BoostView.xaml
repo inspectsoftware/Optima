@@ -269,6 +269,7 @@
               <StackPanel HorizontalAlignment="Center">
                 <ctl:BoostDial Width="380" Height="380"
                                IsOn="{Binding BoostOn, Mode=OneWay}"
+                               IsEngaged="{Binding BoostEngaged, Mode=OneWay}"
                                FeatureCount="{Binding BoostFeatureCount, Mode=OneWay}"
                                ArmedMask="{Binding ArmedMask, Mode=OneWay}"
                                Command="{Binding ToggleBoostCommand}"
@@ -731,8 +732,8 @@
                 <Label DockPanel.Dock="Right" Style="{StaticResource Boost.Pill}" Content="{Binding GpuStateText}" />
                 <TextBlock Text="Graphics adapter" Style="{StaticResource Boost.Name}" />
               </DockPanel>
-              <!-- Grows past the other wells' height: a laptop with two graphics adapters and a virtual
-                   display already lists three, and the preference line under them must not be cut off. -->
+              <!-- Grows past the other wells' height: a desktop can have three graphics adapters, and the
+                   preference line under them must not be cut off. -->
               <Border Style="{StaticResource Boost.Well}" Height="Auto" MinHeight="104">
                 <StackPanel VerticalAlignment="Center">
                   <ItemsControl ItemsSource="{Binding AdapterRows}" Focusable="False">

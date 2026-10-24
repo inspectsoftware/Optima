@@ -146,6 +146,8 @@ public sealed partial class BoostViewModel : ObservableObject
         {
             _logger.LogWarning(ex, "Switching Boost failed");
         }
+        // The dial shows the switch the services act on, also when the switch itself failed.
+        BoostOn = _settings.Current?.BoostEnabled ?? false;
         ShowAll();
     }
 
@@ -359,17 +361,18 @@ public sealed partial class BoostViewModel : ObservableObject
             DemotionStateText = "ARMED";
             DemotionDetailText = "Waiting for the game. Nothing is demoted until Critical Ops is on screen.";
         }
-        else if (status.ProcessCount == 0)
-        {
-            DemotionStateText = "WATCHING";
-            DemotionDetailText = "None of the listed programs is running right now.";
-        }
         else
         {
-            DemotionStateText = "ACTIVE";
-            DemotionDetailText =
-                $"{status.ProcessCount} process{(status.ProcessCount == 1 ? string.Empty : "es")} of "
-                + $"{status.ProgramCount} program{(status.ProgramCount == 1 ? string.Empty : "s")} demoted · put back when the game leaves";
+            // The page's own sample once it has one, as the tile and the rows use: the service only
+            // learns at its next pass, up to 20 seconds on, that a process has ended.
+            var processes = _heldBack?.Count ?? status.ProcessCount;
+            var programs = _heldBack?.Select(p => p.Process.ProcessName).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+                ?? status.ProgramCount;
+            DemotionStateText = processes == 0 ? "WATCHING" : "ACTIVE";
+            DemotionDetailText = processes == 0
+                ? "None of the listed programs is running right now."
+                : $"{processes} process{(processes == 1 ? string.Empty : "es")} of "
+                    + $"{programs} program{(programs == 1 ? string.Empty : "s")} demoted · put back when the game leaves";
         }
     }
 
@@ -428,22 +431,25 @@ public sealed partial class BoostViewModel : ObservableObject
             TimerDetailText = StandbyText;
             return;
         }
+        // Windows' clock is the finest any program asks for, which is not necessarily the tick
+        // Optima or the game gets: since Windows 10 2004 each program gets what it asked for itself.
+        var clock = $"Windows' clock is at {now} ms, the finest any program asks for.";
         if (!status.Enabled)
         {
             TimerStateText = "OFF";
-            TimerDetailText = $"Not holding anything. Windows is at {now} ms for Optima right now.";
+            TimerDetailText = "Not holding anything. " + clock;
         }
         else if (!status.Holding)
         {
             TimerStateText = "ARMED";
-            TimerDetailText = $"Waiting for the game. Windows is at {now} ms for Optima right now.";
+            TimerDetailText = "Waiting for the game. " + clock;
         }
         else
         {
             TimerStateText = "HOLDING";
             var asked = status.RequestedMs.ToString("0.###", CultureInfo.InvariantCulture);
             var applied = status.AppliedMs?.ToString("0.###", CultureInfo.InvariantCulture) ?? "?";
-            TimerDetailText = $"Asked for {asked} ms, Windows applied {applied} ms · "
+            TimerDetailText = $"Asked for {asked} ms; Windows' clock is at {applied} ms · "
                 + (status.ReachesGame ? "this reaches the game" : "on this Windows it stays inside Optima");
         }
     }
@@ -463,7 +469,8 @@ public sealed partial class BoostViewModel : ObservableObject
         }
         try
         {
-            // Text that is not a number yet (the box is mid-edit) keeps the stored threshold.
+            // A number outside the range is saved at the nearest end of it; text that is not a
+            // number keeps the stored threshold.
             var freeBelow = ParseThreshold(CleanerFreeBelowMb);
             var standbyAbove = ParseThreshold(CleanerStandbyAboveMb);
             await _settings.UpdateSettingsAsync(s => s with
@@ -478,11 +485,18 @@ public sealed partial class BoostViewModel : ObservableObject
         {
             _logger.LogWarning(ex, "Saving the memory cleaner settings failed");
         }
+        // The boxes and the card's summary show the thresholds in force, not text the cleaner ignores.
+        if (_settings.Current is { } saved)
+        {
+            _loading = true;
+            CleanerFreeBelowMb = saved.BoostStandbyFreeBelowMb.ToString(CultureInfo.InvariantCulture);
+            CleanerStandbyAboveMb = saved.BoostStandbyAboveMb.ToString(CultureInfo.InvariantCulture);
+            _loading = false;
+        }
 
         static int? ParseThreshold(string text)
             => int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
-                && value is >= StandbyCleanerPolicy.MinThresholdMb and <= StandbyCleanerPolicy.MaxThresholdMb
-                ? value
+                ? StandbyCleanerPolicy.ClampThreshold(value)
                 : null;
     }
 
@@ -548,9 +562,11 @@ public sealed partial class BoostViewModel : ObservableObject
             StandbyCleanerState.WaitingForGame => "Waiting for the game. It only watches memory while Critical Ops is on screen.",
             StandbyCleanerState.WaitingForHelper =>
                 "The game is running but the elevated helper is not, and Optima does not raise an admin prompt from the background. Start it here, or press PLAY next time.",
-            _ => status.Purges == 0
+            // The run's tally, as the MEMORY RECLAIMED tile counts: the helper's own count leaves out
+            // "purge now" and starts again with every game session.
+            _ => status.Tally.Purges == 0
                 ? "Watching. Nothing has needed purging yet."
-                : $"Purged {status.Purges} time{(status.Purges == 1 ? string.Empty : "s")} · last at "
+                : $"Purged {status.Tally.Purges} time{(status.Tally.Purges == 1 ? string.Empty : "s")} this run · last at "
                     + $"{status.LastPurgeAt?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "?"}, "
                     + $"{status.LastFreedMb.ToString("N0", CultureInfo.InvariantCulture)} MB released",
         };
@@ -646,7 +662,12 @@ public sealed partial class BoostViewModel : ObservableObject
     private static readonly HashSet<string> WorkingStates = ["HOLDING", "RUNNING", "ACTIVE", "WATCHING", "AWAKE", "SET"];
 
     /// <summary>OFF, ARMED (on, waiting for the game) or ENGAGED (on, with the game on screen): the header's light.</summary>
-    [ObservableProperty] private string _boostPhase = "OFF";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BoostEngaged))]
+    private string _boostPhase = "OFF";
+
+    /// <summary>Boost on with Critical Ops on screen, which the dial's nameplate reads as ENGAGED.</summary>
+    public bool BoostEngaged => BoostPhase == "ENGAGED";
     [ObservableProperty] private string _headerStatusText = string.Empty;
     [ObservableProperty] private string _coresStateText = "OFF";
     [ObservableProperty] private string _gpuStateText = "OFF";
@@ -706,7 +727,7 @@ public sealed partial class BoostViewModel : ObservableObject
 
     /// <summary>
     /// Starts and stops the live readout with the page: the view calls this as it comes on screen and
-    /// as it goes (another page, the tray). The samples ride on the hardware monitor's tick, which
+    /// as it goes (another page, the tray, a minimized window). The samples ride on the hardware monitor's tick, which
     /// itself only runs while the window is visible and not minimized, so nothing is read for a page
     /// nobody can see.
     /// </summary>
@@ -751,6 +772,7 @@ public sealed partial class BoostViewModel : ObservableObject
             }
             _metrics = metrics;
             _heldBack = heldBack;
+            ShowDemotion(_demotion.Status);
             if (_presence.Current != GamePresence.NotRunning)
             {
                 GameShareHistory.Append(metrics.GameCpuPercent);
@@ -762,7 +784,7 @@ public sealed partial class BoostViewModel : ObservableObject
     /// <summary>
     /// Each demoted process that is still running, with its share of the processor since the last
     /// sample; null for one seen for the first time, which has nothing to compare against yet. The
-    /// service keeps a process on its list until the game leaves, whether it still runs or not, and
+    /// service drops a process that has ended only at its next pass, up to 20 seconds on, and
     /// browsers end processes all the time: one that has ended is not held back any more and is left
     /// out. So is one that cannot be opened, because Optima opened every one of them to demote it.
     /// </summary>
@@ -787,6 +809,13 @@ public sealed partial class BoostViewModel : ObservableObject
                 if (!_cpu.TryGetValue(process.ProcessId, out var entry))
                 {
                     entry = (ProcessQuery.Open(process.ProcessId), null);
+                    // The id may be another process's by now: the page lets go of its handles when it
+                    // goes off screen, and the service drops an ended process only at its next pass.
+                    if (entry.Handle is { } opened && process.StartTime is { } started && ProcessQuery.GetStartTime(opened) != started)
+                    {
+                        opened.Dispose();
+                        entry = (null, null);
+                    }
                 }
                 if (entry.Handle is { } ended && ProcessQuery.HasExited(ended))
                 {
@@ -817,7 +846,10 @@ public sealed partial class BoostViewModel : ObservableObject
         }
         try
         {
-            _adapters = (await _systemInfo.GetInventoryAsync()).Gpus;
+            // The virtual display Optima ships is listed as an adapter too, but the game cannot be
+            // put on it; it is left out the way the Home page leaves it out.
+            _adapters = [.. (await _systemInfo.GetInventoryAsync()).Gpus
+                .Where(g => !g.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))];
             Refresh();
         }
         catch (Exception ex)
@@ -944,8 +976,16 @@ public sealed partial class BoostViewModel : ObservableObject
         string[] rungNames = ["Unchanged", "Normal", "Above", "High"];
         Rungs = [.. GamePriorityOptions.Select((option, i) => new LadderRung(rungNames[i], 18 + 12 * i, option == GamePriority, holding && option == GamePriority))];
 
+        // The timer. Windows' clock is the finest that any program asks for, often another program's.
+        // Shown as Optima's, it credited Boost with a gain another program was making, at nearly
+        // full bar with Boost off; it is given as a note instead.
+        var tickNow = BoostReadout.TimerTickMs(timer.Holding, timer.RequestedMs, timer.CurrentMs, timer.ReachesGame);
+        var otherProgram = timer.CurrentMs > 0 && timer.CurrentMs < tickNow * 0.9
+            ? $" · another program asks for {Ms(timer.CurrentMs)} ms"
+            : string.Empty;
+
         // The timer combs: Windows' default tick above, what is held (or what Windows gives Optima now) below.
-        var combMs = timer.Holding && timer.AppliedMs is { } heldMs ? heldMs : timer.CurrentMs;
+        var combMs = timer.Holding || timer.CurrentMs > 0 ? tickNow : 0;
         TimerHeldLive = timer.Holding;
         TimerHeldText = combMs <= 0 ? "now " + Dash : (timer.Holding ? "held " : "now ") + Ms(combMs) + " ms";
         TimerHeldTick = new Rect(0, 0, combMs > 0 ? Math.Min(1, combMs / CombSpanMs) : 1, 1);
@@ -962,7 +1002,7 @@ public sealed partial class BoostViewModel : ObservableObject
         AdapterRows = _adapters is null ? [] : [.. _adapters.Select(a => new AdapterRow(
             a.Name,
             _adapters.Count == 1 ? "the only adapter"
-                : a.Vendor == GpuVendor.Unknown ? string.Empty : a.Vendor.ToString()))];
+                : a.Vendor switch { GpuVendor.Nvidia => "NVIDIA", GpuVendor.Amd => "AMD", GpuVendor.Intel => "Intel", _ => string.Empty }))];
         GpuPreferenceSet = BoostOn && extras.GpuApplied;
         GpuPreferenceText = GpuPreferenceSet && extras.GamePath is { Length: > 0 } path
             ? "High performance for " + System.IO.Path.GetFileName(path)
@@ -998,14 +1038,14 @@ public sealed partial class BoostViewModel : ObservableObject
                     : cleaner.State == StandbyCleanerState.WaitingForHelper ? "the helper is not running"
                     : "waiting for Critical Ops", 0, false),
 
-            timer.Holding && timer.AppliedMs is { } applied
-                ? new BoostTile("TIMER RESOLUTION", Ms(applied), "ms",
-                    $"{BoostReadout.FinerBy(applied).ToString("0.#", CultureInfo.InvariantCulture)}× finer than Windows' 15.6 ms"
-                        + (timer.ReachesGame ? string.Empty : " · inside Optima only"),
-                    100 * (1 - applied / BoostReadout.WindowsTickMs), true)
+            timer.Holding
+                ? new BoostTile("TIMER RESOLUTION", Ms(tickNow), "ms",
+                    $"{BoostReadout.FinerBy(tickNow).ToString("0.#", CultureInfo.InvariantCulture)}× finer than Windows' 15.6 ms"
+                        + (timer.ReachesGame ? string.Empty : " · inside Optima only") + otherProgram,
+                    100 * (1 - tickNow / BoostReadout.WindowsTickMs), true)
                 : timer.CurrentMs > 0
-                    ? new BoostTile("TIMER RESOLUTION", Ms(timer.CurrentMs), "ms", "Windows' tick for Optima now · nothing held",
-                        100 * (1 - timer.CurrentMs / BoostReadout.WindowsTickMs), false)
+                    ? new BoostTile("TIMER RESOLUTION", Ms(tickNow), "ms",
+                        (timer.ReachesGame ? "Windows' tick now" : "Windows' default tick") + " · nothing held" + otherProgram, 0, false)
                     : new BoostTile("TIMER RESOLUTION", Dash, string.Empty, "not read yet", 0, false),
 
             awake
@@ -1031,7 +1071,8 @@ public sealed partial class BoostViewModel : ObservableObject
 
         static FlowSegment Part(double share, string label) => new(new GridLength(Math.Max(0, share), GridUnitType.Star), label);
         static string Percent(double value, string format) => value.ToString(format, CultureInfo.InvariantCulture) + "%";
-        static string Ms(double ms) => ms.ToString("0.0##", CultureInfo.InvariantCulture);
+        // Windows' default tick is 15.625 ms, written 15.6 everywhere on the page.
+        static string Ms(double ms) => (ms >= BoostReadout.WindowsTickMs ? Math.Round(ms, 1) : ms).ToString("0.0##", CultureInfo.InvariantCulture);
         static string MbOrGb(long mb) => mb >= 1024
             ? (mb / 1024.0).ToString("0.0", CultureInfo.InvariantCulture) + " GB"
             : mb.ToString("N0", CultureInfo.InvariantCulture) + " MB";

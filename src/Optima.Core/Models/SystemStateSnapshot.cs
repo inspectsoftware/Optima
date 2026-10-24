@@ -31,4 +31,10 @@ public sealed record ProcessStateSnapshot
     public ProcessPriorityLevel OriginalPriority { get; init; }
     public ulong OriginalAffinityMask { get; init; }
     public bool PowerThrottlingWasEnabled { get; init; }
+
+    /// <summary>
+    /// When the process started, where it was read: Windows hands the id of a process that ended to
+    /// the next one it starts, and this tells the two apart.
+    /// </summary>
+    public DateTimeOffset? StartTime { get; init; }
 }
