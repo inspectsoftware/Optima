@@ -20,7 +20,33 @@ public sealed class SettingRow : HeaderedContentControl
     public static readonly DependencyProperty StackedProperty = DependencyProperty.Register(
         nameof(Stacked), typeof(bool), typeof(SettingRow), new PropertyMetadata(false));
 
+    private static readonly DependencyPropertyKey WrappedPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(Wrapped), typeof(bool), typeof(SettingRow), new PropertyMetadata(false));
+
+    public static readonly DependencyProperty WrappedProperty = WrappedPropertyKey.DependencyProperty;
+
+    // The room the label keeps beside the control before the control goes under it, as in the design:
+    // 280 of text and the 24 gap, plus the row's padding on both sides.
+    private const double LabelRoom = 280 + 24 + 40;
+
     public string Hint { get => (string)GetValue(HintProperty); set => SetValue(HintProperty, value); }
     public string? Info { get => (string?)GetValue(InfoProperty); set => SetValue(InfoProperty, value); }
     public bool Stacked { get => (bool)GetValue(StackedProperty); set => SetValue(StackedProperty, value); }
+
+    /// <summary>
+    /// True while the row is too narrow for the label beside the control (a small window), and the
+    /// control sits under the label. Side by side, a wide control left the label a few pixels: its
+    /// name was cut off and the hint broke in the middle of words.
+    /// </summary>
+    public bool Wrapped => (bool)GetValue(WrappedProperty);
+
+    protected override Size MeasureOverride(Size constraint)
+    {
+        if (!Stacked && Content is UIElement control && !double.IsInfinity(constraint.Width))
+        {
+            control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            SetValue(WrappedPropertyKey, control.DesiredSize.Width + LabelRoom > constraint.Width);
+        }
+        return base.MeasureOverride(constraint);
+    }
 }
