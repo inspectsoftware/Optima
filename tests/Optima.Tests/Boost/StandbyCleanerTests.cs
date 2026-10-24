@@ -170,6 +170,49 @@ public sealed class StandbyCleanerTests
     }
 
     [Fact]
+    public async Task TheLastStatusHeard_IsTheCurrentOne_WhenAReadoutAndAStopCross()
+    {
+        _broker.IsConnected = true;
+        GameOnScreen();
+        using var cleaner = Create();
+        cleaner.Start();
+        await cleaner.SyncAsync(allowPrompt: false);
+        var heard = new List<StandbyCleanerStatus>();
+        using var handing = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        cleaner.StatusChanged += status =>
+        {
+            // The readout's listener is held up between the change and handing it on, as a
+            // thread switch there would.
+            if (status.State == StandbyCleanerState.Running)
+            {
+                handing.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+            lock (heard)
+            {
+                heard.Add(status);
+            }
+        };
+
+        var readout = Task.Run(() => _broker.Raise(new IpcEvent
+        {
+            Kind = "memoryStatus",
+            Data = new Dictionary<string, string> { ["freeMb"] = "731", ["standbyMb"] = "5120" },
+        }));
+        Assert.True(handing.Wait(TimeSpan.FromSeconds(10)));
+        _settings = _settings with { BoostStandbyCleanerEnabled = false };
+        var stop = Task.Run(() => cleaner.SyncAsync(allowPrompt: false));
+        await Task.WhenAny(stop, Task.Delay(300));
+        release.Set();
+        await readout;
+        await stop;
+
+        Assert.Equal(StandbyCleanerState.Off, cleaner.Status.State);
+        Assert.Equal(cleaner.Status, heard[^1]);
+    }
+
+    [Fact]
     public void FreedMemoryIsTotalledOverTheRun_EachPurgeOnce()
     {
         using var cleaner = Create();

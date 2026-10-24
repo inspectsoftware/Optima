@@ -357,7 +357,12 @@ public sealed partial class PlayViewModel : ObservableObject
                 {
                     _shield.AcceptDisclosure();
                 }
-                _ = _capture.EnsureHelperAsync();
+                // A launch nobody clicked for does not ask: a No the player gave earlier in this run
+                // stands for it, and capture itself does not ask again after one.
+                if (!unattended)
+                {
+                    _ = _capture.EnsureHelperAsync();
+                }
                 // Protected play wants the helper as well, for the same reason and under the same
                 // rule: its request meets the others at the helper's gate, so there is one prompt
                 // for all of them. Not waited for either. Without the helper it runs with reduced
@@ -370,9 +375,11 @@ public sealed partial class PlayViewModel : ObservableObject
             // waited for either: the session asks for the helper for the virtual display moments
             // later, and only a request made while the prompt is still open shares its answer.
             // Waiting here for the answer made that request come after it, and a No was asked again.
-            _ = _standbyCleaner.SyncAsync(allowPrompt: true);
+            // A launch nobody clicked for is not a deliberate act, so neither it nor the session it
+            // starts asks for the helper over a No the player already gave.
+            _ = _standbyCleaner.SyncAsync(allowPrompt: !unattended);
             _crashRelaunch.NoteSessionStart(profile);
-            var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, _sessionCts.Token));
+            var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, LaunchKind.Play, startedByPlayer: !unattended, _sessionCts.Token));
             LastWarnings = result.Warnings;
             if (result.Success)
             {

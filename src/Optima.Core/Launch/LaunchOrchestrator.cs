@@ -193,6 +193,13 @@ public sealed class LaunchOrchestrator
         => RunSessionAsync(profile, LaunchKind.Play, ct);
 
     public Task<LaunchResult> RunSessionAsync(LaunchProfile requested, LaunchKind kind, CancellationToken ct = default)
+        => RunSessionAsync(requested, kind, startedByPlayer: true, ct);
+
+    /// <param name="startedByPlayer">
+    /// False for a launch nobody clicked for (a relaunch after a crash). Such a launch runs unasked, so
+    /// a No the player gave earlier in this run stands for it, as it does for watch mode.
+    /// </param>
+    public Task<LaunchResult> RunSessionAsync(LaunchProfile requested, LaunchKind kind, bool startedByPlayer, CancellationToken ct = default)
     {
         var profile = WithSettingsDisplay(requested);
         return RunGatedAsync(profile, async (context, token) =>
@@ -222,7 +229,7 @@ public sealed class LaunchOrchestrator
             // prompt with them. Not waited for: the launch goes on while the player answers it.
             if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
             {
-                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context, startedByPlayer: true);
+                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context, startedByPlayer);
             }
 
             await PreflightAsync(token).ConfigureAwait(false);
@@ -482,8 +489,9 @@ public sealed class LaunchOrchestrator
             context.DriverMissing = true;
             return false;
         }
-        // Watch mode runs unasked, so a No the player gave earlier in this run stands for it: asked
-        // again, it was a new prompt over every later game. PLAY is the player asking, so it may ask.
+        // Watch mode and a relaunch after a crash run unasked, so a No the player gave earlier in this
+        // run stands for them: asked again, it was a new prompt over every later game. PLAY is the
+        // player asking, so it may ask.
         if (!startedByPlayer && elevation.LastStartFailure == ElevationStartFailure.Declined)
         {
             return false;

@@ -40,6 +40,9 @@ public sealed class PlayerSwitcherService
     /// </summary>
     public event Action? Switching;
 
+    /// <summary>Raises <see cref="Switching"/> for a change of the tracked player written elsewhere: the setup wizard's name.</summary>
+    public void NoteSwitching() => Switching?.Invoke();
+
     /// <summary>Makes a saved account the tracked player and returns its display name.</summary>
     public async Task<string> SwitchToAsync(PlayerAccount account, CancellationToken ct = default)
     {

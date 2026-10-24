@@ -22,6 +22,7 @@ public sealed partial class ChecksViewModel : ObservableObject
     private readonly SettingsService _settings;
     private readonly FirstRunFixService _firstRunFix;
     private readonly StatusViewModel _status;
+    private readonly PlayerSwitcherService _players;
     private readonly IssueEngine _issues;
     private readonly ILogger<ChecksViewModel> _logger;
 
@@ -32,6 +33,7 @@ public sealed partial class ChecksViewModel : ObservableObject
         SettingsService settings,
         FirstRunFixService firstRunFix,
         StatusViewModel status,
+        PlayerSwitcherService players,
         ILogger<ChecksViewModel> logger)
     {
         _checks = checks.OrderBy(c => c.Order).ToList();
@@ -40,6 +42,7 @@ public sealed partial class ChecksViewModel : ObservableObject
         _settings = settings;
         _firstRunFix = firstRunFix;
         _status = status;
+        _players = players;
         _logger = logger;
     }
 
@@ -155,7 +158,7 @@ public sealed partial class ChecksViewModel : ObservableObject
         {
             Owner = System.Windows.Application.Current.MainWindow,
         };
-        var viewModel = new SetupWizardViewModel(_status, this, _settings, _firstRunFix);
+        var viewModel = new SetupWizardViewModel(_status, this, _settings, _firstRunFix, _players);
         wizard.DataContext = viewModel;
         _ = viewModel.RunDetectionAsync();
         viewModel.Completed += (_, _) => wizard.Close();

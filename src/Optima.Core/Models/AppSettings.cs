@@ -89,6 +89,15 @@ public sealed record AppSettings
     /// </summary>
     public bool BoostGpuLeftoverChecked { get; init; }
 
+    /// <summary>
+    /// The master switch as 0.8.0 and 0.8.1 saved it. They kept Boost from one start to the next, and
+    /// only one closed with Boost on can have left its graphics preference in Windows. Read once by
+    /// that look and then cleared; written only while still true, so a save before the look keeps it.
+    /// </summary>
+    [JsonPropertyName("boostEnabled")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool OlderReleaseClosedWithBoostOn { get; init; }
+
     public string Theme { get; init; } = "Dark";
 
     public string AccentColor { get; init; } = "#E8B45A";

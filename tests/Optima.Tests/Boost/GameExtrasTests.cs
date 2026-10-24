@@ -38,8 +38,12 @@ public sealed class GameExtrasTests : IDisposable
         public string? GetGpuPreference(string executablePath)
             => HighPerformance.Contains(executablePath) ? "2" : Other.GetValueOrDefault(executablePath);
 
+        /// <summary>Runs before a preference is written, with the preference about to be written.</summary>
+        public Action<string?>? BeforeSet { get; set; }
+
         public void SetGpuPreference(string executablePath, string? preference)
         {
+            BeforeSet?.Invoke(preference);
             HighPerformance.Remove(executablePath);
             Other.Remove(executablePath);
             if (preference == "2")
@@ -220,6 +224,9 @@ public sealed class GameExtrasTests : IDisposable
             "{\"boostEnabled\":true,\"boostGpuHighPerformance\":true,\"boostGamePath\":"
             + System.Text.Json.JsonSerializer.Serialize(_extras.PathOfGame) + "}");
         _extras.HighPerformance.Add(_extras.PathOfGame!);
+        // Something in this build saves the settings before the look; the old switch survives it.
+        await new SettingsService(paths, _store, NullLogger<SettingsService>.Instance)
+            .UpdateSettingsAsync(s => s with { Theme = "Light" });
         var stored = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
         _settings = (await stored.GetSettingsAsync()).BoostEffective();
         var service = Create(stored);
@@ -230,6 +237,7 @@ public sealed class GameExtrasTests : IDisposable
 
         Assert.DoesNotContain(_extras.PathOfGame!, _extras.HighPerformance);
         Assert.True(stored.Current!.BoostGpuLeftoverChecked);
+        Assert.DoesNotContain("boostEnabled", File.ReadAllText(paths.ConfigFile), StringComparison.OrdinalIgnoreCase);
 
         // Only once: a preference the player sets in Windows afterwards is theirs.
         _extras.HighPerformance.Add(_extras.PathOfGame!);
@@ -240,6 +248,29 @@ public sealed class GameExtrasTests : IDisposable
         next.Dispose();
 
         Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+    }
+
+    [Fact]
+    public async Task AnOlderReleaseClosedWithBoostOff_LeavesTheHighPerformanceThePlayerSetInWindows()
+    {
+        // 0.8.x removed its own preference when Boost went off, and never touched the player's.
+        var paths = new AppPaths(_folder);
+        paths.EnsureCreated();
+        File.WriteAllText(paths.ConfigFile,
+            "{\"boostEnabled\":false,\"boostGpuHighPerformance\":true,\"boostGamePath\":"
+            + System.Text.Json.JsonSerializer.Serialize(_extras.PathOfGame) + "}");
+        _extras.HighPerformance.Add(_extras.PathOfGame!);
+        var stored = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
+        _settings = (await stored.GetSettingsAsync()).BoostEffective();
+        var service = Create(stored);
+
+        await service.AdoptOlderReleasePreferenceAsync();
+        await service.RestoreLeftoverAsync();
+        await service.SyncAsync();
+        service.Dispose();
+
+        Assert.Equal("2", _extras.GetGpuPreference(_extras.PathOfGame!));
+        Assert.True(stored.Current!.BoostGpuLeftoverChecked);
     }
 
     [Fact]
@@ -298,6 +329,36 @@ public sealed class GameExtrasTests : IDisposable
         Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
         service.Dispose();
         Assert.Equal("1", _extras.GetGpuPreference(_extras.PathOfGame!));
+    }
+
+    [Fact]
+    public async Task ClosingOptimaWhileASyncWritesThePreference_StillPutsBackThePlayersChoice()
+    {
+        _extras.Other[_extras.PathOfGame!] = "1";
+        var service = Create();
+        _presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        using var writing = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        _extras.BeforeSet = preference =>
+        {
+            if (preference == "2")
+            {
+                writing.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        // The sync has saved the ledger and is about to write high performance when Optima closes.
+        var sync = Task.Run(() => service.SyncAsync());
+        Assert.True(writing.Wait(TimeSpan.FromSeconds(10)));
+        var exit = Task.Run(service.Dispose);
+        await Task.WhenAny(exit, Task.Delay(300));
+        release.Set();
+        await sync;
+        await exit;
+
+        Assert.Equal("1", _extras.GetGpuPreference(_extras.PathOfGame!));
+        Assert.False(File.Exists(Path.Combine(_folder, "boost-gpu.json")));
     }
 
     [Fact]

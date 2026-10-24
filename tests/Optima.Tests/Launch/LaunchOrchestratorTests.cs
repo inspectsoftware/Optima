@@ -768,6 +768,20 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task ARelaunchNobodyClickedFor_AfterANoThisRun_DoesNotAskAgain()
+    {
+        // A relaunch after a crash goes through PLAY's path, but the player did not ask for it.
+        var elevation = new FakeElevationBroker { LastStartFailure = ElevationStartFailure.Declined, ConnectOnPrompt = true };
+
+        var result = await CreateOrchestrator(elevation: elevation)
+            .RunSessionAsync(CompetitiveProfile, LaunchKind.Play, startedByPlayer: false);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.DoesNotContain("enable", _virtualDisplay.Log);
+    }
+
+    [Fact]
     public async Task Attach_TheHelperIsAlreadyRunning_TheDisplayComesOn()
     {
         var elevation = new FakeElevationBroker { IsConnected = true };

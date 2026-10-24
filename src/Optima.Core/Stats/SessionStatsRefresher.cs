@@ -278,9 +278,18 @@ public sealed class SessionStatsRefresher
         var corrected = 0;
         var unmeasurable = 0;
         var otherPlayer = 0;
+        var newestRunning = false;
         for (var index = 0; index < summaries.Count; index++)
         {
             var session = summaries[index];
+            if (index == 0 && running && session.StatsBaseline is not null)
+            {
+                // The game still running is where this session ends, so it has no end yet. That
+                // passes once the game closes; counted with the sessions that have no snapshot, it
+                // read as if it never would.
+                newestRunning = true;
+                continue;
+            }
             var delta = DeltaFor(summaries, index, live);
             if (delta is null && OtherPlayer(session.StatsBaseline, EndOf(summaries, index, live)))
             {
@@ -317,7 +326,7 @@ public sealed class SessionStatsRefresher
             return new SessionMatchesRefreshResult(SessionStatsRefreshStatus.NoMovement,
                 $"Checked the last {summaries.Count} session{(summaries.Count == 1 ? string.Empty : "s")}: the API " +
                 "reports nothing the history does not already have." +
-                UnmeasurableNote(unmeasurable) + OtherPlayerNote(otherPlayer), 0, 0, 0);
+                UnmeasurableNote(unmeasurable) + OtherPlayerNote(otherPlayer) + RunningNote(newestRunning), 0, 0, 0);
         }
 
         var newestStillEmpty = !running && NewestAwaitsTheApi(summaries, live);
@@ -325,7 +334,7 @@ public sealed class SessionStatsRefresher
             (added + corrected > 0
                 ? $": {added} match row{(added == 1 ? string.Empty : "s")} added, {corrected} corrected"
                 : string.Empty) +
-            "." + UnmeasurableNote(unmeasurable) + OtherPlayerNote(otherPlayer);
+            "." + UnmeasurableNote(unmeasurable) + OtherPlayerNote(otherPlayer) + RunningNote(newestRunning);
         if (newestStillEmpty)
         {
             message += " The newest session still shows no movement; the API may not have published it yet - " +
@@ -396,6 +405,11 @@ public sealed class SessionStatsRefresher
             ? string.Empty
             : $" {sessions} session{(sessions == 1 ? " was" : "s were")} followed by a reading of a different player " +
               $"(the tracked player changed), so nothing is recorded for {(sessions == 1 ? "it" : "them")}.";
+
+    private static string RunningNote(bool newestRunning)
+        => newestRunning
+            ? " A game is running, so the newest session is measured once it is closed: refresh again then."
+            : string.Empty;
 
     /// <summary>The stored snapshot dressed as a profile, which is the shape the delta maths takes.</summary>
     private static CopsPlayerProfile AsBaseline(CopsSeasonStats baseline)
