@@ -194,6 +194,25 @@ public sealed class TrackedPlayerQueryTests
         Assert.Equal(("k", "Kestrel", (long?)48211907), (updated.Key, updated.Ign, updated.AccountId));
     }
 
+    [Fact]
+    public void CompletingThePlayerFoldsTheEntrySavedByNameAndTheOneSavedById()
+    {
+        // Saved twice while the API was down: by the name, then by the id.
+        var saved = new List<PlayerAccount>
+        {
+            new() { Key = "by-name", Ign = "Kestrel", Label = "main" },
+            new() { Key = "by-id", AccountId = 482 },
+            new() { Key = "other", Ign = "Bravo", AccountId = 777 },
+        };
+
+        var updated = TrackedPlayerQuery.WithSaved(saved, "Kestrel", 482);
+
+        Assert.Equal(2, updated.Count);
+        Assert.Equal(("by-name", "main", "Kestrel", (long?)482),
+            (updated[0].Key, updated[0].Label, updated[0].Ign, updated[0].AccountId));
+        Assert.Equal("other", updated[1].Key);
+    }
+
     [Theory]
     [InlineData("frosty", 7L, "FROSTY", 7L, true)]
     [InlineData("OldName", 7L, "NewName", 7L, true)]
