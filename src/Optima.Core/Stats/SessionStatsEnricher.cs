@@ -20,7 +20,9 @@ public sealed class SessionStatsEnricher : IDisposable
     private readonly Func<string, long?, CancellationToken, Task<CopsPlayerProfile?>> _fetchProfile;
     private readonly ILogger<SessionStatsEnricher> _logger;
 
-    private (CopsPlayerProfile Profile, DateTimeOffset At)? _startSnapshot;
+    // Who the snapshot was taken for, so the end of the run reads the same player even when Settings
+    // tracked someone else in the meantime.
+    private (CopsPlayerProfile Profile, DateTimeOffset At, string Ign, long? AccountId)? _startSnapshot;
     private bool _subscribed;
 
     public SessionStatsEnricher(
@@ -67,7 +69,7 @@ public sealed class SessionStatsEnricher : IDisposable
             var profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, CancellationToken.None).ConfigureAwait(false);
             if (profile is not null)
             {
-                _startSnapshot = (profile, at);
+                _startSnapshot = (profile, at, settings.PlayerIgn, settings.PlayerAccountId);
                 _logger.LogDebug("Start-of-run profile snapshot taken for {Name}", profile.Name);
             }
         }
@@ -91,14 +93,8 @@ public sealed class SessionStatsEnricher : IDisposable
                 return;
             }
 
-            var settings = await _settings.GetSettingsAsync().ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(settings.PlayerIgn) && settings.PlayerAccountId is not > 0)
-            {
-                return;
-            }
-
             await Task.Delay(SettleDelay).ConfigureAwait(false);
-            var after = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, CancellationToken.None).ConfigureAwait(false);
+            var after = await _fetchProfile(start.Value.Ign, start.Value.AccountId, CancellationToken.None).ConfigureAwait(false);
             var delta = CopsProfileDelta.Between(start.Value.Profile, after);
             var moved = delta is { IsZero: false };
 
@@ -107,7 +103,7 @@ public sealed class SessionStatsEnricher : IDisposable
             // short and the public API often publishes a finished match a little later, so the
             // Sessions page needs the baseline to re-ask and fill the gap in.
             var sessionId = await _store.AttachStatsAsync(
-                moved ? delta : null, start.Value.Profile.CurrentSeason, windowStart).ConfigureAwait(false);
+                moved ? delta : null, start.Value.Profile.Snapshot, windowStart).ConfigureAwait(false);
             if (!moved)
             {
                 _logger.LogDebug("No stat movement during this run (session: {Session})",

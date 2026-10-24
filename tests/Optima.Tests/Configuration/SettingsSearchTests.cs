@@ -19,4 +19,13 @@ public sealed class SettingsSearchTests
     [Fact]
     public void ARowWithoutAHintIsMatchedOnItsLabel()
         => Assert.True(SettingsSearch.Matches("saved", "Saved in Optima", null));
+
+    [Theory]
+    [InlineData("discord", true)]
+    [InlineData("discord presence", true)]
+    [InlineData("network discord", true)]
+    [InlineData("watchdog", false)]
+    public void ASectionOrCardNameFindsItsRows(string query, bool expected)
+        => Assert.Equal(expected, SettingsSearch.Matches(query, "Application ID", "Optima's own app. Clear it to keep presence off.",
+            "Presence goes to the Discord app on this PC; the only request over the network asks discord.com.", "PRESENCE", "Discord"));
 }

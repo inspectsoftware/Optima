@@ -43,17 +43,22 @@
                 <StackPanel x:Name="Text" VerticalAlignment="Center" Margin="0,0,24,0">
                   <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{TemplateBinding Header}" Style="{StaticResource Text.Base}" FontSize="14" />
-                    <!-- The longer story, for whoever wants it, without putting it on the page. -->
-                    <Border x:Name="InfoGlyph" Background="Transparent" Margin="7,0,0,0" VerticalAlignment="Center"
-                            Tag="{TemplateBinding Info}" ToolTipService.InitialShowDelay="150" ToolTipService.ShowDuration="60000">
+                    <!-- The longer story, for whoever wants it, without putting it on the page. A Label so it
+                         is a tab stop that opens the tip on keyboard focus, and so a screen reader has an
+                         element to read the text from: the old page said all of it inline. -->
+                    <Label x:Name="InfoGlyph" Background="Transparent" Padding="0" Margin="7,0,0,0" VerticalAlignment="Center"
+                           Focusable="True" IsTabStop="True" FocusVisualStyle="{StaticResource Focus.Ring}"
+                           AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource TemplatedParent}, StringFormat=About {0}}"
+                           AutomationProperties.HelpText="{TemplateBinding Info}"
+                           Tag="{TemplateBinding Info}" ToolTipService.InitialShowDelay="150" ToolTipService.ShowDuration="60000">
                       <ctl:Icon Symbol="{StaticResource Icon.Info}" Size="14" Foreground="{DynamicResource Brush.TextMuted}" />
-                      <Border.ToolTip>
+                      <Label.ToolTip>
                         <ToolTip>
                           <TextBlock Text="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ToolTip}}"
                                      TextWrapping="Wrap" MaxWidth="360" />
                         </ToolTip>
-                      </Border.ToolTip>
-                    </Border>
+                      </Label.ToolTip>
+                    </Label>
                   </StackPanel>
                   <TextBlock x:Name="Hint" Text="{TemplateBinding Hint}" Style="{StaticResource Text.Base}" FontSize="12"
                              Foreground="{DynamicResource Brush.TextMuted}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0" />
@@ -90,6 +95,8 @@
 
     <!-- A few options side by side, the chosen one filled with the accent. -->
     <Style x:Key="Segmented" TargetType="ListBox">
+      <EventSetter Event="PreviewMouseLeftButtonDown" Handler="KeepChoice" />
+      <EventSetter Event="PreviewKeyDown" Handler="KeepChoice" />
       <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource AncestorType=ctl:SettingRow}}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Brush.HairlineStrong}" />
       <Setter Property="BorderThickness" Value="1" />
@@ -208,6 +215,8 @@
 
     <!-- No scroll viewer of its own: one would take the mouse wheel over the list, and the page under it would not scroll. -->
     <Style x:Key="SectionList" TargetType="ListBox">
+      <EventSetter Event="PreviewMouseLeftButtonDown" Handler="KeepChoice" />
+      <EventSetter Event="PreviewKeyDown" Handler="KeepChoice" />
       <Setter Property="ItemContainerStyle" Value="{StaticResource SectionItem}" />
       <Setter Property="Template">
         <Setter.Value>
@@ -288,9 +297,15 @@
                          Foreground="{DynamicResource Brush.Ok}" TextWrapping="Wrap" TextTrimming="None" Margin="8,0,0,0" />
             </Grid>
           </StackPanel>
-          <Button x:Name="Save" Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Save to Optima" Padding="16,0"
-                  MinHeight="40" VerticalAlignment="Center" Command="{Binding SaveTrackedCommand}"
-                  ToolTip="Keeps this player in Optima: one click tracks them again, here or in the title bar" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="Save" Style="{StaticResource SecondaryButton}" Content="Save to Optima" Padding="16,0"
+                    MinHeight="40" Command="{Binding SaveTrackedCommand}"
+                    ToolTip="Keeps this player in Optima: one click tracks them again, here or in the title bar" />
+            <!-- The way back to tracking nobody, which emptying the old name and ID boxes used to be. -->
+            <Button Style="{StaticResource GhostButton}" Content="×" Width="40" MinHeight="40" FontSize="14" Margin="6,0,0,0"
+                    Command="{Binding StopTrackingCommand}" AutomationProperties.Name="Stop tracking"
+                    ToolTip="Stop tracking: HOME, sessions and Discord follow nobody until a player is tracked again" />
+          </StackPanel>
         </Grid>
       </Border>
       <DataTemplate.Triggers>
@@ -359,7 +374,7 @@
           <TextBlock Text="%LOCALAPPDATA%\Optima" Style="{StaticResource Text.PageSubtitle}" Margin="0,4,0,0" />
         </StackPanel>
 
-        <!-- Find a setting: every section narrows to the rows whose label or hint has the words. -->
+        <!-- Find a setting: every section narrows to the rows whose label, hint, note, card or section has the words. -->
         <Grid Grid.Column="2" Width="320" HorizontalAlignment="Right" VerticalAlignment="Bottom">
           <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" AutomationProperties.Name="Find a setting"
                    Padding="18,6,9,6" FontFamily="{StaticResource Font.Body}" FontSize="13" />
@@ -398,8 +413,19 @@
                       </TextBox>
                       <TextBlock Text="e.g. Kestrel or 48211907" Tag="{Binding PlayerQuery}" Style="{StaticResource Placeholder}"
                                  FontSize="14" Margin="21,0,0,0" />
-                      <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Content="Track" Padding="24,0" MinHeight="44"
-                              Margin="10,0,0,0" Command="{Binding TrackCommand}" />
+                      <Button Grid.Column="1" Padding="24,0" MinHeight="44" Margin="10,0,0,0" Command="{Binding TrackCommand}">
+                        <Button.Style>
+                          <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                            <Setter Property="Content" Value="Track" />
+                            <Style.Triggers>
+                              <!-- A lookup can take ten seconds or more on a slow API; the button says it is working. -->
+                              <DataTrigger Binding="{Binding IsTracking}" Value="True">
+                                <Setter Property="Content" Value="Looking up…" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Button.Style>
+                      </Button>
                     </Grid>
                     <TextBlock Text="{Binding TrackMessage}" Style="{StaticResource Text.Base}" FontSize="12"
                                Foreground="{DynamicResource Brush.Warn}" TextWrapping="Wrap" TextTrimming="None" Margin="0,8,0,0"
@@ -435,7 +461,7 @@
                   <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding Theme}" />
                 </ctl:SettingRow>
                 <ctl:SettingRow Header="Accent" Hint="Buttons, markers and highlights."
-                                Info="Pick a preset or type your own colour as #RRGGBB. The square at the end shows what applies when you save.">
+                                Info="Pick a preset or type your own colour as a hex code, #RRGGBB. The square at the end shows what applies when you save.">
                   <StackPanel Orientation="Horizontal">
                     <ItemsControl ItemsSource="{Binding AccentPresets}" VerticalAlignment="Center" Focusable="False">
                       <ItemsControl.ItemsPanel>

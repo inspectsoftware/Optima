@@ -28,4 +28,14 @@ public sealed record PlayerAccount
         => AccountId is { } id && accountId is { } other
             ? id == other
             : Ign.Trim().Length > 0 && string.Equals(Ign.Trim(), ign?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether this is the same player and already holds all of that identity: its id, and its name as
+    /// the game spells it. An entry saved while the stats API was down has only the name or only the
+    /// id; it is still the same player, but saving the found player again fills in what is missing.
+    /// </summary>
+    public bool Holds(string ign, long? accountId)
+        => Matches(ign, accountId)
+            && (accountId is null || AccountId == accountId)
+            && (ign.Trim().Length == 0 || string.Equals(Ign.Trim(), ign.Trim(), StringComparison.Ordinal));
 }

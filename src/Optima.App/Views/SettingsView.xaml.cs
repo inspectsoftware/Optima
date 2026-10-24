@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Optima.App.Controls;
 using Optima.App.Services;
 using Optima.App.ViewModels;
@@ -29,6 +30,21 @@ public partial class SettingsView : UserControl
         {
             _page.PropertyChanged += OnPageChanged;
             ShowSections(rise: false);
+        }
+    }
+
+    /// <summary>
+    /// Ctrl+click and Ctrl+Space toggle an item of a single-select list, so on the chosen segment or
+    /// the open section they cleared the choice and nothing was marked. These lists always have one
+    /// chosen, so the toggle is dropped there; the view model refuses an empty choice as well.
+    /// </summary>
+    private void KeepChoice(object sender, InputEventArgs e)
+    {
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
+            && e is MouseButtonEventArgs or KeyEventArgs { Key: Key.Space }
+            && ItemsControl.ContainerFromElement((ListBox)sender, (DependencyObject)e.OriginalSource) is ListBoxItem { IsSelected: true })
+        {
+            e.Handled = true;
         }
     }
 
@@ -64,7 +80,8 @@ public partial class SettingsView : UserControl
                 var shown = 0;
                 foreach (var row in ((Panel)card.Content).Children.OfType<SettingRow>())
                 {
-                    var match = SettingsSearch.Matches(query, (string)row.Header, row.Hint);
+                    // The card and section names too: "discord" or "watchdog" names a whole section, and no row says it.
+                    var match = SettingsSearch.Matches(query, (string)row.Header, row.Hint, row.Info, (string)card.Header, section.Label);
                     row.Visibility = match ? Visibility.Visible : Visibility.Collapsed;
                     shown += match ? 1 : 0;
                 }

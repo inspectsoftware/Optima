@@ -142,6 +142,7 @@ public sealed partial class SetupWizardViewModel : ObservableObject
             FirstRunCompleted = true,
             StartWithWindows = StartWithWindows,
             PlayerIgn = PlayerIgn.Trim(),
+            PlayerAccountId = Optima.Core.Stats.TrackedPlayerQuery.IdForName(s.PlayerIgn, s.PlayerAccountId, PlayerIgn),
             DiscordApplicationId = DiscordApplicationId.Trim().Length > 0
                 ? DiscordApplicationId.Trim()
                 : s.DiscordApplicationId,

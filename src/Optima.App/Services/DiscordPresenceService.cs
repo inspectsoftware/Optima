@@ -94,7 +94,10 @@ public sealed class DiscordPresenceService : IDisposable
 
     private PlayerSeasonBadge? _badge;
     // Which player the cached badge belongs to, so a change of identity invalidates it immediately.
-    private string _badgeName = "";
+    // The name and the id together: a player tracked by id alone has no name, and two of those
+    // would otherwise look like the same player. One string, so it is read and written whole
+    // from the settings thread and the lookup's thread alike.
+    private string _badgeFor = "";
     private DateTimeOffset _badgeAt = DateTimeOffset.MinValue;
     private string _lastSignature = "";
 
@@ -184,7 +187,7 @@ public sealed class DiscordPresenceService : IDisposable
 
         // The rank the card shows comes from the profile, so a new identity invalidates the badge
         // rather than waiting out the rest of its lifetime with the previous player's rank on it.
-        if (!string.Equals(_badgeName, _playerIgn, StringComparison.Ordinal))
+        if (!string.Equals(_badgeFor, BadgeKey(_playerIgn, _playerAccountId), StringComparison.Ordinal))
         {
             _badge = null;
             _badgeAt = DateTimeOffset.MinValue;
@@ -382,9 +385,12 @@ public sealed class DiscordPresenceService : IDisposable
             return;
         }
         _badgeAt = DateTimeOffset.Now;
-        _badgeName = _playerIgn;
+        _badgeFor = BadgeKey(_playerIgn, _playerAccountId);
         _ = RefreshBadgeAsync(_playerIgn, _playerAccountId);
     }
+
+    private static string BadgeKey(string ign, long? accountId)
+        => ign + "|" + accountId?.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Reads the player's ranked record and rank for the card. Failure is not fatal: the card keeps
@@ -400,6 +406,11 @@ public sealed class DiscordPresenceService : IDisposable
         try
         {
             var lookup = await _cops.LookupPlayerAsync(ign, accountId).ConfigureAwait(false);
+            // A slow answer for the player tracked before a switch is not this player's badge.
+            if (!string.Equals(_badgeFor, BadgeKey(ign, accountId), StringComparison.Ordinal))
+            {
+                return;
+            }
             if (lookup.Profile is not { } profile || CopsApiClient.LooksLikePlaceholderProfile(profile))
             {
                 _badge = null;

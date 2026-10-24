@@ -97,6 +97,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         if (value is null)
         {
+            // Null is the search showing every match. Without a search it is Ctrl+click on the open
+            // section, which clears a list's choice and left no page on screen, so that section stays open.
+            if (SearchText.Trim().Length == 0)
+            {
+                SelectedSection = _lastSection ?? Sections[0];
+            }
             return;
         }
         _lastSection = value;
@@ -145,6 +151,42 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private string _theme = "Dark";
     [ObservableProperty] private string _accentColor = AccentMath.DefaultAccentHex;
+
+    // The segmented choices are single-select lists, and Ctrl+click or Ctrl+Space on the chosen
+    // segment clears it. An empty choice is not a setting: it was saved as null, a null display
+    // provider broke every virtual display call, and Off animations came back as System. The
+    // choice stays what it was instead.
+    partial void OnThemeChanged(string? oldValue, string newValue)
+    {
+        if (newValue is null)
+        {
+            Theme = oldValue ?? "Dark";
+        }
+    }
+
+    partial void OnAnimationsChanged(string? oldValue, string newValue)
+    {
+        if (newValue is null)
+        {
+            Animations = oldValue ?? AnimationLabels[0];
+        }
+    }
+
+    partial void OnOverlayCornerChanged(string? oldValue, string newValue)
+    {
+        if (newValue is null)
+        {
+            OverlayCorner = oldValue ?? "TopRight";
+        }
+    }
+
+    partial void OnProviderChanged(string? oldValue, string newValue)
+    {
+        if (newValue is null)
+        {
+            Provider = oldValue ?? "Auto";
+        }
+    }
 
     partial void OnAccentColorChanged(string value)
     {
@@ -254,7 +296,11 @@ public sealed partial class SettingsViewModel : ObservableObject
                 PlayerIgn = decision.Ign,
                 PlayerAccountId = decision.AccountId,
             });
-            PlayerQuery = string.Empty;
+            // The box stays editable while the lookup runs; whatever was typed since is kept.
+            if (string.Equals(PlayerQuery.Trim(), typed, StringComparison.Ordinal))
+            {
+                PlayerQuery = string.Empty;
+            }
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
@@ -278,6 +324,24 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     private bool CanSaveTracked() => !IsTrackedSaved;
+
+    /// <summary>
+    /// The x on the tracked card: tracks nobody, so HOME, the session stats and Discord show no player.
+    /// Saved entries stay; a chip tracks one of them again.
+    /// </summary>
+    [RelayCommand]
+    private async Task StopTrackingAsync()
+    {
+        TrackMessage = string.Empty;
+        try
+        {
+            await _settings.UpdateSettingsAsync(s => s with { PlayerIgn = string.Empty, PlayerAccountId = null });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            TrackMessage = "The player could not be saved: " + ex.Message;
+        }
+    }
 
     /// <summary>A saved chip: makes that player the tracked one.</summary>
     [RelayCommand]
@@ -345,7 +409,7 @@ public sealed partial class SettingsViewModel : ObservableObject
                 _ = FillTrackedSummaryAsync(identity);
             }
         }
-        IsTrackedSaved = SavedPlayers.Any(a => a.IsActive);
+        IsTrackedSaved = SavedPlayers.Any(a => a.Holds(_trackedIgn, _trackedAccountId));
     }
 
     private void ShowTracked(string ign, long? accountId, CopsPlayerProfile? profile, string status, bool ok)
@@ -359,7 +423,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         TrackedSummary = profile is null ? string.Empty : TrackedPlayerQuery.Summary(profile);
         TrackedStatus = status;
         TrackedStatusOk = ok;
-        IsTrackedSaved = SavedPlayers.Any(a => a.Matches(ign, accountId));
+        // Saved only once the entry holds the whole identity: one saved while the API was down, with
+        // just the name or the id, keeps Save on so that saving again completes it.
+        IsTrackedSaved = SavedPlayers.Any(a => a.Holds(ign, accountId));
     }
 
     /// <summary>Looks the stored player up for the card's level and rank line. Quietly: the card works without it.</summary>

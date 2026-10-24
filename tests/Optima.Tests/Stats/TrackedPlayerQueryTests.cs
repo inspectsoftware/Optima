@@ -114,6 +114,15 @@ public sealed class TrackedPlayerQueryTests
         Assert.EndsWith("profile?usernames=frosty", handler.LastUrl);
     }
 
+    [Theory]
+    [InlineData("Kestrel", 48211907L, "Kestrel", 48211907L)]
+    [InlineData("Kestrel", 48211907L, " kestrel ", 48211907L)]
+    [InlineData("Kestrel", 48211907L, "Falcon", null)]
+    [InlineData("Kestrel", 48211907L, "", null)]
+    [InlineData("", 48211907L, "", 48211907L)]
+    public void ANameTypedForSomeoneElseDropsTheStoredId(string storedIgn, long? storedId, string typed, long? expected)
+        => Assert.Equal(expected, TrackedPlayerQuery.IdForName(storedIgn, storedId, typed));
+
     [Fact]
     public void SavingTheSamePlayerAgainReplacesTheEntry()
     {
@@ -135,6 +144,27 @@ public sealed class TrackedPlayerQueryTests
         var updated = TrackedPlayerQuery.WithSaved(saved, "Kestrel", 2);
 
         Assert.Equal(["frosty", "Kestrel"], updated.Select(a => a.Ign));
+    }
+
+    [Theory]
+    [InlineData("Kestrel", 48211907L, "Kestrel", 48211907L, true)]
+    [InlineData("", 48211907L, "Kestrel", 48211907L, false)]
+    [InlineData("osprey", null, "Osprey", 777L, false)]
+    [InlineData("OldName", 7L, "NewName", 7L, false)]
+    [InlineData("", 48211907L, "", 48211907L, true)]
+    [InlineData("osprey", null, "osprey", null, true)]
+    [InlineData("frosty", 7L, "frosty", 8L, false)]
+    public void ASavedEntryHoldsThePlayerOnlyWithTheWholeIdentity(string ign, long? id, string trackedIgn, long? trackedId, bool expected)
+        => Assert.Equal(expected, new PlayerAccount { Ign = ign, AccountId = id }.Holds(trackedIgn, trackedId));
+
+    [Fact]
+    public void SavingTheFoundPlayerCompletesAnEntrySavedWhileTheApiWasDown()
+    {
+        var saved = new List<PlayerAccount> { new() { Key = "k", AccountId = 48211907 } };
+
+        var updated = Assert.Single(TrackedPlayerQuery.WithSaved(saved, "Kestrel", 48211907));
+
+        Assert.Equal(("k", "Kestrel", (long?)48211907), (updated.Key, updated.Ign, updated.AccountId));
     }
 
     [Theory]

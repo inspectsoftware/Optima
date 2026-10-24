@@ -99,6 +99,12 @@ public sealed class SessionStatsRefresher
         _runInProgress = runInProgress ?? (() => false);
     }
 
+    // A session is measured only against the player it was recorded for: the difference between two
+    // players is not anything anyone played.
+    private const string OtherPlayerMessage =
+        "This session belongs to a different player than the reading it would be measured against: the " +
+        "tracked player changed since. Nothing is recorded for it.";
+
     private const string RunInProgressMessage =
         "A game is running, so where the newest session ended cannot be read from the live profile yet. " +
         "Refresh again once the game is closed.";
@@ -145,9 +151,7 @@ public sealed class SessionStatsRefresher
             var settled = DeltaBetween(baseline, end);
             if (settled is null)
             {
-                return new SessionStatsRefreshResult(SessionStatsRefreshStatus.NoMovement,
-                    "The next session's snapshot shows no movement during this one, so there is nothing to record.",
-                    null);
+                return new SessionStatsRefreshResult(SessionStatsRefreshStatus.NoMovement, OtherPlayerMessage, null);
             }
 
             var written = await RecordAsync(session, settled, ct).ConfigureAwait(false);
@@ -179,7 +183,11 @@ public sealed class SessionStatsRefresher
 
             var profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, ct).ConfigureAwait(false);
             reached = profile is not null;
-            var delta = DeltaBetween(baseline, profile?.CurrentSeason);
+            if (baseline.UserId > 0 && profile is { UserId: > 0 } && profile.UserId != baseline.UserId)
+            {
+                return new SessionStatsRefreshResult(SessionStatsRefreshStatus.NoMovement, OtherPlayerMessage, null);
+            }
+            var delta = DeltaBetween(baseline, profile?.Snapshot);
             if (delta is { IsZero: false })
             {
                 var written = await RecordAsync(session, delta, ct).ConfigureAwait(false);
@@ -246,7 +254,7 @@ public sealed class SessionStatsRefresher
         {
             ct.ThrowIfCancellationRequested();
             profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, ct).ConfigureAwait(false);
-            var newest = DeltaFor(summaries, 0, profile?.CurrentSeason);
+            var newest = DeltaFor(summaries, 0, profile?.Snapshot);
             var pending = profile is null || newest is null || newest.IsZero;
             if (!pending || attempt == tries)
             {
@@ -263,7 +271,7 @@ public sealed class SessionStatsRefresher
                 "The stats API could not be reached just now. Check the connection and try again.", 0, 0, 0);
         }
 
-        var live = running ? null : profile.CurrentSeason;
+        var live = running ? null : profile.Snapshot;
         var updated = 0;
         var added = 0;
         var corrected = 0;
@@ -359,7 +367,7 @@ public sealed class SessionStatsRefresher
 
     /// <summary>The stored snapshot dressed as a profile, which is the shape the delta maths takes.</summary>
     private static CopsPlayerProfile AsBaseline(CopsSeasonStats baseline)
-        => new(0, string.Empty, 0, [baseline]);
+        => new(baseline.UserId, string.Empty, 0, [baseline]);
 
     /// <summary>
     /// Brings the automatic match rows in line with the refreshed delta: a mode that still holds exactly

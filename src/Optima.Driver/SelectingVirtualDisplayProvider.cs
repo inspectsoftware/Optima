@@ -50,7 +50,8 @@ public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider, I
             }
 
             var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
-            _selected = settings.VirtualDisplayProvider.ToUpperInvariant() switch
+            // A settings file saved by a Settings page that let the choice be cleared holds null here.
+            _selected = (settings.VirtualDisplayProvider ?? "Auto").ToUpperInvariant() switch
             {
                 "MTTVDD" => _real,
                 "MOCK" => _mock,

@@ -19,8 +19,12 @@ public sealed record CopsModeStats(long Kills, long Deaths, long Assists, long W
     public bool IsZero => Kills == 0 && Deaths == 0 && Assists == 0 && Wins == 0 && Losses == 0;
 }
 
-/// <summary>One season row of the profile's stats.</summary>
-public sealed record CopsSeasonStats(int Season, CopsModeStats Ranked, CopsModeStats Casual, CopsModeStats Custom);
+/// <summary>
+/// One season row of the profile's stats. <paramref name="UserId"/> says whose totals these are when
+/// they are kept as a session's start snapshot; 0 means not known, as in a profile's own rows and in
+/// snapshots stored before it was kept.
+/// </summary>
+public sealed record CopsSeasonStats(int Season, CopsModeStats Ranked, CopsModeStats Casual, CopsModeStats Custom, long UserId = 0);
 
 /// <summary>The slice of the public profile Optima cares about.</summary>
 public sealed record CopsPlayerProfile(
@@ -43,6 +47,9 @@ public sealed record CopsPlayerProfile(
 {
     public CopsSeasonStats? CurrentSeason => Seasons.Count == 0 ? null : Seasons.MaxBy(s => s.Season);
 
+    /// <summary>The current season marked with this player's id, as a session's start snapshot is stored and compared.</summary>
+    public CopsSeasonStats? Snapshot => CurrentSeason is { } season ? season with { UserId = UserId } : null;
+
     /// <summary>Level progress as a 0..1 fraction, or null when the API did not report the span.</summary>
     public double? LevelProgress => CurrentXp is { } xp && NextLevelXp is > 0
         ? Math.Clamp((double)xp / NextLevelXp.Value, 0, 1)
@@ -58,6 +65,13 @@ public sealed record CopsProfileDelta(int Season, CopsModeStats Ranked, CopsMode
     {
         var currentAfter = after?.CurrentSeason;
         if (currentAfter is null)
+        {
+            return null;
+        }
+
+        // Two different players: the tracked player was changed between the readings, and their
+        // difference is not anything anyone played.
+        if (before is { UserId: > 0 } && after!.UserId > 0 && before.UserId != after.UserId)
         {
             return null;
         }
