@@ -114,12 +114,16 @@ public sealed class LaunchStepList
         _details[live] = progress.Phase == LaunchPhase.Monitoring ? "running" : progress.Message;
     }
 
-    /// <summary>The session ended and everything was put back. A skipped step stays skipped.</summary>
+    /// <summary>
+    /// The session ended and everything was put back. A skipped step stays skipped, and a step the
+    /// session never got to stays to come: a cancel ends it there, before a display that waits for
+    /// the game has come on.
+    /// </summary>
     public void Complete()
     {
         for (var i = 0; i < _states.Length; i++)
         {
-            if (_states[i] is not StepState.Skipped)
+            if (_states[i] is StepState.Live or StepState.Done || i == Restore)
             {
                 _states[i] = StepState.Done;
             }

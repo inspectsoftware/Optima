@@ -118,6 +118,17 @@ public sealed class LaunchStepListTests
     }
 
     [Fact]
+    public void ACancelBeforeTheGameIsUp_DoesNotTickOffTheDisplay()
+    {
+        // The cancel path reports Completed straight after the phase it stopped in.
+        var steps = Run([.. UpToTheGame, P(LaunchPhase.Completed, "Cancelled. Settings restored.")]);
+
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Todo, StepState.Done], steps.States);
+        Assert.Null(steps.Details[Display]);
+        Assert.Equal("everything restored", steps.Details[Restore]);
+    }
+
+    [Fact]
     public void AFailureBeforeAnyReport_BlamesTheFirstRow()
     {
         var steps = new LaunchStepList();
