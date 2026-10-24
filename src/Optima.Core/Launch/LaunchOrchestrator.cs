@@ -21,7 +21,11 @@ public enum LaunchPhase
     Failed,
 }
 
-public sealed record LaunchProgress(LaunchPhase Phase, string Message);
+/// <param name="Skipped">
+/// The step the phase names was given up on and the session carries on without it. Reported after
+/// the phase itself, so the step list can show the step as not done rather than done.
+/// </param>
+public sealed record LaunchProgress(LaunchPhase Phase, string Message, bool Skipped = false);
 
 /// <summary>
 /// Something a session went without: a step that failed and was not worth stopping the launch for.
@@ -39,8 +43,9 @@ public sealed record LaunchResult
 }
 
 /// <summary>
-/// The §5 pipeline: validate → snapshot → apply profile → configure display → launch → detect runtime → monitor → wait
-/// for exit → restore → session stats.
+/// The §5 pipeline: validate → snapshot → apply profile → launch → detect runtime → virtual display → monitor → wait
+/// for exit → restore → session stats. The virtual display only comes on once the game is seen running, and goes off
+/// again with the restore when it exits, is killed, or the session ends.
 /// </summary>
 public sealed class LaunchOrchestrator
 {
@@ -230,6 +235,7 @@ public sealed class LaunchOrchestrator
                     "Try launching once from Google Play Games directly").ConfigureAwait(false);
             }
             _logger.LogInformation("Game process detected (emulator PID {Pid})", emulatorPid);
+            await ApplyVirtualDisplayAsync(profile.Display, context, token).ConfigureAwait(false);
 
             return await MonitorAndCompleteAsync(
                 profile, game.PackageId, emulatorPid.Value, context, kind, captureAllowed: true, token).ConfigureAwait(false);
@@ -247,6 +253,7 @@ public sealed class LaunchOrchestrator
 
             await _recovery.SavePendingAsync(context.Snapshot, token).ConfigureAwait(false);
             await ApplyEnvironmentAsync(profile, context, token).ConfigureAwait(false);
+            await ApplyVirtualDisplayAsync(profile.Display, context, token).ConfigureAwait(false);
 
             return await MonitorAndCompleteAsync(
                 profile, game?.PackageId ?? "unknown", emulatorPid, context, LaunchKind.Watch, captureAllowed, token).ConfigureAwait(false);
@@ -373,18 +380,33 @@ public sealed class LaunchOrchestrator
                 }
             }).ConfigureAwait(false);
         }
+    }
 
-        if (profile.Display.VirtualDisplay)
+    /// <summary>
+    /// Switches the virtual display on for a game that is already running. Nothing here ends the
+    /// session: the game is up, and a display that does not come on is a warning, not a reason to
+    /// put everything back under the player. Whatever did come on goes off with the restore at exit.
+    /// </summary>
+    private async Task ApplyVirtualDisplayAsync(DisplayProfile display, SessionContext context, CancellationToken ct)
+    {
+        if (!display.VirtualDisplay)
+        {
+            return;
+        }
+
+        var on = false;
+        await RunOptionalAsync(context, "LAUNCH_STEP_SKIPPED", "The virtual display was not switched on", async () =>
         {
             try
             {
-                await ConfigureVirtualDisplayAsync(profile.Display, context, ct).ConfigureAwait(false);
+                await ConfigureVirtualDisplayAsync(display, context, ct).ConfigureAwait(false);
+                on = true;
             }
             catch (OptimaException ex) when (ex.Error.Code == "VDD_NOT_INSTALLED")
             {
                 // The choice says "virtual display" and the driver is not on this PC (never
-                // installed, or uninstalled since). That is no reason to refuse to start the game:
-                // it runs on the real screen, and the session says what it went without.
+                // installed, or uninstalled since). The game plays on without it, and the session
+                // says what it went without.
                 _logger.LogWarning("The virtual display is switched on but its driver is not installed; the game runs on the real screen");
                 context.Warnings.Add(new LaunchWarning(ex.Error.Code,
                     "The virtual display driver is not installed",
@@ -392,6 +414,11 @@ public sealed class LaunchOrchestrator
                 context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = false };
                 await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
             }
+        }).ConfigureAwait(false);
+
+        if (!on)
+        {
+            Report(LaunchPhase.ConfiguringDisplay, "The virtual display was not switched on. The game carries on without it.", skipped: true);
         }
     }
 
@@ -407,7 +434,7 @@ public sealed class LaunchOrchestrator
         var wasActive = await _virtualDisplay.IsDisplayActiveAsync(ct).ConfigureAwait(false);
         if (!wasActive)
         {
-            await RunEssentialAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
+            await RunWithRepairAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
             context.Snapshot = context.Snapshot with { VirtualDisplayEnabledByUs = true };
             await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
         }
@@ -419,14 +446,8 @@ public sealed class LaunchOrchestrator
         context.Snapshot = context.Snapshot with { DisplayTopology = topology };
         await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
 
-        if (display.MakePrimary
-            && await _virtualDisplay.GetDisplayInfoAsync(ct).ConfigureAwait(false) is { } displayInfo)
-        {
-            // Not worth a launch: the display is up at its mode either way, and the game can be
-            // moved onto it by hand. The session says that it was not made the main screen.
-            await RunOptionalAsync(context, "DISPLAY_PRIMARY_FAILED", "The virtual display was not made the main screen",
-                () => _displayService.MakePrimaryAsync(displayInfo.DeviceName, ct)).ConfigureAwait(false);
-        }
+        // Never made the main screen, whatever an old profile says: the game window is already up on
+        // the player's own monitor, and Windows moves it onto a new main screen that nobody can see.
     }
 
     /// <summary>
@@ -672,11 +693,11 @@ public sealed class LaunchOrchestrator
     }
 
     /// <summary>
-    /// Runs a step the session cannot do without. When it fails with a fault a repair is known
-    /// for, the repair runs and the step gets one more try; a second failure is the session's
+    /// Runs a step that a known repair can rescue. When it fails with a fault a repair is known
+    /// for, the repair runs and the step gets one more try; a second failure is the step's
     /// failure, under the error the step itself gave.
     /// </summary>
-    private async Task RunEssentialAsync(Func<Task> step, CancellationToken ct)
+    private async Task RunWithRepairAsync(Func<Task> step, CancellationToken ct)
     {
         try
         {
@@ -753,10 +774,10 @@ public sealed class LaunchOrchestrator
             },
         };
 
-    private void Report(LaunchPhase phase, string message)
+    private void Report(LaunchPhase phase, string message, bool skipped = false)
     {
         _phase = phase;
         _logger.LogInformation("[{Phase}] {Message}", phase, message);
-        ProgressChanged?.Invoke(this, new LaunchProgress(phase, message));
+        ProgressChanged?.Invoke(this, new LaunchProgress(phase, message, skipped));
     }
 }

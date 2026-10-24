@@ -80,10 +80,12 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.Contains("apply:HighPerformance", _power.Log);
         Assert.Contains("restore", _power.Log);
 
-        // Virtual display enabled, mode set, then original state restored.
+        // Virtual display enabled, mode set, then original state restored and the display switched off.
         Assert.Contains("enable", _virtualDisplay.Log);
         Assert.Contains("mode:1920x1080 @ 240 Hz", _virtualDisplay.Log);
         Assert.Contains("restoreOriginal", _virtualDisplay.Log);
+        Assert.Contains("disable", _virtualDisplay.Log);
+        Assert.False(_virtualDisplay.Active);
 
         // Topology captured before changes and restored after.
         Assert.Contains("capture", _displayService.Log);
@@ -133,8 +135,10 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.False(result.Success);
         Assert.Equal("LAUNCH_FAILED", result.Error?.Code);
         Assert.Contains("restore", _power.Log);
-        Assert.Contains("restoreTopology", _displayService.Log);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
+        // No game, so the virtual display was never touched.
+        Assert.Empty(_virtualDisplay.Log);
+        Assert.Empty(_displayService.Log);
     }
 
     [Fact]
@@ -147,6 +151,7 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.False(result.Success);
         Assert.Equal("GAME_START_TIMEOUT", result.Error?.Code);
         Assert.Contains("restore", _power.Log);
+        Assert.Empty(_virtualDisplay.Log);
     }
 
     [Fact]
@@ -189,18 +194,110 @@ public sealed class LaunchOrchestratorTests : IDisposable
     [Fact]
     public async Task RunSession_UnexpectedFailure_NamesThePhaseAndCarriesTheException()
     {
-        _virtualDisplay.EnableError = new InvalidOperationException("the driver went away");
+        _processMonitor.ExitError = new InvalidOperationException("the process list went away");
 
         var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
 
         Assert.False(result.Success);
         Assert.Equal("UNEXPECTED", result.Error?.Code);
-        Assert.Contains("configuring the virtual display", result.Error!.Explanation);
-        Assert.StartsWith("phase: ConfiguringDisplay", result.Error.DeveloperDetails);
-        Assert.Contains("System.InvalidOperationException: the driver went away", result.Error.DeveloperDetails);
+        Assert.Contains("the game was running", result.Error!.Explanation);
+        Assert.StartsWith("phase: Monitoring", result.Error.DeveloperDetails);
+        Assert.Contains("System.InvalidOperationException: the process list went away", result.Error.DeveloperDetails);
 
-        // And the half-applied profile came off again.
+        // And everything came off again, the virtual display that was on under the game too.
         Assert.Contains("restore", _power.Log);
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.False(_virtualDisplay.Active);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_TheDisplayFailsUnderTheRunningGame_TheSessionCarriesOnWithAWarning()
+    {
+        _virtualDisplay.EnableError = new InvalidOperationException("the driver went away");
+        var reports = new List<LaunchProgress>();
+        var orchestrator = CreateOrchestrator();
+        orchestrator.ProgressChanged += (_, progress) => reports.Add(progress);
+
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
+
+        // The game is up by the time the display is tried, so nothing is put back under it.
+        Assert.True(result.Success);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal("LAUNCH_STEP_SKIPPED", warning.Code);
+        Assert.Equal("The virtual display was not switched on", warning.Title);
+        Assert.Contains("the driver went away", warning.Detail);
+        Assert.Contains(reports, progress => progress is { Phase: LaunchPhase.ConfiguringDisplay, Skipped: true });
+        Assert.Equal([4242], _processOptimizer.Applied);
+        Assert.Single(_sessionStore.Saved);
+        Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.False(_virtualDisplay.Active);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_TheModeIsRefusedAfterTheDisplayCameOn_ItStillGoesOffAtExit()
+    {
+        _virtualDisplay.ModeError = OptimaException.From(
+            "VDD_MODE_NOT_APPLIED", "The virtual display did not take that mode.", "The driver kept its own.");
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal("VDD_MODE_NOT_APPLIED", Assert.Single(result.Warnings).Code);
+        // It was on while the game ran, and the restore at exit switched it off.
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Single(_virtualDisplay.Log, entry => entry == "disable");
+        Assert.False(_virtualDisplay.Active);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_TheDisplayComesOnOnlyOnceTheGameIsSeenRunning()
+    {
+        (int Launches, int GameStartWaits, int Tuned, bool Watching)? atEnable = null;
+        _virtualDisplay.OnEnable = () => atEnable =
+            (_launcher.LaunchCalls, _processMonitor.GameStartWaits, _processOptimizer.Applied.Count, _network.Started);
+
+        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+
+        // After the launcher and after the game was found; before the game is tuned and watched.
+        Assert.True(result.Success);
+        Assert.Equal((1, 1, 0, false), atEnable);
+    }
+
+    [Fact]
+    public async Task RunSession_ReportsTheDisplayBetweenTheGameStartingAndTheGameBeingWatched()
+    {
+        var phases = new List<LaunchPhase>();
+        var orchestrator = CreateOrchestrator();
+        orchestrator.ProgressChanged += (_, progress) => phases.Add(progress.Phase);
+
+        await orchestrator.RunSessionAsync(CompetitiveProfile);
+
+        Assert.Equal(
+        [
+            LaunchPhase.Validating, LaunchPhase.ApplyingPerformanceProfile, LaunchPhase.StartingPlatform,
+            LaunchPhase.WaitingForGame, LaunchPhase.ConfiguringDisplay, LaunchPhase.Monitoring,
+            LaunchPhase.Restoring, LaunchPhase.Completed,
+        ], phases);
+    }
+
+    [Fact]
+    public async Task RunSession_TheDisplayIsOnWhileTheGameRunsAndOffOnceItsProcessIsGone()
+    {
+        _processMonitor.ExitAfter = TimeSpan.FromMinutes(1);
+
+        var session = CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+        await WaitForAsync(() => _network.Started);
+        Assert.True(_virtualDisplay.Active);
+        // What the monitor's wait does when the emulator process is killed: it returns.
+        _processMonitor.EndGameNow();
+        var result = await session;
+
+        Assert.True(result.Success);
+        Assert.Single(_sessionStore.Saved);
+        Assert.False(_virtualDisplay.Active);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
     }
 
@@ -266,7 +363,7 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
-    public async Task RunSession_VirtualDisplayStillMissing_FailsWithTheTypedCode()
+    public async Task RunSession_VirtualDisplayStillMissing_TheGameKeepsItsSessionUnderTheTypedCode()
     {
         var support = new FakeLaunchSupport { Repairable = { "VDD_NO_DISPLAY" } };
         _virtualDisplay.EnableErrors.Enqueue(NoDisplay());
@@ -274,18 +371,20 @@ public sealed class LaunchOrchestratorTests : IDisposable
 
         var result = await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
 
-        // One repair, one more try, and then the failure the step itself gave, not a generic one.
-        Assert.False(result.Success);
-        Assert.Equal("VDD_NO_DISPLAY", result.Error?.Code);
+        // One repair, one more try, and then the warning the step itself gave, not a generic one.
+        // The game was already running, so the session goes on without the display.
+        Assert.True(result.Success);
+        Assert.Equal("VDD_NO_DISPLAY", Assert.Single(result.Warnings).Code);
         Assert.Single(support.Repaired);
         Assert.Equal(2, _virtualDisplay.Log.Count(entry => entry == "enable"));
-        Assert.Equal(0, _launcher.LaunchCalls);
+        Assert.Equal(1, _launcher.LaunchCalls);
+        Assert.Single(_sessionStore.Saved);
         Assert.Contains("restore", _power.Log);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
     }
 
     [Fact]
-    public async Task RunSession_AFaultNoRepairIsKnownFor_FailsWithoutASecondTry()
+    public async Task RunSession_AFaultNoRepairIsKnownFor_IsNotTriedASecondTime()
     {
         var support = new FakeLaunchSupport();
         _virtualDisplay.EnableErrors.Enqueue(OptimaException.From(
@@ -293,7 +392,8 @@ public sealed class LaunchOrchestratorTests : IDisposable
 
         var result = await CreateOrchestrator(support: support).RunSessionAsync(CompetitiveProfile);
 
-        Assert.Equal("DEVICE_TOGGLE_FAILED", result.Error?.Code);
+        Assert.True(result.Success);
+        Assert.Equal("DEVICE_TOGGLE_FAILED", Assert.Single(result.Warnings).Code);
         Assert.Empty(support.Repaired);
         Assert.Single(_virtualDisplay.Log, entry => entry == "enable");
     }
@@ -304,11 +404,16 @@ public sealed class LaunchOrchestratorTests : IDisposable
         _virtualDisplay.EnableError = OptimaException.From(
             "VDD_NOT_INSTALLED", "No virtual display driver device was found.", "It is not in Device Manager.");
 
-        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+        var reports = new List<LaunchProgress>();
+        var orchestrator = CreateOrchestrator();
+        orchestrator.ProgressChanged += (_, progress) => reports.Add(progress);
 
-        // A driver nobody installed is not a reason to refuse to start the game.
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
+
+        // A driver nobody installed is not a reason to stop the game.
         Assert.True(result.Success);
-        Assert.Contains(result.Warnings, warning => warning.Code == "VDD_NOT_INSTALLED");
+        Assert.Equal("VDD_NOT_INSTALLED", Assert.Single(result.Warnings).Code);
+        Assert.Contains(reports, progress => progress is { Phase: LaunchPhase.ConfiguringDisplay, Skipped: true });
         Assert.DoesNotContain(_virtualDisplay.Log, entry => entry.StartsWith("mode:", StringComparison.Ordinal));
         // The rest of the profile still applied.
         Assert.Contains("apply:HighPerformance", _power.Log);
@@ -387,10 +492,15 @@ public sealed class LaunchOrchestratorTests : IDisposable
     [Fact]
     public async Task RunSession_NothingSkipped_CarriesNoWarnings()
     {
-        var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
+        var reports = new List<LaunchProgress>();
+        var orchestrator = CreateOrchestrator();
+        orchestrator.ProgressChanged += (_, progress) => reports.Add(progress);
+
+        var result = await orchestrator.RunSessionAsync(CompetitiveProfile);
 
         Assert.True(result.Success);
         Assert.Empty(result.Warnings);
+        Assert.DoesNotContain(reports, progress => progress.Skipped);
     }
 
     [Fact]
@@ -446,11 +556,13 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.NotNull(result.Session);
         Assert.Equal(LaunchKind.Watch, result.Session.LaunchKind);
 
-        // The full profile went on and came off again, without any launch.
+        // The full profile went on and came off again, without any launch. The game is already
+        // running, so the virtual display comes on at once.
         Assert.Contains("apply:HighPerformance", _power.Log);
         Assert.Contains("restore", _power.Log);
         Assert.Contains("enable", _virtualDisplay.Log);
         Assert.Contains("restoreOriginal", _virtualDisplay.Log);
+        Assert.False(_virtualDisplay.Active);
         Assert.Equal([4242], _processOptimizer.Applied);
         Assert.Equal([4242], _processOptimizer.Restored);
         Assert.True(_metrics.Started);
@@ -649,9 +761,12 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.True(_metrics.Stopped);
         Assert.True(_network.Stopped);
 
-        // Everything was put back, once, and no snapshot is left to ask about at the next start.
+        // Everything was put back, once, and no snapshot is left to ask about at the next start. The
+        // virtual display goes off although the game is still up.
         Assert.Single(_power.Log, entry => entry == "restore");
         Assert.Single(_virtualDisplay.Log, entry => entry == "restoreOriginal");
+        Assert.Single(_virtualDisplay.Log, entry => entry == "disable");
+        Assert.False(_virtualDisplay.Active);
         Assert.Equal([4242], _processOptimizer.Restored);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
     }
@@ -670,11 +785,12 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.True(ended);
         var result = await session;
 
-        // Nothing was played, so there is nothing to record; the half-applied profile came off.
+        // Nothing was played, so there is nothing to record; the half-applied profile came off, and
+        // the virtual display, which waits for the game, was never switched on.
         Assert.Equal("CANCELLED", result.Error?.Code);
         Assert.Empty(_sessionStore.Saved);
         Assert.Single(_power.Log, entry => entry == "restore");
-        Assert.Contains("restoreOriginal", _virtualDisplay.Log);
+        Assert.Empty(_virtualDisplay.Log);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
     }
 
@@ -730,10 +846,13 @@ public sealed class LaunchOrchestratorTests : IDisposable
         await cancel.CancelAsync();
         var result = await session;
 
-        // The Cancel button: a stop asked for by the player is not a session to keep.
+        // The Cancel button: a stop asked for by the player is not a session to keep. The virtual
+        // display that came on with the game goes off with the rest.
         Assert.Equal("CANCELLED", result.Error?.Code);
         Assert.Empty(_sessionStore.Saved);
         Assert.Single(_power.Log, entry => entry == "restore");
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.False(_virtualDisplay.Active);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
     }
 
