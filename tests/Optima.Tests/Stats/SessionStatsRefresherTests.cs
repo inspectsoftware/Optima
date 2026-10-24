@@ -213,6 +213,29 @@ public sealed class SessionStatsRefresherTests : IDisposable
     }
 
     [Fact]
+    public async Task TheMatchesRefreshDuringAGame_SaysTheNewestSessionWaitsForItToClose()
+    {
+        await IdentifyPlayerAsync();
+        var newest = SeedSession(Baseline(120, 80, 11, 5), DateTimeOffset.Now.AddMinutes(-10));
+        var older = SeedSession(Baseline(100), DateTimeOffset.Now.AddMinutes(-40));
+        _profile = ProfileAfter(new CopsModeStats(138, 91, 23, 12, 5));
+        var refresher = new SessionStatsRefresher(_store, _settings, (_, _, _) => Task.FromResult<CopsPlayerProfile?>(_profile),
+            NullLogger<SessionStatsRefresher>.Instance, runInProgress: () => true);
+
+        var result = await refresher.RefreshRecentMatchesAsync(attempts: 1, retryDelay: TimeSpan.Zero);
+        var again = await refresher.RefreshRecentMatchesAsync(attempts: 1, retryDelay: TimeSpan.Zero);
+
+        // The older one is settled by the newest one's snapshot; the newest is left for later.
+        Assert.Contains(_store.UpdatedDeltas, u => u.SessionId == older);
+        Assert.DoesNotContain(_store.UpdatedDeltas, u => u.SessionId == newest);
+        foreach (var message in new[] { result.Message, again.Message })
+        {
+            Assert.DoesNotContain("no snapshot", message, StringComparison.Ordinal);
+            Assert.Contains("A game is running", message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task TheMatchesRefreshAsksAgainWhileTheNewestSessionIsStillEmpty()
     {
         await IdentifyPlayerAsync();
