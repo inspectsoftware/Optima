@@ -424,6 +424,15 @@ internal sealed class FakeTweakService : ITweakService
         => throw new NotSupportedException();
 }
 
+internal sealed class FakeDriverInstaller : IDriverInstaller
+{
+    public DriverState State { get; set; } = DriverState.Installed;
+    public DriverPackageInfo? FindBundledPackage() => null;
+    public Task<DriverState> GetStateAsync(CancellationToken ct = default) => Task.FromResult(State);
+    public Task<DriverInstallResult> InstallAsync(CancellationToken ct = default) => Task.FromResult(DriverInstallResult.Ok());
+    public Task<DriverInstallResult> UninstallAsync(CancellationToken ct = default) => Task.FromResult(DriverInstallResult.Ok());
+}
+
 internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
 {
     public bool Active { get; set; }
@@ -439,9 +448,13 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
     /// <summary>Run when an enable starts, so a test can look at what the session has done by then.</summary>
     public Action? OnEnable { get; set; }
 
+    /// <summary>The real driver needs the elevated helper; the developer's stand-in does not.</summary>
+    public bool RequiresElevation { get; set; } = true;
+
     public string Name => "FakeVdd";
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(true);
-    public Task<DriverCapabilities> GetCapabilitiesAsync(CancellationToken ct = default) => Task.FromResult(new DriverCapabilities());
+    public Task<DriverCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
+        => Task.FromResult(new DriverCapabilities { RequiresElevation = RequiresElevation });
     public Task InitializeAsync(CancellationToken ct = default)
     {
         Log.Add("init");

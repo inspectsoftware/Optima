@@ -67,6 +67,7 @@ public sealed class LaunchOrchestrator
     private readonly SettingsService? _settings;
     private readonly ILaunchSupport? _support;
     private readonly IElevationBroker? _elevation;
+    private readonly IDriverInstaller? _driver;
     private readonly ILogger<LaunchOrchestrator> _logger;
 
     private int _running;
@@ -106,6 +107,9 @@ public sealed class LaunchOrchestrator
         /// when the session asked for none.
         /// </summary>
         public Task<bool>? DisplayHelper { get; set; }
+
+        /// <summary>The driver was not installed, so <see cref="DisplayHelper"/> asked nobody and answered no.</summary>
+        public bool DriverMissing { get; set; }
     }
 
     public LaunchOrchestrator(
@@ -125,10 +129,12 @@ public sealed class LaunchOrchestrator
         ILogger<LaunchOrchestrator> logger,
         SettingsService? settings = null,
         ILaunchSupport? support = null,
-        IElevationBroker? elevation = null)
+        IElevationBroker? elevation = null,
+        IDriverInstaller? driver = null)
     {
         _support = support;
         _elevation = elevation;
+        _driver = driver;
         _detector = detector;
         _launchers = launchers.OrderBy(l => l.Order).ToList();
         _virtualDisplay = virtualDisplay;
@@ -207,9 +213,9 @@ public sealed class LaunchOrchestrator
             // on once the game is up. The helper's administrator prompt belongs here, before the game
             // covers the screen, where it meets the other requests from the PLAY click and is one
             // prompt with them. Not waited for: the launch goes on while the player answers it.
-            if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false })
+            if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
             {
-                context.DisplayHelper = _elevation.EnsureStartedAsync();
+                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context);
             }
 
             await PreflightAsync(token).ConfigureAwait(false);
@@ -442,6 +448,26 @@ public sealed class LaunchOrchestrator
         }
     }
 
+    /// <summary>
+    /// Asks for the helper only when the display will need it. A provider that needs no administrator
+    /// rights (the developer's stand-in) needs no prompt. Nor does a PC without the driver: there is
+    /// nothing for the helper to switch on, and a no to a prompt that was never needed would then be
+    /// blamed for a display that could not have come on anyway.
+    /// </summary>
+    private async Task<bool> AskForDisplayHelperAsync(IElevationBroker elevation, SessionContext context)
+    {
+        if (!(await _virtualDisplay.GetCapabilitiesAsync().ConfigureAwait(false)).RequiresElevation)
+        {
+            return true;
+        }
+        if (_driver is not null && await _driver.GetStateAsync().ConfigureAwait(false) != DriverState.Installed)
+        {
+            context.DriverMissing = true;
+            return false;
+        }
+        return await elevation.EnsureStartedAsync().ConfigureAwait(false);
+    }
+
     private async Task ConfigureVirtualDisplayAsync(DisplayProfile display, SessionContext context, CancellationToken ct)
     {
         Report(LaunchPhase.ConfiguringDisplay, $"Configuring virtual display {display.Mode}…");
@@ -450,6 +476,12 @@ public sealed class LaunchOrchestrator
         // every step of the driver below may need the helper, so none of them is tried.
         if (context.DisplayHelper is { } helper && !await helper.WaitAsync(ct).ConfigureAwait(false))
         {
+            if (context.DriverMissing)
+            {
+                throw OptimaException.From("VDD_NOT_INSTALLED",
+                    "No virtual display driver device was found.",
+                    "The Virtual Display Driver does not appear in Device Manager.");
+            }
             throw OptimaException.From("ELEVATION_DECLINED",
                 "Administrator access is needed to switch the virtual display.",
                 "The administrator prompt at the start of the session did not start Optima's helper, so the " +

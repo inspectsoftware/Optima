@@ -39,10 +39,11 @@ public sealed class LaunchOrchestratorTests : IDisposable
         NullLogger<RecoveryService>.Instance);
 
     private LaunchOrchestrator CreateOrchestrator(
-        SettingsService? settings = null, FakeLaunchSupport? support = null, FakeElevationBroker? elevation = null) => new(
+        SettingsService? settings = null, FakeLaunchSupport? support = null, FakeElevationBroker? elevation = null,
+        FakeDriverInstaller? driver = null) => new(
         _detector, [_launcher], _virtualDisplay, _displayService, _power,
         _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
-        NullLogger<LaunchOrchestrator>.Instance, settings, support, elevation);
+        NullLogger<LaunchOrchestrator>.Instance, settings, support, elevation, driver);
 
     private static OptimaException NoDisplay() => OptimaException.From(
         "VDD_NO_DISPLAY", "The virtual display did not appear.", "Windows never attached its display to the desktop.");
@@ -330,6 +331,38 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.True(result.Success);
         Assert.Equal(0, elevation.Prompts);
         Assert.Contains("enable", _virtualDisplay.Log);
+    }
+
+    [Fact]
+    public async Task RunSession_TheDriverIsNotInstalled_NothingIsAskedAndTheMissingDriverIsTheReason()
+    {
+        // The prompt would be answered with No; it must not even be put up.
+        var elevation = new FakeElevationBroker();
+        var driver = new FakeDriverInstaller { State = DriverState.NotInstalledPackageAvailable };
+
+        var result = await CreateOrchestrator(elevation: elevation, driver: driver).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Equal("VDD_NOT_INSTALLED", Assert.Single(result.Warnings).Code);
+        Assert.Empty(_virtualDisplay.Log);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_AProviderThatNeedsNoAdministrator_IsNeitherAskedForNorStopped()
+    {
+        // The developer's stand-in, which runs without the driver and without the helper.
+        _virtualDisplay.RequiresElevation = false;
+        var elevation = new FakeElevationBroker();
+        var driver = new FakeDriverInstaller { State = DriverState.NotInstalledNoPackage };
+
+        var result = await CreateOrchestrator(elevation: elevation, driver: driver).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Empty(result.Warnings);
     }
 
     [Fact]

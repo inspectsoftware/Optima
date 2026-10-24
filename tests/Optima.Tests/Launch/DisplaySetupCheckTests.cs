@@ -11,18 +11,9 @@ namespace Optima.Tests.Launch;
 /// </summary>
 public sealed class DisplaySetupCheckTests
 {
-    private sealed class FakeInstaller : IDriverInstaller
-    {
-        public DriverState State { get; set; } = DriverState.Installed;
-        public DriverPackageInfo? FindBundledPackage() => null;
-        public Task<DriverState> GetStateAsync(CancellationToken ct = default) => Task.FromResult(State);
-        public Task<DriverInstallResult> InstallAsync(CancellationToken ct = default) => Task.FromResult(DriverInstallResult.Ok());
-        public Task<DriverInstallResult> UninstallAsync(CancellationToken ct = default) => Task.FromResult(DriverInstallResult.Ok());
-    }
-
     private static readonly DisplayMode Mode = new(1920, 1080, 240);
 
-    private readonly FakeInstaller _installer = new();
+    private readonly FakeDriverInstaller _installer = new();
     private readonly FakeVirtualDisplay _display = new();
     private readonly FakeDisplayService _screens = new();
     private bool _helperPresent = true;
