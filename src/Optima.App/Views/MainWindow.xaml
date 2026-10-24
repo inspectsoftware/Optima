@@ -222,7 +222,7 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <TextBlock Margin="10,0,0,0" VerticalAlignment="Center"
-                         Text="ACCOUNT" FontFamily="{StaticResource Font.Mono}"
+                         Text="PLAYER" FontFamily="{StaticResource Font.Mono}"
                          FontSize="{StaticResource Type.Label}"
                          Foreground="{DynamicResource Brush.TextMuted}" />
               <ComboBox Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center"
@@ -231,18 +231,18 @@
                         ItemsSource="{Binding SavedAccounts}"
                         SelectedItem="{Binding ActiveAccount, Mode=TwoWay}"
                         SelectionChanged="OnAccountSelectionChanged"
-                        ToolTip="Switch the active player identity (saved in Settings, Player)">
+                        ToolTip="Switch the tracked player (saved in Settings, Player)">
                 <ComboBox.ItemTemplate>
                   <DataTemplate>
                     <StackPanel Orientation="Horizontal">
                       <TextBlock Text="{Binding DisplayName}" />
                       <TextBlock Text="  [ACTIVE]" Foreground="{DynamicResource Brush.Accent}"
                                  Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}" />
-                      <!-- Takes the account off this list. Only in the open list (the closed box
+                      <!-- Takes the player off this list. Only in the open list (the closed box
                            shows the same template and is not the place for it), and not on the
-                           "no other accounts" line, which is not an account. -->
+                           "no other saved players" line, which is not a player. -->
                       <Button Content="&#x2715;" Padding="6,0" Margin="14,0,0,0" VerticalAlignment="Center"
-                              ToolTip="Remove this account from the list. Add it again any time in Settings, Player."
+                              ToolTip="Remove from Optima. Save the player again any time in Settings, Player."
                               Command="{Binding DataContext.RemoveAccountCommand, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                               CommandParameter="{Binding}">
                         <Button.Style>
@@ -265,7 +265,7 @@
               <TextBlock Grid.Column="2" Margin="0,0,10,0" VerticalAlignment="Center"
                          Style="{StaticResource Text.Micro}"
                          Foreground="{DynamicResource Brush.TextMuted}"
-                         Text="switch identities from here · saved in Settings, Player" />
+                         Text="switch players here · saved in Settings, Player" />
             </Grid>
           </Border>
 

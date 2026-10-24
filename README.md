@@ -38,11 +38,11 @@ Two exceptions, both opt-in:
 ```mermaid
 flowchart LR
     A[Pick a profile] --> B[PLAY]
-    B --> C["Virtual display<br>e.g. 1920x1080 @ 240 Hz"]
-    C --> D["Power plan, priority,<br>EcoQoS"]
-    D --> E["Critical Ops starts through<br>Google Play Games"]
+    B --> C["Power plan, priority,<br>EcoQoS"]
+    C --> D["Critical Ops starts through<br>Google Play Games"]
+    D --> E["Virtual display on once the game runs<br>e.g. 1920x1080 @ 240 Hz"]
     E --> F["External FPS / frametime<br>capture (ETW)"]
-    F --> G["Game closes: everything<br>restored, session saved"]
+    F --> G["Game closes: display off, everything<br>restored, session saved"]
 ```
 
 ## Features

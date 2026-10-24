@@ -61,9 +61,9 @@ public static class SettingExplanations
         {
             SettingKey = "virtualDisplay",
             Title = "Virtual display",
-            WhatItChanges = "Enables the installed virtual display driver and applies the profile's resolution and refresh rate to it for the session.",
+            WhatItChanges = "Switches the installed virtual display on once the game is running, at the Display page's resolution and refresh rate, and off again when the game closes. Your monitor stays the main screen.",
             PotentialBenefit = "Unlocks refresh rates and resolutions your physical monitor does not expose (e.g. 240 Hz), letting the game render on a high-refresh target.",
-            PotentialDownside = "A brief display flicker while modes are applied; if a game window opens on the virtual display you may need to move it back after the session (the bootstrapper restores the previous topology automatically).",
+            PotentialDownside = "A brief display flicker when the display comes on and goes off again. The previous display layout is restored automatically when the session ends.",
             RequiresRestart = false,
             RequiresAdministrator = true,
         },
