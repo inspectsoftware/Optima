@@ -213,6 +213,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     private string _trackedIgn = string.Empty;
     private long? _trackedAccountId;
 
+    // Counts the changes of the tracked player as they arrive, so a Track lookup can tell that the
+    // player was changed another way while it ran: the x, a chip or the title-bar switcher.
+    private int _trackedChanges;
+
     // Who the card is showing, so a settings save that leaves the player alone does not look them up again.
     private (string Ign, long? Id)? _cardFor;
 
@@ -257,6 +261,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         IsTracking = true;
         TrackMessage = string.Empty;
+        var changes = _trackedChanges;
         CopsLookupResult lookup;
         try
         {
@@ -269,6 +274,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         finally
         {
             IsTracking = false;
+        }
+
+        // The player was stopped or switched while the lookup ran. That choice came later, so it
+        // stands; the typed text stays in the box to be tracked again.
+        if (changes != _trackedChanges)
+        {
+            return;
         }
 
         var decision = TrackedPlayerQuery.Decide(typed, lookup);
@@ -397,6 +409,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>The PLAYER card and the saved chips as the settings have them.</summary>
     private void LoadPlayer(AppSettings settings)
     {
+        if (settings.PlayerIgn.Trim() != _trackedIgn || settings.PlayerAccountId != _trackedAccountId)
+        {
+            _trackedChanges++;
+        }
         _trackedIgn = settings.PlayerIgn.Trim();
         _trackedAccountId = settings.PlayerAccountId;
 
