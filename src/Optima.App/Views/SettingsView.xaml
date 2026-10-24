@@ -402,8 +402,19 @@
                       </TextBox>
                       <TextBlock Text="e.g. Kestrel or 48211907" Tag="{Binding PlayerQuery}" Style="{StaticResource Placeholder}"
                                  FontSize="14" Margin="21,0,0,0" />
-                      <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Content="Track" Padding="24,0" MinHeight="44"
-                              Margin="10,0,0,0" Command="{Binding TrackCommand}" />
+                      <Button Grid.Column="1" Padding="24,0" MinHeight="44" Margin="10,0,0,0" Command="{Binding TrackCommand}">
+                        <Button.Style>
+                          <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                            <Setter Property="Content" Value="Track" />
+                            <Style.Triggers>
+                              <!-- A lookup can take ten seconds or more on a slow API; the button says it is working. -->
+                              <DataTrigger Binding="{Binding IsTracking}" Value="True">
+                                <Setter Property="Content" Value="Looking up…" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Button.Style>
+                      </Button>
                     </Grid>
                     <TextBlock Text="{Binding TrackMessage}" Style="{StaticResource Text.Base}" FontSize="12"
                                Foreground="{DynamicResource Brush.Warn}" TextWrapping="Wrap" TextTrimming="None" Margin="0,8,0,0"

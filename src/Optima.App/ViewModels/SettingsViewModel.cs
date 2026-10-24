@@ -296,7 +296,11 @@ public sealed partial class SettingsViewModel : ObservableObject
                 PlayerIgn = decision.Ign,
                 PlayerAccountId = decision.AccountId,
             });
-            PlayerQuery = string.Empty;
+            // The box stays editable while the lookup runs; whatever was typed since is kept.
+            if (string.Equals(PlayerQuery.Trim(), typed, StringComparison.Ordinal))
+            {
+                PlayerQuery = string.Empty;
+            }
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
