@@ -355,6 +355,19 @@ public sealed class BoostDial : FrameworkElement
         return new Size(side, side);
     }
 
+    /// <summary>
+    /// The whole disc takes the pointer, gaps between the plates included, and nothing outside it
+    /// does. The aura, the shadows and the loose plates are drawn past the dial's box, so going by
+    /// what was drawn, a click a little beside an engaged dial switched Boost off.
+    /// </summary>
+    protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters)
+    {
+        var centre = new Point(ActualWidth / 2, ActualHeight / 2);
+        return (hitTestParameters.HitPoint - centre).Length <= Math.Min(ActualWidth, ActualHeight) / 2
+            ? new PointHitTestResult(this, hitTestParameters.HitPoint)
+            : null;
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         var side = Math.Min(ActualWidth, ActualHeight);
@@ -372,9 +385,6 @@ public sealed class BoostDial : FrameworkElement
         var scale = side / Unit;
         dc.PushTransform(new MatrixTransform(
             scale, 0, 0, scale, (ActualWidth - side) / 2 + frame.ShakeX * scale, (ActualHeight - side) / 2 + frame.ShakeY * scale));
-
-        // The whole square takes the click, including the gaps between the plates.
-        dc.DrawEllipse(Brushes.Transparent, null, Center, 200, 200);
 
         var aura = Math.Min(1, frame.Aura + 0.5 * frame.Flare + pilot);
         if (aura > 0.004)
