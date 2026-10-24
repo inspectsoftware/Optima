@@ -309,7 +309,8 @@ public partial class App : Application
         SyncRepairMoment();
 
         // Protected play is started at PLAY, where its one administrator prompt belongs, and here
-        // for a game that watch mode found running, where nothing may prompt. A session that is not
+        // for a game that watch mode found running, where it does not prompt: the virtual display's
+        // helper is the only thing watch mode may ask for. A session that is not
         // protected is said at once and wherever the player is looking, the tray included: before a
         // tournament match is the only time that sentence is of any use.
         var protection = _services.GetRequiredService<Optima.Core.Protection.ShieldLoader>();

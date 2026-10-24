@@ -163,8 +163,9 @@ public sealed class GameWatchService : IAsyncDisposable
         var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
         var profile = await _profiles.GetProfileAsync(settings.SelectedProfileName, ct).ConfigureAwait(false);
 
-        // Never launch the helper (and its UAC prompt) from the background: capture only
-        // joins when the helper is already up from earlier use.
+        // Capture never launches the helper (and its UAC prompt) from the background: it only
+        // joins when the helper is already up from earlier use. The virtual display is the one
+        // exception, asked for once by AttachToRunningGameAsync, because it follows the game.
         var captureAllowed = settings.EnableFrametimeCapture && _elevation.IsConnected;
 
         _logger.LogInformation(

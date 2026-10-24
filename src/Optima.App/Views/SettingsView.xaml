@@ -584,7 +584,7 @@
             <HeaderedContentControl Style="{StaticResource Card}" Header="WATCHDOG">
               <StackPanel>
                 <ctl:SettingRow Header="Auto-attach" Hint="Apply the profile when the game starts outside Optima."
-                                Info="The whole profile applies, the virtual display included, so the screen can change when the game is detected. Everything is put back when the game exits.">
+                                Info="The whole profile applies, the virtual display included, so the screen can change when the game is detected. With the virtual display on and Optima's helper not running yet, that moment can also bring one administrator prompt; a No stands until Optima is started again. Everything is put back when the game exits.">
                   <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding EnableWatchMode}" />
                 </ctl:SettingRow>
                 <ctl:SettingRow Header="Crash relaunch" Hint="Relaunch once if the game dies in its first five minutes."

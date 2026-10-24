@@ -562,7 +562,7 @@ public sealed partial class BoostViewModel : ObservableObject
             StandbyCleanerState.Off => "The cleaner is off. Purge now still works on its own.",
             StandbyCleanerState.WaitingForGame => "Waiting for the game. It only watches memory while Critical Ops is on screen.",
             StandbyCleanerState.WaitingForHelper =>
-                "The game is running but the elevated helper is not, and Optima does not raise an admin prompt from the background. Start it here, or press PLAY next time.",
+                "The game is running but the elevated helper is not, and the cleaner does not raise an admin prompt from the background. Start it here, or press PLAY next time.",
             // The run's tally, as the MEMORY RECLAIMED tile counts: the helper's own count leaves out
             // "purge now" and starts again with every game session.
             _ => status.Tally.Purges == 0
