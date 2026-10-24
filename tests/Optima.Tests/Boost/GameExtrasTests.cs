@@ -18,6 +18,9 @@ public sealed class GameExtrasTests : IDisposable
         public int Raised { get; private set; }
         public List<CoreParkingSnapshot> Restored { get; } = [];
         public HashSet<string> HighPerformance { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Adapter choices other than high performance, such as "1" for power saving.</summary>
+        public Dictionary<string, string> Other { get; } = new(StringComparer.OrdinalIgnoreCase);
         public string? PathOfGame { get; set; } = @"C:\Program Files\Google\Play Games\current\emulator\crosvm.exe";
 
         public CoreParkingSnapshot? KeepCoresUnparked()
@@ -32,17 +35,20 @@ public sealed class GameExtrasTests : IDisposable
 
         public void RestoreCoreParking(CoreParkingSnapshot snapshot) => Restored.Add(snapshot);
         public string? GetProcessPath(int processId) => PathOfGame;
-        public bool IsGpuHighPerformance(string executablePath) => HighPerformance.Contains(executablePath);
+        public string? GetGpuPreference(string executablePath)
+            => HighPerformance.Contains(executablePath) ? "2" : Other.GetValueOrDefault(executablePath);
 
-        public void SetGpuHighPerformance(string executablePath, bool enabled)
+        public void SetGpuPreference(string executablePath, string? preference)
         {
-            if (enabled)
+            HighPerformance.Remove(executablePath);
+            Other.Remove(executablePath);
+            if (preference == "2")
             {
                 HighPerformance.Add(executablePath);
             }
-            else
+            else if (preference is not null)
             {
-                HighPerformance.Remove(executablePath);
+                Other[executablePath] = preference;
             }
         }
     }
@@ -62,14 +68,14 @@ public sealed class GameExtrasTests : IDisposable
 
     private string Ledger => Path.Combine(_folder, "boost-coreparking.json");
 
-    private GameExtrasService Create()
+    private GameExtrasService Create(SettingsService? stored = null)
         => new(_extras, _monitor, _presence, () => _settings,
             path =>
             {
                 _settings = _settings with { BoostGamePath = path };
                 return Task.CompletedTask;
             },
-            _store, Ledger, NullLogger<GameExtrasService>.Instance);
+            _store, Ledger, NullLogger<GameExtrasService>.Instance, stored);
 
     public void Dispose()
     {
@@ -205,6 +211,38 @@ public sealed class GameExtrasTests : IDisposable
     }
 
     [Fact]
+    public async Task APreferenceLeftByAnOlderReleaseWithoutALedger_IsTakenAwayOnce()
+    {
+        // As 0.8.1 left it: Boost saved on, the graphics switch ticked, the game seen, and no ledger.
+        var paths = new AppPaths(_folder);
+        paths.EnsureCreated();
+        File.WriteAllText(paths.ConfigFile,
+            "{\"boostEnabled\":true,\"boostGpuHighPerformance\":true,\"boostGamePath\":"
+            + System.Text.Json.JsonSerializer.Serialize(_extras.PathOfGame) + "}");
+        _extras.HighPerformance.Add(_extras.PathOfGame!);
+        var stored = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
+        _settings = (await stored.GetSettingsAsync()).BoostEffective();
+        var service = Create(stored);
+
+        await service.AdoptOlderReleasePreferenceAsync();
+        await service.SyncAsync();
+        service.Dispose();
+
+        Assert.DoesNotContain(_extras.PathOfGame!, _extras.HighPerformance);
+        Assert.True(stored.Current!.BoostGpuLeftoverChecked);
+
+        // Only once: a preference the player sets in Windows afterwards is theirs.
+        _extras.HighPerformance.Add(_extras.PathOfGame!);
+        var nextStart = new SettingsService(paths, _store, NullLogger<SettingsService>.Instance);
+        var next = Create(nextStart);
+        await next.AdoptOlderReleasePreferenceAsync();
+        await next.SyncAsync();
+        next.Dispose();
+
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+    }
+
+    [Fact]
     public async Task APreferenceWrittenForAnEarlierGamePath_IsTakenAwayWhenTheGameMoves()
     {
         const string oldPath = @"C:\Old\Emulator\HD-Player.exe";
@@ -240,14 +278,58 @@ public sealed class GameExtrasTests : IDisposable
         Assert.Contains(playersOwn, _extras.HighPerformance);
     }
 
+    [Fact]
+    public async Task APowerSavingChoiceThePlayerMadeInWindows_ComesBackWhenBoostGoesOff()
+    {
+        _extras.Other[_extras.PathOfGame!] = "1";
+        var service = Create();
+
+        _presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        await service.SyncAsync();
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+
+        _settings = _settings with { BoostGpuHighPerformance = false };
+        await service.SyncAsync();
+        Assert.Equal("1", _extras.GetGpuPreference(_extras.PathOfGame!));
+
+        // And the same when Optima closes with Boost still on.
+        _settings = _settings with { BoostGpuHighPerformance = true };
+        await service.SyncAsync();
+        Assert.Contains(_extras.PathOfGame!, _extras.HighPerformance);
+        service.Dispose();
+        Assert.Equal("1", _extras.GetGpuPreference(_extras.PathOfGame!));
+    }
+
+    [Fact]
+    public async Task AChoiceThePlayerMadeInWindowsWhileBoostWasOn_IsLeftAsTheyMadeIt()
+    {
+        var service = Create();
+        _presence.ApplyState(GameRuntimeState.Running, DateTimeOffset.UtcNow);
+        await service.SyncAsync();
+
+        _extras.SetGpuPreference(_extras.PathOfGame!, "0");
+        service.Dispose();
+
+        Assert.Equal("0", _extras.GetGpuPreference(_extras.PathOfGame!));
+    }
+
     [Theory]
-    [InlineData(null, true, "GpuPreference=2;")]
-    [InlineData("GpuPreference=1;", true, "GpuPreference=2;")]
-    [InlineData("SwapEffectUpgradeEnable=1;GpuPreference=1;", true, "SwapEffectUpgradeEnable=1;GpuPreference=2;")]
-    [InlineData("SwapEffectUpgradeEnable=1;GpuPreference=2;", false, "SwapEffectUpgradeEnable=1;")]
-    [InlineData("GpuPreference=2;", false, "")]
-    public void OnlyTheAdapterEntryOfTheWindowsValueIsTouched(string? existing, bool on, string expected)
-        => Assert.Equal(expected, WindowsGameExtras.WithGpuPreference(existing, on));
+    [InlineData(null, "2", "GpuPreference=2;")]
+    [InlineData("GpuPreference=1;", "2", "GpuPreference=2;")]
+    [InlineData("SwapEffectUpgradeEnable=1;GpuPreference=1;", "2", "SwapEffectUpgradeEnable=1;GpuPreference=2;")]
+    [InlineData("SwapEffectUpgradeEnable=1;GpuPreference=2;", null, "SwapEffectUpgradeEnable=1;")]
+    [InlineData("SwapEffectUpgradeEnable=1;GpuPreference=2;", "1", "SwapEffectUpgradeEnable=1;GpuPreference=1;")]
+    [InlineData("GpuPreference=2;", null, "")]
+    public void OnlyTheAdapterEntryOfTheWindowsValueIsTouched(string? existing, string? preference, string expected)
+        => Assert.Equal(expected, WindowsGameExtras.WithGpuPreference(existing, preference));
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("SwapEffectUpgradeEnable=1;", null)]
+    [InlineData("GpuPreference=1;", "1")]
+    [InlineData("SwapEffectUpgradeEnable=1;GpuPreference=2;", "2")]
+    public void TheAdapterChoiceIsReadFromTheWindowsValue(string? data, string? expected)
+        => Assert.Equal(expected, WindowsGameExtras.GpuPreferenceOf(data));
 
     [Fact]
     public void TheRealGraphicsPreferenceRoundTrips_AndLeavesNothingBehind()
@@ -255,16 +337,16 @@ public sealed class GameExtrasTests : IDisposable
         var extras = new WindowsGameExtras(NullLogger<WindowsGameExtras>.Instance);
         var path = @"C:\optima-test\" + Guid.NewGuid().ToString("N") + ".exe";
 
-        Assert.False(extras.IsGpuHighPerformance(path));
-        extras.SetGpuHighPerformance(path, true);
+        Assert.Null(extras.GetGpuPreference(path));
+        extras.SetGpuPreference(path, "2");
         try
         {
-            Assert.True(extras.IsGpuHighPerformance(path));
+            Assert.Equal("2", extras.GetGpuPreference(path));
         }
         finally
         {
-            extras.SetGpuHighPerformance(path, false);
+            extras.SetGpuPreference(path, null);
         }
-        Assert.False(extras.IsGpuHighPerformance(path));
+        Assert.Null(extras.GetGpuPreference(path));
     }
 }

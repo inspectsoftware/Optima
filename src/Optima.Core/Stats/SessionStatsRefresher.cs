@@ -254,10 +254,9 @@ public sealed class SessionStatsRefresher
         {
             ct.ThrowIfCancellationRequested();
             profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, ct).ConfigureAwait(false);
-            var newest = DeltaFor(summaries, 0, profile?.Snapshot);
-            // Another player's reading never matches the newest session, however long the API is given.
-            var pending = profile is null
-                || (!OtherPlayer(summaries[0].StatsBaseline, profile.Snapshot) && (newest is null || newest.IsZero));
+            // A newest session with no start snapshot, or another player's reading, never moves,
+            // however long the API is given.
+            var pending = profile is null || NewestAwaitsTheApi(summaries, profile.Snapshot);
             if (!pending || attempt == tries)
             {
                 break;
@@ -321,7 +320,7 @@ public sealed class SessionStatsRefresher
                 UnmeasurableNote(unmeasurable) + OtherPlayerNote(otherPlayer), 0, 0, 0);
         }
 
-        var newestStillEmpty = !running && DeltaFor(summaries, 0, live) is null or { IsZero: true };
+        var newestStillEmpty = !running && NewestAwaitsTheApi(summaries, live);
         var message = $"Re-derived {updated} session{(updated == 1 ? string.Empty : "s")} from the API" +
             (added + corrected > 0
                 ? $": {added} match row{(added == 1 ? string.Empty : "s")} added, {corrected} corrected"
@@ -344,6 +343,16 @@ public sealed class SessionStatsRefresher
         }
         return DeltaBetween(start, EndOf(newestFirst, index, live));
     }
+
+    /// <summary>
+    /// Whether the newest session reads as empty against this reading for a reason time can mend: the
+    /// API has not published its match yet. One with no start snapshot, or read against another
+    /// player, stays empty however long the API is given, so asking again is no help.
+    /// </summary>
+    private static bool NewestAwaitsTheApi(IReadOnlyList<SessionRecord> newestFirst, CopsSeasonStats? live)
+        => newestFirst[0].StatsBaseline is { } start
+            && !OtherPlayer(start, live)
+            && DeltaFor(newestFirst, 0, live) is null or { IsZero: true };
 
     /// <summary>Where one session's run ended: the next session's snapshot, or the live reading for the newest.</summary>
     private static CopsSeasonStats? EndOf(IReadOnlyList<SessionRecord> newestFirst, int index, CopsSeasonStats? live)

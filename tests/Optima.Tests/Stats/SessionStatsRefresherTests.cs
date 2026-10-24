@@ -282,6 +282,53 @@ public sealed class SessionStatsRefresherTests : IDisposable
     }
 
     [Fact]
+    public async Task TheMatchesRefreshDoesNotWaitForANewestSessionWithoutASnapshot()
+    {
+        await IdentifyPlayerAsync();
+        SeedSession(baseline: null, started: DateTimeOffset.Now.AddMinutes(-10));
+        SeedSession(Baseline(100), DateTimeOffset.Now.AddMinutes(-60));
+        _profile = ProfileAfter(new CopsModeStats(140, 80, 20, 10, 5));
+
+        var result = await CreateRefresher().RefreshRecentMatchesAsync(attempts: 3, retryDelay: TimeSpan.FromSeconds(5));
+
+        Assert.Single(_queries);
+        Assert.Contains("no snapshot", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheMatchesRefreshDoesNotSayPressAgainForANewestSessionOfAnotherPlayer()
+    {
+        // Both sessions were recorded for player 1, and the older one moved by a ranked win;
+        // Settings now tracks player 4242.
+        await IdentifyPlayerAsync("friend");
+        SeedSession(Baseline(118, 91, 11, 5) with { UserId = 1 }, DateTimeOffset.Now.AddMinutes(-10));
+        SeedSession(Baseline(100, 80, 10, 5) with { UserId = 1 }, DateTimeOffset.Now.AddMinutes(-60));
+        _profile = ProfileAfter(new CopsModeStats(4000, 3100, 900, 210, 150));
+
+        var result = await CreateRefresher().RefreshRecentMatchesAsync(attempts: 3, retryDelay: TimeSpan.Zero);
+
+        Assert.Equal(SessionStatsRefreshStatus.Updated, result.Status);
+        Assert.Contains("different player", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("press again", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheMatchesRefreshDoesNotSayPressAgainForANewestSessionWithoutASnapshot()
+    {
+        await IdentifyPlayerAsync();
+        SeedSession(baseline: null, started: DateTimeOffset.Now.AddMinutes(-10));
+        SeedSession(Baseline(118, 91, 11, 5), DateTimeOffset.Now.AddMinutes(-40));
+        SeedSession(Baseline(100, 80, 10, 5), DateTimeOffset.Now.AddMinutes(-70));
+        _profile = ProfileAfter(new CopsModeStats(140, 95, 25, 12, 5));
+
+        var result = await CreateRefresher().RefreshRecentMatchesAsync(attempts: 1, retryDelay: TimeSpan.Zero);
+
+        Assert.Equal(SessionStatsRefreshStatus.Updated, result.Status);
+        Assert.Contains("no snapshot", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("press again", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TheMatchesRefreshNeverCreditsASessionWithLaterRuns()
     {
         await IdentifyPlayerAsync();

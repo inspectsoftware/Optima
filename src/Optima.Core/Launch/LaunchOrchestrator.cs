@@ -222,7 +222,7 @@ public sealed class LaunchOrchestrator
             // prompt with them. Not waited for: the launch goes on while the player answers it.
             if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
             {
-                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context);
+                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context, startedByPlayer: true);
             }
 
             await PreflightAsync(token).ConfigureAwait(false);
@@ -291,7 +291,7 @@ public sealed class LaunchOrchestrator
             // the session for as long as it stayed open.
             if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
             {
-                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context);
+                context.DisplayHelper = AskForDisplayHelperAsync(elevation, context, startedByPlayer: false);
             }
 
             await _recovery.SavePendingAsync(context.Snapshot, token).ConfigureAwait(false);
@@ -471,7 +471,7 @@ public sealed class LaunchOrchestrator
     /// nothing for the helper to switch on, and a no to a prompt that was never needed would then be
     /// blamed for a display that could not have come on anyway.
     /// </summary>
-    private async Task<bool> AskForDisplayHelperAsync(IElevationBroker elevation, SessionContext context)
+    private async Task<bool> AskForDisplayHelperAsync(IElevationBroker elevation, SessionContext context, bool startedByPlayer)
     {
         if (!(await _virtualDisplay.GetCapabilitiesAsync().ConfigureAwait(false)).RequiresElevation)
         {
@@ -480,6 +480,12 @@ public sealed class LaunchOrchestrator
         if (_driver is not null && await _driver.GetStateAsync().ConfigureAwait(false) != DriverState.Installed)
         {
             context.DriverMissing = true;
+            return false;
+        }
+        // Watch mode runs unasked, so a No the player gave earlier in this run stands for it: asked
+        // again, it was a new prompt over every later game. PLAY is the player asking, so it may ask.
+        if (!startedByPlayer && elevation.LastStartFailure == ElevationStartFailure.Declined)
+        {
             return false;
         }
         return await elevation.EnsureStartedAsync().ConfigureAwait(false);

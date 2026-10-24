@@ -100,11 +100,15 @@ public static class TrackedPlayerQuery
             // The key stays, so the title-bar switcher's row is the same row; the label is kept too.
             // So is a name or id the save does not carry: one made while the stats API was down has
             // only one of them, and must not cost the entry the other.
-            list[existing] = list[existing] with
+            var merged = list[existing] with
             {
                 Ign = account.Ign.Length > 0 ? account.Ign : list[existing].Ign,
                 AccountId = accountId ?? list[existing].AccountId,
             };
+            list[existing] = merged;
+            // Saved twice while the API was down, once by name and once by id, the same player is
+            // two partial entries; completed, both are this one, and only the first is kept.
+            list.RemoveAll(a => !ReferenceEquals(a, merged) && a.Matches(merged.Ign, merged.AccountId));
         }
         else
         {

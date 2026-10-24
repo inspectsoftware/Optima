@@ -548,7 +548,7 @@
                             IsEnabled="{Binding CleanerBusy, Converter={StaticResource InverseBool}}" />
                   </StackPanel>
                   <TextBlock Style="{StaticResource Text.Micro}" Margin="0,10,0,0" TextWrapping="Wrap" TextTrimming="None"
-                             Text="Windows keeps recently used files in memory (the standby list) and normally hands that memory back on demand. On some systems it does so late, and the game stutters while it waits. The cleaner empties the list only when both conditions hold, which is what ISLC does; 1024 and 1024 are ISLC's defaults. It works on Windows' own cache, never on the game's memory, and a purge cannot be undone: Windows simply refills the cache as files are read again. It needs Optima's elevated helper, so switching it on, PLAY and purge now may each show one administrator prompt per Optima run. A game opened without Optima does not get a prompt; the page says when the helper is missing." />
+                             Text="Windows keeps recently used files in memory (the standby list) and normally hands that memory back on demand. On some systems it does so late, and the game stutters while it waits. The cleaner empties the list only when both conditions hold, which is what ISLC does; 1024 and 1024 are ISLC's defaults. It works on Windows' own cache, never on the game's memory, and a purge cannot be undone: Windows simply refills the cache as files are read again. It needs Optima's elevated helper, so switching it on, PLAY and purge now may each show one administrator prompt per Optima run. The cleaner never asks for it for a game opened without Optima (Auto-attach may ask once, for the virtual display); the page says when the helper is missing." />
                 </StackPanel>
               </Expander>
             </StackPanel>
@@ -781,11 +781,11 @@
               <TextBlock Text="{Binding GpuDetailText}" Style="{StaticResource Boost.Detail}" />
               <Border Style="{StaticResource Boost.Foot}">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="a standing Windows setting · removed when switched off here" />
+                           Text="a standing Windows setting · Boost takes back what it set when switched off or when Optima closes" />
               </Border>
               <Expander Header="about" Margin="0,8,0,0">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="The same per-app choice as Windows Settings, Display, Graphics: it matters on a PC with two graphics adapters (most gaming laptops) and does nothing on a PC with one. It is a standing Windows setting, so it stays until you switch it off here, and Windows reads it the next time the game starts." />
+                           Text="The same per-app choice as Windows Settings, Display, Graphics: it matters on a PC with two graphics adapters (most gaming laptops) and does nothing on a PC with one. It is a standing Windows setting, and Windows reads it the next time the game starts. Boost takes back the preference it set when it is switched off or when Optima closes, and puts back the choice the game had before; high performance you set in Windows yourself is left alone." />
               </Expander>
             </StackPanel>
           </Border>
