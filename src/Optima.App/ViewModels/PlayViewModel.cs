@@ -366,8 +366,11 @@ public sealed partial class PlayViewModel : ObservableObject
             }
             // BOOST's memory cleaner needs the helper too; PLAY is where its one admin prompt
             // belongs, before the game covers the screen. A no-op with the cleaner off. After the
-            // line above, so the two requests meet at the helper's gate and share one prompt.
-            await _standbyCleaner.SyncAsync(allowPrompt: true);
+            // line above, so the two requests meet at the helper's gate and share one prompt. Not
+            // waited for either: the session asks for the helper for the virtual display moments
+            // later, and only a request made while the prompt is still open shares its answer.
+            // Waiting here for the answer made that request come after it, and a No was asked again.
+            _ = _standbyCleaner.SyncAsync(allowPrompt: true);
             _crashRelaunch.NoteSessionStart(profile);
             var result = await Task.Run(() => _orchestrator.RunSessionAsync(profile, _sessionCts.Token));
             LastWarnings = result.Warnings;
