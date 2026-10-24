@@ -38,10 +38,11 @@ public sealed class LaunchOrchestratorTests : IDisposable
         _paths, _store, _displayService, _power, _virtualDisplay, _processOptimizer,
         NullLogger<RecoveryService>.Instance);
 
-    private LaunchOrchestrator CreateOrchestrator(SettingsService? settings = null, FakeLaunchSupport? support = null) => new(
+    private LaunchOrchestrator CreateOrchestrator(
+        SettingsService? settings = null, FakeLaunchSupport? support = null, FakeElevationBroker? elevation = null) => new(
         _detector, [_launcher], _virtualDisplay, _displayService, _power,
         _processMonitor, _processOptimizer, _cleanup, CreateRecovery(), _metrics, _network, _sessionStore, _tweaks,
-        NullLogger<LaunchOrchestrator>.Instance, settings, support);
+        NullLogger<LaunchOrchestrator>.Instance, settings, support, elevation);
 
     private static OptimaException NoDisplay() => OptimaException.From(
         "VDD_NO_DISPLAY", "The virtual display did not appear.", "Windows never attached its display to the desktop.");
@@ -264,6 +265,66 @@ public sealed class LaunchOrchestratorTests : IDisposable
         // After the launcher and after the game was found; before the game is tuned and watched.
         Assert.True(result.Success);
         Assert.Equal((1, 1, 0, false), atEnable);
+    }
+
+    [Fact]
+    public async Task RunSession_TheDisplaysAdministratorPromptComesBeforeTheGameStarts()
+    {
+        var elevation = new FakeElevationBroker { ConnectOnPrompt = true };
+        int? launchesAtPrompt = null;
+        elevation.OnPrompt = () => launchesAtPrompt = _launcher.LaunchCalls;
+
+        var result = await CreateOrchestrator(elevation: elevation).RunSessionAsync(CompetitiveProfile);
+
+        // Asked once, before the launch, and the display then comes on under the running game
+        // without asking again.
+        Assert.True(result.Success);
+        Assert.Equal(1, elevation.Prompts);
+        Assert.Equal(0, launchesAtPrompt);
+        Assert.Contains("enable", _virtualDisplay.Log);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task RunSession_TheAdministratorPromptIsDeclined_TheDisplayDoesNotAskAgainOverTheGame()
+    {
+        var elevation = new FakeElevationBroker();
+
+        var result = await CreateOrchestrator(elevation: elevation).RunSessionAsync(CompetitiveProfile);
+
+        // The game plays on without the display, and nothing of the driver is touched, since any of
+        // it could put the prompt up again.
+        Assert.True(result.Success);
+        Assert.Equal("ELEVATION_DECLINED", Assert.Single(result.Warnings).Code);
+        Assert.Equal(1, elevation.Prompts);
+        Assert.Empty(_virtualDisplay.Log);
+        Assert.Single(_sessionStore.Saved);
+        Assert.False(File.Exists(_paths.PendingSnapshotFile));
+    }
+
+    [Fact]
+    public async Task RunSession_TheHelperIsAlreadyThere_NothingIsAsked()
+    {
+        var elevation = new FakeElevationBroker { IsConnected = true };
+
+        var result = await CreateOrchestrator(elevation: elevation).RunSessionAsync(CompetitiveProfile);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Contains("enable", _virtualDisplay.Log);
+    }
+
+    [Fact]
+    public async Task RunSession_WithoutTheVirtualDisplay_NoPromptIsAskedForIt()
+    {
+        var elevation = new FakeElevationBroker();
+        var profile = CompetitiveProfile with { Display = new DisplayProfile { VirtualDisplay = false } };
+
+        var result = await CreateOrchestrator(elevation: elevation).RunSessionAsync(profile);
+
+        Assert.True(result.Success);
+        Assert.Equal(0, elevation.Prompts);
+        Assert.Empty(_virtualDisplay.Log);
     }
 
     [Fact]

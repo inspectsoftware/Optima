@@ -287,9 +287,13 @@ internal sealed class FakeElevationBroker : IElevationBroker
 
     public event EventHandler<IpcEvent>? EventReceived { add { } remove { } }
 
+    /// <summary>Run when the helper is asked to start, so a test can look at what had happened by then.</summary>
+    public Action? OnPrompt { get; set; }
+
     public Task<bool> EnsureStartedAsync(CancellationToken ct = default)
     {
         Prompts++;
+        OnPrompt?.Invoke();
         IsConnected |= ConnectOnPrompt;
         return Task.FromResult(IsConnected);
     }

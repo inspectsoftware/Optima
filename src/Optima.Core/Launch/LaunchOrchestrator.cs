@@ -64,6 +64,7 @@ public sealed class LaunchOrchestrator
     private readonly ITweakService _tweaks;
     private readonly SettingsService? _settings;
     private readonly ILaunchSupport? _support;
+    private readonly IElevationBroker? _elevation;
     private readonly ILogger<LaunchOrchestrator> _logger;
 
     private int _running;
@@ -97,6 +98,12 @@ public sealed class LaunchOrchestrator
         public required SystemStateSnapshot Snapshot { get; set; }
         public bool MetricsStarted { get; set; }
         public List<LaunchWarning> Warnings { get; } = [];
+
+        /// <summary>
+        /// The elevated helper the virtual display needs, asked for before the game started; null
+        /// when the session asked for none.
+        /// </summary>
+        public Task<bool>? DisplayHelper { get; set; }
     }
 
     public LaunchOrchestrator(
@@ -115,9 +122,11 @@ public sealed class LaunchOrchestrator
         ITweakService tweaks,
         ILogger<LaunchOrchestrator> logger,
         SettingsService? settings = null,
-        ILaunchSupport? support = null)
+        ILaunchSupport? support = null,
+        IElevationBroker? elevation = null)
     {
         _support = support;
+        _elevation = elevation;
         _detector = detector;
         _launchers = launchers.OrderBy(l => l.Order).ToList();
         _virtualDisplay = virtualDisplay;
@@ -190,6 +199,15 @@ public sealed class LaunchOrchestrator
                     "Open Google Play Games and install Critical Ops, then try again.",
                     "Open Google Play Games and install Critical Ops",
                     "Run detection again from the Checks tab on the Debug page");
+            }
+
+            // Switching the virtual display on takes the elevated helper, and the display only comes
+            // on once the game is up. The helper's administrator prompt belongs here, before the game
+            // covers the screen, where it meets the other requests from the PLAY click and is one
+            // prompt with them. Not waited for: the launch goes on while the player answers it.
+            if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false })
+            {
+                context.DisplayHelper = _elevation.EnsureStartedAsync();
             }
 
             await PreflightAsync(token).ConfigureAwait(false);
@@ -425,6 +443,18 @@ public sealed class LaunchOrchestrator
     private async Task ConfigureVirtualDisplayAsync(DisplayProfile display, SessionContext context, CancellationToken ct)
     {
         Report(LaunchPhase.ConfiguringDisplay, $"Configuring virtual display {display.Mode}…");
+
+        // A no to the prompt before the launch is not answered by asking again now, over the game:
+        // every step of the driver below may need the helper, so none of them is tried.
+        if (context.DisplayHelper is { } helper && !await helper.WaitAsync(ct).ConfigureAwait(false))
+        {
+            throw OptimaException.From("ELEVATION_DECLINED",
+                "Administrator access is needed to switch the virtual display.",
+                "The administrator prompt at the start of the session did not start Optima's helper, so the " +
+                "virtual display stayed off rather than ask again over the game. The game ran on your real screen.",
+                null,
+                "Approve the administrator prompt when you press PLAY");
+        }
 
         context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = true };
         await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
