@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Optima.App.Views;
@@ -19,6 +21,10 @@ public sealed class SplashHost
     // Touched on the splash thread only. Null until the window has been built there, and for good
     // when building it failed; every call below then does nothing.
     private SplashWindow? _window;
+
+    // Set on the splash thread once the window is on screen. Other threads only ask Windows where
+    // that window is, which any thread may do.
+    private volatile IntPtr _handle;
 
     // Done once the splash thread stops, for whatever reason: a step waiting on a splash that is
     // gone must not wait for ever.
@@ -90,6 +96,7 @@ public sealed class SplashHost
             window.Closed += (_, _) => _dispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
             window.Show();
             _window = window;
+            _handle = new WindowInteropHelper(window).Handle;
         }
         catch (Exception ex)
         {
@@ -109,6 +116,44 @@ public sealed class SplashHost
     /// either way the window can then be shown.
     /// </summary>
     public Task GrowIntoAsync(Rect target, Color windowGround) => Run(window => window.GrowIntoAsync(target, windowGround));
+
+    /// <summary>
+    /// Puts the main window on the splash's monitor and keeps it there, before it is shown and before
+    /// its place is handed to <see cref="GrowIntoAsync"/>. A CenterScreen window is centred on the
+    /// monitor under the cursor when its handle is made, a second after the splash opened, and again
+    /// when it is shown: a cursor moved to another monitor in between took the window away from the
+    /// card. The card then grew across two monitors, and with their DPI different it ended beside the
+    /// window, because each window's Left and Top are in units of its own DPI. Centred there in the
+    /// work area, as CenterScreen does.
+    /// </summary>
+    public void KeepOnSplashMonitor(Window window)
+    {
+        var handle = new WindowInteropHelper(window).EnsureHandle();
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        var splash = _handle;
+        if (splash == IntPtr.Zero)
+        {
+            return;
+        }
+        var monitor = MonitorFromWindow(splash, MonitorDefaultToNearest);
+        var info = new MonitorInfo { cbSize = Marshal.SizeOf<MonitorInfo>() };
+        if (monitor == MonitorFromWindow(handle, MonitorDefaultToNearest) || !GetMonitorInfo(monitor, ref info))
+        {
+            return;
+        }
+        // Moved only, never sized: on the other monitor Windows gives the window that monitor's DPI,
+        // and WPF sizes it for that DPI itself. A size passed in here was scaled a second time.
+        var work = info.rcWork;
+        SetWindowPos(handle, IntPtr.Zero, work.Left, work.Top, 0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
+        if (!GetWindowRect(handle, out var bounds))
+        {
+            return;
+        }
+        SetWindowPos(handle, IntPtr.Zero,
+            work.Left + (work.Right - work.Left - (bounds.Right - bounds.Left)) / 2,
+            work.Top + (work.Bottom - work.Top - (bounds.Bottom - bounds.Top)) / 2,
+            0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
+    }
 
     /// <summary>Fades the splash off the main window and closes it. The task completes when it is gone.</summary>
     public Task RevealAsync() => Run(window => window.RevealAsync());
@@ -133,4 +178,42 @@ public sealed class SplashHost
             _dispatcher.BeginInvoke(action);
         }
     }
+
+    private const uint MonitorDefaultToNearest = 2;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect32
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int cbSize;
+        public Rect32 rcMonitor;
+        public Rect32 rcWork;
+        public uint dwFlags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out Rect32 lpRect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
 }
