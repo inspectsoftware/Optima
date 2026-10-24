@@ -216,6 +216,11 @@ public sealed partial class SettingsViewModel : ObservableObject
     // Who the card is showing, so a settings save that leaves the player alone does not look them up again.
     private (string Ign, long? Id)? _cardFor;
 
+    // The card's player as the stats API answered for them, once it has: the name the game spells and
+    // the id. Save stores this, so an entry saved while the API was down, with only the name or only
+    // the id, is completed without the player having to be tracked again.
+    private (string Ign, long? Id)? _found;
+
     [ObservableProperty] private bool _hasTrackedPlayer;
     [ObservableProperty] private string _trackedName = string.Empty;
     [ObservableProperty] private string _trackedInitial = string.Empty;
@@ -315,7 +320,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         try
         {
-            await _players.SaveAccountAsync(_trackedIgn, _trackedAccountId);
+            var (ign, accountId) = _found ?? (_trackedIgn, _trackedAccountId);
+            await _players.SaveAccountAsync(ign, accountId);
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.IO.IOException or UnauthorizedAccessException)
         {
@@ -409,12 +415,20 @@ public sealed partial class SettingsViewModel : ObservableObject
                 _ = FillTrackedSummaryAsync(identity);
             }
         }
-        IsTrackedSaved = SavedPlayers.Any(a => a.Holds(_trackedIgn, _trackedAccountId));
+        IsTrackedSaved = HoldsTracked(_trackedIgn, _trackedAccountId);
+    }
+
+    /// <summary>Whether a saved entry already holds everything Save would store for this player.</summary>
+    private bool HoldsTracked(string ign, long? accountId)
+    {
+        var (savedIgn, savedId) = _found ?? (ign, accountId);
+        return SavedPlayers.Any(a => a.Holds(savedIgn, savedId));
     }
 
     private void ShowTracked(string ign, long? accountId, CopsPlayerProfile? profile, string status, bool ok)
     {
         _cardFor = (ign, accountId);
+        _found = profile is null ? null : (profile.Name, accountId);
         var shown = new PlayerAccount { Ign = profile?.Name ?? ign, AccountId = accountId };
         HasTrackedPlayer = ign.Length > 0 || accountId is > 0;
         TrackedName = shown.DisplayName;
@@ -425,7 +439,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         TrackedStatusOk = ok;
         // Saved only once the entry holds the whole identity: one saved while the API was down, with
         // just the name or the id, keeps Save on so that saving again completes it.
-        IsTrackedSaved = SavedPlayers.Any(a => a.Holds(ign, accountId));
+        IsTrackedSaved = HoldsTracked(ign, accountId);
     }
 
     /// <summary>Looks the stored player up for the card's level and rank line. Quietly: the card works without it.</summary>
@@ -448,14 +462,23 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
         if (lookup.IsFound)
         {
-            TrackedName = lookup.Profile!.Name;
+            var profile = lookup.Profile!;
+            TrackedName = profile.Name;
             TrackedInitial = TrackedName.Length > 0 ? TrackedName[..1].ToUpperInvariant() : string.Empty;
-            TrackedSummary = TrackedPlayerQuery.Summary(lookup.Profile);
+            TrackedSummary = TrackedPlayerQuery.Summary(profile);
+            var id = profile.UserId > 0 ? profile.UserId : identity.Id;
             // As Track says it: an id the API answers with an empty, default-named account is probably wrong.
-            if (CopsApiClient.LooksLikePlaceholderProfile(lookup.Profile))
+            if (CopsApiClient.LooksLikePlaceholderProfile(profile))
             {
                 TrackedStatus = lookup.Detail;
                 TrackedStatusOk = false;
+            }
+            // Only when it is the same player: a stored id the API does not know falls back to the name,
+            // which can find somebody else.
+            else if (new PlayerAccount { Ign = identity.Ign, AccountId = identity.Id }.Matches(profile.Name, id))
+            {
+                _found = (profile.Name, id);
+                IsTrackedSaved = HoldsTracked(identity.Ign, identity.Id);
             }
         }
         else if (lookup.Status == CopsLookupStatus.Error)
