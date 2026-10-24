@@ -150,6 +150,8 @@ public sealed class BoostDial : FrameworkElement
     private double _ranMs;
     private bool _animateNextChange;
     private bool _hooked;
+    // Whether the still Off picture has been drawn since it last changed.
+    private bool _drewStill;
 
     // The lettering is laid out once per label and drawn every frame; rebuilt when the window lands on another DPI.
     private double _textDpi;
@@ -294,7 +296,17 @@ public sealed class BoostDial : FrameworkElement
                 _modeStartedMs += length;
             }
         }
-        // Something is always turning, flickering or settling, so every frame is drawn.
+        // While engaged or changing over something is always turning, flickering or settling, so
+        // every frame is drawn. Off, the machine is a still picture once the pilot flame has
+        // settled, and drawing it again every frame cost about half a core on the page Boost now
+        // opens to. One more frame is drawn after the last change, so the cool-down and the flame
+        // land exactly where they rest; a hover, a tick or a switch redraws by itself.
+        var still = _mode == BoostDialMode.Off && !_hover.Moving(_clock.Elapsed.TotalSeconds);
+        if (still && _drewStill)
+        {
+            return;
+        }
+        _drewStill = still;
         InvalidateVisual();
     }
 
