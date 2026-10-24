@@ -361,17 +361,18 @@ public sealed partial class BoostViewModel : ObservableObject
             DemotionStateText = "ARMED";
             DemotionDetailText = "Waiting for the game. Nothing is demoted until Critical Ops is on screen.";
         }
-        else if (status.ProcessCount == 0)
-        {
-            DemotionStateText = "WATCHING";
-            DemotionDetailText = "None of the listed programs is running right now.";
-        }
         else
         {
-            DemotionStateText = "ACTIVE";
-            DemotionDetailText =
-                $"{status.ProcessCount} process{(status.ProcessCount == 1 ? string.Empty : "es")} of "
-                + $"{status.ProgramCount} program{(status.ProgramCount == 1 ? string.Empty : "s")} demoted · put back when the game leaves";
+            // The page's own sample once it has one, as the tile and the rows use: the service only
+            // learns at its next pass, up to 20 seconds on, that a process has ended.
+            var processes = _heldBack?.Count ?? status.ProcessCount;
+            var programs = _heldBack?.Select(p => p.Process.ProcessName).Distinct(StringComparer.OrdinalIgnoreCase).Count()
+                ?? status.ProgramCount;
+            DemotionStateText = processes == 0 ? "WATCHING" : "ACTIVE";
+            DemotionDetailText = processes == 0
+                ? "None of the listed programs is running right now."
+                : $"{processes} process{(processes == 1 ? string.Empty : "es")} of "
+                    + $"{programs} program{(programs == 1 ? string.Empty : "s")} demoted · put back when the game leaves";
         }
     }
 
@@ -761,6 +762,7 @@ public sealed partial class BoostViewModel : ObservableObject
             }
             _metrics = metrics;
             _heldBack = heldBack;
+            ShowDemotion(_demotion.Status);
             if (_presence.Current != GamePresence.NotRunning)
             {
                 GameShareHistory.Append(metrics.GameCpuPercent);
@@ -772,7 +774,7 @@ public sealed partial class BoostViewModel : ObservableObject
     /// <summary>
     /// Each demoted process that is still running, with its share of the processor since the last
     /// sample; null for one seen for the first time, which has nothing to compare against yet. The
-    /// service keeps a process on its list until the game leaves, whether it still runs or not, and
+    /// service drops a process that has ended only at its next pass, up to 20 seconds on, and
     /// browsers end processes all the time: one that has ended is not held back any more and is left
     /// out. So is one that cannot be opened, because Optima opened every one of them to demote it.
     /// </summary>
@@ -798,7 +800,7 @@ public sealed partial class BoostViewModel : ObservableObject
                 {
                     entry = (ProcessQuery.Open(process.ProcessId), null);
                     // The id may be another process's by now: the page lets go of its handles when it
-                    // goes off screen, and the service lists a process until the game leaves.
+                    // goes off screen, and the service drops an ended process only at its next pass.
                     if (entry.Handle is { } opened && process.StartTime is { } started && ProcessQuery.GetStartTime(opened) != started)
                     {
                         opened.Dispose();

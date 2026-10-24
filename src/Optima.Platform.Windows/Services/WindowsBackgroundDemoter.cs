@@ -87,6 +87,13 @@ public sealed class WindowsBackgroundDemoter : IBackgroundDemoter
             return demoted;
         }, ct);
 
+    public bool IsStillRunning(ProcessStateSnapshot demoted)
+    {
+        using var handle = ProcessQuery.Open(demoted.ProcessId);
+        return handle is not null && !ProcessQuery.HasExited(handle)
+            && (demoted.StartTime is not { } started || ProcessQuery.GetStartTime(handle) == started);
+    }
+
     /// <summary>"Chrome.exe " and "chrome" are the same entry.</summary>
     private static string NormalizeName(string name)
     {

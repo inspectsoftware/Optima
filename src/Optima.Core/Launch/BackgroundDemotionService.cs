@@ -146,13 +146,20 @@ public sealed class BackgroundDemotionService : IDisposable
 
             if (enabled && inGame)
             {
+                // One that has ended is not held back any more (browsers end processes all the time),
+                // and its id may already be a new process's, which is to be demoted, not skipped.
+                var ended = _demoted.Values.Where(d => !_demoter.IsStillRunning(d)).Select(d => d.ProcessId).ToList();
+                foreach (var pid in ended)
+                {
+                    _demoted.Remove(pid);
+                }
                 var names = settings!.BoostDemoteProcessNames;
                 var fresh = await _demoter.DemoteAsync(names, _demoted.Keys.ToHashSet(), ct).ConfigureAwait(false);
                 foreach (var snapshot in fresh)
                 {
                     _demoted[snapshot.ProcessId] = snapshot;
                 }
-                if (fresh.Count > 0)
+                if (fresh.Count > 0 || ended.Count > 0)
                 {
                     await _store.SaveAsync(_ledgerPath, _demoted.Values.ToList(), ct).ConfigureAwait(false);
                 }
