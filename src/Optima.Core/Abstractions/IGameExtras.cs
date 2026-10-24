@@ -17,12 +17,16 @@ public interface IGameExtras
     /// <summary>The executable behind a process id, or null when it cannot be read.</summary>
     string? GetProcessPath(int processId);
 
-    /// <summary>Whether Windows' per-app graphics preference for this executable is "High performance".</summary>
-    bool IsGpuHighPerformance(string executablePath);
+    /// <summary>
+    /// The adapter choice in Windows' per-app graphics preference (Settings, Display, Graphics) for
+    /// an executable: "0" (let Windows decide), "1" (power saving) or "2" (high performance), or
+    /// null when it has none.
+    /// </summary>
+    string? GetGpuPreference(string executablePath);
 
     /// <summary>
-    /// Sets or clears Windows' per-app graphics preference (Settings, Display, Graphics) for an
-    /// executable. Clearing only removes a "High performance" entry, never one the user set otherwise.
+    /// Sets the adapter choice for an executable, or takes it out when <paramref name="preference"/>
+    /// is null. The other per-app choices kept in the same Windows value stay as they are.
     /// </summary>
-    void SetGpuHighPerformance(string executablePath, bool enabled);
+    void SetGpuPreference(string executablePath, string? preference);
 }
