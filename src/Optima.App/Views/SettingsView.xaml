@@ -90,6 +90,7 @@
 
     <!-- A few options side by side, the chosen one filled with the accent. -->
     <Style x:Key="Segmented" TargetType="ListBox">
+      <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource AncestorType=ctl:SettingRow}}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Brush.HairlineStrong}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="HorizontalAlignment" Value="Right" />
@@ -142,11 +143,14 @@
       </Setter>
     </Style>
 
+    <!-- A switch or a box has no text of its own; a screen reader names it by its row's label. -->
     <Style x:Key="RowSwitch" TargetType="CheckBox" BasedOn="{StaticResource Switch}">
+      <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource AncestorType=ctl:SettingRow}}" />
       <Setter Property="HorizontalAlignment" Value="Right" />
     </Style>
 
     <Style x:Key="RowBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource AncestorType=ctl:SettingRow}}" />
       <Setter Property="Width" Value="260" />
       <Setter Property="Height" Value="34" />
       <Setter Property="Padding" Value="9,2" />
@@ -307,7 +311,7 @@
         <StackPanel Orientation="Horizontal">
           <Button Style="{StaticResource GhostButton}" Padding="12,0" MinHeight="36"
                   Command="{Binding DataContext.UseSavedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                  CommandParameter="{Binding}" ToolTip="Track this player">
+                  CommandParameter="{Binding}" ToolTip="Track this player" AutomationProperties.Name="{Binding DisplayName}">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Base}" />
               <TextBlock Text="{Binding AccountId}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
@@ -315,6 +319,7 @@
           </Button>
           <Border Width="1" Background="{DynamicResource Brush.Hairline}" />
           <Button Style="{StaticResource GhostButton}" Content="×" Width="34" FontSize="14"
+                  AutomationProperties.Name="{Binding DisplayName, StringFormat=Remove {0}}"
                   Command="{Binding DataContext.RemoveSavedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   CommandParameter="{Binding}" ToolTip="Remove from Optima" />
         </StackPanel>
@@ -348,14 +353,14 @@
 
         <!-- Find a setting: every section narrows to the rows whose label or hint has the words. -->
         <Grid Grid.Column="2" Width="320" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-          <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40"
+          <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" AutomationProperties.Name="Find a setting"
                    Padding="18,6,9,6" FontFamily="{StaticResource Font.Body}" FontSize="13" />
           <ctl:Icon Symbol="{StaticResource Icon.Search}" Size="16" Foreground="{DynamicResource Brush.TextMuted}"
                     HorizontalAlignment="Left" VerticalAlignment="Center" Margin="12,0,0,0" IsHitTestVisible="False" />
           <TextBlock Text="find a setting" Tag="{Binding SearchText}" Style="{StaticResource Placeholder}" Margin="39,0,0,0" />
         </Grid>
 
-        <ListBox Grid.Row="1" Margin="0,24,0,0" VerticalAlignment="Top"
+        <ListBox Grid.Row="1" Margin="0,24,0,0" VerticalAlignment="Top" AutomationProperties.Name="Settings sections"
                  ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection}" Style="{StaticResource SectionList}" />
 
         <!-- Room at the bottom, so the save bar never covers the last row. -->
@@ -377,6 +382,7 @@
                         <ColumnDefinition Width="Auto" />
                       </Grid.ColumnDefinitions>
                       <TextBox Text="{Binding PlayerQuery, UpdateSourceTrigger=PropertyChanged}" MinHeight="44"
+                               AutomationProperties.Name="In-game name or account ID"
                                FontFamily="{StaticResource Font.Body}" FontSize="14">
                         <TextBox.InputBindings>
                           <KeyBinding Key="Return" Command="{Binding TrackCommand}" />
@@ -432,7 +438,8 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
                           <Button Command="{Binding DataContext.SelectAccentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                  CommandParameter="{Binding}" Cursor="Hand" ToolTip="{Binding Name}" Margin="0,0,6,0">
+                                  CommandParameter="{Binding}" Cursor="Hand" ToolTip="{Binding Name}" Margin="0,0,6,0"
+                                  AutomationProperties.Name="{Binding Name}">
                             <Button.Template>
                               <ControlTemplate TargetType="Button">
                                 <Border x:Name="Ring" Width="28" Height="28" BorderThickness="2" BorderBrush="Transparent" Padding="2">
@@ -454,7 +461,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <TextBox Text="{Binding AccentColor, UpdateSourceTrigger=PropertyChanged}" Width="92" Margin="6,0,0,0"
-                             VerticalAlignment="Center" ToolTip="Your own accent as #RRGGBB" />
+                             VerticalAlignment="Center" ToolTip="Your own accent as #RRGGBB" AutomationProperties.Name="Accent hex" />
                     <Border Width="24" Height="24" Margin="8,0,0,0" VerticalAlignment="Center"
                             Background="{Binding AccentColor, Converter={StaticResource HexToBrush}}"
                             BorderBrush="{DynamicResource Brush.Glass.Border}" BorderThickness="1" />
@@ -605,7 +612,8 @@
             <HeaderedContentControl Style="{StaticResource Card}" Header="DEBUGGING">
               <StackPanel>
                 <ctl:SettingRow Header="Log level" Hint="Lowest level written to the log.">
-                  <ComboBox ItemsSource="{Binding LogLevelOptions}" SelectedItem="{Binding LogLevel}" Width="160" />
+                  <ComboBox ItemsSource="{Binding LogLevelOptions}" SelectedItem="{Binding LogLevel}" Width="160"
+                            AutomationProperties.Name="Log level" />
                 </ctl:SettingRow>
                 <ctl:SettingRow Header="Developer mode" Hint="Show the Developer page (Alt+D).">
                   <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding DeveloperMode}" />

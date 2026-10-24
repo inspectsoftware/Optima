@@ -21,7 +21,11 @@ public sealed partial class AccentPreset(string name, string hex) : ObservableOb
 }
 
 /// <summary>One option of a segmented choice whose stored value is not the text it shows.</summary>
-public sealed record SettingChoice(string Label, object Value);
+public sealed record SettingChoice(string Label, object Value)
+{
+    // What a screen reader says for the option; the record's own text is its type and every field.
+    public override string ToString() => Label;
+}
 
 /// <summary>
 /// One entry of the list down the left of the SETTINGS page. Count is the number of rows the
@@ -34,6 +38,9 @@ public sealed partial class SettingsSection(string key, string label, string blu
     public string Blurb { get; } = blurb;
 
     [ObservableProperty] private int _count;
+
+    // What a screen reader says for the entry, rather than the class name.
+    public override string ToString() => Label;
 }
 
 /// <summary>SETTINGS page (§21/§28/§29): appearance, app options, detection overrides.</summary>
