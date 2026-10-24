@@ -25,6 +25,14 @@ public sealed class BoostDial : FrameworkElement
         nameof(FeatureCount), typeof(int), typeof(BoostDial),
         new FrameworkPropertyMetadata(5, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    /// <summary>
+    /// Which of the six features are ticked, one bit each in the page's order: priority guard,
+    /// memory cleaner, timer resolution, background programs, core parking, graphics adapter.
+    /// </summary>
+    public static readonly DependencyProperty ArmedMaskProperty = DependencyProperty.Register(
+        nameof(ArmedMask), typeof(int), typeof(BoostDial),
+        new FrameworkPropertyMetadata(0b11_1111, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public static readonly DependencyProperty CommandProperty = DependencyProperty.Register(
         nameof(Command), typeof(ICommand), typeof(BoostDial), new PropertyMetadata(null));
 
@@ -83,6 +91,12 @@ public sealed class BoostDial : FrameworkElement
     {
         get => (int)GetValue(FeatureCountProperty);
         set => SetValue(FeatureCountProperty, value);
+    }
+
+    public int ArmedMask
+    {
+        get => (int)GetValue(ArmedMaskProperty);
+        set => SetValue(ArmedMaskProperty, value);
     }
 
     public ICommand? Command
