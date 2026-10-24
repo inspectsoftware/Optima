@@ -38,7 +38,6 @@ public sealed class GameExtrasService : IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CoreParkingSnapshot? _parking;
     private bool _coresAlreadyAwake;
-    private bool _gpuWasEnabled;
     private bool _started;
 
     public GameExtrasService(
@@ -171,16 +170,10 @@ public sealed class GameExtrasService : IDisposable
                     await _store.SaveAsync(_gpuLedgerPath, new GpuPreferenceLedger(gamePath), ct).ConfigureAwait(false);
                     _extras.SetGpuHighPerformance(gamePath, true);
                 }
-                // Also removed when the switch was seen going off in this run. A preference that is
-                // there while the switch has been off all along, and that Boost did not write, is
-                // the player's own, set in Windows.
-                else if (!gpuEnabled && _gpuWasEnabled && _extras.IsGpuHighPerformance(gamePath))
-                {
-                    _extras.SetGpuHighPerformance(gamePath, false);
-                }
+                // Nothing else is removed: every preference Boost wrote is in the ledger, so one
+                // that is not is the player's own, set in Windows.
                 gpuApplied = gpuEnabled;
             }
-            _gpuWasEnabled = gpuEnabled;
 
             Status = new GameExtrasStatus(coresEnabled, _parking is not null, _coresAlreadyAwake, gpuEnabled, gpuApplied, gamePath);
             StatusChanged?.Invoke(Status);
