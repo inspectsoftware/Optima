@@ -27,6 +27,9 @@ public sealed record StandbyCleanerStatus(
     DateTimeOffset? LastPurgeAt)
 {
     public static StandbyCleanerStatus Initial { get; } = new(StandbyCleanerState.Off, null, null, 0, 0, null);
+
+    /// <summary>Everything purged in this run of Optima, "purge now" included.</summary>
+    public PurgeTally Tally { get; init; } = PurgeTally.Empty;
 }
 
 /// <summary>
@@ -205,6 +208,7 @@ public sealed class StandbyCleanerService : IDisposable
 
     private void Publish(StandbyCleanerStatus status)
     {
+        status = status with { Tally = status.Tally.Add(Status.LastPurgeAt, status.LastPurgeAt, status.LastFreedMb) };
         Status = status;
         StatusChanged?.Invoke(status);
     }

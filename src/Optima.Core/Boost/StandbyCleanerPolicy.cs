@@ -1,6 +1,29 @@
 namespace Optima.Core.Boost;
 
 /// <summary>
+/// What the memory cleaner has released in this run of Optima, and when its recent purges were, for
+/// the BOOST page. Built from readouts that each carry only the latest purge, so a purge counts once,
+/// on the first readout that shows a purge time later than the one before it.
+/// </summary>
+public sealed record PurgeTally(long TotalFreedMb, IReadOnlyList<DateTimeOffset> Recent)
+{
+    /// <summary>The page draws about half an hour of purges; at one every few seconds this is plenty.</summary>
+    public const int RecentLimit = 64;
+
+    public static PurgeTally Empty { get; } = new(0, []);
+
+    /// <summary>
+    /// Counts the purge a readout reports when it is newer than the last one seen. "Purge now" stamps
+    /// its own time, so the helper's next readout, which still names its own older purge, must not
+    /// count that one a second time; hence later, not merely different.
+    /// </summary>
+    public PurgeTally Add(DateTimeOffset? previousPurgeAt, DateTimeOffset? purgeAt, long freedMb)
+        => purgeAt is { } at && (previousPurgeAt is not { } before || at > before)
+            ? new PurgeTally(TotalFreedMb + Math.Max(0, freedMb), [.. Recent.TakeLast(RecentLimit - 1), at])
+            : this;
+}
+
+/// <summary>
 /// The rule and the limits of the BOOST memory cleaner, in one place: the app validates what it
 /// sends with them and the elevated helper validates what it receives with the same ones.
 /// </summary>

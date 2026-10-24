@@ -7,7 +7,14 @@ using Microsoft.Extensions.Logging;
 namespace Optima.Core.Launch;
 
 /// <summary>What the demotion is doing right now, for the BOOST page.</summary>
-public sealed record BackgroundDemotionStatus(bool Enabled, bool GameOnScreen, int ProcessCount, int ProgramCount);
+public sealed record BackgroundDemotionStatus(bool Enabled, bool GameOnScreen, int ProcessCount, int ProgramCount)
+{
+    /// <summary>
+    /// The processes held back right now, by id and name. A copy taken inside the pass, so the page
+    /// can read it from its sampling thread while the next pass changes the service's own list.
+    /// </summary>
+    public IReadOnlyList<ProcessStateSnapshot> Demoted { get; init; } = [];
+}
 
 /// <summary>
 /// While the game is on screen, keeps the listed background programs demoted, including the ones
@@ -159,7 +166,10 @@ public sealed class BackgroundDemotionService : IDisposable
                 enabled,
                 inGame,
                 _demoted.Count,
-                _demoted.Values.Select(d => d.ProcessName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+                _demoted.Values.Select(d => d.ProcessName).Distinct(StringComparer.OrdinalIgnoreCase).Count())
+            {
+                Demoted = [.. _demoted.Values],
+            };
             StatusChanged?.Invoke(Status);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

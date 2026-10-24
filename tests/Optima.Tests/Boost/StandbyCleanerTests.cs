@@ -143,4 +143,27 @@ public sealed class StandbyCleanerTests
         Assert.Equal(2, cleaner.Status.Purges);
         Assert.Equal(4096, cleaner.Status.LastFreedMb);
     }
+
+    [Fact]
+    public void FreedMemoryIsTotalledOverTheRun_EachPurgeOnce()
+    {
+        using var cleaner = Create();
+        cleaner.Start();
+        void Readout(string purges, string freedMb, string at) => _broker.Raise(new IpcEvent
+        {
+            Kind = "memoryStatus",
+            Data = new Dictionary<string, string>
+            {
+                ["freeMb"] = "900", ["standbyMb"] = "3000", ["purges"] = purges, ["lastFreedMb"] = freedMb, ["lastPurgeAt"] = at,
+            },
+        });
+
+        Readout("0", "0", string.Empty);
+        Readout("1", "742", "2026-10-24T20:51:00.0000000+00:00");
+        Readout("1", "742", "2026-10-24T20:51:00.0000000+00:00");
+        Readout("2", "300", "2026-10-24T20:55:00.0000000+00:00");
+
+        Assert.Equal(1042, cleaner.Status.Tally.TotalFreedMb);
+        Assert.Equal(2, cleaner.Status.Tally.Recent.Count);
+    }
 }

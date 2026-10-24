@@ -80,6 +80,23 @@ public sealed class BackgroundDemotionTests : IDisposable
     }
 
     [Fact]
+    public async Task TheStatusNamesTheProcessesHeldBack_AndEmptiesWhenTheyArePutBack()
+    {
+        _demoter.Running.AddRange([Chrome(1), Chrome(2)]);
+        GameOnScreen();
+        using var service = Create();
+        await service.SyncAsync();
+        var held = service.Status.Demoted;
+
+        _settings = _settings with { BoostDemoteBackgroundEnabled = false };
+        await service.SyncAsync();
+
+        Assert.Equal([1, 2], held.Select(p => p.ProcessId).Order());
+        Assert.All(held, p => Assert.Equal("chrome", p.ProcessName));
+        Assert.Empty(service.Status.Demoted);
+    }
+
+    [Fact]
     public async Task WhenTheGameLeaves_EverythingIsPutBack_AndTheLedgerIsGone()
     {
         _demoter.Running.AddRange([Chrome(1), Chrome(2)]);
