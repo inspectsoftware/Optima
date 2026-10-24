@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using Optima.App.Controls;
 using Optima.App.Services;
 using Optima.App.ViewModels;
+using Optima.Core.Launch;
 using Optima.Core.Theming;
 
 namespace Optima.App.Views;
