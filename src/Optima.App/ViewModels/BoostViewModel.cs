@@ -562,9 +562,11 @@ public sealed partial class BoostViewModel : ObservableObject
             StandbyCleanerState.WaitingForGame => "Waiting for the game. It only watches memory while Critical Ops is on screen.",
             StandbyCleanerState.WaitingForHelper =>
                 "The game is running but the elevated helper is not, and Optima does not raise an admin prompt from the background. Start it here, or press PLAY next time.",
-            _ => status.Purges == 0
+            // The run's tally, as the MEMORY RECLAIMED tile counts: the helper's own count leaves out
+            // "purge now" and starts again with every game session.
+            _ => status.Tally.Purges == 0
                 ? "Watching. Nothing has needed purging yet."
-                : $"Purged {status.Purges} time{(status.Purges == 1 ? string.Empty : "s")} · last at "
+                : $"Purged {status.Tally.Purges} time{(status.Tally.Purges == 1 ? string.Empty : "s")} this run · last at "
                     + $"{status.LastPurgeAt?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "?"}, "
                     + $"{status.LastFreedMb.ToString("N0", CultureInfo.InvariantCulture)} MB released",
         };
