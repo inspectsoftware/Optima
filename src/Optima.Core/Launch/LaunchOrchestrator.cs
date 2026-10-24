@@ -429,7 +429,7 @@ public sealed class LaunchOrchestrator
                 context.Warnings.Add(new LaunchWarning(ex.Error.Code,
                     "The virtual display driver is not installed",
                     "The game ran on your real screen. Install the driver on the Display page, or switch the virtual display off there."));
-                context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = false };
+                context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = false, VirtualDisplayEnabledByUs = false };
                 await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
             }
         }).ConfigureAwait(false);
@@ -464,9 +464,14 @@ public sealed class LaunchOrchestrator
         var wasActive = await _virtualDisplay.IsDisplayActiveAsync(ct).ConfigureAwait(false);
         if (!wasActive)
         {
-            await RunWithRepairAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
+            // Written down before the device is switched on, not after. The helper switches it on in
+            // its own process, and an Optima killed while the enable waits for the display would
+            // otherwise leave a snapshot that says nothing was switched on, so the next start's
+            // restore would leave the display on for good. Switching off a device that never came
+            // on does nothing.
             context.Snapshot = context.Snapshot with { VirtualDisplayEnabledByUs = true };
             await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+            await RunWithRepairAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
         }
 
         await _virtualDisplay.SetModeAsync(display.Mode, ct).ConfigureAwait(false);

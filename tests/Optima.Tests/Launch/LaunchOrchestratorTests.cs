@@ -268,6 +268,24 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task RunSession_OptimaKilledWhileTheDisplayComesOn_TheNextStartSwitchesItOff()
+    {
+        SystemStateSnapshot? onDisk = null;
+        var recovery = CreateRecovery();
+        _virtualDisplay.OnEnable = () => onDisk = recovery.GetPendingAsync().GetAwaiter().GetResult();
+
+        Assert.True((await CreateOrchestrator().RunSessionAsync(CompetitiveProfile)).Success);
+
+        // What the pending file said while the device was being switched on, restored by the next
+        // start's fresh provider over a display the dead session left on.
+        Assert.True(onDisk!.VirtualDisplayEnabledByUs);
+        var afterKill = new FakeVirtualDisplay { Active = true };
+        await new RecoveryService(_paths, _store, _displayService, _power, afterKill, _processOptimizer,
+            NullLogger<RecoveryService>.Instance).RestoreAsync(onDisk);
+        Assert.False(afterKill.Active);
+    }
+
+    [Fact]
     public async Task RunSession_TheDisplaysAdministratorPromptComesBeforeTheGameStarts()
     {
         var elevation = new FakeElevationBroker { ConnectOnPrompt = true };
