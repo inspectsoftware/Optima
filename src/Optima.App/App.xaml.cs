@@ -213,7 +213,7 @@ public partial class App : Application
         // An update ends with the setup replacing this process: out without the exit questions.
         _services.GetRequiredService<UpdateViewModel>().ExitForUpdate = () => _shutdown.ShutdownNow(0);
 
-        _tray = new TrayService(window, _services.GetRequiredService<SettingsService>(), _shutdown);
+        _tray = new TrayService(window, _services.GetRequiredService<SettingsService>(), _shutdown, _windowShown.Task);
         var orchestrator = _orchestrator = _services.GetRequiredService<LaunchOrchestrator>();
         _tray.AttachOrchestrator(orchestrator);
         orchestrator.ProgressChanged += (_, progress) => Dispatcher.BeginInvoke(() =>
@@ -386,6 +386,7 @@ public partial class App : Application
             var ground = window.TryFindResource("Color.Background") is System.Windows.Media.Color background
                 ? background
                 : System.Windows.Media.Colors.Black;
+            splash.KeepOnSplashMonitor(window);
             var covered = splash.GrowIntoAsync(PlacementOf(window), ground);
             if (await Task.WhenAny(covered, Task.Delay(SplashPatience)) != covered)
             {
@@ -413,8 +414,9 @@ public partial class App : Application
 
     /// <summary>
     /// Where the main window will be once it is shown, in the units of its Left and Top. Read before
-    /// it is shown: the handle gives the window its centred place (measured: showing it afterwards
-    /// does not move it), and a window that opens maximized fills the work area.
+    /// it is shown: the handle gives the window its centred place (and the splash, keeping it on its
+    /// monitor, makes sure showing it afterwards does not move it), and a window that opens maximized
+    /// fills the work area.
     /// </summary>
     private static Rect PlacementOf(Window window)
     {
@@ -736,7 +738,9 @@ public partial class App : Application
                 _ = dispatcher.BeginInvoke(() =>
                 {
                     var window = MainWindow;
-                    if (window is null)
+                    // Until startup has shown the window, showing it is the splash handover's job,
+                    // and the handover brings it up anyway: shown from here, it stood beside the card.
+                    if (window is null || !_windowShown.Task.IsCompleted)
                     {
                         return;
                     }
