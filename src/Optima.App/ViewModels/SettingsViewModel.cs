@@ -453,7 +453,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         HasTrackedPlayer = ign.Length > 0 || accountId is > 0;
         TrackedName = shown.DisplayName;
         TrackedInitial = TrackedName.Length > 0 ? TrackedName[..1].ToUpperInvariant() : string.Empty;
-        TrackedIdText = accountId is { } id ? "ID " + id.ToString(CultureInfo.InvariantCulture) : "no ID yet";
+        TrackedIdText = IdText(accountId);
         TrackedSummary = profile is null ? string.Empty : TrackedPlayerQuery.Summary(profile);
         TrackedStatus = status;
         TrackedStatusOk = ok;
@@ -461,6 +461,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         // just the name or the id, keeps Save on so that saving again completes it.
         IsTrackedSaved = HoldsTracked(ign, accountId);
     }
+
+    private static string IdText(long? accountId)
+        => accountId is { } id ? "ID " + id.ToString(CultureInfo.InvariantCulture) : "no ID yet";
 
     /// <summary>Looks the stored player up for the card's level and rank line. Quietly: the card works without it.</summary>
     private async Task FillTrackedSummaryAsync((string Ign, long? Id) identity)
@@ -498,6 +501,8 @@ public sealed partial class SettingsViewModel : ObservableObject
             else if (new PlayerAccount { Ign = identity.Ign, AccountId = identity.Id }.Matches(profile.Name, id))
             {
                 _found = (profile.Name, id);
+                // The id the API answered with, which Save stores: "no ID yet" promised one the card has.
+                TrackedIdText = IdText(id);
                 IsTrackedSaved = HoldsTracked(identity.Ign, identity.Id);
             }
         }
