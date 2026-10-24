@@ -63,7 +63,10 @@ public sealed class StandbyCleanerService : IDisposable
 
     public StandbyCleanerStatus Status { get; private set; } = StandbyCleanerStatus.Initial;
 
-    /// <summary>Raised on a state change and on every readout from the helper, on whatever thread delivered it.</summary>
+    /// <summary>
+    /// Raised on a state change and on every readout from the helper, on whatever thread delivered it,
+    /// and in order. A handler only hands the status on (to the dispatcher, say) and never waits.
+    /// </summary>
     public event Action<StandbyCleanerStatus>? StatusChanged;
 
     public void Start()
@@ -216,19 +219,20 @@ public sealed class StandbyCleanerService : IDisposable
     /// <summary>
     /// Applies one change to the status. The helper's readouts arrive on the pipe's thread while a sync
     /// runs on the pool, and each change is read and written as one step: done apart, a sync that read
-    /// the status just before a readout wrote it back without the readout's numbers.
+    /// the status just before a readout wrote it back without the readout's numbers. Raised in the same
+    /// step, so listeners hear the changes in the order they were made: raised after it, a readout and
+    /// a stop could be heard the other way round, and the page kept showing RUNNING with the cleaner off.
     /// </summary>
     private void Publish(Func<StandbyCleanerStatus, StandbyCleanerStatus> change)
     {
-        StandbyCleanerStatus status;
         lock (_statusLock)
         {
             var before = Status;
-            status = change(before);
+            var status = change(before);
             status = status with { Tally = status.Tally.Add(before.LastPurgeAt, status.LastPurgeAt, status.LastFreedMb) };
             Status = status;
+            StatusChanged?.Invoke(status);
         }
-        StatusChanged?.Invoke(status);
     }
 
     public void Dispose()
