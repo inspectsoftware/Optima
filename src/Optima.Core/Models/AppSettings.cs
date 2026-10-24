@@ -92,11 +92,11 @@ public sealed record AppSettings
     /// <summary>Critical Ops account id, used before the name for profile lookups (exact, survives renames).</summary>
     public long? PlayerAccountId { get; init; }
 
-    /// <summary>Saved identities (main plus alternates) for the title-bar account switcher.</summary>
+    /// <summary>
+    /// Players saved from the PLAYER card in Settings, for tracking again with one click there or in
+    /// the title-bar switcher. A trackedPlayers list in an older config.json is no longer read.
+    /// </summary>
     public IReadOnlyList<PlayerAccount> SavedAccounts { get; init; } = [];
-
-    /// <summary>Friends and clanmates tracked on the HOME player panel.</summary>
-    public IReadOnlyList<PlayerAccount> TrackedPlayers { get; init; } = [];
 
     /// <summary>
     /// The HOME dashboard layout: widget ids in the order they are shown. Null means the layout has

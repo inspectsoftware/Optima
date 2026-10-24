@@ -7,6 +7,104 @@
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Margin" Value="0,6,12,6" />
     </Style>
+
+    <!-- The hint inside the empty PLAYER box. -->
+    <Style x:Key="Placeholder" TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
+      <Setter Property="IsHitTestVisible" Value="False" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="11,0,0,0" />
+      <Setter Property="Visibility" Value="Collapsed" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding PlayerQuery}" Value="">
+          <Setter Property="Visibility" Value="Visible" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="NoSavedPlayers" TargetType="TextBlock" BasedOn="{StaticResource Text.Micro}">
+      <Setter Property="Visibility" Value="Collapsed" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding SavedPlayers.Count}" Value="0">
+          <Setter Property="Visibility" Value="Visible" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <!-- The tracked player: who HOME, the session stats and Discord follow. -->
+    <DataTemplate x:Key="TrackedCard">
+      <Border Background="{DynamicResource Brush.Tile}" BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="1"
+              Padding="16" SnapsToDevicePixels="True">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <Border Width="56" Height="56" Background="{DynamicResource Brush.Glass.Surface2}"
+                  BorderBrush="{DynamicResource Brush.HairlineStrong}" BorderThickness="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding TrackedInitial}" Style="{StaticResource Text.Base}" FontSize="22" FontWeight="Bold"
+                       Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <StackPanel Grid.Column="1" Margin="16,0,16,0" VerticalAlignment="Center">
+            <WrapPanel>
+              <TextBlock Text="{Binding TrackedName}" Style="{StaticResource Text.Base}" FontSize="18" FontWeight="SemiBold"
+                         Margin="0,0,10,0" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding TrackedIdText}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+            </WrapPanel>
+            <TextBlock Text="{Binding TrackedSummary}" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextSecondary}"
+                       Margin="0,6,0,0" TextWrapping="Wrap"
+                       Visibility="{Binding TrackedSummary, Converter={StaticResource EmptyToCollapsed}}" />
+            <Grid Margin="0,8,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition />
+              </Grid.ColumnDefinitions>
+              <Ellipse x:Name="Dot" Width="6" Height="6" Fill="{DynamicResource Brush.Ok}" VerticalAlignment="Center" />
+              <TextBlock x:Name="Status" Grid.Column="1" Text="{Binding TrackedStatus}" Style="{StaticResource Text.Label}"
+                         Foreground="{DynamicResource Brush.Ok}" TextWrapping="Wrap" Margin="8,0,0,0" />
+            </Grid>
+          </StackPanel>
+          <Button x:Name="Save" Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Save to Optima" Padding="16,8"
+                  VerticalAlignment="Center" Command="{Binding SaveTrackedCommand}"
+                  ToolTip="Keeps this player in Optima, so tracking them again is one click here or in the title bar" />
+        </Grid>
+      </Border>
+      <DataTemplate.Triggers>
+        <DataTrigger Binding="{Binding TrackedStatusOk}" Value="False">
+          <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource Brush.Warn}" />
+          <Setter TargetName="Status" Property="Foreground" Value="{DynamicResource Brush.Warn}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding IsTrackedSaved}" Value="True">
+          <Setter TargetName="Save" Property="Content" Value="Saved in Optima" />
+        </DataTrigger>
+      </DataTemplate.Triggers>
+    </DataTemplate>
+
+    <!-- One saved player: the name tracks them, the x forgets them. -->
+    <DataTemplate x:Key="SavedChip">
+      <Border x:Name="Chip" BorderBrush="{DynamicResource Brush.Hairline}" BorderThickness="1"
+              Background="{DynamicResource Brush.Tile}" Margin="0,0,8,8" SnapsToDevicePixels="True">
+        <StackPanel Orientation="Horizontal">
+          <Button Style="{StaticResource GhostButton}" Padding="12,0" MinHeight="34"
+                  Command="{Binding DataContext.UseSavedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  CommandParameter="{Binding}" ToolTip="Track this player">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Base}" FontSize="{StaticResource Type.Label}" />
+              <TextBlock Text="{Binding AccountId}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Border Width="1" Background="{DynamicResource Brush.Hairline}" />
+          <Button Style="{StaticResource GhostButton}" Content="×" Width="34" FontSize="14"
+                  Command="{Binding DataContext.RemoveSavedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  CommandParameter="{Binding}" ToolTip="Remove from Optima" />
+        </StackPanel>
+      </Border>
+      <DataTemplate.Triggers>
+        <DataTrigger Binding="{Binding IsActive}" Value="True">
+          <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+        </DataTrigger>
+      </DataTemplate.Triggers>
+    </DataTemplate>
   </UserControl.Resources>
 
   <Grid>
@@ -205,71 +303,39 @@
 
         <StackPanel Grid.Column="2">
           <HeaderedContentControl Style="{StaticResource Section}" Header="PLAYER">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition />
-              </Grid.ColumnDefinitions>
-              <Grid.RowDefinitions>
-                <RowDefinition /><RowDefinition /><RowDefinition />
-              </Grid.RowDefinitions>
-              <TextBlock Text="in-game name" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Column="1" Margin="0,5">
-                <TextBox Text="{Binding PlayerIgn, UpdateSourceTrigger=PropertyChanged}" MinWidth="220" MaxWidth="320" HorizontalAlignment="Left" />
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Reads your public profile from Critical Force's public API so sessions can record ranked kills, deaths and wins. Either this or the account id below enables all stat lookups." />
-              </StackPanel>
-              <TextBlock Grid.Row="1" Text="account id" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,5">
-                <TextBox Text="{Binding PlayerAccountId, UpdateSourceTrigger=PropertyChanged}" MinWidth="220" MaxWidth="320" HorizontalAlignment="Left" />
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="The number on your Critical Ops profile. The id is checked first and is exact, so it keeps working if you rename. The in-game name is the fallback when no id is set." />
-                <Grid Margin="0,8,0,0">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MaxWidth="200" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox Text="{Binding SaveAccountLabel, UpdateSourceTrigger=PropertyChanged}"
-                           VerticalAlignment="Center"
-                           ToolTip="Optional label, e.g. Main or Smurf" />
-                  <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="save as account" Margin="8,0,0,0"
-                          Command="{Binding SaveAsAccountCommand}"
-                          ToolTip="Stores this identity so it can be switched to from the title bar" />
-                </Grid>
-                <TextBlock Style="{StaticResource Text.Micro}" Margin="0,4,0,0" TextWrapping="Wrap"
-                           Text="Saved identities appear in the switcher at the top of the window. The current one is marked ACTIVE there." />
-              </StackPanel>
-
-              <TextBlock Grid.Row="2" Text="tracked players" Style="{StaticResource RowLabel}" VerticalAlignment="Top" Margin="0,10,12,6" />
-              <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,5">
-                <ItemsControl ItemsSource="{Binding TrackedPlayers}" Margin="0,2,0,6">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                      <StackPanel Orientation="Horizontal" Margin="0,2">
-                        <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Label}" VerticalAlignment="Center" />
-                        <Button Style="{StaticResource GhostButton}" Content="remove" Padding="6,0" Margin="10,0,0,0"
-                                Command="{Binding DataContext.RemoveTrackedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}" />
-                      </StackPanel>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MaxWidth="200" />
-                    <ColumnDefinition Width="*" MaxWidth="140" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox Text="{Binding NewTrackedIgn, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
-                           ToolTip="Friend's in-game name" />
-                  <TextBox Grid.Column="1" Text="{Binding NewTrackedAccountId, UpdateSourceTrigger=PropertyChanged}" Margin="8,0,0,0" VerticalAlignment="Center"
-                           ToolTip="Optional account id" />
-                  <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="track" Margin="8,0,0,0"
-                          Command="{Binding TrackPlayerCommand}"
-                          ToolTip="Adds the player to the HOME friends strip" />
-                </Grid>
-              </StackPanel>
-            </Grid>
+            <StackPanel>
+              <TextBlock Text="In-game name or account ID" Style="{StaticResource Text.Label}" Margin="0,0,0,6" />
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Text="{Binding PlayerQuery, UpdateSourceTrigger=PropertyChanged}" MinHeight="38">
+                  <TextBox.InputBindings>
+                    <KeyBinding Key="Return" Command="{Binding TrackCommand}" />
+                  </TextBox.InputBindings>
+                </TextBox>
+                <TextBlock Text="e.g. Kestrel or 48211907" Style="{StaticResource Placeholder}" />
+                <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Content="Track" Padding="22,8" Margin="10,0,0,0"
+                        Command="{Binding TrackCommand}" />
+              </Grid>
+              <TextBlock Text="{Binding TrackMessage}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.Warn}"
+                         TextWrapping="Wrap" Margin="0,8,0,0"
+                         Visibility="{Binding TrackMessage, Converter={StaticResource EmptyToCollapsed}}" />
+              <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TrackedCard}" Margin="0,14,0,0"
+                              Visibility="{Binding HasTrackedPlayer, Converter={StaticResource BoolToVis}}" />
+              <TextBlock Text="Saved in Optima" Style="{StaticResource Text.Label}" Margin="0,16,0,8" />
+              <ItemsControl ItemsSource="{Binding SavedPlayers}" ItemTemplate="{StaticResource SavedChip}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              </ItemsControl>
+              <TextBlock Text="Nobody saved yet. Track a player, then save them to Optima." Style="{StaticResource NoSavedPlayers}" />
+              <TextBlock Style="{StaticResource Text.Micro}" Margin="0,10,0,0" TextWrapping="Wrap"
+                         Text="Stats come from Critical Force's public profile API. An ID is exact and survives a rename; a name is looked up as typed." />
+            </StackPanel>
           </HeaderedContentControl>
 
           <HeaderedContentControl Style="{StaticResource Section}" Header="GENERAL">

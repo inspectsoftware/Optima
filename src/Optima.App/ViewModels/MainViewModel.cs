@@ -223,7 +223,8 @@ public sealed partial class MainViewModel : ObservableObject
         {
             SavedAccounts.Add(account with
             {
-                IsActive = string.Equals(account.Ign.Trim(), settings.PlayerIgn.Trim(), StringComparison.OrdinalIgnoreCase),
+                // By id where both have one, so an account saved by id alone is still found.
+                IsActive = account.Matches(settings.PlayerIgn, settings.PlayerAccountId),
             });
         }
         // The dropdown must always open with something meaningful, even for a single account.
@@ -231,8 +232,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             SavedAccounts.Add(NoOtherAccountPlaceholder);
         }
-        ActiveAccount = SavedAccounts.FirstOrDefault(a => a.IsActive)
-            ?? SavedAccounts.FirstOrDefault(a => a.Matches(settings.PlayerIgn, settings.PlayerAccountId));
+        ActiveAccount = SavedAccounts.FirstOrDefault(a => a.IsActive);
     }
 
     [ObservableProperty]

@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
+using Optima.Core.Stats;
 using Optima.Core.Theming;
 
 namespace Optima.App.ViewModels;
@@ -18,19 +19,24 @@ public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly SettingsService _settings;
     private readonly Services.PlayerSwitcherService _players;
+    private readonly CopsApiClient _api;
     private readonly Optima.Core.Linking.BotLinkClient _botLink;
     private readonly Optima.Core.Protection.ShieldLoader _shield;
 
     public SettingsViewModel(
         SettingsService settings,
         Services.PlayerSwitcherService players,
+        CopsApiClient api,
         Optima.Core.Linking.BotLinkClient botLink,
         Optima.Core.Protection.ShieldLoader shield)
     {
         _settings = settings;
         _players = players;
+        _api = api;
         _botLink = botLink;
         _shield = shield;
+        // The tracked player and the saved list also change from the title-bar switcher.
+        _settings.SettingsChanged += OnSettingsChanged;
     }
 
     public IReadOnlyList<string> ProviderOptions { get; } = ["Auto", "MttVdd", "Mock"];
@@ -63,66 +69,240 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private string _theme = "Dark";
     [ObservableProperty] private string _accentColor = AccentMath.DefaultAccentHex;
-    [ObservableProperty] private string _playerIgn = string.Empty;
-    [ObservableProperty] private string _playerAccountId = string.Empty;
-    [ObservableProperty] private string _saveAccountLabel = string.Empty;
-    [ObservableProperty] private string _newTrackedIgn = string.Empty;
-    [ObservableProperty] private string _newTrackedAccountId = string.Empty;
-    public ObservableCollection<PlayerAccount> TrackedPlayers { get; } = [];
+    // ---------------------------------------------------------------- PLAYER
 
-    [RelayCommand]
-    private async Task SaveAsAccountAsync()
+    /// <summary>The one PLAYER box: an in-game name or an account id.</summary>
+    [ObservableProperty] private string _playerQuery = string.Empty;
+
+    /// <summary>Why the last Track press changed nothing (no such player), shown under the box.</summary>
+    [ObservableProperty] private string _trackMessage = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(TrackCommand))]
+    private bool _isTracking;
+
+    // The tracked player as stored. Tracking and switching write it straight to the settings, not
+    // through the save bar: HOME, the session stats and Discord follow it the moment it changes.
+    private string _trackedIgn = string.Empty;
+    private long? _trackedAccountId;
+
+    // Who the card is showing, so a settings save that leaves the player alone does not look them up again.
+    private (string Ign, long? Id)? _cardFor;
+
+    [ObservableProperty] private bool _hasTrackedPlayer;
+    [ObservableProperty] private string _trackedName = string.Empty;
+    [ObservableProperty] private string _trackedInitial = string.Empty;
+    [ObservableProperty] private string _trackedIdText = string.Empty;
+
+    /// <summary>Level, rank and ranked record, once the API has answered for this player.</summary>
+    [ObservableProperty] private string _trackedSummary = string.Empty;
+
+    [ObservableProperty] private string _trackedStatus = string.Empty;
+
+    /// <summary>False when the status line is a warning (API unreachable, a doubtful id).</summary>
+    [ObservableProperty] private bool _trackedStatusOk = true;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveTrackedCommand))]
+    private bool _isTrackedSaved;
+
+    /// <summary>Players saved in Optima, shown as chips; the tracked one is marked active.</summary>
+    public ObservableCollection<PlayerAccount> SavedPlayers { get; } = [];
+
+    private const string FollowLine = "Tracking · HOME, sessions and Discord follow this player";
+
+    private bool CanTrack() => !IsTracking;
+
+    [RelayCommand(CanExecute = nameof(CanTrack))]
+    private async Task TrackAsync()
+    {
+        var typed = PlayerQuery.Trim();
+        if (typed.Length == 0)
+        {
+            TrackMessage = "Type an in-game name or an account ID first.";
+            return;
+        }
+
+        IsTracking = true;
+        TrackMessage = string.Empty;
+        CopsLookupResult lookup;
+        try
+        {
+            lookup = await TrackedPlayerQuery.LookupAsync(_api, typed);
+        }
+        catch (Exception)
+        {
+            lookup = new CopsLookupResult(CopsLookupStatus.Error, null, "The stats API could not be reached.");
+        }
+        finally
+        {
+            IsTracking = false;
+        }
+
+        var decision = TrackedPlayerQuery.Decide(typed, lookup);
+        if (!decision.Tracks)
+        {
+            TrackMessage = TrackedPlayerQuery.AsAccountId(typed) is null
+                ? $"No player called {typed} was found. Check the spelling, or use the account ID from the profile."
+                : $"No player has the ID {typed}, and nobody is called that either.";
+            return;
+        }
+
+        // The card first, so the settings change that follows finds it already showing this player.
+        if (decision.Outcome == TrackOutcome.Found)
+        {
+            var profile = lookup.Profile!;
+            ShowTracked(decision.Ign, decision.AccountId, profile,
+                CopsApiClient.LooksLikePlaceholderProfile(profile) ? lookup.Detail : FollowLine,
+                ok: !CopsApiClient.LooksLikePlaceholderProfile(profile));
+        }
+        else
+        {
+            ShowTracked(decision.Ign, decision.AccountId, null,
+                "The stats API could not be reached, so this is tracked as typed. Stats fill in once it answers.", ok: false);
+        }
+
+        try
+        {
+            await _settings.UpdateSettingsAsync(s => s with
+            {
+                PlayerIgn = decision.Ign,
+                PlayerAccountId = decision.AccountId,
+            });
+            PlayerQuery = string.Empty;
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            TrackMessage = "The player could not be saved: " + ex.Message;
+            _cardFor = null;
+            LoadPlayer(await _settings.GetSettingsAsync());
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanSaveTracked))]
+    private async Task SaveTrackedAsync()
     {
         try
         {
-            await _players.SaveCurrentAsAccountAsync(SaveAccountLabel);
-            SaveAccountLabel = string.Empty;
-            SaveBarMark = "[ OK ]";
-            SaveBarText = "Account saved. It is now in the switcher at the top of the window.";
-            SaveBarVisible = true;
+            await _players.SaveAccountAsync(_trackedIgn, _trackedAccountId);
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or System.IO.IOException or UnauthorizedAccessException)
         {
-            SaveBarMark = "[ ! ]";
-            SaveBarText = ex.Message;
-            SaveBarVisible = true;
+            TrackMessage = ex.Message;
         }
     }
 
+    private bool CanSaveTracked() => !IsTrackedSaved;
+
+    /// <summary>A saved chip: makes that player the tracked one.</summary>
     [RelayCommand]
-    private async Task TrackPlayerAsync()
+    private async Task UseSavedAsync(PlayerAccount? account)
     {
-        var ign = NewTrackedIgn.Trim();
-        if (ign.Length == 0)
+        if (account is null || account.Matches(_trackedIgn, _trackedAccountId))
         {
-            SaveBarMark = "[ ! ]";
-            SaveBarText = "Give the player's in-game name first.";
-            SaveBarVisible = true;
             return;
         }
-        long? accountId = long.TryParse(NewTrackedAccountId.Trim(), out var id) && id > 0 ? id : null;
-        // One instance for both: the row has to carry the key that was stored, or it cannot be removed.
-        var tracked = new PlayerAccount { Ign = ign, AccountId = accountId };
-        if (!await _players.AddTrackedAsync(tracked))
-        {
-            SaveBarMark = "[ ! ]";
-            SaveBarText = $"{ign} is already tracked.";
-            SaveBarVisible = true;
-            return;
-        }
-        TrackedPlayers.Add(tracked);
-        NewTrackedIgn = string.Empty;
-        NewTrackedAccountId = string.Empty;
-        SaveBarMark = "[ OK ]";
-        SaveBarText = $"Tracking {ign}. They appear on HOME beside your own stats.";
-        SaveBarVisible = true;
+        TrackMessage = string.Empty;
+        await _players.SwitchToAsync(account);
     }
 
+    /// <summary>The x on a saved chip. The tracked player stays tracked; only the saved entry goes.</summary>
     [RelayCommand]
-    private async Task RemoveTrackedAsync(PlayerAccount account)
+    private async Task RemoveSavedAsync(PlayerAccount? account)
     {
-        await _players.RemoveTrackedAsync(account.Key);
-        TrackedPlayers.Remove(account);
+        if (account is not { Key.Length: > 0 })
+        {
+            return;
+        }
+        await _players.RemoveAccountAsync(account.Key);
+    }
+
+    // Every change below (tracking, saving, switching, removing) arrives here through the settings
+    // change, the same way a switch made from the title bar does.
+    private void OnSettingsChanged(object? sender, AppSettings settings)
+    {
+        // Raised on whatever thread finished the save; the card is bound to the UI.
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(() => LoadPlayer(settings));
+            return;
+        }
+        LoadPlayer(settings);
+    }
+
+    /// <summary>The PLAYER card and the saved chips as the settings have them.</summary>
+    private void LoadPlayer(AppSettings settings)
+    {
+        _trackedIgn = settings.PlayerIgn.Trim();
+        _trackedAccountId = settings.PlayerAccountId;
+
+        SavedPlayers.Clear();
+        foreach (var account in settings.SavedAccounts)
+        {
+            SavedPlayers.Add(account with { IsActive = account.Matches(_trackedIgn, _trackedAccountId) });
+        }
+
+        var identity = (_trackedIgn, _trackedAccountId);
+        if (_cardFor != identity)
+        {
+            ShowTracked(_trackedIgn, _trackedAccountId, null, FollowLine, ok: true);
+            if (HasTrackedPlayer)
+            {
+                _ = FillTrackedSummaryAsync(identity);
+            }
+        }
+        IsTrackedSaved = SavedPlayers.Any(a => a.IsActive);
+    }
+
+    private void ShowTracked(string ign, long? accountId, CopsPlayerProfile? profile, string status, bool ok)
+    {
+        _cardFor = (ign, accountId);
+        var shown = new PlayerAccount { Ign = profile?.Name ?? ign, AccountId = accountId };
+        HasTrackedPlayer = ign.Length > 0 || accountId is > 0;
+        TrackedName = shown.DisplayName;
+        TrackedInitial = TrackedName.Length > 0 ? TrackedName[..1].ToUpperInvariant() : string.Empty;
+        TrackedIdText = accountId is { } id ? "ID " + id.ToString(CultureInfo.InvariantCulture) : "no ID yet";
+        TrackedSummary = profile is null ? string.Empty : TrackedPlayerQuery.Summary(profile);
+        TrackedStatus = status;
+        TrackedStatusOk = ok;
+        IsTrackedSaved = SavedPlayers.Any(a => a.Matches(ign, accountId));
+    }
+
+    /// <summary>Looks the stored player up for the card's level and rank line. Quietly: the card works without it.</summary>
+    private async Task FillTrackedSummaryAsync((string Ign, long? Id) identity)
+    {
+        CopsLookupResult lookup;
+        try
+        {
+            lookup = await _api.LookupPlayerAsync(identity.Ign, identity.Id);
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        // The player may have changed while the lookup ran.
+        if (_cardFor != identity)
+        {
+            return;
+        }
+        if (lookup.IsFound)
+        {
+            TrackedName = lookup.Profile!.Name;
+            TrackedInitial = TrackedName.Length > 0 ? TrackedName[..1].ToUpperInvariant() : string.Empty;
+            TrackedSummary = TrackedPlayerQuery.Summary(lookup.Profile);
+        }
+        else if (lookup.Status == CopsLookupStatus.Error)
+        {
+            TrackedStatus = "The stats API could not be reached; the stats show once it answers.";
+            TrackedStatusOk = false;
+        }
+        else
+        {
+            TrackedStatus = "The stats API does not know this player. Track them again by name or ID.";
+            TrackedStatusOk = false;
+        }
     }
 
     [ObservableProperty] private bool _discordPresenceEnabled = true;
@@ -171,7 +351,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         var baseUrl = Optima.Core.Linking.BotLinkClient.NormalizeBaseUrl(DiscordBotUrl)
             ?? Optima.Core.Linking.BotLinkClient.DefaultBaseUrl;
-        long? accountId = long.TryParse(PlayerAccountId.Trim(), out var id) && id > 0 ? id : null;
+        var accountId = _trackedAccountId;
 
         // The tracker webhook is optional, but a typo in it would look like a working tracker that
         // never posts anything, and the bot refuses one it cannot post to anyway: catch it here, where
@@ -210,7 +390,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             return;
         }
 
-        var window = new Views.DiscordLinkWindow(_botLink, baseUrl, accountId, PlayerIgn.Trim(), status, webhook, deviceKey)
+        var window = new Views.DiscordLinkWindow(_botLink, baseUrl, accountId, _trackedIgn, status, webhook, deviceKey)
         {
             Owner = System.Windows.Application.Current?.MainWindow,
         };
@@ -402,52 +582,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             RefreshUnsavedState();
         }
-
-        // The player identity is persisted as it is typed (debounced): it must survive an
-        // app close or a crash without hunting for the Save button first.
-        if (e.PropertyName is nameof(PlayerIgn) or nameof(PlayerAccountId))
-        {
-            RestartIdentityAutosave();
-        }
-    }
-
-    private DispatcherTimer? _identityAutosaveTimer;
-
-    private void RestartIdentityAutosave()
-    {
-        if (_savedValues.Count == 0)
-        {
-            // Not initialized yet (settings still loading); do not persist half-loaded text.
-            return;
-        }
-        if (_identityAutosaveTimer is null)
-        {
-            _identityAutosaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
-            _identityAutosaveTimer.Tick += OnIdentityAutosaveTick;
-        }
-        _identityAutosaveTimer.Stop();
-        _identityAutosaveTimer.Start();
-    }
-
-    private async void OnIdentityAutosaveTick(object? sender, EventArgs e)
-    {
-        var timer = (DispatcherTimer)sender!;
-        timer.Stop();
-        try
-        {
-            // An empty box clears the id; text that is not a number yet keeps the stored one.
-            var idText = PlayerAccountId.Trim();
-            var idValid = long.TryParse(idText, out var id) && id > 0;
-            await _settings.UpdateSettingsAsync(s => s with
-            {
-                PlayerIgn = PlayerIgn.Trim(),
-                PlayerAccountId = idValid ? id : idText.Length == 0 ? null : s.PlayerAccountId,
-            });
-        }
-        catch
-        {
-            // Autosave is best-effort; the Save button remains the authoritative path.
-        }
     }
 
     private void CaptureSavedValues() => _savedValues = NormalizedValues();
@@ -457,8 +591,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         [nameof(Theme)] = Theme,
         [nameof(AutoRelaunchOnCrash)] = AutoRelaunchOnCrash,
         [nameof(AccentColor)] = AccentColor.Trim(),
-        [nameof(PlayerIgn)] = PlayerIgn.Trim(),
-        [nameof(PlayerAccountId)] = PlayerAccountId.Trim(),
         [nameof(DiscordPresenceEnabled)] = DiscordPresenceEnabled,
         [nameof(DiscordPresenceInLauncher)] = DiscordPresenceInLauncher,
         [nameof(DiscordOptions)] = DiscordOptions,
@@ -532,8 +664,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var settings = await _settings.GetSettingsAsync(ct);
         Theme = settings.Theme;
         AccentColor = settings.AccentColor;
-        PlayerIgn = settings.PlayerIgn;
-        PlayerAccountId = settings.PlayerAccountId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        LoadPlayer(settings);
         DiscordPresenceEnabled = settings.DiscordPresenceEnabled;
         DiscordPresenceInLauncher = settings.DiscordPresenceInLauncher;
         DiscordOptions = settings.EffectivePresenceOptions;
@@ -570,12 +701,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         ManualInstallPath = rules.ManualInstallPath ?? string.Empty;
         CustomLaunchCommand = rules.CustomLaunchCommand ?? string.Empty;
 
-        TrackedPlayers.Clear();
-        foreach (var tracked in settings.TrackedPlayers)
-        {
-            TrackedPlayers.Add(tracked);
-        }
-
         CaptureSavedValues();
         HasUnsavedChanges = false;
         StopConfirmTimer();
@@ -587,27 +712,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         var accentValid = AccentMath.TryParse(AccentColor) is not null;
 
-        long? accountId = null;
-        var accountText = PlayerAccountId.Trim();
-        var accountValid = true;
-        if (accountText.Length > 0)
-        {
-            if (long.TryParse(accountText, CultureInfo.InvariantCulture, out var parsed) && parsed > 0)
-            {
-                accountId = parsed;
-            }
-            else
-            {
-                accountValid = false;
-            }
-        }
-
         await _settings.UpdateSettingsAsync(s => s with
         {
             Theme = Theme,
             AccentColor = accentValid ? AccentColor.Trim() : s.AccentColor,
-            PlayerIgn = PlayerIgn.Trim(),
-            PlayerAccountId = accountValid ? accountId : s.PlayerAccountId,
             DiscordPresenceEnabled = DiscordPresenceEnabled,
             DiscordPresenceInLauncher = DiscordPresenceInLauncher,
             DiscordPresenceOptions = DiscordOptions,
@@ -646,10 +754,6 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         App.LogLevelSwitch.MinimumLevel = LogStreamViewModel.ToSerilogLevel(LogLevel);
 
-        if (!accountValid)
-        {
-            PlayerAccountId = (await _settings.GetSettingsAsync()).PlayerAccountId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
-        }
         if (!accentValid)
         {
             // Put back before the saved values are captured, or the box and the capture disagree
@@ -660,17 +764,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         CaptureSavedValues();
         HasUnsavedChanges = false;
 
-        if (!accentValid && !accountValid)
-        {
-            ShowSaveConfirmation("Settings saved. The accent was not valid hex and the account id was not a number, so both were kept as they were.");
-        }
-        else if (!accentValid)
+        if (!accentValid)
         {
             ShowSaveConfirmation("Settings saved. Accent color was not a valid hex value, so the previous accent was kept.");
-        }
-        else if (!accountValid)
-        {
-            ShowSaveConfirmation("Settings saved. The account id was not a number, so it was left unchanged; use the id shown on your Critical Ops profile page.");
         }
         else
         {

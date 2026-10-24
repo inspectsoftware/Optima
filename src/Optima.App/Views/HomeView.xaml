@@ -245,46 +245,6 @@
       </HeaderedContentControl>
     </DataTemplate>
 
-    <DataTemplate x:Key="Widget.friends">
-      <HeaderedContentControl Style="{StaticResource Section}" Header="TRACKED PLAYERS" DataContext="{Binding Host}">
-        <StackPanel>
-          <Grid Visibility="{Binding HasFriends, Converter={StaticResource BoolToVis}}">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="150" />
-              <ColumnDefinition Width="70" />
-              <ColumnDefinition Width="90" />
-              <ColumnDefinition Width="90" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="TRACKED" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
-            <TextBlock Grid.Column="1" Text="LEVEL" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
-            <TextBlock Grid.Column="2" Text="RECORD" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
-            <TextBlock Grid.Column="3" Text="WIN RATE" Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" />
-          </Grid>
-          <ItemsControl ItemsSource="{Binding Friends}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Grid Margin="0,3">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="150" />
-                    <ColumnDefinition Width="70" />
-                    <ColumnDefinition Width="90" />
-                    <ColumnDefinition Width="90" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Label}" />
-                  <TextBlock Grid.Column="1" Text="{Binding LevelText}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.TextMuted}" />
-                  <TextBlock Grid.Column="2" Text="{Binding RecordText}" Style="{StaticResource Text.Value}" />
-                  <TextBlock Grid.Column="3" Text="{Binding WinRateText}" Style="{StaticResource Text.Label}" Foreground="{DynamicResource Brush.Accent}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock Text="{Binding FriendsStatus}" Style="{StaticResource Text.Micro}" Margin="0,8,0,0"
-                     TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
-                     Visibility="{Binding FriendsStatus, Converter={StaticResource EmptyToCollapsed}}" />
-        </StackPanel>
-      </HeaderedContentControl>
-    </DataTemplate>
-
     <DataTemplate x:Key="Widget.sessions">
       <HeaderedContentControl Style="{StaticResource Section}" Header="RECENT SESSIONS" DataContext="{Binding Host}">
         <StackPanel>
