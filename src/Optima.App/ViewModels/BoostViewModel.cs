@@ -50,9 +50,10 @@ public sealed partial class BoostViewModel : ObservableObject
 
     // Open handles to the demoted processes and their processor time at the last sample, used on
     // the hardware monitor's thread. A handle stays open while its process is demoted, so its id
-    // cannot be handed to another process in between; null once the process has ended.
+    // cannot be handed to another process in between; null once the process has ended. Start is the
+    // start time of the process the entry was opened for, since a process is its id and start time.
     private readonly object _cpuGate = new();
-    private readonly Dictionary<int, (SafeProcessHandle? Handle, TimeSpan? Cpu)> _cpu = [];
+    private readonly Dictionary<int, (SafeProcessHandle? Handle, TimeSpan? Cpu, DateTimeOffset? Start)> _cpu = [];
     private long _sampledAt;
 
     public BoostViewModel(
@@ -748,7 +749,7 @@ public sealed partial class BoostViewModel : ObservableObject
         _monitor.MetricsUpdated -= OnMetrics;
         lock (_cpuGate)
         {
-            foreach (var (handle, _) in _cpu.Values)
+            foreach (var (handle, _, _) in _cpu.Values)
             {
                 handle?.Dispose();
             }
@@ -806,26 +807,29 @@ public sealed partial class BoostViewModel : ObservableObject
             }
             foreach (var process in demoted)
             {
-                if (!_cpu.TryGetValue(process.ProcessId, out var entry))
+                // A different start time is a later process the service demoted at an ended one's id,
+                // which it drops and demotes in the same pass, so the id never leaves the list.
+                if (!_cpu.TryGetValue(process.ProcessId, out var entry) || entry.Start != process.StartTime)
                 {
-                    entry = (ProcessQuery.Open(process.ProcessId), null);
+                    entry.Handle?.Dispose();
+                    entry = (ProcessQuery.Open(process.ProcessId), null, process.StartTime);
                     // The id may be another process's by now: the page lets go of its handles when it
                     // goes off screen, and the service drops an ended process only at its next pass.
                     if (entry.Handle is { } opened && process.StartTime is { } started && ProcessQuery.GetStartTime(opened) != started)
                     {
                         opened.Dispose();
-                        entry = (null, null);
+                        entry = (null, null, process.StartTime);
                     }
                 }
                 if (entry.Handle is { } ended && ProcessQuery.HasExited(ended))
                 {
                     ended.Dispose();
-                    entry = (null, null);
+                    entry = (null, null, process.StartTime);
                 }
                 // One that has ended stays in the table without a handle, so its id is not opened
                 // again as whatever process Windows hands that id to next.
                 var now = entry.Handle is { } handle ? ProcessQuery.GetTotalProcessorTime(handle) : null;
-                _cpu[process.ProcessId] = (entry.Handle, now);
+                _cpu[process.ProcessId] = (entry.Handle, now, process.StartTime);
                 if (entry.Handle is not null)
                 {
                     result.Add((process, now is { } cpu && entry.Cpu is { } before
