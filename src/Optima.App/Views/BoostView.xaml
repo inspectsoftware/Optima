@@ -781,11 +781,11 @@
               <TextBlock Text="{Binding GpuDetailText}" Style="{StaticResource Boost.Detail}" />
               <Border Style="{StaticResource Boost.Foot}">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="a standing Windows setting · removed when switched off here" />
+                           Text="a standing Windows setting · Boost takes back what it set when switched off or when Optima closes" />
               </Border>
               <Expander Header="about" Margin="0,8,0,0">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="The same per-app choice as Windows Settings, Display, Graphics: it matters on a PC with two graphics adapters (most gaming laptops) and does nothing on a PC with one. It is a standing Windows setting, so it stays until you switch it off here, and Windows reads it the next time the game starts." />
+                           Text="The same per-app choice as Windows Settings, Display, Graphics: it matters on a PC with two graphics adapters (most gaming laptops) and does nothing on a PC with one. It is a standing Windows setting, and Windows reads it the next time the game starts. Boost takes back the preference it set when it is switched off or when Optima closes, and puts back the choice the game had before; high performance you set in Windows yourself is left alone." />
               </Expander>
             </StackPanel>
           </Border>

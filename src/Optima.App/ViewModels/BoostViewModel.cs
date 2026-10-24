@@ -416,7 +416,7 @@ public sealed partial class BoostViewModel : ObservableObject
         GpuDetailText = !BoostOn && GpuHighPerformance
             ? StandbyText
             : !status.GpuEnabled
-            ? "Off. Windows chooses the graphics adapter."
+            ? "Off. The game's graphics adapter is as Windows Settings has it."
             : status.GpuApplied
                 ? "Set for " + System.IO.Path.GetFileName(status.GamePath) + " · Windows reads it the next time the game starts"
                 : "It will be set the first time Optima sees the game running, because that is how it learns where the game is installed.";
@@ -1011,7 +1011,7 @@ public sealed partial class BoostViewModel : ObservableObject
         GpuPreferenceText = GpuPreferenceSet && extras.GamePath is { Length: > 0 } path
             ? "High performance for " + System.IO.Path.GetFileName(path)
             : GpuHighPerformance && BoostOn ? "Not set yet: the game has not been seen running"
-            : "No preference: Windows chooses";
+            : "Not set by Boost: as Windows Settings has it";
 
         Tiles =
         [
