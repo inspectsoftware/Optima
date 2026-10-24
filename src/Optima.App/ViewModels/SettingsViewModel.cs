@@ -11,8 +11,30 @@ using Optima.Core.Theming;
 
 namespace Optima.App.ViewModels;
 
-/// <summary>One selectable accent preset on the SETTINGS page.</summary>
-public sealed record AccentPreset(string Name, string Hex);
+/// <summary>One selectable accent preset on the SETTINGS page; the chosen one is ringed.</summary>
+public sealed partial class AccentPreset(string name, string hex) : ObservableObject
+{
+    public string Name { get; } = name;
+    public string Hex { get; } = hex;
+
+    [ObservableProperty] private bool _isSelected;
+}
+
+/// <summary>One option of a segmented choice whose stored value is not the text it shows.</summary>
+public sealed record SettingChoice(string Label, object Value);
+
+/// <summary>
+/// One entry of the list down the left of the SETTINGS page. Count is the number of rows the
+/// section has, or while the find box has text, the number of them that match it.
+/// </summary>
+public sealed partial class SettingsSection(string key, string label, string blurb) : ObservableObject
+{
+    public string Key { get; } = key;
+    public string Label { get; } = label;
+    public string Blurb { get; } = blurb;
+
+    [ObservableProperty] private int _count;
+}
 
 /// <summary>SETTINGS page (§21/§28/§29): appearance, app options, detection overrides.</summary>
 public sealed partial class SettingsViewModel : ObservableObject
@@ -37,22 +59,69 @@ public sealed partial class SettingsViewModel : ObservableObject
         _shield = shield;
         // The tracked player and the saved list also change from the title-bar switcher.
         _settings.SettingsChanged += OnSettingsChanged;
+        SelectedSection = Sections[0];
+        // The stored accent is usually the default this field starts with, and then no change ever rings its swatch.
+        OnAccentColorChanged(AccentColor);
+    }
+
+    // ---------------------------------------------------------------- page
+
+    /// <summary>The sections down the left, in order. The view shows the selected one.</summary>
+    public IReadOnlyList<SettingsSection> Sections { get; } =
+    [
+        new("player", "Player", "One tracked player. HOME, sessions and Discord follow whoever is tracked here."),
+        new("appearance", "Appearance", "Applies the moment you save."),
+        new("discord", "Discord", "What your Discord card shows, and the OptimaBot link."),
+        new("overlay", "Overlay", "The fps readout over the game. Alt+F10 toggles it any time."),
+        new("game", "Game & watchdog", "What Optima does when the game starts or dies on its own."),
+        new("general", "General", "Start-up, tray, updates and capture."),
+        new("advanced", "Advanced", "For unusual installs and for debugging. Empty means automatic."),
+    ];
+
+    /// <summary>The open section; null while the find box has text, when every match is shown.</summary>
+    [ObservableProperty] private SettingsSection? _selectedSection;
+
+    [ObservableProperty] private string _searchText = string.Empty;
+
+    // The section to go back to when the find box is cleared.
+    private SettingsSection? _lastSection;
+
+    partial void OnSelectedSectionChanged(SettingsSection? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+        _lastSection = value;
+        // Picking a section while searching ends the search and opens that section.
+        SearchText = string.Empty;
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        if (value.Trim().Length > 0)
+        {
+            SelectedSection = null;
+        }
+        else
+        {
+            SelectedSection ??= _lastSection ?? Sections[0];
+        }
     }
 
     public IReadOnlyList<string> ProviderOptions { get; } = ["Auto", "MttVdd", "Mock"];
     public IReadOnlyList<string> LogLevelOptions { get; } = ["Trace", "Debug", "Information", "Warning", "Error"];
-    public IReadOnlyList<string> CornerOptions { get; } = ["TopLeft", "TopRight", "BottomLeft", "BottomRight"];
-    public IReadOnlyList<double> OpacityOptions { get; } = [0.5, 0.65, 0.8, 1.0];
     public IReadOnlyList<string> ThemeOptions { get; } = ["Dark", "Light"];
 
-    // In the order of MotionPolicy.Modes: System, On, Off.
-    private static readonly string[] AnimationLabels = ["as Windows says", "always on", "off"];
-    public IReadOnlyList<string> AnimationOptions => AnimationLabels;
+    public IReadOnlyList<SettingChoice> CornerOptions { get; } =
+        [new("Top left", "TopLeft"), new("Top right", "TopRight"), new("Bottom left", "BottomLeft"), new("Bottom right", "BottomRight")];
 
-    /// <summary>
-    /// The priority Optima pins for the Google Play Games process that runs Critical Ops.
-    /// Unchanged defers to the priority stored in the selected launch profile.
-    /// </summary>
+    public IReadOnlyList<SettingChoice> OpacityOptions { get; } =
+        [new("50%", 0.5), new("65%", 0.65), new("80%", 0.8), new("100%", 1.0)];
+
+    // In the order of MotionPolicy.Modes: System, On, Off.
+    private static readonly string[] AnimationLabels = ["As Windows", "Always", "Off"];
+    public IReadOnlyList<string> AnimationOptions => AnimationLabels;
 
     public IReadOnlyList<AccentPreset> AccentPresets { get; } =
     [
@@ -69,6 +138,15 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private string _theme = "Dark";
     [ObservableProperty] private string _accentColor = AccentMath.DefaultAccentHex;
+
+    partial void OnAccentColorChanged(string value)
+    {
+        foreach (var preset in AccentPresets)
+        {
+            preset.IsSelected = string.Equals(preset.Hex, value.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     // ---------------------------------------------------------------- PLAYER
 
     /// <summary>The one PLAYER box: an in-game name or an account id.</summary>
@@ -619,10 +697,10 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private void RefreshUnsavedState()
     {
-        var current = NormalizedValues();
-        HasUnsavedChanges = _savedValues.Count > 0
-            && (current.Count != _savedValues.Count
-                || current.Any(kv => !Equals(kv.Value, _savedValues.GetValueOrDefault(kv.Key))));
+        var changed = _savedValues.Count == 0
+            ? 0
+            : NormalizedValues().Count(kv => !Equals(kv.Value, _savedValues.GetValueOrDefault(kv.Key)));
+        HasUnsavedChanges = changed > 0;
         if (!HasUnsavedChanges)
         {
             return;
@@ -631,9 +709,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         // Any further edit replaces the confirmation with the warning again.
         StopConfirmTimer();
         SaveBarMark = "[ ! ]";
-        SaveBarText = "Unsaved changes. Settings apply when saved.";
+        SaveBarText = changed == 1
+            ? "1 unsaved change · settings apply when saved"
+            : $"{changed} unsaved changes · settings apply when saved";
         SaveBarVisible = true;
     }
+
+    /// <summary>Puts every field back to what is saved, and the save bar goes.</summary>
+    [RelayCommand]
+    private Task UndoAsync() => InitializeAsync();
 
     private void ShowSaveConfirmation(string message)
     {
