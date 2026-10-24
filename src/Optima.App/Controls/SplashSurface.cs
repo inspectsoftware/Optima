@@ -55,6 +55,9 @@ public sealed class SplashSurface : FrameworkElement
     private double? _revealStartedMs;
     private Rect _cardStart = new(0, 0, CardWidth, CardHeight);
     private Rect _target = new(0, 0, CardWidth, CardHeight);
+    // What the card's ground turns into as it grows: the main window's. In the light theme a card
+    // that stayed dark put a black slab the size of the window on screen before the window came through.
+    private Color _windowGround = Ground;
     private TaskCompletionSource? _covered;
     private TaskCompletionSource? _revealed;
 
@@ -110,13 +113,15 @@ public sealed class SplashSurface : FrameworkElement
 
     /// <summary>
     /// Grows the card over the main window's place. <paramref name="cardStart"/> is where the card
-    /// sits now and <paramref name="target"/> is the main window, both in this element's coordinates.
-    /// The task completes once a frame covering the target in full has been drawn.
+    /// sits now and <paramref name="target"/> is the main window, both in this element's coordinates;
+    /// <paramref name="windowGround"/> is the main window's ground. The task completes once a frame
+    /// covering the target in full has been drawn.
     /// </summary>
-    public Task GrowAsync(Rect cardStart, Rect target)
+    public Task GrowAsync(Rect cardStart, Rect target, Color windowGround)
     {
         _cardStart = cardStart;
         _target = target;
+        _windowGround = windowGround;
         _covered = new TaskCompletionSource();
         _growStartedMs = _animate ? Now : Now - SplashTimeline.GrowMs;
         InvalidateVisual();
@@ -174,7 +179,7 @@ public sealed class SplashSurface : FrameworkElement
 
         // The card. Solid all the way as it grows: until the main window is drawn underneath, it is
         // what stands in the window's place.
-        dc.DrawRoundedRectangle(Solid(Ground, 1), new Pen(Solid(_accent, 0.2 * (1 - grow)), 1), card, 10 * (1 - grow), 10 * (1 - grow));
+        dc.DrawRoundedRectangle(Solid(Mix(Ground, _windowGround, grow), 1), new Pen(Solid(_accent, 0.2 * (1 - grow)), 1), card, 10 * (1 - grow), 10 * (1 - grow));
 
         // The mark.
         dc.PushTransform(new TranslateTransform(markCenter.X, markCenter.Y));
@@ -325,6 +330,11 @@ public sealed class SplashSurface : FrameworkElement
         from.Y + (to.Y - from.Y) * amount,
         Math.Max(0, from.Width + (to.Width - from.Width) * amount),
         Math.Max(0, from.Height + (to.Height - from.Height) * amount));
+
+    private static Color Mix(Color from, Color to, double amount) => Color.FromRgb(
+        (byte)Math.Round(from.R + (to.R - from.R) * amount),
+        (byte)Math.Round(from.G + (to.G - from.G) * amount),
+        (byte)Math.Round(from.B + (to.B - from.B) * amount));
 
     private static SolidColorBrush Solid(Color color, double opacity)
     {

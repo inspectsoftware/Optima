@@ -383,7 +383,10 @@ public partial class App : Application
         if (splash is not null)
         {
             splash.SetStatus("ready", 1);
-            var covered = splash.GrowIntoAsync(PlacementOf(window));
+            var ground = window.TryFindResource("Color.Background") is System.Windows.Media.Color background
+                ? background
+                : System.Windows.Media.Colors.Black;
+            var covered = splash.GrowIntoAsync(PlacementOf(window), ground);
             if (await Task.WhenAny(covered, Task.Delay(SplashPatience)) != covered)
             {
                 Log.Warning("The splash did not hand over in time; the window is shown without it");

@@ -104,10 +104,11 @@ public sealed class SplashHost
     public void SetAccent(Color accent) => Post(() => _window?.SetAccent(accent));
 
     /// <summary>
-    /// Grows the splash over the main window's bounds, once the intro has played. The task completes
-    /// when they are covered, or at once when the splash is gone; either way the window can then be shown.
+    /// Grows the splash over the main window's bounds, once the intro has played, its ground turning to
+    /// the window's. The task completes when they are covered, or at once when the splash is gone;
+    /// either way the window can then be shown.
     /// </summary>
-    public Task GrowIntoAsync(Rect target) => Run(window => window.GrowIntoAsync(target));
+    public Task GrowIntoAsync(Rect target, Color windowGround) => Run(window => window.GrowIntoAsync(target, windowGround));
 
     /// <summary>Fades the splash off the main window and closes it. The task completes when it is gone.</summary>
     public Task RevealAsync() => Run(window => window.RevealAsync());

@@ -38,10 +38,10 @@ public sealed class SplashWindow : Window
 
     /// <summary>
     /// The handover, first half. Waits until the intro has played in full, then takes in the main
-    /// window's bounds (one resize, not one per frame) and grows the card over them. Completes once
-    /// the card covers them: the window can be shown underneath from then on.
+    /// window's bounds (one resize, not one per frame) and grows the card over them, turning to the
+    /// window's ground. Completes once the card covers them: the window can be shown underneath from then on.
     /// </summary>
-    public async Task GrowIntoAsync(Rect target)
+    public async Task GrowIntoAsync(Rect target, Color windowGround)
     {
         var wait = _surface.IntroRemainingMs;
         if (wait > 0)
@@ -57,7 +57,8 @@ public sealed class SplashWindow : Window
         Height = cover.Height;
         await _surface.GrowAsync(
             new Rect(card.Left - cover.Left, card.Top - cover.Top, card.Width, card.Height),
-            new Rect(target.Left - cover.Left, target.Top - cover.Top, target.Width, target.Height)).ConfigureAwait(true);
+            new Rect(target.Left - cover.Left, target.Top - cover.Top, target.Width, target.Height),
+            windowGround).ConfigureAwait(true);
     }
 
     /// <summary>The handover, second half: fades off the main window, which is drawn underneath by now, and closes.</summary>
