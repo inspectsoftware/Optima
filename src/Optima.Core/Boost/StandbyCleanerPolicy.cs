@@ -5,12 +5,12 @@ namespace Optima.Core.Boost;
 /// the BOOST page. Built from readouts that each carry only the latest purge, so a purge counts once,
 /// on the first readout that shows a purge time later than the one before it.
 /// </summary>
-public sealed record PurgeTally(long TotalFreedMb, IReadOnlyList<DateTimeOffset> Recent)
+public sealed record PurgeTally(long TotalFreedMb, int Purges, IReadOnlyList<DateTimeOffset> Recent)
 {
-    /// <summary>The page draws about half an hour of purges; at one every few seconds this is plenty.</summary>
+    /// <summary>The page draws the last half hour of purges, which only happen when memory runs short; this is far more than that.</summary>
     public const int RecentLimit = 64;
 
-    public static PurgeTally Empty { get; } = new(0, []);
+    public static PurgeTally Empty { get; } = new(0, 0, []);
 
     /// <summary>
     /// Counts the purge a readout reports when it is newer than the last one seen. "Purge now" stamps
@@ -19,7 +19,7 @@ public sealed record PurgeTally(long TotalFreedMb, IReadOnlyList<DateTimeOffset>
     /// </summary>
     public PurgeTally Add(DateTimeOffset? previousPurgeAt, DateTimeOffset? purgeAt, long freedMb)
         => purgeAt is { } at && (previousPurgeAt is not { } before || at > before)
-            ? new PurgeTally(TotalFreedMb + Math.Max(0, freedMb), [.. Recent.TakeLast(RecentLimit - 1), at])
+            ? new PurgeTally(TotalFreedMb + Math.Max(0, freedMb), Purges + 1, [.. Recent.TakeLast(RecentLimit - 1), at])
             : this;
 }
 

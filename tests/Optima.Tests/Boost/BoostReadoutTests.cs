@@ -84,6 +84,7 @@ public sealed class BoostReadoutTests
             .Add(first, second, 300);
 
         Assert.Equal(1042, tally.TotalFreedMb);
+        Assert.Equal(2, tally.Purges);
         Assert.Equal([first, second], tally.Recent);
     }
 
@@ -114,6 +115,7 @@ public sealed class BoostReadoutTests
         }
 
         Assert.Equal(PurgeTally.RecentLimit + 10, tally.TotalFreedMb);
+        Assert.Equal(PurgeTally.RecentLimit + 10, tally.Purges);
         Assert.Equal(PurgeTally.RecentLimit, tally.Recent.Count);
         Assert.Equal(at.AddSeconds(PurgeTally.RecentLimit + 10), tally.Recent[^1]);
     }
