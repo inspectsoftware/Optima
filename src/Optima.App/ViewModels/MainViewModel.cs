@@ -414,7 +414,7 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 await windowShown;
                 var wizard = new SetupWizardWindow { Owner = Application.Current.MainWindow };
-                var wizardViewModel = new SetupWizardViewModel(Status, Debug.Checks, _settings, _firstRunFix);
+                var wizardViewModel = new SetupWizardViewModel(Status, Debug.Checks, _settings, _firstRunFix, _players);
                 wizard.DataContext = wizardViewModel;
                 _ = wizardViewModel.RunDetectionAsync();
                 wizard.ShowDialog();

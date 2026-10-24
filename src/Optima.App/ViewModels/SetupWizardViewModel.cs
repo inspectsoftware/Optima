@@ -16,18 +16,24 @@ public sealed partial class SetupWizardViewModel : ObservableObject
 {
     private readonly SettingsService _settings;
     private readonly FirstRunFixService _fix;
+    private readonly PlayerSwitcherService _players;
     private ReadinessReport? _report;
+
+    // The name the box was filled in with, so Finish can tell whether the player was changed here.
+    private string _shownIgn = string.Empty;
 
     public SetupWizardViewModel(
         StatusViewModel status,
         ChecksViewModel checks,
         SettingsService settings,
-        FirstRunFixService fix)
+        FirstRunFixService fix,
+        PlayerSwitcherService players)
     {
         Status = status;
         Checks = checks;
         _settings = settings;
         _fix = fix;
+        _players = players;
     }
 
     public StatusViewModel Status { get; }
@@ -60,6 +66,7 @@ public sealed partial class SetupWizardViewModel : ObservableObject
 
             var current = await _settings.GetSettingsAsync();
             PlayerIgn = current.PlayerIgn;
+            _shownIgn = PlayerIgn.Trim();
             DiscordApplicationId = current.DiscordApplicationId;
             if (current.FirstRunCompleted)
             {
@@ -137,18 +144,35 @@ public sealed partial class SetupWizardViewModel : ObservableObject
     [RelayCommand]
     private async Task FinishAsync()
     {
+        await SaveChoicesAsync();
+        AutostartService.Apply(StartWithWindows);
+        FirstRunFixService.ClearResume();
+        Completed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task SaveChoicesAsync()
+    {
+        // The wizard can be opened again from the Debug page while a Track lookup on the PLAYER card
+        // still runs. A name left as it was filled in leaves the player alone: written back, it put
+        // back a player that Track or a switch had replaced meanwhile, without their id. A changed
+        // one is a switch like any other, told before it is written so that lookup leaves it alone.
+        var typed = PlayerIgn.Trim();
+        var changesPlayer = !string.Equals(typed, _shownIgn, StringComparison.Ordinal);
+        if (changesPlayer)
+        {
+            _players.NoteSwitching();
+        }
         await _settings.UpdateSettingsAsync(s => s with
         {
             FirstRunCompleted = true,
             StartWithWindows = StartWithWindows,
-            PlayerIgn = PlayerIgn.Trim(),
-            PlayerAccountId = Optima.Core.Stats.TrackedPlayerQuery.IdForName(s.PlayerIgn, s.PlayerAccountId, PlayerIgn),
+            PlayerIgn = changesPlayer ? typed : s.PlayerIgn,
+            PlayerAccountId = changesPlayer
+                ? Optima.Core.Stats.TrackedPlayerQuery.IdForName(s.PlayerIgn, s.PlayerAccountId, typed)
+                : s.PlayerAccountId,
             DiscordApplicationId = DiscordApplicationId.Trim().Length > 0
                 ? DiscordApplicationId.Trim()
                 : s.DiscordApplicationId,
         });
-        AutostartService.Apply(StartWithWindows);
-        FirstRunFixService.ClearResume();
-        Completed?.Invoke(this, EventArgs.Empty);
     }
 }
