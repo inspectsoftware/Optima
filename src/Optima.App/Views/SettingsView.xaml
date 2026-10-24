@@ -314,7 +314,7 @@
                   CommandParameter="{Binding}" ToolTip="Track this player" AutomationProperties.Name="{Binding DisplayName}">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="{Binding DisplayName}" Style="{StaticResource Text.Base}" />
-              <TextBlock Text="{Binding AccountId}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
+              <TextBlock x:Name="Id" Text="{Binding AccountId}" Style="{StaticResource Text.Micro}" Margin="8,0,0,0" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Border Width="1" Background="{DynamicResource Brush.Hairline}" />
@@ -328,6 +328,14 @@
         <DataTrigger Binding="{Binding IsActive}" Value="True">
           <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
         </DataTrigger>
+        <!-- Saved by ID alone (the stats API was down): the name shown is already the ID, so it is not said twice. -->
+        <MultiDataTrigger>
+          <MultiDataTrigger.Conditions>
+            <Condition Binding="{Binding Ign}" Value="" />
+            <Condition Binding="{Binding Label}" Value="{x:Null}" />
+          </MultiDataTrigger.Conditions>
+          <Setter TargetName="Id" Property="Visibility" Value="Collapsed" />
+        </MultiDataTrigger>
       </DataTemplate.Triggers>
     </DataTemplate>
   </UserControl.Resources>
