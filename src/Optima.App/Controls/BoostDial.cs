@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Input;
 using System.Windows.Media;
 using Optima.App.Services;
@@ -257,6 +260,12 @@ public sealed class BoostDial : FrameworkElement
         dial._heldMs = 0;
         dial._animateNextChange = false;
         dial.InvalidateVisual();
+        // A screen reader that is reading the switch hears it change.
+        if (UIElementAutomationPeer.FromElement(dial) is BoostDialAutomationPeer peer)
+        {
+            peer.RaisePropertyChangedEvent(TogglePatternIdentifiers.ToggleStateProperty,
+                on ? ToggleState.Off : ToggleState.On, on ? ToggleState.On : ToggleState.Off);
+        }
     }
 
     /// <summary>
@@ -388,6 +397,34 @@ public sealed class BoostDial : FrameworkElement
         base.OnIsKeyboardFocusedChanged(e);
         _focusRing = IsKeyboardFocused && InputManager.Current.MostRecentInputDevice is KeyboardDevice;
         InvalidateVisual();
+    }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new BoostDialAutomationPeer(this);
+
+    /// <summary>
+    /// The dial as screen readers and UI Automation see it: a toggle button, named by the view's
+    /// AutomationProperties.Name and on while Boost is on. A FrameworkElement has no peer of its
+    /// own, so the master switch was left out of the automation tree altogether.
+    /// </summary>
+    private sealed class BoostDialAutomationPeer(BoostDial dial) : FrameworkElementAutomationPeer(dial), IToggleProvider
+    {
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Button;
+
+        protected override string GetClassNameCore() => nameof(BoostDial);
+
+        public override object? GetPattern(PatternInterface patternInterface)
+            => patternInterface == PatternInterface.Toggle ? this : base.GetPattern(patternInterface);
+
+        public ToggleState ToggleState => ((BoostDial)Owner).IsOn ? ToggleState.On : ToggleState.Off;
+
+        public void Toggle()
+        {
+            if (!IsEnabled())
+            {
+                throw new ElementNotEnabledException();
+            }
+            ((BoostDial)Owner).Toggle();
+        }
     }
 
     protected override Size MeasureOverride(Size availableSize)
