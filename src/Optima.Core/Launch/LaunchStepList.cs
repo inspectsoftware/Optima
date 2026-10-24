@@ -61,9 +61,10 @@ public sealed class LaunchStepList
 
         if (progress is { Phase: LaunchPhase.ConfiguringDisplay, Skipped: true })
         {
-            // Why is on the session's notices; the row only says that it did not happen.
+            // Why is on the session's notices; the row only says that it was not set up. Not "off": the
+            // display can have come on and then refused the chosen mode.
             _states[Display] = StepState.Skipped;
-            _details[Display] = "not switched on";
+            _details[Display] = "not set up";
             return;
         }
 

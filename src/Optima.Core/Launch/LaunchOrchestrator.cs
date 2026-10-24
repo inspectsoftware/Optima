@@ -413,7 +413,7 @@ public sealed class LaunchOrchestrator
         }
 
         var on = false;
-        await RunOptionalAsync(context, "LAUNCH_STEP_SKIPPED", "The virtual display was not switched on", async () =>
+        await RunOptionalAsync(context, "LAUNCH_STEP_SKIPPED", "The virtual display was not set up", async () =>
         {
             try
             {
@@ -436,7 +436,7 @@ public sealed class LaunchOrchestrator
 
         if (!on)
         {
-            Report(LaunchPhase.ConfiguringDisplay, "The virtual display was not switched on. The game carries on without it.", skipped: true);
+            Report(LaunchPhase.ConfiguringDisplay, "The virtual display was not set up. The game carries on.", skipped: true);
         }
     }
 

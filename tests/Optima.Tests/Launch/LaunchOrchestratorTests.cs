@@ -226,7 +226,7 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.True(result.Success);
         var warning = Assert.Single(result.Warnings);
         Assert.Equal("LAUNCH_STEP_SKIPPED", warning.Code);
-        Assert.Equal("The virtual display was not switched on", warning.Title);
+        Assert.Equal("The virtual display was not set up", warning.Title);
         Assert.Contains("the driver went away", warning.Detail);
         Assert.Contains(reports, progress => progress is { Phase: LaunchPhase.ConfiguringDisplay, Skipped: true });
         Assert.Equal([4242], _processOptimizer.Applied);

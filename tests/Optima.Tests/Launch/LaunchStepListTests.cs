@@ -84,16 +84,16 @@ public sealed class LaunchStepListTests
         [
             .. UpToTheGame,
             P(LaunchPhase.ConfiguringDisplay, "Configuring virtual display 1920x1080 @ 240 Hz…"),
-            P(LaunchPhase.ConfiguringDisplay, "The virtual display was not switched on.", skipped: true),
+            P(LaunchPhase.ConfiguringDisplay, "The virtual display was not set up. The game carries on.", skipped: true),
         ]);
 
         // Nothing is running for the moment the display was given up; the game row takes over next.
         Assert.Equal(StepState.Skipped, steps.States[Display]);
-        Assert.Equal("not switched on", steps.Details[Display]);
+        Assert.Equal("not set up", steps.Details[Display]);
 
         Run(steps, P(LaunchPhase.Monitoring, "Critical Ops is running."));
         Assert.Equal([StepState.Done, StepState.Done, StepState.Live, StepState.Skipped, StepState.Todo], steps.States);
-        Assert.Equal("not switched on", steps.Details[Display]);
+        Assert.Equal("not set up", steps.Details[Display]);
 
         Run(steps, P(LaunchPhase.Restoring), P(LaunchPhase.Completed));
         Assert.Equal(StepState.Skipped, steps.States[Display]);
