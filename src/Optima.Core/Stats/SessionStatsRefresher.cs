@@ -255,7 +255,9 @@ public sealed class SessionStatsRefresher
             ct.ThrowIfCancellationRequested();
             profile = await _fetchProfile(settings.PlayerIgn, settings.PlayerAccountId, ct).ConfigureAwait(false);
             var newest = DeltaFor(summaries, 0, profile?.Snapshot);
-            var pending = profile is null || newest is null || newest.IsZero;
+            // Another player's reading never matches the newest session, however long the API is given.
+            var pending = profile is null
+                || (!OtherPlayer(summaries[0].StatsBaseline, profile.Snapshot) && (newest is null || newest.IsZero));
             if (!pending || attempt == tries)
             {
                 break;
@@ -276,10 +278,18 @@ public sealed class SessionStatsRefresher
         var added = 0;
         var corrected = 0;
         var unmeasurable = 0;
+        var otherPlayer = 0;
         for (var index = 0; index < summaries.Count; index++)
         {
             var session = summaries[index];
             var delta = DeltaFor(summaries, index, live);
+            if (delta is null && OtherPlayer(session.StatsBaseline, EndOf(summaries, index, live)))
+            {
+                // It has a snapshot, but the reading after it is of another player: the tracked
+                // player changed in between, and the difference is nothing anyone played.
+                otherPlayer++;
+                continue;
+            }
             if (delta is null)
             {
                 // Either this session has no start snapshot, or the run after it has none, which
@@ -308,7 +318,7 @@ public sealed class SessionStatsRefresher
             return new SessionMatchesRefreshResult(SessionStatsRefreshStatus.NoMovement,
                 $"Checked the last {summaries.Count} session{(summaries.Count == 1 ? string.Empty : "s")}: the API " +
                 "reports nothing the history does not already have." +
-                UnmeasurableNote(unmeasurable), 0, 0, 0);
+                UnmeasurableNote(unmeasurable) + OtherPlayerNote(otherPlayer), 0, 0, 0);
         }
 
         var newestStillEmpty = !running && DeltaFor(summaries, 0, live) is null or { IsZero: true };
@@ -316,7 +326,7 @@ public sealed class SessionStatsRefresher
             (added + corrected > 0
                 ? $": {added} match row{(added == 1 ? string.Empty : "s")} added, {corrected} corrected"
                 : string.Empty) +
-            "." + UnmeasurableNote(unmeasurable);
+            "." + UnmeasurableNote(unmeasurable) + OtherPlayerNote(otherPlayer);
         if (newestStillEmpty)
         {
             message += " The newest session still shows no movement; the API may not have published it yet - " +
@@ -332,9 +342,16 @@ public sealed class SessionStatsRefresher
         {
             return null;
         }
-        var end = index == 0 ? live : newestFirst[index - 1].StatsBaseline;
-        return DeltaBetween(start, end);
+        return DeltaBetween(start, EndOf(newestFirst, index, live));
     }
+
+    /// <summary>Where one session's run ended: the next session's snapshot, or the live reading for the newest.</summary>
+    private static CopsSeasonStats? EndOf(IReadOnlyList<SessionRecord> newestFirst, int index, CopsSeasonStats? live)
+        => index == 0 ? live : newestFirst[index - 1].StatsBaseline;
+
+    /// <summary>Whether two readings are of two different players, which no delta is measured across.</summary>
+    private static bool OtherPlayer(CopsSeasonStats? start, CopsSeasonStats? end)
+        => start is { UserId: > 0 } && end is { UserId: > 0 } && start.UserId != end.UserId;
 
     /// <summary>The delta between two snapshots, or null when the end of the run is unknown.</summary>
     private static CopsProfileDelta? DeltaBetween(CopsSeasonStats start, CopsSeasonStats? end)
@@ -364,6 +381,12 @@ public sealed class SessionStatsRefresher
         => unmeasurable == 0
             ? string.Empty
             : $" {unmeasurable} session{(unmeasurable == 1 ? string.Empty : "s")} had no snapshot to measure against.";
+
+    private static string OtherPlayerNote(int sessions)
+        => sessions == 0
+            ? string.Empty
+            : $" {sessions} session{(sessions == 1 ? " was" : "s were")} followed by a reading of a different player " +
+              $"(the tracked player changed), so nothing is recorded for {(sessions == 1 ? "it" : "them")}.";
 
     /// <summary>The stored snapshot dressed as a profile, which is the shape the delta maths takes.</summary>
     private static CopsPlayerProfile AsBaseline(CopsSeasonStats baseline)

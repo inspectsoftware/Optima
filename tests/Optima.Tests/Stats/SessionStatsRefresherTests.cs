@@ -265,6 +265,23 @@ public sealed class SessionStatsRefresherTests : IDisposable
     }
 
     [Fact]
+    public async Task TheMatchesRefreshDoesNotWaitForAnotherPlayersReadingToMove()
+    {
+        // The newest session was recorded for player 1; Settings now tracks player 4242.
+        await IdentifyPlayerAsync("friend");
+        SeedSession(Baseline() with { UserId = 1 }, DateTimeOffset.Now.AddMinutes(-10));
+        _profile = ProfileAfter(new CopsModeStats(4000, 3100, 900, 210, 150));
+
+        var result = await CreateRefresher().RefreshRecentMatchesAsync(attempts: 3, retryDelay: TimeSpan.FromSeconds(5));
+
+        Assert.Single(_queries);
+        Assert.Equal(SessionStatsRefreshStatus.NoMovement, result.Status);
+        Assert.Contains("different player", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("no snapshot", result.Message, StringComparison.Ordinal);
+        Assert.Empty(_store.UpdatedDeltas);
+    }
+
+    [Fact]
     public async Task TheMatchesRefreshNeverCreditsASessionWithLaterRuns()
     {
         await IdentifyPlayerAsync();
