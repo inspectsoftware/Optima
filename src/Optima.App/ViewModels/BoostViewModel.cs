@@ -827,7 +827,10 @@ public sealed partial class BoostViewModel : ObservableObject
         }
         try
         {
-            _adapters = (await _systemInfo.GetInventoryAsync()).Gpus;
+            // The virtual display Optima ships is listed as an adapter too, but the game cannot be
+            // put on it; it is left out the way the Home page leaves it out.
+            _adapters = [.. (await _systemInfo.GetInventoryAsync()).Gpus
+                .Where(g => !g.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))];
             Refresh();
         }
         catch (Exception ex)
@@ -980,7 +983,7 @@ public sealed partial class BoostViewModel : ObservableObject
         AdapterRows = _adapters is null ? [] : [.. _adapters.Select(a => new AdapterRow(
             a.Name,
             _adapters.Count == 1 ? "the only adapter"
-                : a.Vendor == GpuVendor.Unknown ? string.Empty : a.Vendor.ToString()))];
+                : a.Vendor switch { GpuVendor.Nvidia => "NVIDIA", GpuVendor.Amd => "AMD", GpuVendor.Intel => "Intel", _ => string.Empty }))];
         GpuPreferenceSet = BoostOn && extras.GpuApplied;
         GpuPreferenceText = GpuPreferenceSet && extras.GamePath is { Length: > 0 } path
             ? "High performance for " + System.IO.Path.GetFileName(path)
