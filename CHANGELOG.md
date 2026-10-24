@@ -4,6 +4,59 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-24 - 0.8.5: splash first, the virtual display follows the game, a new Boost, one tracked player and a new Settings page
+
+- STARTUP:
+- Only the splash is on screen at launch. When Optima is ready the card grows to the main window's place and size, the window appears under it, and the card fades off it. The window and the card are never on screen side by side.
+- The recovery question and the first-run wizard wait for the main window instead of coming up over the splash.
+- A second start of Optima, or the tray menu, during the splash no longer shows the main window beside the card.
+- In the light theme the card grows into the window's own light ground, with no black slab in between.
+- The splash lands exactly on the main window when your monitors use different scaling.
+- VIRTUAL DISPLAY:
+- The virtual display comes on only once Critical Ops is seen running, and goes off again when the game closes or its process is ended. It used to come on before the game was launched.
+- Its administrator prompt comes at PLAY, before the game covers the screen. A prompt still open when the game appears holds the session for 20 seconds at most; after that the game plays on without the display.
+- With Auto-attach, a game found running gets the display as well. If Optima's helper is not running yet, that means one administrator prompt over the game. A No stands until Optima is started again, and a relaunch after a crash does not ask again either.
+- A display that does not come on once the game runs is a warning on the session, not a failed session. The game keeps playing on your own screen.
+- PLAY no longer asks for administrator rights for a virtual display whose driver is not installed.
+- If Optima is ended while the display is coming on, the restore at the next start still switches it off.
+- The PLAY steps show "Game running" before "Virtual display", and a cancelled session no longer ticks off steps it never reached.
+- BOOST, THE MASTER SWITCH:
+- Boost is off at every start of Optima, whatever it was when Optima closed. Switch it on again when you want it.
+- The switch is a metal gear machine now: a drive gear with one gear for each boost around it, inside a ring of scrap plates. Ticked boosts are bright steel, unticked ones rust.
+- Switching it on: the plates clamp onto the rim, the gears spin up three turns, the furnace behind the grille lights, and every ticked gear turns brass and throws sparks. While Boost runs the gears keep turning and embers rise. Switching it off unwinds the gears, the furnace cools and the plates loosen.
+- It reads ARMED until Critical Ops is on screen, and ENGAGED while it is.
+- Nothing on it moves while a game is running or animations are off, and it no longer redraws itself when nothing changes, which used to cost half a processor core with Boost off.
+- Holding Space or Enter no longer flips Boost on and off. Screen readers can find the switch and use it. A click no longer leaves a dashed ring round it, and clicks beside it no longer count.
+- The switch can no longer show the opposite of what Boost is doing when a settings save fails.
+- BOOST, THE PAGE:
+- The BOOST page shows every boost live. Six tiles at the top: CPU to the game, programs held back, memory reclaimed, timer resolution, cores awake and game priority.
+- RESOURCE FLOW: how the processor and memory are split right now between Critical Ops, the programs Boost holds back, Windows and other apps, memory Boost freed, and what is idle, with the game's share of the processor over the last 60 seconds.
+- Each boost has its own card: its switch, what it is doing this second, and a live picture of it. The priority ladder, the memory bar with each purge, Windows' timer tick against the one held, the held-back programs with their processor use, the processor cores, and the graphics adapters. Each card's settings are folded inside it.
+- Every number is measured. Where something is not read, the page says so instead of guessing. The page only reads while it is on screen.
+- Held-back programs count only while they run, and a program that takes over an ended one's process id is not mistaken for it. Putting the programs back leaves such a newcomer alone.
+- The timer tile no longer credits Boost with a timer another program holds.
+- The graphics card no longer lists the virtual display as an adapter, and shows a card's memory correctly above 4 GB.
+- The graphics preference Boost sets for the game is removed when Boost or that switch goes off and when Optima closes, also when Optima closes in the middle of writing it, and a choice you had made in Windows yourself is put back. One that 0.8.0 or 0.8.1 left behind is removed once after updating; a High performance choice you set yourself is kept.
+- The memory cleaner's figures, its purge count and its RUNNING state follow the helper reliably.
+- A cleaner threshold that cannot be saved goes back to the saved value instead of staying on screen as if it applied.
+- PLAYER:
+- The tracked-players list is gone, from Settings and from HOME.
+- Settings, Player: one box for an in-game name or an account ID, and Track. Optima looks the player up and shows a card with their name, ID, level, rank, ranked record and K/D. From then on HOME, sessions and Discord follow that player. Stop tracking goes back to nobody.
+- Save to Optima keeps the player in a list of saved players: click one to track them again, x to remove them. The same players are in the switcher at the top of the window.
+- Track says when it is looking up, and a name typed meanwhile is kept. Stopping or switching the player during a lookup stands.
+- A player tracked or saved while the stats API is down is kept as typed and completed once the API answers again.
+- Tracking someone else mid-game no longer records their stats as your session, and Refresh matches says so.
+- A name typed in the setup wizard is the player that gets tracked.
+- The Discord card shows the newly tracked player's rank, not the previous one's.
+- SETTINGS:
+- Rebuilt and far less crowded: the sections down the left (Player, Appearance, Discord, Overlay, Game & watchdog, General, Advanced), one section at a time on the right, every setting a row with a one-line note and its control, and switches instead of tick boxes.
+- A find box searches the settings and the section names.
+- The save bar has Undo, which puts back what was last saved.
+- The longer explanations sit behind a small info mark, which the keyboard and screen readers reach too.
+- A choice can no longer be cleared with Ctrl+click, which used to break the virtual display.
+- OTHER:
+- Wording about the virtual display and the player switcher is updated across the app and the README.
+
 ## 2026-10-23 - 0.8.1: Play works again after a Windows restart
 
 - Fixed: the first PLAY after a Windows restart failed at the display step with DEVICE_TOGGLE_FAILED ("The device is not connected"). Every launch after a restart was affected while the virtual display was switched on.

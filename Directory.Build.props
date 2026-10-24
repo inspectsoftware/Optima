@@ -18,6 +18,6 @@
     <TieredPGO>false</TieredPGO>
     <Company>Inspect Software</Company>
     <Product>Optima</Product>
-    <Version>0.8.1</Version>
+    <Version>0.8.5</Version>
   </PropertyGroup>
 </Project>
