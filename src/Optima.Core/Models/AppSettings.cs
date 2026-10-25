@@ -262,7 +262,10 @@ public sealed record AppSettings
 
     public bool KeepInTrayOnClose { get; init; }
 
-    /// <summary>Ask GitHub at every start whether a newer Optima is out. One request; nothing is downloaded unasked.</summary>
+    /// <summary>
+    /// Ask GitHub at every start, and every few hours while Optima runs, whether a newer Optima is
+    /// out, and install it by itself when the game is not running. The name is older than the install.
+    /// </summary>
     public bool CheckForUpdatesAtStart { get; init; } = true;
 
     /// <summary>

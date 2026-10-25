@@ -10,6 +10,11 @@ under it, plain text, no em dashes.
 - The virtual display now comes on when you press PLAY, right after the profile is applied and before Google Play Games launches the game. It still goes off when the game closes, and also when the launch fails or is cancelled.
 - The PLAY steps show "Virtual display" before "Game running".
 - With Auto-attach, a game found running still gets the display as before.
+- UPDATES:
+- Optima updates itself from now on. When a newer version is out it is downloaded, checked against Optima's signature and installed without pressing Update. Windows still asks once for administrator approval.
+- It never updates while Critical Ops is running. It asks GitHub at every start and again every 6 hours while Optima runs, so one in the tray is updated too.
+- A No to the administrator prompt is not asked again until Optima is started again; Update on HOME still works.
+- Settings, General: "Check for updates" is now "Update automatically". Switched off, Optima does not check at all.
 
 ## 2026-10-24 - 0.8.5: splash first, the virtual display follows the game, a new Boost, one tracked player and a new Settings page
 

@@ -23,7 +23,7 @@
                      Foreground="{DynamicResource Brush.Warn}"
                      Visibility="{Binding Updates.Problem, Converter={StaticResource EmptyToCollapsed}}" />
           <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" Margin="0,8,0,0"
-                     Text="Optima asks GitHub once at every start whether a newer version is out (Settings turns that off). Nothing is downloaded until you press Update. The setup is checked against Optima's own signature before it runs, and Windows asks once for administrator approval." />
+                     Text="Optima asks GitHub at every start, and every 6 hours while it runs, whether a newer version is out, and installs it by itself when Critical Ops is not running (Settings turns that off). The setup is checked against Optima's own signature before it runs, and Windows asks once for administrator approval." />
         </StackPanel>
       </HeaderedContentControl>
 

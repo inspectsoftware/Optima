@@ -607,7 +607,7 @@
                 <ctl:SettingRow Header="Start with Windows" Hint="Start minimised to the tray at sign-in.">
                   <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding StartWithWindows}" />
                 </ctl:SettingRow>
-                <ctl:SettingRow Header="Check for updates" Hint="One request to GitHub at every start.">
+                <ctl:SettingRow Header="Update automatically" Hint="Checks GitHub at start and every 6 hours, and installs a new version when the game is not running.">
                   <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding CheckForUpdatesAtStart}" />
                 </ctl:SettingRow>
               </StackPanel>

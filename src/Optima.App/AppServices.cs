@@ -142,7 +142,7 @@ public static class AppServices
             sp.GetRequiredService<ILogger<Optima.Core.Launch.GameExtrasService>>(),
             sp.GetRequiredService<SettingsService>()));
         services.AddSingleton<Optima.Core.News.CopsNewsService>();
-        // The update check: one request to GitHub's releases at start, and the signed setup on request.
+        // The update check: GitHub's releases at start and every few hours, and the signed setup installed by itself.
         services.AddSingleton(sp => new Optima.Core.Updates.UpdateService(
             paths, sp.GetRequiredService<ILogger<Optima.Core.Updates.UpdateService>>()));
         services.AddSingleton(sp => new UpdateViewModel(

@@ -10,8 +10,10 @@ namespace Optima.App.ViewModels;
 
 /// <summary>
 /// The update notice on HOME and the same thing on the UPDATES page: one state, shown twice.
-/// A start asks once whether a newer Optima is out. Nothing is downloaded until Update is pressed,
-/// and nothing that was downloaded is run unless it carries Optima's signature.
+/// A start asks whether a newer Optima is out, and asks again every few hours while Optima runs. A
+/// newer one is downloaded and installed by itself, never while the game runs; Windows still asks
+/// once for administrator approval. Nothing that was downloaded is run unless it carries Optima's
+/// signature.
 /// </summary>
 public sealed partial class UpdateViewModel : ObservableObject
 {
@@ -19,12 +21,18 @@ public sealed partial class UpdateViewModel : ObservableObject
     // again when done (installer.iss reads /relaunch).
     private const string SetupArguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /relaunch=1";
 
+    /// <summary>How often a running Optima (most often one in the tray) asks again.</summary>
+    private static readonly TimeSpan RecheckInterval = TimeSpan.FromHours(6);
+
     private readonly UpdateService _updates;
     private readonly SettingsService _settings;
     private readonly Func<bool> _gameRunning;
     private readonly ILogger<UpdateViewModel> _logger;
     private UpdateRelease? _release;
     private bool _dismissed;
+
+    /// <summary>The player said No to the setup's administrator prompt: not asked again by itself this run.</summary>
+    private bool _declined;
 
     public UpdateViewModel(
         UpdateService updates, SettingsService settings, Func<bool> gameRunning, ILogger<UpdateViewModel> logger)
@@ -59,21 +67,44 @@ public sealed partial class UpdateViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(InstallCommand))]
     private bool _updateAvailable;
 
-    /// <summary>The check a start makes by itself, when Settings allows it. Never throws.</summary>
+    /// <summary>
+    /// The check a start makes by itself, when Settings allows it, then the same every
+    /// <see cref="RecheckInterval"/> for as long as Optima runs. Never throws.
+    /// </summary>
     public async Task CheckAtStartAsync()
     {
-        try
+        using var timer = new PeriodicTimer(RecheckInterval);
+        do
         {
-            if ((await _settings.GetSettingsAsync()).CheckForUpdatesAtStart)
+            try
             {
-                await CheckAsync();
+                if ((await _settings.GetSettingsAsync()).CheckForUpdatesAtStart && !IsBusy)
+                {
+                    await CheckAsync();
+                    await InstallByItselfAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                // A failed check must never disturb a start or a running Optima.
+                _logger.LogDebug(ex, "The update check by itself failed");
             }
         }
-        catch (Exception ex)
+        while (await timer.WaitForNextTickAsync());
+    }
+
+    /// <summary>
+    /// Installs what the check found without a click. Not while the game runs: the update closes
+    /// Optima, and that ends the session; the next check tries again. Nor after a No to the prompt.
+    /// </summary>
+    private async Task InstallByItselfAsync()
+    {
+        if (!UpdateAvailable || _declined || _gameRunning())
         {
-            // The notice is a courtesy; a failed check must never disturb a start.
-            _logger.LogDebug(ex, "The update check at start failed");
+            return;
         }
+        _logger.LogInformation("Installing Optima {Version} by itself", _release?.VersionText);
+        await InstallAsync();
     }
 
     [RelayCommand(CanExecute = nameof(CanCheck))]
@@ -143,6 +174,7 @@ public sealed partial class UpdateViewModel : ObservableObject
             }
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
+                _declined = true;
                 Problem = "Windows asked for administrator approval and the answer was No. Optima was not updated.";
                 BannerText = available;
                 return;
