@@ -39,9 +39,9 @@ Two exceptions, both opt-in:
 flowchart LR
     A[Pick a profile] --> B[PLAY]
     B --> C["Power plan, priority,<br>EcoQoS"]
-    C --> D["Critical Ops starts through<br>Google Play Games"]
-    D --> E["Virtual display on once the game runs<br>e.g. 1920x1080 @ 240 Hz"]
-    E --> F["External FPS / frametime<br>capture (ETW)"]
+    C --> E["Virtual display on<br>e.g. 1920x1080 @ 240 Hz"]
+    E --> D["Critical Ops starts through<br>Google Play Games"]
+    D --> F["External FPS / frametime<br>capture (ETW)"]
     F --> G["Game closes: display off, everything<br>restored, session saved"]
 ```
 

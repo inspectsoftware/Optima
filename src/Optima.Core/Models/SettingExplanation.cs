@@ -61,7 +61,7 @@ public static class SettingExplanations
         {
             SettingKey = "virtualDisplay",
             Title = "Virtual display",
-            WhatItChanges = "Switches the installed virtual display on once the game is running, at the Display page's resolution and refresh rate, and off again when the game closes. Your monitor stays the main screen.",
+            WhatItChanges = "Switches the installed virtual display on at PLAY, before the game starts, at the Display page's resolution and refresh rate, and off again when the game closes. Your monitor stays the main screen.",
             PotentialBenefit = "Unlocks refresh rates and resolutions your physical monitor does not expose (e.g. 240 Hz), letting the game render on a high-refresh target.",
             PotentialDownside = "A brief display flicker when the display comes on and goes off again. The previous display layout is restored automatically when the session ends.",
             RequiresRestart = false,

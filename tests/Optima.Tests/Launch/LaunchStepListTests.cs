@@ -27,38 +27,41 @@ public sealed class LaunchStepListTests
 
     private static LaunchProgress P(LaunchPhase phase, string message = "", bool skipped = false) => new(phase, message, skipped);
 
-    private static readonly LaunchProgress[] UpToTheGame =
+    private static readonly LaunchProgress[] UpToTheProfile =
     [
         P(LaunchPhase.Validating, "Checking Google Play Games and Critical Ops…"),
         P(LaunchPhase.ApplyingPerformanceProfile, "Applying performance profile…"),
+    ];
+
+    private static readonly LaunchProgress TheDisplay =
+        P(LaunchPhase.ConfiguringDisplay, "Configuring virtual display 1920x1080 @ 240 Hz…");
+
+    private static readonly LaunchProgress[] TheLaunch =
+    [
         P(LaunchPhase.StartingPlatform, "Launching Critical Ops through Google Play Games…"),
         P(LaunchPhase.WaitingForGame, "Waiting for the game to start…"),
     ];
 
+    /// <summary>A PLAY with the display switched off on the Display page.</summary>
+    private static readonly LaunchProgress[] UpToTheGame = [.. UpToTheProfile, .. TheLaunch];
+
     [Fact]
-    public void BeforeTheGameIsUp_TheDisplayIsStillToCome()
+    public void WithTheDisplay_ItComesOnBeforeTheGameIsLaunched()
     {
-        var steps = Run(UpToTheGame);
+        var steps = Run([.. UpToTheProfile, TheDisplay]);
 
         Assert.Equal([StepState.Done, StepState.Done, StepState.Live, StepState.Todo, StepState.Todo], steps.States);
-        Assert.Equal("Waiting for the game to start…", steps.Details[Game]);
-        Assert.Null(steps.Details[Display]);
-    }
-
-    [Fact]
-    public void WithTheDisplay_ItComesOnAfterTheGameAndTheGameIsWhatRunsAfterwards()
-    {
-        var steps = Run(UpToTheGame);
-
-        Run(steps, P(LaunchPhase.ConfiguringDisplay, "Configuring virtual display 1920x1080 @ 240 Hz…"));
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Live, StepState.Todo], steps.States);
-        Assert.Equal("running", steps.Details[Game]);
         Assert.Equal("Configuring virtual display 1920x1080 @ 240 Hz…", steps.Details[Display]);
+        Assert.Null(steps.Details[Game]);
+
+        Run(steps, TheLaunch);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Live, StepState.Todo], steps.States);
+        Assert.Equal("Waiting for the game to start…", steps.Details[Game]);
+        Assert.Equal("on while the game runs", steps.Details[Display]);
 
         Run(steps, P(LaunchPhase.Monitoring, "Critical Ops is running."));
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Live, StepState.Done, StepState.Todo], steps.States);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Live, StepState.Todo], steps.States);
         Assert.Equal("running", steps.Details[Game]);
-        Assert.Equal("on while the game runs", steps.Details[Display]);
 
         Run(steps, P(LaunchPhase.Restoring, "Restoring system settings…"), P(LaunchPhase.Completed, "Session complete."));
         Assert.All(steps.States, state => Assert.Equal(StepState.Done, state));
@@ -70,11 +73,11 @@ public sealed class LaunchStepListTests
     {
         var steps = Run([.. UpToTheGame, P(LaunchPhase.Monitoring, "Critical Ops is running.")]);
 
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Live, StepState.Skipped, StepState.Todo], steps.States);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Skipped, StepState.Live, StepState.Todo], steps.States);
         Assert.Equal("off on the Display page", steps.Details[Display]);
 
         Run(steps, P(LaunchPhase.Restoring), P(LaunchPhase.Completed));
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Skipped, StepState.Done], steps.States);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Skipped, StepState.Done, StepState.Done], steps.States);
     }
 
     [Fact]
@@ -82,8 +85,8 @@ public sealed class LaunchStepListTests
     {
         var steps = Run(
         [
-            .. UpToTheGame,
-            P(LaunchPhase.ConfiguringDisplay, "Configuring virtual display 1920x1080 @ 240 Hz…"),
+            .. UpToTheProfile,
+            TheDisplay,
             P(LaunchPhase.ConfiguringDisplay, "The virtual display was not set up. The game carries on.", skipped: true),
         ]);
 
@@ -91,8 +94,8 @@ public sealed class LaunchStepListTests
         Assert.Equal(StepState.Skipped, steps.States[Display]);
         Assert.Equal("not set up", steps.Details[Display]);
 
-        Run(steps, P(LaunchPhase.Monitoring, "Critical Ops is running."));
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Live, StepState.Skipped, StepState.Todo], steps.States);
+        Run(steps, [.. TheLaunch, P(LaunchPhase.Monitoring, "Critical Ops is running.")]);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Skipped, StepState.Live, StepState.Todo], steps.States);
         Assert.Equal("not set up", steps.Details[Display]);
 
         Run(steps, P(LaunchPhase.Restoring), P(LaunchPhase.Completed));
@@ -103,6 +106,7 @@ public sealed class LaunchStepListTests
     [InlineData(LaunchPhase.StartingPlatform, Game)]
     [InlineData(LaunchPhase.WaitingForGame, Game)]
     [InlineData(LaunchPhase.Monitoring, Game)]
+    [InlineData(LaunchPhase.ConfiguringDisplay, Display)]
     [InlineData(LaunchPhase.ApplyingPerformanceProfile, Profile)]
     public void AFailure_MarksTheRowThatWasRunning(LaunchPhase lastPhase, int failed)
     {
@@ -120,24 +124,24 @@ public sealed class LaunchStepListTests
     private static readonly LaunchProgress Cancelled = P(LaunchPhase.Completed, "Cancelled. Settings restored.", skipped: true);
 
     [Fact]
-    public void ACancelBeforeTheGameIsUp_TicksOffNeitherTheGameNorTheDisplay()
+    public void ACancelBeforeTheGameIsUp_DoesNotTickOffTheGame()
     {
         // The cancel path reports Completed straight after the phase it stopped in.
-        var steps = Run([.. UpToTheGame, Cancelled]);
+        var steps = Run([.. UpToTheProfile, TheDisplay, .. TheLaunch, Cancelled]);
 
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Skipped, StepState.Todo, StepState.Done], steps.States);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Skipped, StepState.Done], steps.States);
         Assert.Equal("cancelled", steps.Details[Game]);
-        Assert.Null(steps.Details[Display]);
         Assert.Equal("everything restored", steps.Details[Restore]);
     }
 
     [Fact]
     public void ACancelWhileTheDisplayComesOn_DoesNotTickItOff()
     {
-        var steps = Run([.. UpToTheGame, P(LaunchPhase.ConfiguringDisplay, "Configuring virtual display 1920x1080 @ 240 Hz…"), Cancelled]);
+        var steps = Run([.. UpToTheProfile, TheDisplay, Cancelled]);
 
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Skipped, StepState.Done], steps.States);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Skipped, StepState.Todo, StepState.Done], steps.States);
         Assert.Equal("cancelled", steps.Details[Display]);
+        Assert.Null(steps.Details[Game]);
     }
 
     [Fact]
@@ -172,8 +176,8 @@ public sealed class LaunchStepListTests
 
         Run(steps,
             P(LaunchPhase.ApplyingPerformanceProfile),
-            P(LaunchPhase.ConfiguringDisplay, "Configuring virtual display 1920x1080 @ 240 Hz…"),
+            TheDisplay,
             P(LaunchPhase.Monitoring));
-        Assert.Equal([StepState.Done, StepState.Done, StepState.Live, StepState.Done, StepState.Todo], steps.States);
+        Assert.Equal([StepState.Done, StepState.Done, StepState.Done, StepState.Live, StepState.Todo], steps.States);
     }
 }

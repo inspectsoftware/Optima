@@ -14,22 +14,23 @@ public enum StepState
 
 /// <summary>
 /// The session page's step list, moved along by the launch's progress reports. The rows are in the
-/// order things happen: the install is checked, the profile goes on, the game starts, the virtual
-/// display comes on once the game is running, and everything is put back when it exits. Kept apart
+/// order things happen: the install is checked, the profile goes on, the virtual display comes on
+/// before the game is launched, the game starts, and everything is put back when it exits. A game
+/// found running gets the display in the same place, before it is watched. Kept apart
 /// from the page so these rules can be tested; the page copies the states and lines onto its rows.
 /// </summary>
 public sealed class LaunchStepList
 {
     public const int Launcher = 0;
     public const int Profile = 1;
-    public const int Game = 2;
-    public const int Display = 3;
+    public const int Display = 2;
+    public const int Game = 3;
     public const int Restore = 4;
 
     private readonly StepState[] _states = new StepState[Restore + 1];
     private readonly string?[] _details = new string?[Restore + 1];
 
-    /// <summary>The game has been seen running in this session: the display step or the watch has begun.</summary>
+    /// <summary>The game has been seen running in this session: the watch has begun.</summary>
     private bool _gameSeenRunning;
 
     public IReadOnlyList<StepState> States => _states;
@@ -63,7 +64,7 @@ public sealed class LaunchStepList
                 break;
         }
 
-        _gameSeenRunning |= progress.Phase is LaunchPhase.ConfiguringDisplay or LaunchPhase.Monitoring;
+        _gameSeenRunning |= progress.Phase is LaunchPhase.Monitoring;
 
         if (progress is { Phase: LaunchPhase.ConfiguringDisplay, Skipped: true })
         {
@@ -88,15 +89,10 @@ public sealed class LaunchStepList
             return;
         }
 
-        if (live == Display)
+        if (live >= Game)
         {
-            // The display only comes on once the game has been seen running.
-            _details[Game] = "running";
-        }
-        if (progress.Phase is LaunchPhase.Monitoring or LaunchPhase.Restoring)
-        {
-            // The display row comes after the game's, and is settled by the time the game is being
-            // watched: it came on, it was given up on (marked when that happened), or it was never asked for.
+            // The display row comes before the game's, and is settled once the launch or the watch
+            // begins: it came on, it was given up on (marked when that happened), or it was never asked for.
             switch (_states[Display])
             {
                 case StepState.Live or StepState.Done:
@@ -123,9 +119,8 @@ public sealed class LaunchStepList
 
     /// <summary>
     /// The session ended and everything was put back. A skipped step stays skipped, and a step the
-    /// session never got to stays to come: a cancel ends it there, before a display that waits for
-    /// the game has come on. Nor is the step a cancel stopped in ticked off: a game that was still
-    /// being waited for never ran, and a display still coming on never came on. A game that was
+    /// session never got to stays to come. Nor is the step a cancel stopped in ticked off: a game
+    /// that was still being waited for never ran, and a display still coming on never came on. A game that was
     /// already running did run, and keeps its tick.
     /// </summary>
     public void Complete(bool cancelled = false)

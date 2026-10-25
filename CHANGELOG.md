@@ -4,6 +4,13 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-25 - 0.8.6: hotfix, the virtual display is on before the game starts
+
+- Fixed: Critical Ops did not pick up the virtual display's refresh rate, so its FPS cap stayed at your own monitor's. The display came on only once the game was seen running, after the game had already read the screens.
+- The virtual display now comes on when you press PLAY, right after the profile is applied and before Google Play Games launches the game. It still goes off when the game closes, and also when the launch fails or is cancelled.
+- The PLAY steps show "Virtual display" before "Game running".
+- With Auto-attach, a game found running still gets the display as before.
+
 ## 2026-10-24 - 0.8.5: splash first, the virtual display follows the game, a new Boost, one tracked player and a new Settings page
 
 - STARTUP:

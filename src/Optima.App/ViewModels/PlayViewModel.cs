@@ -203,8 +203,8 @@ public sealed partial class PlayViewModel : ObservableObject
     [
         new("Launcher resolved", "checking the install"),
         new("Profile applied", "power plan, priority, throttling"),
+        new("Virtual display", "on before the game starts"),
         new("Game running", "waiting for the game window"),
-        new("Virtual display", "once the game is running"),
         new("Restore on exit", "pending"),
     ];
 

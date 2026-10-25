@@ -261,7 +261,7 @@ public sealed partial class PlayGuideViewModel : ObservableObject
         Steps.Add(new PlayGuideStep(4, "05", "Play",
             "launch from Optima or from the platform",
             "Everything is in place. Launch the game straight from the Play tab with your chosen profile — Optima " +
-            "applies the performance profile, switches the virtual display on once the game is running, and restores " +
+            "applies the performance profile, switches the virtual display on before the game starts, and restores " +
             "everything when you quit. " +
             "Sign in with Google or Facebook to recover your progress; Apple ID / Game Center do not exist on PC.",
             actionLabel: "close the guide and play"));

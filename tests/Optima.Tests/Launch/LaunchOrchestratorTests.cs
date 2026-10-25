@@ -138,9 +138,9 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.Equal("LAUNCH_FAILED", result.Error?.Code);
         Assert.Contains("restore", _power.Log);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
-        // No game, so the virtual display was never touched.
-        Assert.Empty(_virtualDisplay.Log);
-        Assert.Empty(_displayService.Log);
+        // The display came on at PLAY and went off with the restore.
+        Assert.Single(_virtualDisplay.Log, entry => entry == "disable");
+        Assert.False(_virtualDisplay.Active);
     }
 
     [Fact]
@@ -153,7 +153,8 @@ public sealed class LaunchOrchestratorTests : IDisposable
         Assert.False(result.Success);
         Assert.Equal("GAME_START_TIMEOUT", result.Error?.Code);
         Assert.Contains("restore", _power.Log);
-        Assert.Empty(_virtualDisplay.Log);
+        Assert.Single(_virtualDisplay.Log, entry => entry == "disable");
+        Assert.False(_virtualDisplay.Active);
     }
 
     [Fact]
@@ -255,7 +256,7 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
-    public async Task RunSession_TheDisplayComesOnOnlyOnceTheGameIsSeenRunning()
+    public async Task RunSession_TheDisplayComesOnBeforeTheGameIsLaunched()
     {
         (int Launches, int GameStartWaits, int Tuned, bool Watching)? atEnable = null;
         _virtualDisplay.OnEnable = () => atEnable =
@@ -263,9 +264,9 @@ public sealed class LaunchOrchestratorTests : IDisposable
 
         var result = await CreateOrchestrator().RunSessionAsync(CompetitiveProfile);
 
-        // After the launcher and after the game was found; before the game is tuned and watched.
+        // Before the launcher, so the game finds the display when it starts.
         Assert.True(result.Success);
-        Assert.Equal((1, 1, 0, false), atEnable);
+        Assert.Equal((0, 0, 0, false), atEnable);
     }
 
     [Fact]
@@ -295,8 +296,7 @@ public sealed class LaunchOrchestratorTests : IDisposable
 
         var result = await CreateOrchestrator(elevation: elevation).RunSessionAsync(CompetitiveProfile);
 
-        // Asked once, before the launch, and the display then comes on under the running game
-        // without asking again.
+        // Asked once, before the launch, and the display then comes on without asking again.
         Assert.True(result.Success);
         Assert.Equal(1, elevation.Prompts);
         Assert.Equal(0, launchesAtPrompt);
@@ -400,7 +400,7 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
-    public async Task RunSession_ReportsTheDisplayBetweenTheGameStartingAndTheGameBeingWatched()
+    public async Task RunSession_ReportsTheDisplayBetweenTheProfileAndTheLaunch()
     {
         var phases = new List<LaunchPhase>();
         var orchestrator = CreateOrchestrator();
@@ -410,8 +410,8 @@ public sealed class LaunchOrchestratorTests : IDisposable
 
         Assert.Equal(
         [
-            LaunchPhase.Validating, LaunchPhase.ApplyingPerformanceProfile, LaunchPhase.StartingPlatform,
-            LaunchPhase.WaitingForGame, LaunchPhase.ConfiguringDisplay, LaunchPhase.Monitoring,
+            LaunchPhase.Validating, LaunchPhase.ApplyingPerformanceProfile, LaunchPhase.ConfiguringDisplay,
+            LaunchPhase.StartingPlatform, LaunchPhase.WaitingForGame, LaunchPhase.Monitoring,
             LaunchPhase.Restoring, LaunchPhase.Completed,
         ], phases);
     }
@@ -1012,13 +1012,14 @@ public sealed class LaunchOrchestratorTests : IDisposable
         var result = await session;
 
         // Nothing was played, so there is nothing to record; the half-applied profile came off, and
-        // the virtual display, which waits for the game, was never switched on.
+        // so did the virtual display that came on at PLAY.
         Assert.Equal("CANCELLED", result.Error?.Code);
         // The end is reported as a cancel, so the step list does not tick off the wait for the game.
         Assert.Equal(new LaunchProgress(LaunchPhase.Completed, "Cancelled. Settings restored.", Skipped: true), last);
         Assert.Empty(_sessionStore.Saved);
         Assert.Single(_power.Log, entry => entry == "restore");
-        Assert.Empty(_virtualDisplay.Log);
+        Assert.Single(_virtualDisplay.Log, entry => entry == "disable");
+        Assert.False(_virtualDisplay.Active);
         Assert.False(File.Exists(_paths.PendingSnapshotFile));
     }
 

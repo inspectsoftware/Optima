@@ -45,9 +45,9 @@ public sealed record LaunchResult
 }
 
 /// <summary>
-/// The §5 pipeline: validate → snapshot → apply profile → launch → detect runtime → virtual display → monitor → wait
-/// for exit → restore → session stats. The virtual display only comes on once the game is seen running, and goes off
-/// again with the restore when it exits, is killed, or the session ends.
+/// The §5 pipeline: validate → snapshot → apply profile → virtual display → launch → detect runtime → monitor → wait
+/// for exit → restore → session stats. The virtual display comes on before the game is launched, so the game finds it
+/// at its start, and goes off again with the restore when it exits, is killed, or the session ends.
 /// </summary>
 public sealed class LaunchOrchestrator
 {
@@ -96,8 +96,8 @@ public sealed class LaunchOrchestrator
     public TimeSpan PriorityKeeperInterval { get; set; } = DefaultPriorityKeeperInterval;
 
     /// <summary>
-    /// How long the display step waits, once the game is up, for an administrator prompt the player
-    /// has not answered yet. The game is neither tuned nor watched for its exit while it waits. The
+    /// How long the display step waits for an administrator prompt the player has not answered yet.
+    /// PLAY holds the launch while it waits; a game found running is neither tuned nor watched. The
     /// property exists so a test can shorten the wait.
     /// </summary>
     public TimeSpan DisplayHelperWait { get; set; } = TimeSpan.FromSeconds(20);
@@ -223,10 +223,9 @@ public sealed class LaunchOrchestrator
                     "Run detection again from the Checks tab on the Debug page");
             }
 
-            // Switching the virtual display on takes the elevated helper, and the display only comes
-            // on once the game is up. The helper's administrator prompt belongs here, before the game
-            // covers the screen, where it meets the other requests from the PLAY click and is one
-            // prompt with them. Not waited for: the launch goes on while the player answers it.
+            // Switching the virtual display on takes the elevated helper. Its administrator prompt is
+            // asked here, at the PLAY click, where it meets the other requests and is one prompt with
+            // them. The display step below waits for the answer.
             if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
             {
                 context.DisplayHelper = AskForDisplayHelperAsync(elevation, context, startedByPlayer);
@@ -235,6 +234,10 @@ public sealed class LaunchOrchestrator
             await PreflightAsync(token).ConfigureAwait(false);
             await _recovery.SavePendingAsync(context.Snapshot, token).ConfigureAwait(false);
             await ApplyEnvironmentAsync(profile, context, token).ConfigureAwait(false);
+
+            // Before the launch, not once the game is seen running: Critical Ops reads the displays
+            // and their refresh rates when it starts, and a display that comes on later is missed.
+            await ApplyVirtualDisplayAsync(profile.Display, context, token).ConfigureAwait(false);
 
             Report(LaunchPhase.StartingPlatform, "Launching Critical Ops through Google Play Games…");
             var launched = false;
@@ -275,7 +278,6 @@ public sealed class LaunchOrchestrator
                     "Try launching once from Google Play Games directly").ConfigureAwait(false);
             }
             _logger.LogInformation("Game process detected (emulator PID {Pid})", emulatorPid);
-            await ApplyVirtualDisplayAsync(profile.Display, context, token).ConfigureAwait(false);
 
             return await MonitorAndCompleteAsync(
                 profile, game.PackageId, emulatorPid.Value, context, kind, captureAllowed: true, token).ConfigureAwait(false);
@@ -291,11 +293,10 @@ public sealed class LaunchOrchestrator
             Report(LaunchPhase.Validating, "Game detected. Applying the selected profile…");
             var game = await _detector.DetectTargetGameAsync(token).ConfigureAwait(false);
 
-            // The display follows the game, so a game found running still gets it, and with the helper
-            // not running that means one administrator prompt over the game. Asked here, like PLAY
-            // does before the launch, so the display step waits for the answer only as long as PLAY
-            // does and the game is tuned and watched either way; left to the driver, the prompt held
-            // the session for as long as it stayed open.
+            // A game found running still gets the display, and with the helper not running that means
+            // one administrator prompt over the game. Asked here, like PLAY does, so the display step
+            // waits for the answer only as long as PLAY does and the game is tuned and watched either
+            // way; left to the driver, the prompt held the session for as long as it stayed open.
             if (profile.Display.VirtualDisplay && _elevation is { IsConnected: false } elevation)
             {
                 context.DisplayHelper = AskForDisplayHelperAsync(elevation, context, startedByPlayer: false);
@@ -433,9 +434,9 @@ public sealed class LaunchOrchestrator
     }
 
     /// <summary>
-    /// Switches the virtual display on for a game that is already running. Nothing here ends the
-    /// session: the game is up, and a display that does not come on is a warning, not a reason to
-    /// put everything back under the player. Whatever did come on goes off with the restore at exit.
+    /// Switches the virtual display on, before PLAY launches the game or for a game found running.
+    /// Nothing here ends the session: a display that does not come on is a warning, and the game
+    /// plays on the real screen. Whatever did come on goes off with the restore at exit.
     /// </summary>
     private async Task ApplyVirtualDisplayAsync(DisplayProfile display, SessionContext context, CancellationToken ct)
     {
@@ -500,10 +501,10 @@ public sealed class LaunchOrchestrator
     }
 
     /// <summary>
-    /// Waits for the answer to the helper's prompt, but not for long: the game is already running.
-    /// A prompt still open after <see cref="DisplayHelperWait"/> is given up on for this session, so
-    /// the game is tuned and watched, and a yes that comes later only starts the helper for whoever
-    /// asks next instead of switching the display on behind a game that may have closed by then.
+    /// Waits for the answer to the helper's prompt, but not for long: PLAY holds the launch for it,
+    /// and a game found running is not tuned or watched meanwhile. A prompt still open after
+    /// <see cref="DisplayHelperWait"/> is given up on for this session, and a yes that comes later
+    /// only starts the helper for whoever asks next.
     /// </summary>
     private async Task<bool> WaitForDisplayHelperAsync(Task<bool> helper, CancellationToken ct)
     {
@@ -514,9 +515,9 @@ public sealed class LaunchOrchestrator
         catch (TimeoutException)
         {
             throw OptimaException.From("ELEVATION_DECLINED",
-                "The administrator prompt was still open after the game had started.",
-                "The virtual display needs Optima's helper, and the running game was not held up any longer " +
-                "waiting for it. The display stayed off for this session and the game ran on your real screen.",
+                "The administrator prompt was left open too long.",
+                "The virtual display needs Optima's helper, and the game was not held up any longer waiting " +
+                "for it. The display stayed off for this session and the game ran on your real screen.",
                 null,
                 "Approve the administrator prompt when you press PLAY");
         }
@@ -526,8 +527,8 @@ public sealed class LaunchOrchestrator
     {
         Report(LaunchPhase.ConfiguringDisplay, $"Configuring virtual display {display.Mode}…");
 
-        // A no to the prompt before the launch is not answered by asking again now, over the game:
-        // every step of the driver below may need the helper, so none of them is tried.
+        // A no to the prompt is not answered by asking again now: every step of the driver below
+        // may need the helper, so none of them is tried.
         if (context.DisplayHelper is { } helper && !await WaitForDisplayHelperAsync(helper, ct).ConfigureAwait(false))
         {
             if (context.DriverMissing)
@@ -569,8 +570,8 @@ public sealed class LaunchOrchestrator
         context.Snapshot = context.Snapshot with { DisplayTopology = topology };
         await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
 
-        // Never made the main screen, whatever an old profile says: the game window is already up on
-        // the player's own monitor, and Windows moves it onto a new main screen that nobody can see.
+        // Never made the main screen, whatever an old profile says: the game window opens on the
+        // player's own monitor, and Windows would move it onto a new main screen that nobody can see.
     }
 
     /// <summary>

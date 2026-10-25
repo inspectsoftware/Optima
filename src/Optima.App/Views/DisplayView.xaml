@@ -124,7 +124,7 @@
               <TextBlock Text="Hz" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="8,0,0,0" />
             </WrapPanel>
             <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" Margin="90,8,0,0"
-                       Text="This is the resolution PLAY uses, with every profile. Your own monitor stays the main screen, and the game opens there as always. The virtual display comes on once the game is running and goes off again when it closes." />
+                       Text="This is the resolution PLAY uses, with every profile. Your own monitor stays the main screen, and the game opens there as always. The virtual display comes on when you press PLAY, before the game starts, and goes off again when it closes." />
           </StackPanel>
         </StackPanel>
       </HeaderedContentControl>
