@@ -239,6 +239,7 @@ public partial class App : Application
         // On the pool: the settings are already cached, so this would run start to finish on this
         // thread, building the Discord client and sending the first two web requests of the process.
         _ = Task.Run(discord.StartAsync);
+        _services.GetRequiredService<Services.OnlineCounterService>().Start();
 
         var hardware = _services.GetRequiredService<IPerformanceMonitor>();
         void SyncHardwareMonitor()

@@ -53,6 +53,17 @@ public sealed record BotTrackerTestResponse(
     [property: JsonPropertyName("message")] string Message);
 
 /// <summary>
+/// The app's once-a-minute ping for the online counter. The id is made up when the app starts and never
+/// saved, so it tells the bot that one run is still open and nothing about whose it is.
+/// </summary>
+public sealed record BotOnlinePing(
+    [property: JsonPropertyName("instanceId")] Guid InstanceId);
+
+/// <summary>How many copies of Optima pinged the bot in the last few minutes, the asking one included.</summary>
+public sealed record BotOnlineResponse(
+    [property: JsonPropertyName("online")] int Online);
+
+/// <summary>
 /// The link code's shape. One definition, shared by the bot that mints codes and any client that
 /// validates what the user typed, so a code can never be well formed on one side and not the other.
 /// The alphabet leaves out I, O, 0 and 1: a code is read off a Discord message and typed by hand.

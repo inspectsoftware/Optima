@@ -92,6 +92,7 @@ public static class AppServices
         // The desktop side of the OptimaBot link handshake: the app redeems the code the user typed with
         // the Critical Ops account it already has, and the bot is the only party that sees both halves.
         services.AddSingleton<Optima.Core.Linking.BotLinkClient>();
+        services.AddSingleton<Optima.App.Services.OnlineCounterService>();
         // Protected play: Optima Shield, a separate program beside Optima.exe. This only starts it
         // and reads what it says. Its files are in the real per-user folder whatever folder this app
         // was told to use, because that is where the module itself looks.

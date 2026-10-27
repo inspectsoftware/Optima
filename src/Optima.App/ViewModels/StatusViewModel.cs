@@ -55,8 +55,10 @@ public sealed partial class StatusViewModel : ObservableObject
         IProcessMonitor processMonitor,
         GamePresenceService presence,
         SettingsService settings,
+        Services.OnlineCounterService online,
         ILogger<StatusViewModel> logger)
     {
+        Online = online;
         _detector = detector;
         _virtualDisplay = virtualDisplay;
         _driverInstaller = driverInstaller;
@@ -75,6 +77,9 @@ public sealed partial class StatusViewModel : ObservableObject
     public StatusItem VirtualDisplay { get; } = new("Virtual display");
     public StatusItem Virtualization { get; } = new("VT-x");
     public StatusItem Display { get; } = new("Display");
+
+    /// <summary>How many copies of Optima are open, for the line in the sidebar footer.</summary>
+    public Services.OnlineCounterService Online { get; }
 
     [ObservableProperty]
     private bool _gameIsRunning;

@@ -118,6 +118,18 @@ public sealed class BotLinkClient : IDisposable
             new BotTrackerTestRequest(webhookUrl),
             ct).ConfigureAwait(false);
 
+    /// <summary>
+    /// Tells the bot this run of Optima is open and reads back how many are. The id is the one this run
+    /// made up at start; the bot counts ids it heard from in the last few minutes.
+    /// </summary>
+    public async Task<BotLinkCallResult<BotOnlineResponse>> PingOnlineAsync(
+        string baseUrl, Guid instanceId, CancellationToken ct = default)
+        => await PostAsync<BotOnlinePing, BotOnlineResponse>(
+            baseUrl,
+            "v1/online",
+            new BotOnlinePing(instanceId),
+            ct).ConfigureAwait(false);
+
     /// <summary>Asks the bot who, if anyone, this Critical Ops account is linked to.</summary>
     public async Task<BotLinkCallResult<BotLinkStatusResponse>> GetStatusAsync(
         string baseUrl, long accountId, CancellationToken ct = default)

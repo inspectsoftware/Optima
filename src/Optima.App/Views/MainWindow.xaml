@@ -123,6 +123,27 @@
                 </Button>
               </Grid>
 
+              <!-- How many copies of Optima are open right now. Hidden until OptimaBot answers, and
+                   while it cannot be reached, rather than showing a number that is no longer true. -->
+              <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="12,8,0,0"
+                          ToolTip="Copies of Optima open right now, this one included. Counted by OptimaBot once a minute; nothing about you is sent.">
+                <StackPanel.Style>
+                  <Style TargetType="StackPanel">
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Status.Online.Online}" Value="{x:Null}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding RailCollapsed}" Value="True">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </StackPanel.Style>
+                <Ellipse Width="6" Height="6" VerticalAlignment="Center" Margin="0,0,8,0"
+                         Fill="{DynamicResource Brush.Ok}" />
+                <TextBlock Style="{StaticResource Text.Micro}" Text="{Binding Status.Online.Text}" />
+              </StackPanel>
+
               <Grid x:Name="NavArea" Margin="0,2,0,0">
               <!-- One marker for the whole rail, which glides to the row of the open page. -->
               <ctl:ChamferBorder x:Name="NavMarker" Chamfer="0" VerticalAlignment="Top" Height="0" Opacity="0"
