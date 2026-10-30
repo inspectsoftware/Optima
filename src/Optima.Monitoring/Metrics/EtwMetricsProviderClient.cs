@@ -32,8 +32,6 @@ public sealed class EtwMetricsProviderClient : IPerformanceMetricsProvider
 
     public string Name => "ETW present statistics";
 
-    public event EventHandler<(double Fps, double FrametimeMs)>? SampleArrived;
-
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
         => (await _settings.GetSettingsAsync(ct).ConfigureAwait(false)).EnableFrametimeCapture;
 
@@ -195,7 +193,6 @@ public sealed class EtwMetricsProviderClient : IPerformanceMetricsProvider
             _liveFpsSamples.Add(fps);
             _liveFrametimes.Add(frametime);
         }
-        SampleArrived?.Invoke(this, (fps, frametime));
     }
 
     private static double ParseDouble(Dictionary<string, string> data, string key)

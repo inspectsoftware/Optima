@@ -70,7 +70,8 @@ internal static class InstallDriverCommand
 
     private static void EnsureDefaultSettingsFile()
     {
-        var path = VddSettingsDefaults.DefaultPath;
+        // Where the driver will read it: an earlier install of the driver may have set VDDPATH.
+        var path = DriverSettingsLocation.Resolve(userOverride: null);
         try
         {
             if (File.Exists(path))

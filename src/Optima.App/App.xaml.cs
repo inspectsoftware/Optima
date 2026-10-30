@@ -23,7 +23,6 @@ public partial class App : Application
     private TrayService? _tray;
     private AppShutdown? _shutdown;
     private ConsoleWindow? _console;
-    private OverlayController? _overlay;
     private ThemeService? _theme;
     private Services.SplashHost? _splash;
     private Core.Health.CrashMarker? _crashMarker;
@@ -201,13 +200,6 @@ public partial class App : Application
         _hotkeys.ConsoleRequested += ToggleConsole;
         _hotkeys.KillGameRequested += KillGameFromHotkey;
 
-        _overlay = new OverlayController(
-            _services.GetRequiredService<OverlayViewModel>(),
-            _services.GetRequiredService<IGameWindowLocator>(),
-            _services.GetRequiredService<SettingsService>(),
-            _services.GetRequiredService<LaunchOrchestrator>(),
-            _services.GetRequiredService<INetworkQualityMonitor>());
-        _hotkeys.OverlayRequested += () => _overlay!.Toggle();
 
         _shutdown = new AppShutdown(window, _services.GetRequiredService<IDriverInstaller>(), _services.GetRequiredService<SettingsService>());
         // An update ends with the setup replacing this process: out without the exit questions.
@@ -262,6 +254,12 @@ public partial class App : Application
         _services.GetRequiredService<Optima.Core.Launch.TimerResolutionService>().Start();
         _services.GetRequiredService<Optima.Core.Launch.BackgroundDemotionService>().Start();
         _services.GetRequiredService<Optima.Core.Launch.GameExtrasService>().Start();
+        _services.GetRequiredService<Optima.Core.Launch.WifiScanService>().Start();
+        if (_services.GetRequiredService<Optima.Core.Configuration.SettingsService>().Current?.BoostAtStart == true)
+        {
+            _ = mainViewModel.Boost.TurnOnAtStartAsync();
+        }
+        WatchBoostForSessions();
         // Repairs are decided on the moment: whether the window is on screen, whether a game runs.
         // Each time one of those changes, what was waiting for it is looked at again.
         var repairs = _services.GetRequiredService<Core.Health.RepairRunner>();
@@ -528,6 +526,38 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Feeds every Boost service's status to the recorder the launch keeps in each saved session,
+    /// so the Sessions page can compare sessions by what Boost did in them. Subscribed first and
+    /// then read once, so a change in between is not missed.
+    /// </summary>
+    private void WatchBoostForSessions()
+    {
+        var services = _services!;
+        var recorder = services.GetRequiredService<Core.Boost.BoostSessionRecorder>();
+        var guard = services.GetRequiredService<Core.Launch.PriorityGuardService>();
+        var cleaner = services.GetRequiredService<Optima.Monitoring.Metrics.StandbyCleanerService>();
+        var timer = services.GetRequiredService<Core.Launch.TimerResolutionService>();
+        var demotion = services.GetRequiredService<Core.Launch.BackgroundDemotionService>();
+        var extras = services.GetRequiredService<Core.Launch.GameExtrasService>();
+        var wifi = services.GetRequiredService<Core.Launch.WifiScanService>();
+        void ObserveCleaner(Optima.Monitoring.Metrics.StandbyCleanerStatus status)
+            => recorder.ObserveCleaner(status.State == Optima.Monitoring.Metrics.StandbyCleanerState.Running, status.Purges);
+
+        guard.StatusChanged += recorder.Observe;
+        cleaner.StatusChanged += ObserveCleaner;
+        timer.StatusChanged += recorder.Observe;
+        demotion.StatusChanged += recorder.Observe;
+        extras.StatusChanged += recorder.Observe;
+        wifi.StatusChanged += recorder.Observe;
+        recorder.Observe(guard.Status);
+        ObserveCleaner(cleaner.Status);
+        recorder.Observe(timer.Status);
+        recorder.Observe(demotion.Status);
+        recorder.Observe(extras.Status);
+        recorder.Observe(wifi.Status);
+    }
+
     private async Task SyncSessionTweaksAsync(Core.Launch.SessionTweakService sessionTweaks)
     {
         try
@@ -773,7 +803,6 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeys?.Dispose();
-        _overlay?.Dispose();
         _tray?.Dispose();
         _shutdown?.Dispose();
         _theme?.Dispose();

@@ -18,8 +18,6 @@
   <sys:Double x:Key="Chamfer.Chip">6</sys:Double>
   <sys:Double x:Key="Chamfer.Box">4</sys:Double>
   <CornerRadius x:Key="Radius.Control">0</CornerRadius>
-  <SolidColorBrush x:Key="Brush.Overlay.Ground" Color="#CC000000" />
-  <SolidColorBrush x:Key="Brush.Overlay.Border" Color="#33FFFFFF" />
 
   <DropShadowEffect x:Key="Shadow.Popup" Color="#000000" Opacity="0.55" BlurRadius="30" ShadowDepth="10" Direction="270" />
 </ResourceDictionary>

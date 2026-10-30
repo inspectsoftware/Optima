@@ -9,6 +9,7 @@ namespace Optima.Platform.Windows.NativeMethods;
 internal static partial class DisplayNative
 {
     internal const int ENUM_CURRENT_SETTINGS = -1;
+    internal const int ENUM_REGISTRY_SETTINGS = -2;
 
     internal const int DISP_CHANGE_SUCCESSFUL = 0;
     internal const int DISP_CHANGE_RESTART = 1;
@@ -18,6 +19,7 @@ internal static partial class DisplayNative
     internal const int CDS_UPDATEREGISTRY = 0x01; // deliberately never used, changes stay temporary
     internal const int CDS_TEST = 0x02;
 
+    internal const int DM_POSITION = 0x20;
     internal const int DM_PELSWIDTH = 0x80000;
     internal const int DM_PELSHEIGHT = 0x100000;
     internal const int DM_DISPLAYFREQUENCY = 0x400000;

@@ -461,7 +461,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try
         {
-            if ((await _settings.GetSettingsAsync()).VirtualDisplayEnabled is not null)
+            if ((await _settings.GetSettingsAsync()) is { VirtualDisplayEnabled: not null, VirtualDisplayAwaitsDriver: false })
             {
                 return;
             }

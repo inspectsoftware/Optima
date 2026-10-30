@@ -55,6 +55,19 @@ public sealed class DisplaySetupCheckTests
     }
 
     [Fact]
+    public async Task ADeviceThatWasAlreadyOnIsNotSwitchedOffAtTheEnd()
+    {
+        // On from the start, its display only off the desktop: the check attaches it and leaves the device on.
+        _display.DeviceWasEnabledInitially = true;
+
+        await Run();
+
+        Assert.Contains("enable", _display.Log);
+        Assert.DoesNotContain("disable", _display.Log);
+        Assert.Equal("v1:topology", _screens.RestoredTopology);
+    }
+
+    [Fact]
     public async Task WithoutTheDriverNothingIsTouchedAndInstallIsOffered()
     {
         _installer.State = DriverState.NotInstalledPackageAvailable;
@@ -109,6 +122,24 @@ public sealed class DisplaySetupCheckTests
         Assert.Equal(DisplayCheckState.NotReached, Step(steps, DisplaySetupCheck.Mode).State);
         Assert.Equal(DisplayCheckState.Passed, Step(steps, DisplaySetupCheck.PutBack).State);
         Assert.Contains("restoreOriginal", _display.Log);
+    }
+
+    [Theory]
+    [InlineData("VDD_DEVICE_NO_DRIVER", DisplayCheckFix.InstallDriver)]
+    [InlineData("VDD_DRIVER_BLOCKED", DisplayCheckFix.InstallDriver)]
+    [InlineData("VDD_DEVICE_FAILED", DisplayCheckFix.InstallDriver)]
+    [InlineData("VDD_RESTART_NEEDED", DisplayCheckFix.RestartWindows)]
+    [InlineData("VDD_NOT_ATTACHED", DisplayCheckFix.OpenGuide)]
+    public async Task ADeviceProblemIsReportedWithItsCodeAndNotAReload(string code, DisplayCheckFix fix)
+    {
+        _display.EnableError = OptimaException.From(code, "The virtual display device is not working (problem code 43).", "");
+
+        var appears = Step(await Run(), DisplaySetupCheck.Appears);
+
+        Assert.Equal(DisplayCheckState.Failed, appears.State);
+        Assert.Equal(fix, appears.Fix);
+        Assert.Equal(code, appears.ErrorCode);
+        Assert.Contains("problem code 43", appears.Detail);
     }
 
     [Fact]

@@ -346,7 +346,7 @@ public sealed partial class HomeViewModel : ObservableObject
             {
                 var banner =
                     $"Critical Ops updated to {latest}. Optima has not been validated against this " +
-                    "version yet; the overlay, tracking and saved profiles may need a re-check.";
+                    "version yet; tracking and saved profiles may need a re-check.";
                 Application.Current?.Dispatcher.BeginInvoke(() => GameUpdateBanner = banner);
             }
             if (!string.Equals(stored, latest, StringComparison.Ordinal))

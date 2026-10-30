@@ -24,4 +24,11 @@ public sealed record DisplayInfo
     public bool IsPrimary { get; init; }
 
     public bool IsActive { get; init; }
+
+    /// <summary>
+    /// Whether a monitor hangs off this source. Windows lists one source per output an adapter
+    /// declares, including outputs where the driver created no monitor, and such a source is not a
+    /// display. True by default so a source only reads as empty when the enumeration said so.
+    /// </summary>
+    public bool HasMonitor { get; init; } = true;
 }

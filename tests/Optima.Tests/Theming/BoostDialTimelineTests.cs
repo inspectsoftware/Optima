@@ -135,15 +135,16 @@ public sealed class BoostDialTimelineTests
             BoostDemoteBackgroundEnabled = true,
             BoostKeepCoresAwake = true,
             BoostGpuHighPerformance = true,
+            BoostPowerFloor = true,
         };
 
         var off = ticked.BoostEffective();
         Assert.False(off.BoostPriorityGuardEnabled || off.BoostStandbyCleanerEnabled || off.BoostTimerResolutionEnabled
-            || off.BoostDemoteBackgroundEnabled || off.BoostKeepCoresAwake || off.BoostGpuHighPerformance);
+            || off.BoostDemoteBackgroundEnabled || off.BoostKeepCoresAwake || off.BoostGpuHighPerformance || off.BoostPowerFloor);
         Assert.True(ticked.BoostStandbyCleanerEnabled);
 
         var on = (ticked with { BoostEnabled = true }).BoostEffective();
         Assert.True(on.BoostPriorityGuardEnabled && on.BoostStandbyCleanerEnabled && on.BoostTimerResolutionEnabled
-            && on.BoostDemoteBackgroundEnabled && on.BoostKeepCoresAwake && on.BoostGpuHighPerformance);
+            && on.BoostDemoteBackgroundEnabled && on.BoostKeepCoresAwake && on.BoostGpuHighPerformance && on.BoostPowerFloor);
     }
 }

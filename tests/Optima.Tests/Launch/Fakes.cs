@@ -58,6 +58,14 @@ internal sealed class FakeDisplayService : IDisplayService
         Log.Add($"primary:{deviceName}");
         return Task.CompletedTask;
     }
+
+    /// <summary>What the next attach reports; true, as on a PC where the display came up on its own.</summary>
+    public bool AttachResult { get; set; } = true;
+    public Task<bool> AttachToDesktopAsync(string adapterNameContains, CancellationToken ct = default)
+    {
+        Log.Add($"attach:{adapterNameContains}");
+        return Task.FromResult(AttachResult);
+    }
     public Task<string> CaptureTopologyAsync(CancellationToken ct = default)
     {
         Log.Add("capture");
@@ -240,7 +248,6 @@ internal sealed class FakeMetrics : IPerformanceMetricsProvider
     public bool Stopped { get; private set; }
 
     public string Name => "FakeMetrics";
-    public event EventHandler<(double Fps, double FrametimeMs)>? SampleArrived { add { } remove { } }
 
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(Available);
     public Task StartAsync(IReadOnlyList<int> processIds, CancellationToken ct = default)
@@ -459,6 +466,9 @@ internal sealed class FakeVirtualDisplay : IVirtualDisplayProvider
     public bool RequiresElevation { get; set; } = true;
 
     public string Name => "FakeVdd";
+
+    /// <summary>The device was already on at the start, with only its display off the desktop.</summary>
+    public bool DeviceWasEnabledInitially { get; set; }
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(true);
     public Task<DriverCapabilities> GetCapabilitiesAsync(CancellationToken ct = default)
         => Task.FromResult(new DriverCapabilities { RequiresElevation = RequiresElevation });

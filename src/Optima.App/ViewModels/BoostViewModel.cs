@@ -34,6 +34,7 @@ public sealed partial class BoostViewModel : ObservableObject
     private readonly ITweakService _tweaks;
     private readonly BackgroundDemotionService _demotion;
     private readonly GameExtrasService _extras;
+    private readonly WifiScanService _wifi;
     private readonly IPerformanceMonitor _monitor;
     private readonly ISystemInfoService _systemInfo;
     private readonly GamePresenceService _presence;
@@ -65,6 +66,7 @@ public sealed partial class BoostViewModel : ObservableObject
         ITweakService tweaks,
         BackgroundDemotionService demotion,
         GameExtrasService extras,
+        WifiScanService wifi,
         IPerformanceMonitor monitor,
         ISystemInfoService systemInfo,
         GamePresenceService presence,
@@ -74,6 +76,7 @@ public sealed partial class BoostViewModel : ObservableObject
         _systemInfo = systemInfo;
         _presence = presence;
         _extras = extras;
+        _wifi = wifi;
         _demotion = demotion;
         _timer = timer;
         _timerInfo = timerInfo;
@@ -96,12 +99,13 @@ public sealed partial class BoostViewModel : ObservableObject
 
     /// <summary>
     /// Which features are ticked, one bit each in the page's order: priority guard, memory cleaner,
-    /// timer resolution, background programs, core parking, graphics adapter. The dial lights one
-    /// gear per bit.
+    /// timer resolution, background (programs held back or Wi-Fi scans paused, one gear for the card),
+    /// cores (parking off, best-core placement or the power floor, one gear for the card), graphics (adapter or GPU priority,
+    /// one gear for the card). The dial lights one gear per bit.
     /// </summary>
     public int ArmedMask
         => (PriorityGuardEnabled ? 1 : 0) | (CleanerEnabled ? 2 : 0) | (TimerEnabled ? 4 : 0)
-            | (DemotionEnabled ? 8 : 0) | (KeepCoresAwake ? 16 : 0) | (GpuHighPerformance ? 32 : 0);
+            | (DemotionEnabled || WifiScanPaused ? 8 : 0) | (KeepCoresAwake || CorePlacement || PowerFloor ? 16 : 0) | (GpuHighPerformance || GpuPriorityHigh ? 32 : 0);
 
     public string BoostSummaryText => BoostFeatureCount switch
     {
@@ -113,7 +117,8 @@ public sealed partial class BoostViewModel : ObservableObject
     {
         base.OnPropertyChanged(e);
         var tick = e.PropertyName is nameof(PriorityGuardEnabled) or nameof(CleanerEnabled) or nameof(TimerEnabled)
-            or nameof(DemotionEnabled) or nameof(KeepCoresAwake) or nameof(GpuHighPerformance);
+            or nameof(DemotionEnabled) or nameof(WifiScanPaused) or nameof(KeepCoresAwake) or nameof(CorePlacement) or nameof(PowerFloor)
+            or nameof(GpuHighPerformance) or nameof(GpuPriorityHigh);
         if (tick)
         {
             base.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs(nameof(ArmedMask)));
@@ -128,9 +133,17 @@ public sealed partial class BoostViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task ToggleBoostAsync()
+    private Task ToggleBoostAsync() => SwitchBoostAsync(!BoostOn, allowPrompt: !BoostOn);
+
+    /// <summary>
+    /// Settings, Boost at start. Unlike the dial it never asks for the administrator: a prompt
+    /// nobody asked for at sign-in is worse than a cleaner that waits for the dial.
+    /// </summary>
+    public Task TurnOnAtStartAsync() => BoostOn ? Task.CompletedTask : SwitchBoostAsync(true, allowPrompt: false);
+
+    private async Task SwitchBoostAsync(bool on, bool allowPrompt)
     {
-        BoostOn = !BoostOn;
+        BoostOn = on;
         ShowAll();
         try
         {
@@ -139,9 +152,10 @@ public sealed partial class BoostViewModel : ObservableObject
             await _timer.SyncAsync();
             await _demotion.SyncAsync();
             await _extras.SyncAsync();
+            await _wifi.SyncAsync();
             // Last, because it is the one that may stop for the administrator prompt. Switching
             // Boost on is a deliberate act, so it is allowed to ask.
-            await _cleaner.SyncAsync(allowPrompt: BoostOn);
+            await _cleaner.SyncAsync(allowPrompt: allowPrompt);
         }
         catch (Exception ex)
         {
@@ -159,6 +173,7 @@ public sealed partial class BoostViewModel : ObservableObject
         ShowTimer(_timer.Status);
         ShowDemotion(_demotion.Status);
         ShowExtras(_extras.Status);
+        ShowWifi(_wifi.Status);
         Refresh();
     }
 
@@ -195,11 +210,19 @@ public sealed partial class BoostViewModel : ObservableObject
     [ObservableProperty] private string _demotionNames = string.Empty;
     [ObservableProperty] private string _demotionStateText = string.Empty;
     [ObservableProperty] private string _demotionDetailText = string.Empty;
+    [ObservableProperty] private bool _wifiScanPaused;
+    [ObservableProperty] private string _wifiDetailText = string.Empty;
 
     [ObservableProperty] private bool _keepCoresAwake;
     [ObservableProperty] private bool _gpuHighPerformance;
+    [ObservableProperty] private bool _corePlacement;
     [ObservableProperty] private string _coresDetailText = string.Empty;
+    [ObservableProperty] private string _placementDetailText = string.Empty;
+    [ObservableProperty] private bool _powerFloor;
+    [ObservableProperty] private string _powerFloorDetailText = string.Empty;
     [ObservableProperty] private string _gpuDetailText = string.Empty;
+    [ObservableProperty] private bool _gpuPriorityHigh;
+    [ObservableProperty] private string _gpuPriorityDetailText = string.Empty;
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -222,6 +245,10 @@ public sealed partial class BoostViewModel : ObservableObject
             DemotionNames = string.Join(Environment.NewLine, settings.BoostDemoteProcessNames);
             KeepCoresAwake = settings.BoostKeepCoresAwake;
             GpuHighPerformance = settings.BoostGpuHighPerformance;
+            CorePlacement = settings.BoostCorePlacement;
+            PowerFloor = settings.BoostPowerFloor;
+            GpuPriorityHigh = settings.BoostGpuPriorityHigh;
+            WifiScanPaused = settings.BoostWifiScanPaused;
         }
         finally
         {
@@ -237,9 +264,11 @@ public sealed partial class BoostViewModel : ObservableObject
             _timer.StatusChanged += status => Application.Current?.Dispatcher.BeginInvoke(() => { ShowTimer(status); Refresh(); });
             _demotion.StatusChanged += status => Application.Current?.Dispatcher.BeginInvoke(() => { ShowDemotion(status); Refresh(); });
             _extras.StatusChanged += status => Application.Current?.Dispatcher.BeginInvoke(() => { ShowExtras(status); Refresh(); });
+            _wifi.StatusChanged += status => Application.Current?.Dispatcher.BeginInvoke(() => { ShowWifi(status); Refresh(); });
             _presence.PresenceChanged += _ => Application.Current?.Dispatcher.BeginInvoke(Refresh);
         }
         ShowExtras(_extras.Status);
+        ShowWifi(_wifi.Status);
         ShowDemotion(_demotion.Status);
         ShowGuard(_guard.Status);
         ShowCleaner(_cleaner.Status);
@@ -377,9 +406,57 @@ public sealed partial class BoostViewModel : ObservableObject
         }
     }
 
+    partial void OnWifiScanPausedChanged(bool value) => _ = PersistWifiAsync();
+
+    private async Task PersistWifiAsync()
+    {
+        if (_loading)
+        {
+            return;
+        }
+        try
+        {
+            await _settings.UpdateSettingsAsync(s => s with { BoostWifiScanPaused = WifiScanPaused });
+            await _wifi.SyncAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Saving the Wi-Fi scan setting failed");
+        }
+    }
+
+    private void ShowWifi(WifiScanStatus status)
+    {
+        WifiDetailText = !BoostOn && WifiScanPaused
+            ? StandbyText
+            : !status.Enabled
+            ? "Off. Windows looks for other Wi-Fi networks about once a minute, as usual."
+            : !status.GameOnScreen
+                ? "Waiting for the game."
+            : status.Failed
+                ? "Windows' Wi-Fi service did not answer. Trying again shortly."
+            : !status.HasWifi
+                ? "This PC has no Wi-Fi, so there is nothing to pause."
+            : status.Interfaces.Count == 0
+                ? "Not connected over Wi-Fi, so there is nothing to pause."
+                : string.Join(" · ", status.Interfaces.Select(i => i.Name + ": " + (i.StreamingMode, i.ScanPaused) switch
+                {
+                    (true, true) => "scans paused, streaming mode on",
+                    (false, true) => "scans paused (Windows refused streaming mode)",
+                    (true, false) => "streaming mode on (Windows refused the scan pause)",
+                    _ => "Windows refused both",
+                })) + " · let go when the game leaves";
+    }
+
     partial void OnKeepCoresAwakeChanged(bool value) => _ = PersistExtrasAsync();
 
     partial void OnGpuHighPerformanceChanged(bool value) => _ = PersistExtrasAsync();
+
+    partial void OnCorePlacementChanged(bool value) => _ = PersistExtrasAsync();
+
+    partial void OnPowerFloorChanged(bool value) => _ = PersistExtrasAsync();
+
+    partial void OnGpuPriorityHighChanged(bool value) => _ = PersistExtrasAsync();
 
     private async Task PersistExtrasAsync()
     {
@@ -393,6 +470,9 @@ public sealed partial class BoostViewModel : ObservableObject
             {
                 BoostKeepCoresAwake = KeepCoresAwake,
                 BoostGpuHighPerformance = GpuHighPerformance,
+                BoostCorePlacement = CorePlacement,
+                BoostPowerFloor = PowerFloor,
+                BoostGpuPriorityHigh = GpuPriorityHigh,
             });
             await _extras.SyncAsync();
         }
@@ -413,6 +493,33 @@ public sealed partial class BoostViewModel : ObservableObject
                 : status.CoresAlreadyAwake
                     ? "The active power plan already keeps every core awake, so there is nothing to change."
                     : "Waiting for the game.";
+        PlacementDetailText = !BoostOn && CorePlacement
+            ? StandbyText
+            : !status.PlacementEnabled
+            ? "Off. Windows spreads the game over every core."
+            : status.PlacementUnsupported
+                ? "Not on this PC yet: its processors are in more than one group (over 64), or Windows did not list them."
+            : status.Placement is null
+                ? "Waiting for the game."
+                : !status.Placement.Narrows
+                    ? $"Nothing to choose: {status.Placement.Reason}."
+                    : status.PlacementApplied
+                        ? $"The game runs on {status.Placement.Cores} of {status.Placement.TotalCores} cores · {status.Placement.Reason}."
+                            + (status.ProgramsOnSpareCores > 0 ? $" {status.ProgramsOnSpareCores} held-back program process(es) kept on the other cores." : string.Empty)
+                            + (status.PlacementCorrections > 0 ? $" Put back {status.PlacementCorrections} time(s) after something changed it." : string.Empty)
+                            + (status.PlacementPinnedThreads > 0
+                                ? $" {status.PlacementPinnedThreads} of the game's threads are pinned by the emulator to cores outside it, and Windows follows that pin."
+                                : string.Empty)
+                        : "Windows refused to place the game. Optima tries again at the next match.";
+        PowerFloorDetailText = !BoostOn && PowerFloor
+            ? StandbyText
+            : !status.PowerFloorEnabled
+            ? "Off. The processor clocks down and USB devices sleep as the active power plan says."
+            : status.PowerFloorHeld
+                ? "Full processor speed on mains and USB devices kept awake · the plan's own settings come back when the game leaves"
+                : status.PowerFloorAlreadySet
+                    ? "The active power plan already does both, so there is nothing to change."
+                    : "Waiting for the game.";
         GpuDetailText = !BoostOn && GpuHighPerformance
             ? StandbyText
             : !status.GpuEnabled
@@ -420,6 +527,17 @@ public sealed partial class BoostViewModel : ObservableObject
             : status.GpuApplied
                 ? "Set for " + System.IO.Path.GetFileName(status.GamePath) + " · Windows reads it the next time the game starts"
                 : "It will be set the first time Optima sees the game running, because that is how it learns where the game is installed.";
+        GpuPriorityDetailText = !BoostOn && GpuPriorityHigh
+            ? StandbyText
+            : !status.GpuPriorityEnabled
+            ? "Off. The game's work on the graphics card waits its turn like any program's."
+            : status.GpuPriorityRaised > 0
+                ? "High GPU priority on the game's emulator · its own setting comes back when the game leaves"
+            : status.GpuPriorityRefused
+                ? "Windows refused it for the game's emulator on this account, so nothing was changed."
+            : status.GpuPriorityAlreadyHigh
+                ? "The game's emulator already has high GPU priority, so there is nothing to change."
+                : "Waiting for the game.";
     }
 
     private void ShowTimer(TimerResolutionStatus status)
@@ -670,6 +788,7 @@ public sealed partial class BoostViewModel : ObservableObject
     /// <summary>Boost on with Critical Ops on screen, which the dial's nameplate reads as ENGAGED.</summary>
     public bool BoostEngaged => BoostPhase == "ENGAGED";
     [ObservableProperty] private string _headerStatusText = string.Empty;
+    [ObservableProperty] private string _backgroundStateText = "OFF";
     [ObservableProperty] private string _coresStateText = "OFF";
     [ObservableProperty] private string _gpuStateText = "OFF";
 
@@ -880,15 +999,28 @@ public sealed partial class BoostViewModel : ObservableObject
         var timer = _timer.Status;
         var demotion = _demotion.Status;
         var extras = _extras.Status;
+        var wifi = _wifi.Status;
         var presence = _presence.Current;
         var gameRunning = presence != GamePresence.NotRunning;
         var metrics = _metrics;
         var processors = Environment.ProcessorCount;
         var tally = cleaner.Tally;
 
-        CoresStateText = !KeepCoresAwake ? "OFF" : !BoostOn ? "STANDBY" : extras.CoresHeld || extras.CoresAlreadyAwake ? "AWAKE" : "ARMED";
-        GpuStateText = !GpuHighPerformance ? "OFF" : !BoostOn ? "STANDBY" : extras.GpuApplied ? "SET" : "WAITING";
-        var working = new[] { GuardStateText, CleanerStateText, TimerStateText, DemotionStateText, CoresStateText, GpuStateText }
+        // One pill for the card's three switches: working when any is.
+        CoresStateText = !KeepCoresAwake && !CorePlacement && !PowerFloor ? "OFF" : !BoostOn ? "STANDBY"
+            : extras.PlacementApplied ? "ACTIVE"
+            : extras.CoresHeld || extras.CoresAlreadyAwake || extras.PowerFloorHeld || extras.PowerFloorAlreadySet ? "AWAKE" : "ARMED";
+        // One pill for the card's two switches: working when either is.
+        BackgroundStateText = !DemotionEnabled && !WifiScanPaused ? "OFF" : !BoostOn ? "STANDBY"
+            : DemotionEnabled && WorkingStates.Contains(DemotionStateText) ? DemotionStateText
+            : WifiScanPaused && wifi.Held ? "HOLDING"
+            : !DemotionEnabled && wifi.GameOnScreen && !wifi.Failed ? "IDLE"
+            : "ARMED";
+        // One pill for the card's two switches: working when either is.
+        GpuStateText = !GpuHighPerformance && !GpuPriorityHigh ? "OFF" : !BoostOn ? "STANDBY"
+            : GpuPriorityHigh && extras.GpuPriorityRaised > 0 ? "ACTIVE"
+            : GpuHighPerformance && extras.GpuApplied ? "SET" : "WAITING";
+        var working = new[] { GuardStateText, CleanerStateText, TimerStateText, BackgroundStateText, CoresStateText, GpuStateText }
             .Count(WorkingStates.Contains);
         BoostPhase = !BoostOn ? "OFF" : presence == GamePresence.InGame ? "ENGAGED" : "ARMED";
         HeaderStatusText = BoostPhase switch
@@ -996,10 +1128,25 @@ public sealed partial class BoostViewModel : ObservableObject
         TimerHeldBox = new Rect(0, 0, Math.Max(CombTickMs * 1.5, combMs > 0 ? combMs : CombSpanMs), 1);
 
         var awake = BoostOn && (extras.CoresHeld || extras.CoresAlreadyAwake);
-        CoreCells = [.. Enumerable.Repeat(awake, processors)];
-        CoresCellsText = awake
-            ? $"all {processors} logical processors awake"
-            : $"{processors} logical processors · which are parked is not read";
+        // With the game placed, the lit cells are the logical processors it runs on.
+        if (BoostOn && extras is { PlacementApplied: true, Placement: { } placed })
+        {
+            var cells = new bool[processors];
+            foreach (var logical in placed.LogicalProcessors.Where(l => l < processors))
+            {
+                cells[logical] = true;
+            }
+            CoreCells = cells;
+            CoresCellsText = $"game on {placed.CpuSetIds.Count} of {processors} logical processors"
+                + (awake ? " · all awake" : string.Empty);
+        }
+        else
+        {
+            CoreCells = [.. Enumerable.Repeat(awake, processors)];
+            CoresCellsText = awake
+                ? $"all {processors} logical processors awake"
+                : $"{processors} logical processors · which are parked is not read";
+        }
 
         // By maker, not memory: Windows reports an adapter's memory in 32 bits, so every card with
         // 4 GB or more reads as 4 GB.

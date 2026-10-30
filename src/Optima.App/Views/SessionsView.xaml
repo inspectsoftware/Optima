@@ -55,6 +55,36 @@
         </StackPanel>
       </HeaderedContentControl>
 
+      <!-- Which Boost switches go with better frame rates in this player's own sessions. A hint:
+           nothing holds the map, the server or the rest of the PC still between sessions. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="WHAT HELPS">
+        <StackPanel>
+          <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
+                     Text="Median fps of your sessions longer than 3 minutes with each boost working, against those with it off. Other things change between sessions too, so this is a hint, not a proof." />
+          <TextBlock Text="No session has a Boost record yet. Sessions saved before this update are left out; play a few and this fills in."
+                     Style="{StaticResource Text.Micro}" Foreground="{DynamicResource Brush.TextMuted}" Margin="0,8,0,0"
+                     TextWrapping="Wrap" TextTrimming="None"
+                     Visibility="{Binding HasBoostRecords, Converter={StaticResource InverseBoolToVis}}" />
+          <ItemsControl ItemsSource="{Binding BoostEffects}" Margin="0,8,0,0"
+                        Visibility="{Binding HasBoostRecords, Converter={StaticResource BoolToVis}}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,3">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" /><ColumnDefinition Width="110" />
+                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding Name}" Style="{StaticResource Text.Label}" />
+                  <TextBlock Grid.Column="1" Text="{Binding CountText}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Text="{Binding LowText}" Style="{StaticResource Text.Value}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="3" Text="{Binding AverageText}" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" Margin="16,0,0,0" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </HeaderedContentControl>
+
       <HeaderedContentControl Style="{StaticResource Section}" Header="HISTORY">
         <HeaderedContentControl.Tag>
           <StackPanel Orientation="Horizontal">

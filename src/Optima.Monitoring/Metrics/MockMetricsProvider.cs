@@ -25,8 +25,6 @@ public sealed class MockMetricsProvider : IPerformanceMetricsProvider
 
     public string Name => "Mock metrics";
 
-    public event EventHandler<(double Fps, double FrametimeMs)>? SampleArrived;
-
     public Task<bool> IsAvailableAsync(CancellationToken ct = default) => Task.FromResult(true);
 
     public Task StartAsync(IReadOnlyList<int> processIds, CancellationToken ct = default)
@@ -71,7 +69,6 @@ public sealed class MockMetricsProvider : IPerformanceMetricsProvider
             avgFrametime = frames.Average();
             _fpsSamples.Add(fps);
         }
-        SampleArrived?.Invoke(this, (fps, avgFrametime));
     }
 
     public SessionStats GetSessionStats()

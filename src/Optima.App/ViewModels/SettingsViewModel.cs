@@ -80,9 +80,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         new("player", "Player", "One tracked player. HOME, sessions and Discord follow whoever is tracked here."),
         new("appearance", "Appearance", "Applies the moment you save."),
         new("discord", "Discord", "What your Discord card shows, and the OptimaBot link."),
-        new("overlay", "Overlay", "The fps readout over the game. Alt+F10 toggles it any time."),
         new("game", "Game & watchdog", "What Optima does when the game starts or dies on its own."),
-        new("general", "General", "Start-up, tray, updates and capture."),
+        new("general", "General", "Start-up, tray, updates, capture and the ping target."),
         new("advanced", "Advanced", "For unusual installs and for debugging. Empty means automatic."),
     ];
 
@@ -127,12 +126,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     public IReadOnlyList<string> LogLevelOptions { get; } = ["Trace", "Debug", "Information", "Warning", "Error"];
     public IReadOnlyList<string> ThemeOptions { get; } = ["Dark", "Light"];
 
-    public IReadOnlyList<SettingChoice> CornerOptions { get; } =
-        [new("Top left", "TopLeft"), new("Top right", "TopRight"), new("Bottom left", "BottomLeft"), new("Bottom right", "BottomRight")];
-
-    public IReadOnlyList<SettingChoice> OpacityOptions { get; } =
-        [new("50%", 0.5), new("65%", 0.65), new("80%", 0.8), new("100%", 1.0)];
-
     // In the order of MotionPolicy.Modes: System, On, Off.
     private static readonly string[] AnimationLabels = ["As Windows", "Always", "Off"];
     public IReadOnlyList<string> AnimationOptions => AnimationLabels;
@@ -170,14 +163,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (newValue is null)
         {
             Animations = oldValue ?? AnimationLabels[0];
-        }
-    }
-
-    partial void OnOverlayCornerChanged(string? oldValue, string newValue)
-    {
-        if (newValue is null)
-        {
-            OverlayCorner = oldValue ?? "TopRight";
         }
     }
 
@@ -763,15 +748,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>One of <see cref="AnimationOptions"/>.</summary>
     [ObservableProperty] private string _animations = AnimationLabels[0];
     [ObservableProperty] private bool _startWithWindows;
-    [ObservableProperty] private bool _overlayEnabled;
-    [ObservableProperty] private string _overlayCorner = "TopRight";
-    [ObservableProperty] private double _overlayOpacity = 0.8;
-    [ObservableProperty] private bool _overlayShowNetwork = true;
+    [ObservableProperty] private bool _boostAtStart;
     [ObservableProperty] private string _networkReferenceHost = "1.1.1.1";
     [ObservableProperty] private bool _enableWatchMode;
     [ObservableProperty] private bool _autoRelaunchOnCrash;
     [ObservableProperty] private bool _useMockMetricsProvider;
     [ObservableProperty] private string _vddSettingsPath = string.Empty;
+
+    /// <summary>
+    /// The file used when the box is empty, worked out the way the provider does: on a PC where the
+    /// driver's VDDPATH points elsewhere, a hard-coded "default" copied into the box would override
+    /// VDDPATH and send Optima's edits to a file the driver never reads.
+    /// </summary>
+    public string VddSettingsHint { get; } = DescribeDefaultVddSettings();
+
+    private static string DescribeDefaultVddSettings()
+    {
+        var (path, source) = DriverSettingsLocation.Locate(null);
+        return $"Leave empty to use {path} ({source}).";
+    }
     [ObservableProperty] private string _manualInstallPath = string.Empty;
     [ObservableProperty] private string _customLaunchCommand = string.Empty;
 
@@ -818,10 +813,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         [nameof(CheckForUpdatesAtStart)] = CheckForUpdatesAtStart,
         [nameof(Animations)] = Animations,
         [nameof(StartWithWindows)] = StartWithWindows,
-        [nameof(OverlayEnabled)] = OverlayEnabled,
-        [nameof(OverlayCorner)] = OverlayCorner,
-        [nameof(OverlayOpacity)] = OverlayOpacity,
-        [nameof(OverlayShowNetwork)] = OverlayShowNetwork,
+        [nameof(BoostAtStart)] = BoostAtStart,
         [nameof(NetworkReferenceHost)] = string.IsNullOrWhiteSpace(NetworkReferenceHost) ? "1.1.1.1" : NetworkReferenceHost.Trim(),
         [nameof(EnableWatchMode)] = EnableWatchMode,
         [nameof(UseMockMetricsProvider)] = UseMockMetricsProvider,
@@ -915,10 +907,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         CheckForUpdatesAtStart = settings.CheckForUpdatesAtStart;
         Animations = AnimationLabels[Math.Max(0, Optima.Core.Theming.MotionPolicy.Modes.ToList().FindIndex(mode => string.Equals(mode, settings.EffectiveAnimations, StringComparison.OrdinalIgnoreCase)))];
         StartWithWindows = settings.StartWithWindows;
-        OverlayEnabled = settings.OverlayEnabled;
-        OverlayCorner = settings.OverlayCorner ?? "TopRight";
-        OverlayOpacity = settings.OverlayOpacity;
-        OverlayShowNetwork = settings.OverlayShowNetwork;
+        BoostAtStart = settings.BoostAtStart;
         NetworkReferenceHost = settings.NetworkReferenceHost;
         EnableWatchMode = settings.EnableWatchMode;
         AutoRelaunchOnCrash = settings.AutoRelaunchOnCrash;
@@ -960,10 +949,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             CheckForUpdatesAtStart = CheckForUpdatesAtStart,
             Animations = Optima.Core.Theming.MotionPolicy.Modes[Math.Max(0, Array.IndexOf(AnimationLabels, Animations))],
             StartWithWindows = StartWithWindows,
-            OverlayEnabled = OverlayEnabled,
-            OverlayCorner = OverlayCorner,
-            OverlayOpacity = OverlayOpacity,
-            OverlayShowNetwork = OverlayShowNetwork,
+            BoostAtStart = BoostAtStart,
             NetworkReferenceHost = string.IsNullOrWhiteSpace(NetworkReferenceHost) ? "1.1.1.1" : NetworkReferenceHost.Trim(),
             EnableWatchMode = EnableWatchMode,
             AutoRelaunchOnCrash = AutoRelaunchOnCrash,

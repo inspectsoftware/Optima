@@ -100,84 +100,62 @@ public static class PresenceComposer
     public static PresenceCard Compose(
         GamePresence state,
         PlayerSeasonBadge? player,
-        string? profileName,
-        DiscordPresenceOptions? options = null)
+        DiscordPresenceOptions? options = null,
+        MatchState? match = null)
     {
-        // Which facts are allowed out is decided field by field inside the card builders, so the
-        // privacy rule lives with the wording instead of being re-derived by every caller.
+        // Which facts are allowed out is decided field by field here, so the privacy rule lives with
+        // the wording instead of being re-derived by every caller.
         options ??= DiscordPresenceOptions.Standard;
+
+        var name = options.ShowPlayerName ? player?.Name : null;
+        var rank = options.ShowRank ? player?.RankLabel : null;
+        var record = options.ShowRankedRecord ? player?.Record : null;
+
+        var card = new PresenceCard
+        {
+            LargeImageText = AppName,
+            LargeImageUrl = ProjectUrl,
+            SmallImageText = SmallCaption(player, options),
+            StatusDisplay = options.StatusDisplay,
+            RankTier = EmblemTier(player, options),
+        };
+
+        // Discord puts "Playing" in front of the status line itself. When that line is the details,
+        // the card says "Critical Ops" so the member list reads "Playing Critical Ops", and the idle
+        // and launching cards fall back to the app name rather than "Playing Idling...".
+        var statusIsDetails = options.StatusDisplay == PresenceStatusDisplay.Details;
+        var game = statusIsDetails ? "Critical Ops" : "Playing Critical Ops";
+        var notPlaying = statusIsDetails ? PresenceStatusDisplay.Name : options.StatusDisplay;
 
         return state switch
         {
-            GamePresence.InGame => ComposeInGame(player, options),
-            GamePresence.Starting => ComposeStarting(profileName, player, options),
-            _ => ComposeLauncher(player, options),
+            GamePresence.InGame => card with
+            {
+                // In a match the map and the playlist follow the game.
+                Details = match?.Phase == MatchPhase.InMatch
+                    ? Join(game, ModeLabel(match.Mode), match.Map)
+                    : game,
+                State = match?.Phase == MatchPhase.InMenu
+                    ? Join("In menu", name, rank, record)
+                    : Join(name, rank, record),
+                DetailsUrl = GameUrl,
+            },
+            GamePresence.Starting => card with
+            {
+                Details = "Launching", State = Join(name, rank), DetailsUrl = GameUrl, StatusDisplay = notPlaying,
+            },
+            _ => card with { Details = "Idling...", State = Join(name, rank), StatusDisplay = notPlaying },
         };
     }
 
-    /// <summary>
-    /// Playing: the game on the details line with the rank beside it, and the live session facts
-    /// (who, how the season is going) on the state line.
-    /// </summary>
-    private static PresenceCard ComposeInGame(PlayerSeasonBadge? player, DiscordPresenceOptions options)
+    /// <summary>The playlist shown before the map, once the match mode is known.</summary>
+    private static string? ModeLabel(MatchMode mode) => mode switch
     {
-        var rank = options.ShowRank ? player?.RankLabel ?? string.Empty : string.Empty;
-        var details = rank.Length == 0 ? "Critical Ops" : "Critical Ops · " + rank;
-
-        return new PresenceCard
-        {
-            Details = Truncate(details),
-            State = Join(
-                options.ShowPlayerName ? player?.Name : null,
-                options.ShowRankedRecord ? player?.Record : null),
-            DetailsUrl = GameUrl,
-            LargeImageText = AppName,
-            LargeImageUrl = ProjectUrl,
-            SmallImageText = SmallCaption(player, options),
-            StatusDisplay = options.StatusDisplay,
-            RankTier = EmblemTier(player, options),
-        };
-    }
-
-    /// <summary>Launching: what is happening and which profile is being applied.</summary>
-    private static PresenceCard ComposeStarting(string? profileName, PlayerSeasonBadge? player, DiscordPresenceOptions options)
-    {
-        var applying = string.IsNullOrWhiteSpace(profileName) ? string.Empty : "applying " + profileName.Trim();
-
-        return new PresenceCard
-        {
-            Details = "Launching Critical Ops",
-            State = Truncate(applying),
-            DetailsUrl = GameUrl,
-            LargeImageText = AppName,
-            LargeImageUrl = ProjectUrl,
-            SmallImageText = SmallCaption(player, options),
-            StatusDisplay = options.StatusDisplay,
-            RankTier = EmblemTier(player, options),
-        };
-    }
-
-    /// <summary>
-    /// Browsing the launcher: the app is running but no game is. Shows who is at the launcher and
-    /// their rank once that is known, so the card is not an empty shell for people who sit here.
-    /// </summary>
-    private static PresenceCard ComposeLauncher(PlayerSeasonBadge? player, DiscordPresenceOptions options)
-    {
-        var state = Join(
-            options.ShowPlayerName ? player?.Name : null,
-            options.ShowRank ? player?.RankLabel : null);
-
-        return new PresenceCard
-        {
-            Details = "Optima Launcher",
-            State = state.Length == 0 ? "Browsing the launcher" : state,
-            LargeImageText = AppName,
-            LargeImageUrl = ProjectUrl,
-            SmallImageText = SmallCaption(player, options),
-            StatusDisplay = options.StatusDisplay,
-            RankTier = EmblemTier(player, options),
-        };
-    }
+        MatchMode.Ranked => "Ranked",
+        // Casual covers TDM, casual defuse and custom: the game's log does not tell them apart.
+        MatchMode.Casual => "Casual",
+        _ => null,
+    };
 
     /// <summary>The small image's tier, or null when the chooser keeps the emblem off.</summary>
     private static int? EmblemTier(PlayerSeasonBadge? player, DiscordPresenceOptions options)

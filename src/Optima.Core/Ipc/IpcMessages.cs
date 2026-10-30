@@ -9,6 +9,7 @@ public enum IpcCommand
     Ping,
     EnableDevice,
     DisableDevice,
+    RestartDevice,
     WriteVddPipe,
     StartEtw,
     StopEtw,
@@ -25,6 +26,7 @@ public enum IpcCommand
     StopStandbyCleaner,
     PurgeStandbyList,
     LaunchShield,
+    RunLatencyScan,
     Shutdown,
 }
 

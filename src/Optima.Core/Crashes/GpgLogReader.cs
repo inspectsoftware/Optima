@@ -19,6 +19,9 @@ public sealed class GpgLogReader
 
     public bool LogsFolderExists => Directory.Exists(_logsDirectory);
 
+    /// <summary>The live logcat file GPG is writing to now (it is rotated to a backup name when full).</summary>
+    public string SerialLogPath => Path.Combine(_logsDirectory, SerialLogName);
+
     public string? CrashReportingDirectory
     {
         get

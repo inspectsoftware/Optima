@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Optima.Core.Detection;
 
 namespace Optima.Watchdog;
 
@@ -15,6 +16,10 @@ internal static class DeviceInstaller
     private const uint DIF_REGISTERDEVICE = 0x00000019;
     private const uint DIF_REMOVE = 0x00000005;
     private const uint DIGCF_PRESENT = 0x00000002;
+    private const uint DIGCF_ALLCLASSES = 0x00000004;
+    private const uint SPDRP_DRIVER = 0x00000009;
+    private const uint DN_HAS_PROBLEM = 0x00000400;
+    private const uint CM_DISABLE_UI_NOT_OK = 0x00000004;
     private const uint INSTALLFLAG_FORCE = 0x00000001;
     private const int ERROR_NO_MORE_ITEMS = 259;
 
@@ -31,7 +36,11 @@ internal static class DeviceInstaller
     private static extern IntPtr SetupDiCreateDeviceInfoList(ref Guid classGuid, IntPtr hwndParent);
 
     [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, IntPtr enumerator, IntPtr hwndParent, uint flags);
+    private static extern IntPtr SetupDiGetClassDevs(IntPtr classGuid, string enumerator, IntPtr hwndParent, uint flags);
+
+    [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SetupDiGetDeviceInstanceId(
+        IntPtr deviceInfoSet, ref SP_DEVINFO_DATA deviceInfoData, char[] buffer, int bufferSize, out int requiredSize);
 
     [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetupDiCreateDeviceInfo(
@@ -66,11 +75,63 @@ internal static class DeviceInstaller
     [DllImport("cfgmgr32.dll")]
     private static extern int CM_Enable_DevNode(uint devInst, uint flags);
 
+    [DllImport("cfgmgr32.dll")]
+    private static extern int CM_Disable_DevNode(uint devInst, uint flags);
+
+    [DllImport("cfgmgr32.dll")]
+    private static extern int CM_Get_DevNode_Status(out uint status, out uint problemNumber, uint devInst, uint flags);
+
+    private delegate void NodeAction(IntPtr set, ref SP_DEVINFO_DATA data);
+
     /// <summary>Enables a device by instance id. Returns the CONFIGRET, 0 on success.</summary>
     internal static int EnableDevice(string instanceId)
     {
         var located = CM_Locate_DevNodeW(out var devInst, instanceId, 0);
         return located != 0 ? located : CM_Enable_DevNode(devInst, 0);
+    }
+
+    /// <summary>
+    /// Disables then enables a device once, which makes Windows start the driver again: what Device
+    /// Manager's disable/enable does for a node stuck after a failed start. The enable runs even when
+    /// the disable was refused, so a restart never leaves the device switched off.
+    /// Returns both CONFIGRETs, 0 on success.
+    /// </summary>
+    internal static (int Disable, int Enable) RestartDevice(string instanceId)
+    {
+        var located = CM_Locate_DevNodeW(out var devInst, instanceId, 0);
+        if (located != 0)
+        {
+            return (located, located);
+        }
+        var disabled = CM_Disable_DevNode(devInst, CM_DISABLE_UI_NOT_OK);
+        return (disabled, CM_Enable_DevNode(devInst, 0));
+    }
+
+    /// <summary>
+    /// Every present root node carrying the hardware id, with its Device Manager problem code (0 when
+    /// working) and whether a driver is bound to it. Root nodes of any class are included, because a
+    /// node whose driver install failed can be left without the Display class.
+    /// </summary>
+    internal static IReadOnlyList<VddRootNodes.Node> GetRootDevices(string hardwareId)
+    {
+        var nodes = new List<VddRootNodes.Node>();
+        ForEachRootDevice(hardwareId, (IntPtr set, ref SP_DEVINFO_DATA data) =>
+        {
+            var buffer = new char[400];
+            var instanceId = SetupDiGetDeviceInstanceId(set, ref data, buffer, buffer.Length, out var length)
+                ? new string(buffer, 0, Math.Max(0, length - 1))
+                : $"devinst {data.DevInst}";
+
+            // -1 when Windows will not say, so an unreadable node is never taken for a working one.
+            var problem = CM_Get_DevNode_Status(out var status, out var number, data.DevInst, 0) != 0 ? -1
+                : (status & DN_HAS_PROBLEM) != 0 ? (int)number
+                : 0;
+
+            // A bound driver has a driver key; a node Windows found no driver for has none.
+            SetupDiGetDeviceRegistryProperty(set, ref data, SPDRP_DRIVER, out _, null, 0, out var driverKeySize);
+            nodes.Add(new VddRootNodes.Node(instanceId, problem, HasDriver: driverKeySize > 0));
+        });
+        return nodes;
     }
 
     internal static (bool Success, bool RebootRequired, string Error) CreateRootDevice(string hardwareId, string infPath)
@@ -117,15 +178,28 @@ internal static class DeviceInstaller
         return (true, rebootRequired, string.Empty);
     }
 
-    /// <summary>
-    /// True when a present device already carries this hardware id. Installing the package again
-    /// then only needs to update the staged driver, because creating a second device node would
-    /// put a second virtual display on the desktop.
-    /// </summary>
-    internal static bool RootDeviceExists(string hardwareId)
+    internal static (bool Success, int Removed, string Error) RemoveRootDevices(string hardwareId)
     {
-        var classGuid = DisplayClassGuid;
-        var deviceInfoSet = SetupDiGetClassDevs(ref classGuid, IntPtr.Zero, IntPtr.Zero, DIGCF_PRESENT);
+        var removed = 0;
+        var opened = ForEachRootDevice(hardwareId, (IntPtr set, ref SP_DEVINFO_DATA data) =>
+        {
+            if (SetupDiCallClassInstaller(DIF_REMOVE, set, ref data))
+            {
+                removed++;
+            }
+        });
+        return opened
+            ? (true, removed, string.Empty)
+            : (false, 0, $"SetupDiGetClassDevs failed ({Marshal.GetLastWin32Error()}).");
+    }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> on every present root node carrying the hardware id, whatever its
+    /// class. False when the device list could not be opened.
+    /// </summary>
+    private static bool ForEachRootDevice(string hardwareId, NodeAction action)
+    {
+        var deviceInfoSet = SetupDiGetClassDevs(IntPtr.Zero, "ROOT", IntPtr.Zero, DIGCF_PRESENT | DIGCF_ALLCLASSES);
         if (deviceInfoSet == IntPtr.Zero || deviceInfoSet == new IntPtr(-1))
         {
             return false;
@@ -147,7 +221,7 @@ internal static class DeviceInstaller
 
                 if (MatchesHardwareId(deviceInfoSet, ref deviceInfoData, hardwareId))
                 {
-                    return true;
+                    action(deviceInfoSet, ref deviceInfoData);
                 }
             }
         }
@@ -155,51 +229,7 @@ internal static class DeviceInstaller
         {
             SetupDiDestroyDeviceInfoList(deviceInfoSet);
         }
-
-        return false;
-    }
-
-    internal static (bool Success, int Removed, string Error) RemoveRootDevices(string hardwareId)
-    {
-        var classGuid = DisplayClassGuid;
-        var deviceInfoSet = SetupDiGetClassDevs(ref classGuid, IntPtr.Zero, IntPtr.Zero, DIGCF_PRESENT);
-        if (deviceInfoSet == IntPtr.Zero || deviceInfoSet == new IntPtr(-1))
-        {
-            return (false, 0, $"SetupDiGetClassDevs failed ({Marshal.GetLastWin32Error()}).");
-        }
-
-        var removed = 0;
-        try
-        {
-            for (uint index = 0; ; index++)
-            {
-                var deviceInfoData = new SP_DEVINFO_DATA { cbSize = Marshal.SizeOf<SP_DEVINFO_DATA>() };
-                if (!SetupDiEnumDeviceInfo(deviceInfoSet, index, ref deviceInfoData))
-                {
-                    if (Marshal.GetLastWin32Error() == ERROR_NO_MORE_ITEMS)
-                    {
-                        break;
-                    }
-                    continue;
-                }
-
-                if (!MatchesHardwareId(deviceInfoSet, ref deviceInfoData, hardwareId))
-                {
-                    continue;
-                }
-
-                if (SetupDiCallClassInstaller(DIF_REMOVE, deviceInfoSet, ref deviceInfoData))
-                {
-                    removed++;
-                }
-            }
-        }
-        finally
-        {
-            SetupDiDestroyDeviceInfoList(deviceInfoSet);
-        }
-
-        return (true, removed, string.Empty);
+        return true;
     }
 
     private static bool MatchesHardwareId(IntPtr set, ref SP_DEVINFO_DATA data, string hardwareId)

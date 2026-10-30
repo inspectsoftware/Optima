@@ -69,6 +69,29 @@ public sealed class DisplayChoiceTests
     }
 
     [Fact]
+    public void ANewPcWithoutTheDriverGetsTheDisplayOnceTheDriverIsThere()
+    {
+        var first = Migrate(new AppSettings(), fresh: true, driver: false);
+        Assert.False(first.VirtualDisplayEnabled);
+
+        // A later start: no longer a fresh install, and the driver has been installed since.
+        var later = Migrate(first with { FirstRunCompleted = true }, fresh: false, driver: true);
+        Assert.True(later.VirtualDisplayEnabled);
+        Assert.False(later.VirtualDisplayAwaitsDriver);
+
+        // Still no driver: stays off, and keeps waiting.
+        Assert.Same(first, Migrate(first, fresh: false, driver: false));
+    }
+
+    [Fact]
+    public void AnOffThePlayerChoseStaysOffWhenTheDriverArrives()
+    {
+        var chosen = new AppSettings { VirtualDisplayEnabled = false, VirtualDisplayAwaitsDriver = false };
+
+        Assert.Same(chosen, Migrate(chosen, fresh: false, driver: true));
+    }
+
+    [Fact]
     public void AChoiceThatWasMadeIsNeverMovedAgain()
     {
         var chosen = new AppSettings { VirtualDisplayEnabled = false, SelectedProfileName = "Competitive 1080p240" };

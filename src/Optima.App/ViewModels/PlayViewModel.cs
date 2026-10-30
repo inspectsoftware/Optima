@@ -70,6 +70,7 @@ public sealed partial class PlayViewModel : ObservableObject
     private readonly Optima.Monitoring.Metrics.StandbyCleanerService _standbyCleaner;
     private readonly Optima.Monitoring.Metrics.EtwMetricsProviderClient _capture;
     private readonly Optima.Core.Protection.ShieldLoader _shield;
+    private readonly ChecksViewModel _checks;
     private CancellationTokenSource? _sessionCts;
     private DispatcherTimer? _elapsedTimer;
 
@@ -86,8 +87,19 @@ public sealed partial class PlayViewModel : ObservableObject
         Optima.Monitoring.Metrics.StandbyCleanerService standbyCleaner,
         Optima.Monitoring.Metrics.EtwMetricsProviderClient capture,
         Optima.Core.Protection.ShieldLoader shield,
+        ChecksViewModel checks,
         ILogger<PlayViewModel> logger)
     {
+        _checks = checks;
+        // The driver latency scan holds the elevated helper and a kernel trace for its ten
+        // seconds: a launch then would queue behind it and start the game under the trace.
+        _checks.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ChecksViewModel.IsLatencyScanning))
+            {
+                PlayCommand.NotifyCanExecuteChanged();
+            }
+        };
         _standbyCleaner = standbyCleaner;
         _capture = capture;
         _shield = shield;
@@ -415,7 +427,7 @@ public sealed partial class PlayViewModel : ObservableObject
         }
     }
 
-    private bool CanPlay() => !IsSessionActive;
+    private bool CanPlay() => !IsSessionActive && !_checks.IsLatencyScanning;
 
     [RelayCommand(CanExecute = nameof(IsSessionActive))]
     private void Cancel()

@@ -40,6 +40,7 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
     private bool _deviceWasEnabledInitially = true;
     private bool _displayWasActiveInitially;
     private bool _weEnabledDevice;
+    private string? _enabledInstanceId;
 
     public MttVddProvider(
         IDisplayService displayService,
@@ -91,7 +92,9 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
     {
         await RestoreSettingsFromMarkerAsync(ct).ConfigureAwait(false);
 
-        var settingsPath = await GetSettingsPathAsync(ct).ConfigureAwait(false);
+        var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
+        var (settingsPath, source) = DriverSettingsLocation.Locate(settings.VddSettingsPath);
+        _logger.LogInformation("Virtual display settings file: {Path} (from {Source})", settingsPath, source);
         if (!File.Exists(settingsPath))
         {
             await EnsureDefaultSettingsFileAsync(settingsPath, ct).ConfigureAwait(false);
@@ -106,15 +109,23 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
         }
 
         var devices = await _deviceLocator.FindDisplayDevicesAsync(DeviceNameMarker, ct).ConfigureAwait(false);
-        _deviceWasEnabledInitially = devices.Count == 0 || devices.Any(d => d.Enabled);
+        // The first node is the one EnableDisplayAsync acts on, so it is the one whose state is put back.
+        _deviceWasEnabledInitially = devices.Count == 0 || devices[0].Enabled;
         _displayWasActiveInitially = await IsDisplayActiveAsync(ct).ConfigureAwait(false);
         _logger.LogInformation(
             "Virtual display driver initialized (device enabled: {Enabled}, display active: {Active}, settings: {Path})",
             _deviceWasEnabledInitially, _displayWasActiveInitially, settingsPath);
     }
 
+    public override bool DeviceWasEnabledInitially => _deviceWasEnabledInitially;
+
     public override Task CreateDisplayAsync(CancellationToken ct = default) => EnableDisplayAsync(ct);
 
+    /// <summary>
+    /// Turns the display on according to what Device Manager says about the device: switched off is
+    /// switched on, a start failure gets one restart, and a fault no restart fixes is reported by
+    /// its own code at once instead of after a 15-second wait for a display that cannot come.
+    /// </summary>
     public override async Task EnableDisplayAsync(CancellationToken ct = default)
     {
         if (await IsDisplayActiveAsync(ct).ConfigureAwait(false))
@@ -122,6 +133,181 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
             return;
         }
 
+        var device = await ProbeDeviceAsync(ct).ConfigureAwait(false);
+        switch (ActionFor(device.ProblemCode))
+        {
+            case DeviceAction.Enable:
+                await SendDeviceCommandAsync(IpcCommand.EnableDevice, device.InstanceId, ct).ConfigureAwait(false);
+                _weEnabledDevice = true;
+                _enabledInstanceId = device.InstanceId;
+                break;
+            case DeviceAction.Restart:
+                // A start failure is often a driver that came up before something it needs; starting
+                // it again once is what a disable and enable in Device Manager does by hand.
+                _logger.LogWarning("Virtual display device {Id} has problem code {Code}; restarting it once",
+                    device.InstanceId, device.ProblemCode);
+                try
+                {
+                    await SendDeviceCommandAsync(IpcCommand.RestartDevice, device.InstanceId, ct).ConfigureAwait(false);
+                }
+                catch (OptimaException ex) when (ex.Error.Code == "DEVICE_TOGGLE_FAILED")
+                {
+                    // Half a restart: the disable went through and the enable did not. The device must
+                    // end switched on, as it started, and the error must name its code rather than
+                    // "could not toggle".
+                    _logger.LogWarning(ex, "Restarting virtual display device {Id} did not fully succeed; checking its state", device.InstanceId);
+                    if ((await ProbeDeviceAsync(ct).ConfigureAwait(false)).ProblemCode == PnpDeviceLocator.ProblemDisabled)
+                    {
+                        await SendDeviceCommandAsync(IpcCommand.EnableDevice, device.InstanceId, ct).ConfigureAwait(false);
+                    }
+                }
+                var codeBeforeRestart = device.ProblemCode;
+                device = await ProbeDeviceAsync(ct).ConfigureAwait(false);
+                if (!device.Healthy)
+                {
+                    throw ProblemError(device.ProblemCode == PnpDeviceLocator.ProblemDisabled ? codeBeforeRestart : device.ProblemCode);
+                }
+                break;
+            case DeviceAction.Fail:
+                throw ProblemError(device.ProblemCode);
+        }
+
+        if (await WaitForDisplayStateAsync(active: true, TimeSpan.FromSeconds(5), ct).ConfigureAwait(false))
+        {
+            await ThrowIfMainScreenAsync(ct).ConfigureAwait(false);
+            _logger.LogInformation("Virtual display created and attached to the desktop");
+            return;
+        }
+
+        // The device can fail while it starts, and its code names the problem better than "no display".
+        device = await ProbeDeviceAsync(ct).ConfigureAwait(false);
+        if (!device.Healthy)
+        {
+            throw ProblemError(device.ProblemCode);
+        }
+
+        // Windows keeps a display it once saw detached as detached. Attaching puts it to the right of
+        // the desktop, never as the main screen, and only until Windows next changes the layout.
+        if (await _displayService.AttachToDesktopAsync(DeviceNameMarker, ct).ConfigureAwait(false))
+        {
+            _logger.LogInformation("The virtual display was present but off the desktop; attached it");
+        }
+        if (await WaitForDisplayStateAsync(active: true, TimeSpan.FromSeconds(10), ct).ConfigureAwait(false))
+        {
+            // Active is not success: an attach that came up as the main screen and could not be
+            // taken back is still active, and must fail the session rather than run it there.
+            await ThrowIfMainScreenAsync(ct).ConfigureAwait(false);
+            _logger.LogInformation("Virtual display created and attached to the desktop");
+            return;
+        }
+
+        // A display that is there but off the desktop is Windows' layout, which a driver reload does
+        // not touch; no display at all is the driver offering none, which a reload can fix.
+        var displays = await _displayService.GetDisplaysAsync(ct).ConfigureAwait(false);
+        // Only a source with a monitor is a display: an empty output on the adapter is the driver
+        // offering none, which is VDD_NO_DISPLAY and its reload, not a layout problem.
+        var sources = displays.Where(d => d.AdapterName.Contains(DeviceNameMarker, StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var source in sources)
+        {
+            _logger.LogInformation("Virtual display source {Device}: monitor {HasMonitor}, attached {Active}",
+                source.DeviceName, source.HasMonitor, source.IsActive);
+        }
+        if (sources.Any(d => d.HasMonitor))
+        {
+            throw OptimaException.From("VDD_NOT_ATTACHED",
+                "Windows did not add the virtual display to the desktop.",
+                "The driver is working and its display is there, but Windows kept it off the desktop and did not accept attaching it.",
+                null,
+                "In Windows Settings > System > Display, choose Extend desktop to this display for the virtual display",
+                "Run Check my setup on the Display page again");
+        }
+        throw OptimaException.From("VDD_NO_DISPLAY",
+            "The virtual display did not appear.",
+            "The driver device is working but it offered Windows no display.",
+            null,
+            "Press Reload driver in Check my setup on the Display page",
+            "Check vdd_settings.xml has a monitor count of at least 1",
+            "Reinstall the virtual display driver");
+    }
+
+    /// <summary>Whether a display of this driver is the main screen, which it must never be.</summary>
+    internal static bool IsMainScreen(IEnumerable<DisplayInfo> displays)
+        => displays.Any(d => d.IsPrimary && d.AdapterName.Contains(DeviceNameMarker, StringComparison.OrdinalIgnoreCase));
+
+    private async Task ThrowIfMainScreenAsync(CancellationToken ct)
+    {
+        if (IsMainScreen(await _displayService.GetDisplaysAsync(ct).ConfigureAwait(false)))
+        {
+            throw OptimaException.From("VDD_BECAME_MAIN_SCREEN",
+                "The virtual display became the main screen.",
+                "Windows made the virtual display the main screen when it was added, and it could not be moved back.",
+                null,
+                "In Windows Settings > System > Display, select your own monitor and choose Make this my main display",
+                "Run Check my setup on the Display page again");
+        }
+    }
+
+    /// <summary>What turning the display on does about the device's problem code.</summary>
+    internal enum DeviceAction
+    {
+        None,
+        Enable,
+        Restart,
+        Fail,
+    }
+
+    /// <summary>
+    /// 0 needs nothing; 22 is switched off and gets switched on; a start failure (10, 31, 43) gets
+    /// one restart; everything else (no driver, a pending restart, a blocked signature) is not
+    /// helped by a restart and fails at once with <see cref="ProblemError"/>.
+    /// </summary>
+    internal static DeviceAction ActionFor(int problemCode) => problemCode switch
+    {
+        0 => DeviceAction.None,
+        PnpDeviceLocator.ProblemDisabled => DeviceAction.Enable,
+        10 or 31 or 43 => DeviceAction.Restart,
+        _ => DeviceAction.Fail,
+    };
+
+    /// <summary>Device Manager's codes for a node with no driver bound to it: only a reinstall helps.</summary>
+    internal static bool HasNoDriver(int problemCode) => problemCode is 1 or 18 or 28;
+
+    /// <summary>The error for a device that cannot be used as it is, with what to do about its code.</summary>
+    internal static OptimaException ProblemError(int problemCode)
+    {
+        if (HasNoDriver(problemCode))
+        {
+            return OptimaException.From("VDD_DEVICE_NO_DRIVER",
+                "The virtual display device has no driver.",
+                $"Windows lists the device but did not bind the driver to it (problem code {problemCode}).",
+                null,
+                "Reinstall the virtual display driver from the Display page");
+        }
+        return problemCode switch
+        {
+            14 => OptimaException.From("VDD_RESTART_NEEDED",
+                "Windows needs a restart before the virtual display can work.",
+                "The driver was installed or changed, and Windows finishes that only at the next restart (problem code 14).",
+                null,
+                "Restart the PC, then press PLAY again"),
+            52 => OptimaException.From("VDD_DRIVER_BLOCKED",
+                "Windows blocked the virtual display driver.",
+                "Windows could not verify the driver's digital signature and would not load it (problem code 52).",
+                null,
+                "Reinstall the virtual display driver from the Display page",
+                "Check whether security software is blocking the driver"),
+            _ => OptimaException.From("VDD_DEVICE_FAILED",
+                $"The virtual display device is not working (problem code {problemCode}).",
+                $"Device Manager reports problem code {problemCode} for the virtual display device.",
+                null,
+                "Reinstall the virtual display driver from the Display page",
+                "Look the code up in Device Manager under Display adapters"),
+        };
+    }
+
+    /// <summary>The healthiest virtual display node (every node is logged by the locator), or VDD_NOT_INSTALLED.</summary>
+    private async Task<PnpDeviceLocator.PnpDevice> ProbeDeviceAsync(CancellationToken ct)
+    {
         var devices = await _deviceLocator.FindDisplayDevicesAsync(DeviceNameMarker, ct).ConfigureAwait(false);
         if (devices.Count == 0)
         {
@@ -132,36 +318,25 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
                 "Install the Virtual Display Driver",
                 "Check Device Manager under Display adapters");
         }
-
-        var disabled = devices.FirstOrDefault(d => !d.Enabled);
-        if (disabled is not null)
-        {
-            await SendDeviceCommandAsync(IpcCommand.EnableDevice, disabled.InstanceId, ct).ConfigureAwait(false);
-            _weEnabledDevice = true;
-        }
-
-        if (!await WaitForDisplayStateAsync(active: true, TimeSpan.FromSeconds(15), ct).ConfigureAwait(false))
-        {
-            throw OptimaException.From("VDD_NO_DISPLAY",
-                "The virtual display did not appear.",
-                "The driver device is enabled but Windows never attached its display to the desktop.",
-                null,
-                "Press Reload driver in Check my setup on the Display page",
-                "Check vdd_settings.xml has a monitor count of at least 1",
-                "Reinstall the virtual display driver");
-        }
-        _logger.LogInformation("Virtual display created and attached to the desktop");
+        return devices[0];
     }
 
     public override async Task DisableDisplayAsync(CancellationToken ct = default)
     {
         var devices = await _deviceLocator.FindDisplayDevicesAsync(DeviceNameMarker, ct).ConfigureAwait(false);
-        var enabled = devices.FirstOrDefault(d => d.Enabled);
+        // A node with no driver is skipped: disabling it only turns its code into 22, which then reads
+        // as an installed driver and hides the reinstall that is the only fix.
+        var enabled = devices.FirstOrDefault(d => d.Enabled && !HasNoDriver(d.ProblemCode));
         if (enabled is null)
         {
             return;
         }
-        await SendDeviceCommandAsync(IpcCommand.DisableDevice, enabled.InstanceId, ct).ConfigureAwait(false);
+        await DisableDeviceAsync(enabled.InstanceId, ct).ConfigureAwait(false);
+    }
+
+    private async Task DisableDeviceAsync(string instanceId, CancellationToken ct)
+    {
+        await SendDeviceCommandAsync(IpcCommand.DisableDevice, instanceId, ct).ConfigureAwait(false);
         await WaitForDisplayStateAsync(active: false, TimeSpan.FromSeconds(10), ct).ConfigureAwait(false);
         _logger.LogInformation("Virtual display disabled");
     }
@@ -385,8 +560,18 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
 
         if (_weEnabledDevice && !_deviceWasEnabledInitially)
         {
-            await DisableDisplayAsync(ct).ConfigureAwait(false);
+            // The node this session switched on, not whichever is on first: with several nodes the
+            // first "enabled" one can be another that was on from the start.
+            if (_enabledInstanceId is not null)
+            {
+                await DisableDeviceAsync(_enabledInstanceId, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await DisableDisplayAsync(ct).ConfigureAwait(false);
+            }
             _weEnabledDevice = false;
+            _enabledInstanceId = null;
         }
     }
 
@@ -608,6 +793,6 @@ public sealed class MttVddProvider : VirtualDisplayProviderBase, IVirtualDisplay
     private async Task<string> GetSettingsPathAsync(CancellationToken ct)
     {
         var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
-        return string.IsNullOrWhiteSpace(settings.VddSettingsPath) ? DefaultSettingsPath : settings.VddSettingsPath;
+        return DriverSettingsLocation.Resolve(settings.VddSettingsPath);
     }
 }

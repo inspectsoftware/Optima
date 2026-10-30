@@ -149,7 +149,9 @@ public sealed class DisplaySetupCheck
             if (!await _provider.IsDisplayActiveAsync(ct))
             {
                 await _provider.EnableDisplayAsync(ct);
-                enabledHere = true;
+                // A device that was on from the start (its display only off the desktop, or a fault
+                // the restart fixed) ends the check on, as it started, not switched off.
+                enabledHere = !_provider.DeviceWasEnabledInitially;
             }
             Set(Appears, DisplayCheckState.Passed);
 
@@ -207,7 +209,9 @@ public sealed class DisplaySetupCheck
     /// <summary>What can be done on the spot for an error; everything else is a page of the guide.</summary>
     private static DisplayCheckFix FixFor(string code) => code switch
     {
-        "VDD_NOT_INSTALLED" => DisplayCheckFix.InstallDriver,
+        // A reinstall replaces a broken device node with a new one, so it is the fix for every device fault.
+        "VDD_NOT_INSTALLED" or "VDD_DEVICE_NO_DRIVER" or "VDD_DRIVER_BLOCKED" or "VDD_DEVICE_FAILED" => DisplayCheckFix.InstallDriver,
+        "VDD_RESTART_NEEDED" => DisplayCheckFix.RestartWindows,
         "VDD_NO_DISPLAY" or "VDD_PIPE_FAILED" => DisplayCheckFix.ReloadDriver,
         // Declined is the player's answer; there is nothing to repair, only to ask again.
         "ELEVATION_DECLINED" => DisplayCheckFix.None,

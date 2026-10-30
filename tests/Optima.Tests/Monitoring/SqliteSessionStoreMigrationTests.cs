@@ -87,7 +87,7 @@ public sealed class SqliteSessionStoreMigrationTests : IDisposable
         await using (var version = connection.CreateCommand())
         {
             version.CommandText = "PRAGMA user_version";
-            Assert.Equal(3L, (long)(await version.ExecuteScalarAsync())!);
+            Assert.Equal(4L, (long)(await version.ExecuteScalarAsync())!);
         }
         await using var tables = connection.CreateCommand();
         tables.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='matches'";
@@ -296,6 +296,20 @@ public sealed class SqliteSessionStoreMigrationTests : IDisposable
         Assert.Equal(24.5, loaded.Network.AveragePingMs, 3);
         Assert.Equal(1.2, loaded.Network.JitterMs, 3);
         Assert.Equal(0.5, loaded.Network.PacketLossPct, 3);
+    }
+
+    [Fact]
+    public async Task TheBoostRecordRoundTrips_InFullRecordsAndSummaries_AndOlderRowsHaveNone()
+    {
+        CreateV0Database();
+        var store = CreateStore();
+        var boost = new Optima.Core.Boost.BoostSessionRecord { Player = "123", On = ["timer", "gpu"], Applied = ["timer"] };
+        var id = await store.SaveSessionAsync(MakeRecord("Boosted") with { Boost = boost });
+
+        Assert.Equal(boost, Assert.Single(await store.GetSessionsByIdsAsync([id])).Boost);
+        var summaries = await store.GetSessionSummariesAsync();
+        Assert.Equal(boost, summaries.Single(s => s.Id == id).Boost);
+        Assert.Null(summaries.Single(s => s.ProfileName == "Legacy").Boost);
     }
 
     [Fact]

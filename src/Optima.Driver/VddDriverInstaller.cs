@@ -51,7 +51,9 @@ public sealed class VddDriverInstaller : IDriverInstaller
     public async Task<DriverState> GetStateAsync(CancellationToken ct = default)
     {
         var devices = await _deviceLocator.FindDisplayDevicesAsync(MttVddProvider.DeviceNameMarker, ct).ConfigureAwait(false);
-        if (devices.Count > 0)
+        // A node Windows bound no driver to (codes 1, 18, 28) is a failed install, not an installed
+        // driver: reading it as installed hid the Install driver button that rebuilds it.
+        if (devices.Any(d => !MttVddProvider.HasNoDriver(d.ProblemCode)))
         {
             return DriverState.Installed;
         }
@@ -104,6 +106,10 @@ public sealed class VddDriverInstaller : IDriverInstaller
             {
                 ["infPath"] = package.InfPath,
                 ["hardwareId"] = package.HardwareId,
+                // The Display page's button is the only caller, and it is pressed to fix a fault.
+                // Optima's own restore leaves a faulty node at code 22, which would otherwise read
+                // as fine and be kept, so the press would change nothing.
+                ["rebuild"] = "1",
             },
         }, ct).ConfigureAwait(false);
 
@@ -185,9 +191,7 @@ public sealed class VddDriverInstaller : IDriverInstaller
     private async Task EnsureSettingsFileAsync(CancellationToken ct)
     {
         var settings = await _settings.GetSettingsAsync(ct).ConfigureAwait(false);
-        var path = string.IsNullOrWhiteSpace(settings.VddSettingsPath)
-            ? VddSettingsDefaults.DefaultPath
-            : settings.VddSettingsPath;
+        var path = DriverSettingsLocation.Resolve(settings.VddSettingsPath);
 
         if (File.Exists(path))
         {

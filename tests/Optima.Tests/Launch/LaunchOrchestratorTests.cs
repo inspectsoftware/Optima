@@ -270,6 +270,35 @@ public sealed class LaunchOrchestratorTests : IDisposable
     }
 
     [Fact]
+    public async Task RunSession_ADeviceThatWasAlreadyOn_IsNotRecordedAsSwitchedOnByUs()
+    {
+        SystemStateSnapshot? onDisk = null;
+        var recovery = CreateRecovery();
+        _virtualDisplay.DeviceWasEnabledInitially = true;
+        _virtualDisplay.OnEnable = () => onDisk = recovery.GetPendingAsync().GetAwaiter().GetResult();
+
+        Assert.True((await CreateOrchestrator().RunSessionAsync(CompetitiveProfile)).Success);
+
+        // Its display was only off the desktop: the recovery must not switch the device off at the end.
+        Assert.False(onDisk!.VirtualDisplayEnabledByUs);
+    }
+
+    [Fact]
+    public async Task RunSession_TheLayoutIsCapturedBeforeTheDisplayIsAttached()
+    {
+        SystemStateSnapshot? onDisk = null;
+        var recovery = CreateRecovery();
+        _virtualDisplay.DeviceWasEnabledInitially = true;
+        _virtualDisplay.OnEnable = () => onDisk = recovery.GetPendingAsync().GetAwaiter().GetResult();
+
+        Assert.True((await CreateOrchestrator().RunSessionAsync(CompetitiveProfile)).Success);
+
+        // A device already on gets only its display attached; the layout from before that attach is
+        // what takes it off the desktop again at exit.
+        Assert.Equal("v1:topology", onDisk!.DisplayTopology);
+    }
+
+    [Fact]
     public async Task RunSession_OptimaKilledWhileTheDisplayComesOn_TheNextStartSwitchesItOff()
     {
         SystemStateSnapshot? onDisk = null;

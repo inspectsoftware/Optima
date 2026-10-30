@@ -43,6 +43,10 @@ public sealed record AppSettings
             BoostDemoteBackgroundEnabled = false,
             BoostKeepCoresAwake = false,
             BoostGpuHighPerformance = false,
+            BoostCorePlacement = false,
+            BoostWifiScanPaused = false,
+            BoostGpuPriorityHigh = false,
+            BoostPowerFloor = false,
         };
 
     /// <summary>
@@ -76,6 +80,21 @@ public sealed record AppSettings
 
     /// <summary>BOOST: Windows' per-app graphics preference "High performance" for the game's executable.</summary>
     public bool BoostGpuHighPerformance { get; init; }
+
+    /// <summary>BOOST: run the game's emulator on the best cores (CPU sets) while the game is on screen.</summary>
+    public bool BoostCorePlacement { get; init; }
+
+    /// <summary>BOOST: Wi-Fi media streaming mode on and background scanning off while the game is on screen.</summary>
+    public bool BoostWifiScanPaused { get; init; }
+
+    /// <summary>BOOST: high GPU scheduling priority for the game's emulator while the game is on screen.</summary>
+    public bool BoostGpuPriorityHigh { get; init; }
+
+    /// <summary>
+    /// BOOST: while the game is on screen, the active power plan's minimum processor state at 100% on
+    /// mains and USB selective suspend off, each put back when the game leaves.
+    /// </summary>
+    public bool BoostPowerFloor { get; init; }
 
     /// <summary>
     /// The game's executable as last seen running. The graphics preference is keyed by it, and
@@ -211,6 +230,13 @@ public sealed record AppSettings
     /// </summary>
     public bool? VirtualDisplayEnabled { get; init; }
 
+    /// <summary>
+    /// True while <see cref="VirtualDisplayEnabled"/> is off only because a new PC had no driver at
+    /// its first start, and the player has not chosen on the Display page since. The first start that
+    /// finds the driver switches the display on (see <see cref="Optima.Core.Configuration.DisplayChoice"/>).
+    /// </summary>
+    public bool VirtualDisplayAwaitsDriver { get; init; }
+
     public int VirtualDisplayWidth { get; init; } = 1920;
 
     public int VirtualDisplayHeight { get; init; } = 1080;
@@ -290,13 +316,11 @@ public sealed record AppSettings
 
     public bool StartWithWindows { get; init; }
 
-    public bool OverlayEnabled { get; init; }
-
-    public string OverlayCorner { get; init; } = "TopRight";
-
-    public double OverlayOpacity { get; init; } = 0.8;
-
-    public bool OverlayShowNetwork { get; init; } = true;
+    /// <summary>
+    /// Turns Boost on by itself each time Optima starts, as if the dial had been pressed. Off by
+    /// default: <see cref="BoostEnabled"/> is never saved, so without this every start begins off.
+    /// </summary>
+    public bool BoostAtStart { get; init; }
 
     public string NetworkReferenceHost { get; init; } = "1.1.1.1";
 

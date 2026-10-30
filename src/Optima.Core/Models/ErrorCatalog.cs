@@ -20,12 +20,65 @@ public static class ErrorCatalog
         new(
             "VDD_NO_DISPLAY",
             "The virtual display did not appear",
-            "Optima enabled the virtual display driver, but Windows never attached a display to the desktop within 15 seconds.",
-            "The driver device was enabled but its monitor output stayed parked. This is the most common virtual display fault; a settings reload almost always wakes it.",
+            "The virtual display driver device is working, but it offered Windows no display at all.",
+            "The driver reads how many displays to offer from vdd_settings.xml. A count of 0, a damaged file, or a file in a folder the driver does not read leaves it with none; a reload makes it read the file again.",
             [
                 "Open the Display page, run Check my setup, and press Reload driver on the step that failed",
-                "Check vdd_settings.xml (default C:\\VirtualDisplayDriver\\vdd_settings.xml) has a monitor count of at least 1",
+                "Check vdd_settings.xml has a monitor count of at least 1. The driver reads it from the VDDPATH folder when that is set, else C:\\VirtualDisplayDriver; the log names the path Optima used",
                 "Reinstall the virtual display driver from the Display page",
+            ]),
+        new(
+            "VDD_NOT_ATTACHED",
+            "Windows did not add the virtual display to the desktop",
+            "The virtual display driver is working and its display is there, but Windows kept it off the desktop, and attaching it beside your screens did not take.",
+            "Windows remembers a display that was once set to Disconnect this display or Show only on another screen, and keeps it off the desktop until the layout changes.",
+            [
+                "In Windows Settings > System > Display, select the virtual display and choose Extend desktop to this display",
+                "Run Check my setup on the Display page again",
+            ]),
+        new(
+            "VDD_BECAME_MAIN_SCREEN",
+            "The virtual display became the main screen",
+            "Windows made the virtual display the main screen when Optima added it to the desktop, and moving the main screen back to your monitor did not take. Optima stopped rather than run the game on a screen nobody can see.",
+            "Windows can pick a newly added display as the main screen, and while the layout is still settling it can refuse to change it again.",
+            [
+                "In Windows Settings > System > Display, select your own monitor and choose Make this my main display",
+                "Run Check my setup on the Display page again",
+            ]),
+        new(
+            "VDD_RESTART_NEEDED",
+            "Windows needs a restart for the virtual display",
+            "The virtual display device reports problem code 14: Windows will not start it until the PC restarts.",
+            "The driver was installed, updated or removed, and Windows finishes that only at the next restart.",
+            [
+                "Restart the PC, then press PLAY again",
+            ]),
+        new(
+            "VDD_DRIVER_BLOCKED",
+            "Windows blocked the virtual display driver",
+            "The virtual display device reports problem code 52: Windows could not verify the driver's digital signature and would not load it.",
+            "The driver files were changed or damaged, or a policy or security tool only allows drivers it trusts.",
+            [
+                "Reinstall the virtual display driver from the Display page",
+                "Check whether security software is blocking the driver",
+            ]),
+        new(
+            "VDD_DEVICE_NO_DRIVER",
+            "The virtual display device has no driver",
+            "Windows lists the virtual display device but did not bind its driver to it (problem code 1, 18 or 28).",
+            "An install that stopped half way, or a driver package removed while its device stayed, leaves a device with nothing to run it.",
+            [
+                "Reinstall the virtual display driver from the Display page: it removes the broken device and creates a new one",
+            ]),
+        new(
+            "VDD_DEVICE_FAILED",
+            "The virtual display device is not working",
+            "Device Manager reports a problem code for the virtual display device; the message names it.",
+            "The driver failed to start or stopped. Optima restarts the device once for start failures (codes 10, 31 and 43); this is what was left after that.",
+            [
+                "Reinstall the virtual display driver from the Display page",
+                "Restart the PC once, then run Check my setup on the Display page",
+                "Look the code up in Device Manager under Display adapters",
             ]),
         new(
             "VDD_NOT_INSTALLED",
@@ -382,6 +435,46 @@ public static class ErrorCatalog
                 "The Checks tab of the Debug page shows which backup would overwrite which file",
                 "If the backup is what should be there, start a session with a virtual display profile and let the restore run",
                 "To keep the settings file as it is now, delete backups\\vdd-settings.pending under %LOCALAPPDATA%\\Optima",
+            ]),
+        new(
+            "MEMORY_INTEGRITY_ON",
+            "Memory Integrity is on",
+            "Windows' Memory Integrity (Core isolation) is running. It uses the hypervisor to check the code the Windows kernel runs, so a driver that was tampered with cannot load.",
+            "Many new PCs ship with it on. The checking often costs some frame rate, more on older processors. Turning it off gives that back and gives up the protection: that is a security choice, and it is yours. Optima never changes it.",
+            [
+                "Nothing has to be done: this is a note, not a fault",
+                "To turn it off: Windows Security > Device security > Core isolation details > Memory integrity, then restart",
+                "Keep it on if you install drivers or tools you do not fully trust, or if your work or school asks for it",
+            ]),
+        new(
+            "HYPERVISOR_SCHEDULER_NOT_ROOT",
+            "The hypervisor does not use the root scheduler",
+            "Windows logged at startup that the hypervisor runs the classic or core scheduler instead of the root scheduler.",
+            "Client Windows is built for the root scheduler, under which Windows places the emulator's virtual processors like any other thread, and that is what Optima's core placement works through. Under the others the hypervisor places them itself, so core placement may not reach the game. A Hyper-V or server setup usually chose it.",
+            [
+                "Nothing has to be done for the game to run: this is a note, not a fault",
+                "If you did not choose this scheduler on purpose, ask whoever set the PC up; it is the hypervisorschedulertype boot setting",
+                "The scheduler is read once per Windows start, so a change shows here after a restart",
+            ]),
+        new(
+            "DRIVER_LATENCY_HIGH",
+            "A driver holds the processor too long",
+            "The driver latency scan on DEBUG saw a driver run a single DPC or ISR (the work a driver does the moment its device calls) for more than a millisecond.",
+            "While that work runs, nothing else can use that core: not the game, not the sound. A millisecond is long enough to be felt as a stutter, a hitch in the mouse or a crackle in the audio. It is nearly always one driver, and the scan names it.",
+            [
+                "Update the named driver from the maker of the device or of your PC, not only through Windows Update",
+                "If the trouble started after a driver update, roll it back: Device Manager > the device > Properties > Driver > Roll Back Driver",
+                "Wi-Fi, audio, RGB lighting and storage drivers are the usual causes. Unplugging or turning off the device and scanning again shows whether it is the one",
+                "Run the scan again afterwards to see the difference",
+            ]),
+        new(
+            "DRIVER_LATENCY_ELEVATED",
+            "A driver holds the processor longer than it should",
+            "The driver latency scan on DEBUG saw a driver run a single DPC or ISR for more than half a millisecond.",
+            "That is not long enough to cause a stutter on its own, but it is more than a healthy driver needs, and it is the one to look at first if the game ever hitches.",
+            [
+                "Nothing has to be done: this is a note, not a fault",
+                "If the game hitches, update the named driver from the maker of the device, or roll it back if it changed recently",
             ]),
         new(
             "UNCLASSIFIED",

@@ -12,21 +12,21 @@ namespace Optima.Monitoring;
 /// <summary>Session history in SQLite (%LOCALAPPDATA%\Optima\sessions.db, §13/§21).</summary>
 public sealed class SqliteSessionStore : ISessionStore
 {
-    private const int SchemaVersion = 3;
+    private const int SchemaVersion = 4;
 
     /// <summary>Every column of a session row, spelled out so a query never pulls a series it does not need.</summary>
     private const string SessionColumns =
         "id, profile_name, game_package_id, started_at, duration_seconds, sample_count, average_fps, " +
         "one_percent_low_fps, point_one_percent_low_fps, average_frametime_ms, p95_frametime_ms, " +
         "p99_frametime_ms, tweak_ids, profile_hash, launch_kind, avg_ping_ms, jitter_ms, packet_loss_pct, " +
-        "stats_delta, game_version, stats_baseline, fps_samples";
+        "stats_delta, game_version, stats_baseline, boost, fps_samples";
 
     /// <summary>The same list without the per-second fps series: the history list shows numbers, not graphs.</summary>
     private const string SessionSummaryColumns =
         "id, profile_name, game_package_id, started_at, duration_seconds, sample_count, average_fps, " +
         "one_percent_low_fps, point_one_percent_low_fps, average_frametime_ms, p95_frametime_ms, " +
         "p99_frametime_ms, tweak_ids, profile_hash, launch_kind, avg_ping_ms, jitter_ms, packet_loss_pct, " +
-        "stats_delta, game_version, stats_baseline";
+        "stats_delta, game_version, stats_baseline, boost";
 
     private const string MatchColumns =
         "id, session_id, started_at, mode, result, kills, deaths, assists, map, source, note";
@@ -238,6 +238,23 @@ public sealed class SqliteSessionStore : ISessionStore
             await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
             await transaction.CommitAsync(ct).ConfigureAwait(false);
         }
+
+        if (version < 4)
+        {
+            // Null on every older row: what Boost did in those sessions is unknown, and the
+            // comparison leaves them out rather than reading them as Boost off.
+            _logger.LogInformation("Migrating session store schema v{From} -> v4", Math.Max(version, 3));
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText =
+                """
+                ALTER TABLE sessions ADD COLUMN boost TEXT NULL;
+                PRAGMA user_version = 4;
+                """;
+            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
     }
 
     private void TryBackupDatabase()
@@ -273,9 +290,9 @@ public sealed class SqliteSessionStore : ISessionStore
                 sample_count, average_fps, one_percent_low_fps, point_one_percent_low_fps,
                 average_frametime_ms, p95_frametime_ms, p99_frametime_ms, fps_samples,
                 tweak_ids, profile_hash, launch_kind, avg_ping_ms, jitter_ms, packet_loss_pct,
-                stats_delta, game_version, stats_baseline)
+                stats_delta, game_version, stats_baseline, boost)
             VALUES ($profile, $package, $started, $duration, $samples, $avg, $low1, $low01, $avgFt, $p95, $p99, $fps,
-                $tweaks, $hash, $kind, $ping, $jitter, $loss, $delta, $gameVersion, $baseline);
+                $tweaks, $hash, $kind, $ping, $jitter, $loss, $delta, $gameVersion, $baseline, $boost);
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$profile", record.ProfileName);
@@ -302,6 +319,8 @@ public sealed class SqliteSessionStore : ISessionStore
         command.Parameters.AddWithValue("$gameVersion", (object?)record.GameVersion ?? DBNull.Value);
         command.Parameters.AddWithValue("$baseline",
             record.StatsBaseline is { } baseline ? JsonSerializer.Serialize(baseline) : DBNull.Value);
+        command.Parameters.AddWithValue("$boost",
+            record.Boost is { } boost ? JsonSerializer.Serialize(boost) : DBNull.Value);
 
         var id = Convert.ToInt64(await command.ExecuteScalarAsync(ct).ConfigureAwait(false), CultureInfo.InvariantCulture);
         _logger.LogInformation("Session #{Id} saved ({Profile}, {Duration})", id, record.ProfileName, record.Duration);
@@ -393,6 +412,7 @@ public sealed class SqliteSessionStore : ISessionStore
             Network = ReadNetwork(reader, columns),
             StatsDelta = ReadStatsDelta(reader, columns),
             StatsBaseline = ReadStatsBaseline(reader, columns),
+            Boost = ReadBoost(reader, columns),
             GameVersion = reader.IsDBNull(columns.Get(reader, "game_version"))
                 ? null
                 : reader.GetString(columns.Get(reader, "game_version")),
@@ -451,6 +471,23 @@ public sealed class SqliteSessionStore : ISessionStore
         try
         {
             return JsonSerializer.Deserialize<CopsSeasonStats>(reader.GetString(ordinal));
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static Optima.Core.Boost.BoostSessionRecord? ReadBoost(SqliteDataReader reader, ColumnOrdinals columns)
+    {
+        var ordinal = columns.Get(reader, "boost");
+        if (reader.IsDBNull(ordinal))
+        {
+            return null;
+        }
+        try
+        {
+            return JsonSerializer.Deserialize<Optima.Core.Boost.BoostSessionRecord>(reader.GetString(ordinal));
         }
         catch (JsonException)
         {

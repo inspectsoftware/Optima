@@ -27,8 +27,6 @@ public interface IPerformanceMetricsProvider : IAsyncDisposable
 
     Task StopAsync();
 
-    event EventHandler<(double Fps, double FrametimeMs)>? SampleArrived;
-
     SessionStats GetSessionStats();
 
     IReadOnlyList<double> GetFpsSamples();

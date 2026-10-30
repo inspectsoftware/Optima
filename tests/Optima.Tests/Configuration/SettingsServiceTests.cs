@@ -119,6 +119,16 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task BoostAtStartIsKept_WhileBoostItselfIsNot()
+    {
+        await CreateService().UpdateSettingsAsync(s => s with { BoostAtStart = true, BoostEnabled = true });
+
+        var next = await CreateService().GetSettingsAsync();
+        Assert.True(next.BoostAtStart);
+        Assert.False(next.BoostEnabled);
+    }
+
+    [Fact]
     public async Task BoostIsOffAtEveryStart_EvenWhenItWasOnAtExit()
     {
         var service = CreateService();

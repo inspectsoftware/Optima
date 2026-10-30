@@ -550,37 +550,10 @@
             </HeaderedContentControl>
           </StackPanel>
 
-          <!-- OVERLAY -->
-          <StackPanel Tag="overlay">
-            <TextBlock Text="Overlay" Style="{StaticResource SectionTitle}" />
-            <TextBlock Text="{Binding Sections[3].Blurb}" Style="{StaticResource SectionBlurb}" />
-            <HeaderedContentControl Style="{StaticResource Card}" Header="OVERLAY">
-              <StackPanel>
-                <ctl:SettingRow Header="FPS overlay" Hint="Show fps over the game.">
-                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding OverlayEnabled}" />
-                </ctl:SettingRow>
-                <ctl:SettingRow Header="Corner" Hint="Where the readout sits.">
-                  <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding CornerOptions}"
-                           DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding OverlayCorner}" />
-                </ctl:SettingRow>
-                <ctl:SettingRow Header="Opacity" Hint="How solid the readout is.">
-                  <ListBox Style="{StaticResource Segmented}" ItemsSource="{Binding OpacityOptions}"
-                           DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding OverlayOpacity}" />
-                </ctl:SettingRow>
-                <ctl:SettingRow Header="Network line" Hint="Ping, jitter and loss under the fps.">
-                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding OverlayShowNetwork}" />
-                </ctl:SettingRow>
-                <ctl:SettingRow Header="Reference host" Hint="Pinged when no game server answers.">
-                  <TextBox Style="{StaticResource RowBox}" Text="{Binding NetworkReferenceHost, UpdateSourceTrigger=PropertyChanged}" />
-                </ctl:SettingRow>
-              </StackPanel>
-            </HeaderedContentControl>
-          </StackPanel>
-
           <!-- GAME AND WATCHDOG -->
           <StackPanel Tag="game">
             <TextBlock Text="Game &amp; watchdog" Style="{StaticResource SectionTitle}" />
-            <TextBlock Text="{Binding Sections[4].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <TextBlock Text="{Binding Sections[3].Blurb}" Style="{StaticResource SectionBlurb}" />
             <HeaderedContentControl Style="{StaticResource Card}" Header="WATCHDOG">
               <StackPanel>
                 <ctl:SettingRow Header="Auto-attach" Hint="Apply the profile when the game starts outside Optima."
@@ -598,7 +571,7 @@
           <!-- GENERAL -->
           <StackPanel Tag="general">
             <TextBlock Text="General" Style="{StaticResource SectionTitle}" />
-            <TextBlock Text="{Binding Sections[5].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <TextBlock Text="{Binding Sections[4].Blurb}" Style="{StaticResource SectionBlurb}" />
             <HeaderedContentControl Style="{StaticResource Card}" Header="APP">
               <StackPanel>
                 <ctl:SettingRow Header="Keep in tray" Hint="Closing the window keeps Optima running.">
@@ -606,6 +579,10 @@
                 </ctl:SettingRow>
                 <ctl:SettingRow Header="Start with Windows" Hint="Start minimised to the tray at sign-in.">
                   <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding StartWithWindows}" />
+                </ctl:SettingRow>
+                <ctl:SettingRow Header="Boost at start" Hint="Turn Boost on by itself each time Optima opens."
+                                Info="Arms the same features the BOOST dial does. A feature that needs the administrator prompt waits until you press 'start the helper' on its card in BOOST.">
+                  <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding BoostAtStart}" />
                 </ctl:SettingRow>
                 <ctl:SettingRow Header="Update automatically" Hint="Checks GitHub at start and every 6 hours, and installs a new version when the game is not running.">
                   <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding CheckForUpdatesAtStart}" />
@@ -620,6 +597,9 @@
                 <ctl:SettingRow Header="Frametime capture" Hint="FPS through event tracing; needs the helper.">
                   <CheckBox Style="{StaticResource RowSwitch}" IsChecked="{Binding EnableFrametimeCapture}" />
                 </ctl:SettingRow>
+                <ctl:SettingRow Header="Reference host" Hint="Pinged when no game server answers.">
+                  <TextBox Style="{StaticResource RowBox}" Text="{Binding NetworkReferenceHost, UpdateSourceTrigger=PropertyChanged}" />
+                </ctl:SettingRow>
               </StackPanel>
             </HeaderedContentControl>
           </StackPanel>
@@ -627,14 +607,14 @@
           <!-- ADVANCED -->
           <StackPanel Tag="advanced">
             <TextBlock Text="Advanced" Style="{StaticResource SectionTitle}" />
-            <TextBlock Text="{Binding Sections[6].Blurb}" Style="{StaticResource SectionBlurb}" />
+            <TextBlock Text="{Binding Sections[5].Blurb}" Style="{StaticResource SectionBlurb}" />
             <HeaderedContentControl Style="{StaticResource Card}" Header="PATHS">
               <StackPanel>
                 <ctl:SettingRow Header="Play Games folder" Hint="Leave empty to detect it."
                                 Info="A fallback for unusual installs, so a Google Play Games update can be followed without a new Optima.">
                   <TextBox Style="{StaticResource RowBox}" Text="{Binding ManualInstallPath, UpdateSourceTrigger=PropertyChanged}" />
                 </ctl:SettingRow>
-                <ctl:SettingRow Header="VDD settings file" Hint="Default C:\VirtualDisplayDriver\vdd_settings.xml">
+                <ctl:SettingRow Header="VDD settings file" Hint="{Binding VddSettingsHint}">
                   <TextBox Style="{StaticResource RowBox}" Text="{Binding VddSettingsPath, UpdateSourceTrigger=PropertyChanged}" />
                 </ctl:SettingRow>
                 <ctl:SettingRow Header="Custom launch command" Hint="Placeholders {uri} and {package}."

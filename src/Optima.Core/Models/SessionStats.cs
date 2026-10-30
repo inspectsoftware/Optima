@@ -56,6 +56,13 @@ public sealed record SessionRecord
     public Stats.CopsSeasonStats? StatsBaseline { get; init; }
 
     public string? GameVersion { get; init; }
+
+    /// <summary>
+    /// Which Boost switches were on during the session and which of them worked. Null for sessions
+    /// saved before this was kept: what Boost did in them is unknown, so they are left out of the
+    /// Sessions page's comparison rather than counted as Boost off.
+    /// </summary>
+    public Boost.BoostSessionRecord? Boost { get; init; }
 }
 
 /// <summary>Per-run benchmark result: each completed run's average FPS is one observation (§14).</summary>

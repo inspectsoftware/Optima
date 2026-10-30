@@ -623,15 +623,13 @@
             </StackPanel>
           </Border>
 
-          <!-- 04 Background programs -->
+          <!-- 04 Background: programs held back and Wi-Fi scans paused, one gear -->
           <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Boost.Card}">
             <StackPanel>
               <DockPanel>
                 <TextBlock DockPanel.Dock="Left" Text="04" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding DemotionEnabled}"
-                          AutomationProperties.Name="Background programs" Margin="10,0,0,0" />
-                <Label DockPanel.Dock="Right" Style="{StaticResource Boost.Pill}" Content="{Binding DemotionStateText}" />
-                <TextBlock Text="Background programs" Style="{StaticResource Boost.Name}" />
+                <Label DockPanel.Dock="Right" Style="{StaticResource Boost.Pill}" Content="{Binding BackgroundStateText}" />
+                <TextBlock Text="Background" Style="{StaticResource Boost.Name}" />
               </DockPanel>
               <Border Style="{StaticResource Boost.Well}">
                 <Grid>
@@ -660,10 +658,21 @@
                              Visibility="{Binding HeldBackEmptyText, Converter={StaticResource EmptyToCollapsed}}" />
                 </Grid>
               </Border>
+              <DockPanel Margin="0,10,0,0">
+                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding DemotionEnabled}"
+                          AutomationProperties.Name="Programs held back" Margin="10,0,0,0" />
+                <TextBlock Text="Programs held back" Style="{StaticResource Boost.Name}" FontSize="13" />
+              </DockPanel>
               <TextBlock Text="{Binding DemotionDetailText}" Style="{StaticResource Boost.Detail}" />
+              <DockPanel Margin="0,10,0,0">
+                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding WifiScanPaused}"
+                          AutomationProperties.Name="Wi-Fi scans paused" Margin="10,0,0,0" />
+                <TextBlock Text="Wi-Fi scans paused" Style="{StaticResource Boost.Name}" FontSize="13" />
+              </DockPanel>
+              <TextBlock Text="{Binding WifiDetailText}" Style="{StaticResource Boost.Detail}" />
               <Border Style="{StaticResource Boost.Foot}">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="read each second · new ones caught within 20 s · nothing is closed" />
+                           Text="programs: read each second · new ones caught within 20 s · nothing is closed · Wi-Fi: nothing to do over a cable" />
               </Border>
               <Expander Header="settings" Margin="0,8,0,0">
                 <StackPanel>
@@ -675,20 +684,20 @@
                   </StackPanel>
                   <TextBlock Style="{StaticResource Text.Micro}" Margin="0,10,0,0" TextWrapping="Wrap" TextTrimming="None"
                              Text="One process name per line, with or without .exe. While Critical Ops is on screen each listed program runs at below-normal priority in Windows' efficiency mode, so it gets processor time only when the game is not asking for it; programs that start mid-game are caught within twenty seconds. When the game leaves, the switch is turned off or Optima closes, each one gets back exactly the priority it had, and if Optima itself dies mid-game the next start puts them back. Windows, the game, Google Play Games and Optima are never touched, whatever the list says. Voice and music apps are left out of the built-in list on purpose: a demoted Discord is a stuttering call." />
+                  <TextBlock Style="{StaticResource Text.Micro}" Margin="0,10,0,0" TextWrapping="Wrap" TextTrimming="None"
+                             Text="Wi-Fi scans paused: even while connected, Windows looks for other networks about once a minute, and each look takes the radio off your network for a moment, which shows as a ping spike every minute or so. While Critical Ops is on screen Optima asks Windows to skip those looks and to keep the connection in its streaming mode. Both last only while Optima holds them: they end when the game leaves, the switch is turned off or Optima closes, and Windows drops them by itself if Optima stops. Windows may refuse the scan pause to a program without administrator rights; the line under the switch says what it accepted." />
                 </StackPanel>
               </Expander>
             </StackPanel>
           </Border>
 
-          <!-- 05 Core parking -->
+          <!-- 05 Cores: parking off, best-core placement and the power floor, one gear -->
           <Border Grid.Row="4" Style="{StaticResource Boost.Card}">
             <StackPanel>
               <DockPanel>
                 <TextBlock DockPanel.Dock="Left" Text="05" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding KeepCoresAwake}"
-                          AutomationProperties.Name="Core parking off" Margin="10,0,0,0" />
                 <Label DockPanel.Dock="Right" Style="{StaticResource Boost.Pill}" Content="{Binding CoresStateText}" />
-                <TextBlock Text="Core parking off" Style="{StaticResource Boost.Name}" />
+                <TextBlock Text="Cores" Style="{StaticResource Boost.Name}" />
               </DockPanel>
               <Border Style="{StaticResource Boost.Well}">
                 <DockPanel>
@@ -710,27 +719,42 @@
                   </ItemsControl>
                 </DockPanel>
               </Border>
+              <DockPanel Margin="0,10,0,0">
+                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding KeepCoresAwake}"
+                          AutomationProperties.Name="Core parking off" Margin="10,0,0,0" />
+                <TextBlock Text="Core parking off" Style="{StaticResource Boost.Name}" FontSize="13" />
+              </DockPanel>
               <TextBlock Text="{Binding CoresDetailText}" Style="{StaticResource Boost.Detail}" />
+              <DockPanel Margin="0,10,0,0">
+                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding CorePlacement}"
+                          AutomationProperties.Name="Best cores for the game" Margin="10,0,0,0" />
+                <TextBlock Text="Best cores for the game" Style="{StaticResource Boost.Name}" FontSize="13" />
+              </DockPanel>
+              <TextBlock Text="{Binding PlacementDetailText}" Style="{StaticResource Boost.Detail}" />
+              <DockPanel Margin="0,10,0,0">
+                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding PowerFloor}"
+                          AutomationProperties.Name="Power floor" Margin="10,0,0,0" />
+                <TextBlock Text="Power floor" Style="{StaticResource Boost.Name}" FontSize="13" />
+              </DockPanel>
+              <TextBlock Text="{Binding PowerFloorDetailText}" Style="{StaticResource Boost.Detail}" />
               <Border Style="{StaticResource Boost.Foot}">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="no change on High or Ultimate Performance plans · per-core load is not measured" />
+                           Text="parking: no change on High or Ultimate Performance plans · placement: never fewer than six cores · power floor: battery speed left alone" />
               </Border>
               <Expander Header="about" Margin="0,8,0,0">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="Core parking puts idle cores to sleep and wakes them on demand; the wake-up is a small hitch at exactly the wrong moment. The switch sets the active power plan to keep all cores awake for the match and writes the plan's own value back afterwards. It changes nothing on High or Ultimate Performance, which already do this, and it costs battery on a laptop." />
+                           Text="Core parking puts idle cores to sleep and wakes them on demand; the wake-up is a small hitch at exactly the wrong moment. The switch sets the active power plan to keep all cores awake for the match and writes the plan's own value back afterwards. It changes nothing on High or Ultimate Performance, which already do this, and it costs battery on a laptop. Best cores for the game gives the Google Play Games emulator, whose virtual processors are threads of its own, a set of cores while the game is on screen: the performance cores on a hybrid processor, the die with the larger cache on a dual-die X3D, then the fastest cores by Windows' own ranking, leaving the core of processor 0 and the slowest core to Windows and the rest. It is never fewer than six cores. It is taken off when the game leaves, and a start after a crash takes off one left behind. Power floor sets the active power plan's minimum processor state to 100% on mains, so the processor does not clock down between frames and ramp up again, and turns USB selective suspend off, so Windows does not put an idle mouse, keyboard or headset to sleep and miss the first input after it. On battery the processor is left as the plan has it. Each value is changed only where the plan does not have it already, and the plan's own values are written back when the game leaves, also after a crash." />
               </Expander>
             </StackPanel>
           </Border>
 
-          <!-- 06 Graphics adapter -->
+          <!-- 06 Graphics: high-performance adapter and GPU priority, one gear -->
           <Border Grid.Row="4" Grid.Column="2" Style="{StaticResource Boost.Card}">
             <StackPanel>
               <DockPanel>
                 <TextBlock DockPanel.Dock="Left" Text="06" Style="{StaticResource Text.Micro}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding GpuHighPerformance}"
-                          AutomationProperties.Name="Graphics adapter" Margin="10,0,0,0" />
                 <Label DockPanel.Dock="Right" Style="{StaticResource Boost.Pill}" Content="{Binding GpuStateText}" />
-                <TextBlock Text="Graphics adapter" Style="{StaticResource Boost.Name}" />
+                <TextBlock Text="Graphics" Style="{StaticResource Boost.Name}" />
               </DockPanel>
               <!-- Grows past the other wells' height: a desktop can have three graphics adapters, and the
                    preference line under them must not be cut off. -->
@@ -778,14 +802,25 @@
                   </Border>
                 </StackPanel>
               </Border>
+              <DockPanel Margin="0,10,0,0">
+                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding GpuHighPerformance}"
+                          AutomationProperties.Name="High-performance adapter" Margin="10,0,0,0" />
+                <TextBlock Text="High-performance adapter" Style="{StaticResource Boost.Name}" FontSize="13" />
+              </DockPanel>
               <TextBlock Text="{Binding GpuDetailText}" Style="{StaticResource Boost.Detail}" />
+              <DockPanel Margin="0,10,0,0">
+                <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding GpuPriorityHigh}"
+                          AutomationProperties.Name="Higher GPU priority" Margin="10,0,0,0" />
+                <TextBlock Text="Higher GPU priority" Style="{StaticResource Boost.Name}" FontSize="13" />
+              </DockPanel>
+              <TextBlock Text="{Binding GpuPriorityDetailText}" Style="{StaticResource Boost.Detail}" />
               <Border Style="{StaticResource Boost.Foot}">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="a standing Windows setting · Boost takes back what it set when switched off or when Optima closes" />
+                           Text="adapter: a standing Windows setting · priority: high, never realtime · both taken back when switched off or when Optima closes" />
               </Border>
               <Expander Header="about" Margin="0,8,0,0">
                 <TextBlock Style="{StaticResource Text.Micro}" TextWrapping="Wrap" TextTrimming="None"
-                           Text="The same per-app choice as Windows Settings, Display, Graphics: it matters on a PC with two graphics adapters (most gaming laptops) and does nothing on a PC with one. It is a standing Windows setting, and Windows reads it the next time the game starts. Boost takes back the preference it set when it is switched off or when Optima closes, and puts back the choice the game had before; high performance you set in Windows yourself is left alone." />
+                           Text="The same per-app choice as Windows Settings, Display, Graphics: it matters on a PC with two graphics adapters (most gaming laptops) and does nothing on a PC with one. It is a standing Windows setting, and Windows reads it the next time the game starts. Boost takes back the preference it set when it is switched off or when Optima closes, and puts back the choice the game had before; high performance you set in Windows yourself is left alone. Higher GPU priority asks the graphics kernel to run the Google Play Games emulator's work on the graphics card ahead of other programs' while the game is on screen. It uses high, never realtime, which can starve the desktop itself. The class the emulator had comes back when the game leaves, and a start after a crash puts back one left behind. It helps most when something else uses the graphics card during a match: a browser, a stream, a recording." />
               </Expander>
             </StackPanel>
           </Border>

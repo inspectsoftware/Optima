@@ -36,3 +36,17 @@ public sealed record VirtualizationState
     public bool? WindowsHypervisorPlatformEnabled { get; init; }
     public string HypervisorLaunchType { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// What Windows says about Memory Integrity (hypervisor-protected code integrity), as read, so the
+/// check decides and a test can hand it any combination. Null is a source that could not be read.
+/// </summary>
+/// <param name="SecurityServicesRunning">Win32_DeviceGuard's SecurityServicesRunning; 2 is Memory Integrity.</param>
+/// <param name="RegistryEnabled">The Enabled value under DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity.</param>
+public sealed record MemoryIntegrityReading(IReadOnlyList<int>? SecurityServicesRunning, int? RegistryEnabled);
+
+/// <summary>The scheduler type the hypervisor logged when it last started (event 2), and when.</summary>
+public sealed record HypervisorSchedulerReading(int Type, DateTimeOffset LoggedAt);
+
+/// <summary>One graphics adapter and its MSISupported value; null when the adapter has none set.</summary>
+public sealed record GpuInterruptReading(string Name, string InstanceId, int? MsiSupported);

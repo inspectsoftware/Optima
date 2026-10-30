@@ -13,7 +13,7 @@ public sealed record DiscordPresenceOptions
     /// <summary>Your in-game name, on the card's live line.</summary>
     public bool ShowPlayerName { get; init; } = true;
 
-    /// <summary>The ranked tier and division, beside the game on the details line.</summary>
+    /// <summary>The ranked tier and division, on the card's live line.</summary>
     public bool ShowRank { get; init; } = true;
 
     /// <summary>The rank emblem as the card's small image.</summary>

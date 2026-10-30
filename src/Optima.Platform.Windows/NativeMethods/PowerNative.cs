@@ -73,6 +73,38 @@ internal static class PowerNative
         }
     }
 
+    // Processor power management, "minimum processor state" (PROCTHROTTLEMIN, percent).
+    internal static readonly (Guid SubGroup, Guid Setting) MinProcessorState =
+        (ProcessorSubGroup, new Guid("893dee8e-2bef-41e0-89c6-b55d0929964c"));
+
+    // USB settings, "USB selective suspend setting" (0 disabled, 1 enabled).
+    internal static readonly (Guid SubGroup, Guid Setting) UsbSelectiveSuspend =
+        (new Guid("2a737441-1930-4402-8d77-b2bebba308a3"), new Guid("48e6b7a6-50f5-4782-a5d4-53bb8f07e226"));
+
+    internal static (uint Ac, uint Dc) ReadValue(Guid scheme, (Guid SubGroup, Guid Setting) value)
+    {
+        var (sub, setting) = value;
+        var acResult = PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out var ac);
+        var dcResult = PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, out var dc);
+        if (acResult != ERROR_SUCCESS || dcResult != ERROR_SUCCESS)
+        {
+            throw new System.ComponentModel.Win32Exception((int)(acResult != ERROR_SUCCESS ? acResult : dcResult), $"Reading power setting {setting} failed");
+        }
+        return (ac, dc);
+    }
+
+    /// <summary>Writes the value on mains, on battery, or both; a null one is left as it is.</summary>
+    internal static void WriteValue(Guid scheme, (Guid SubGroup, Guid Setting) value, uint? ac, uint? dc)
+    {
+        var (sub, setting) = value;
+        var acResult = ac is { } a ? PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, a) : ERROR_SUCCESS;
+        var dcResult = dc is { } d ? PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref sub, ref setting, d) : ERROR_SUCCESS;
+        if (acResult != ERROR_SUCCESS || dcResult != ERROR_SUCCESS)
+        {
+            throw new System.ComponentModel.Win32Exception((int)(acResult != ERROR_SUCCESS ? acResult : dcResult), $"Writing power setting {setting} failed");
+        }
+    }
+
     internal static Guid GetActiveScheme()
     {
         var result = PowerGetActiveScheme(IntPtr.Zero, out var ptr);
@@ -90,12 +122,36 @@ internal static class PowerNative
         }
     }
 
+    // Boost re-activates a plan to apply values it wrote while a session switches plans on another
+    // thread. Without one lock around both, a re-activation that read the plan as active just before
+    // the session put the player's plan back would switch the session's plan on again after it.
+    private static readonly object SchemeLock = new();
+
     internal static void SetActiveScheme(Guid scheme)
     {
-        var result = PowerSetActiveScheme(IntPtr.Zero, ref scheme);
-        if (result != ERROR_SUCCESS)
+        lock (SchemeLock)
         {
-            throw new System.ComponentModel.Win32Exception((int)result, $"PowerSetActiveScheme({scheme}) failed");
+            var result = PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+            if (result != ERROR_SUCCESS)
+            {
+                throw new System.ComponentModel.Win32Exception((int)result, $"PowerSetActiveScheme({scheme}) failed");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A plan's values are only read when it becomes active, so a plan written to while active is
+    /// activated again to apply them. One no longer active is left as it is: something else chose
+    /// another plan since, and that choice stands.
+    /// </summary>
+    internal static void ReactivateIfActive(Guid scheme)
+    {
+        lock (SchemeLock)
+        {
+            if (GetActiveScheme() == scheme)
+            {
+                SetActiveScheme(scheme);
+            }
         }
     }
 

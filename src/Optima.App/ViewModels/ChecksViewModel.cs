@@ -5,7 +5,9 @@ using Optima.App.Services;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
 using Optima.Core.Health;
+using Optima.Core.Ipc;
 using Optima.Core.Models;
+using Optima.Core.Monitoring;
 using Microsoft.Extensions.Logging;
 
 namespace Optima.App.ViewModels;
@@ -24,7 +26,15 @@ public sealed partial class ChecksViewModel : ObservableObject
     private readonly StatusViewModel _status;
     private readonly PlayerSwitcherService _players;
     private readonly IssueEngine _issues;
+    private readonly IElevationBroker _elevation;
+    private readonly GamePresenceService _presence;
     private readonly ILogger<ChecksViewModel> _logger;
+
+    /// <summary>How long the latency scan records. Long enough to catch a driver that misbehaves all the time, short enough to wait for.</summary>
+    private const int LatencyScanSeconds = 10;
+
+    /// <summary>The last latency scan's row, kept across "run all": that scan only runs on a click of its own.</summary>
+    private DiagnosticResult? _latency;
 
     public ChecksViewModel(
         IEnumerable<IDiagnosticCheck> checks,
@@ -34,6 +44,8 @@ public sealed partial class ChecksViewModel : ObservableObject
         FirstRunFixService firstRunFix,
         StatusViewModel status,
         PlayerSwitcherService players,
+        IElevationBroker elevation,
+        GamePresenceService presence,
         ILogger<ChecksViewModel> logger)
     {
         _checks = checks.OrderBy(c => c.Order).ToList();
@@ -43,6 +55,8 @@ public sealed partial class ChecksViewModel : ObservableObject
         _firstRunFix = firstRunFix;
         _status = status;
         _players = players;
+        _elevation = elevation;
+        _presence = presence;
         _logger = logger;
     }
 
@@ -52,6 +66,8 @@ public sealed partial class ChecksViewModel : ObservableObject
     [ObservableProperty] private string _summary = string.Empty;
     [ObservableProperty] private string _heartbeatText = "not checked yet";
     [ObservableProperty] private string _repairStatus = string.Empty;
+    [ObservableProperty] private bool _isLatencyScanning;
+    [ObservableProperty] private string _latencyStatus = "not run yet · asks for administrator rights once";
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -94,17 +110,11 @@ public sealed partial class ChecksViewModel : ObservableObject
                 // A failing check opens an issue and a passing one closes it; advice does neither.
                 _issues.Report(result);
             }
-
-            var passed = Results.Count(r => r.Status == DiagnosticStatus.Pass);
-            var warned = Results.Count(r => r.Status == DiagnosticStatus.Warning);
-            var failed = Results.Count(r => r.Status == DiagnosticStatus.Fail);
-            Summary = (failed, warned) switch
+            if (_latency is not null)
             {
-                (0, 0) => $"All good. {passed}/{Results.Count} checks passed.",
-                (0, _) => $"{passed}/{Results.Count} passed, {warned} warning(s), nothing blocking.",
-                (_, 0) => $"{failed} check(s) need attention.",
-                _ => $"{failed} check(s) need attention, {warned} warning(s).",
-            };
+                Results.Add(_latency);
+            }
+            UpdateSummary();
         }
         catch (OperationCanceledException)
         {
@@ -113,6 +123,98 @@ public sealed partial class ChecksViewModel : ObservableObject
         finally
         {
             IsRunning = false;
+        }
+    }
+
+    private void UpdateSummary()
+    {
+        var passed = Results.Count(r => r.Status == DiagnosticStatus.Pass);
+        var warned = Results.Count(r => r.Status == DiagnosticStatus.Warning);
+        var failed = Results.Count(r => r.Status == DiagnosticStatus.Fail);
+        Summary = (failed, warned) switch
+        {
+            (0, 0) => $"All good. {passed}/{Results.Count} checks passed.",
+            (0, _) => $"{passed}/{Results.Count} passed, {warned} warning(s), nothing blocking.",
+            (_, 0) => $"{failed} check(s) need attention.",
+            _ => $"{failed} check(s) need attention, {warned} warning(s).",
+        };
+    }
+
+    /// <summary>
+    /// Records every driver's DPCs and ISRs for ten seconds and ranks them. A kernel trace needs the
+    /// elevated helper, so this is the one check that can put up the administrator prompt, and so it
+    /// runs only from its own button, never with the others, and never while the game is up: the
+    /// trace would cost the match a little, and the player is not there to answer a prompt.
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanDriverLatencyAsync()
+    {
+        if (IsLatencyScanning)
+        {
+            return;
+        }
+        if (_presence.Current != GamePresence.NotRunning)
+        {
+            LatencyStatus = "close Critical Ops first, then scan";
+            return;
+        }
+        IsLatencyScanning = true;
+        LatencyStatus = $"recording drivers for {LatencyScanSeconds} seconds…";
+        try
+        {
+            if (!await _elevation.EnsureStartedAsync())
+            {
+                LatencyStatus = "needs administrator rights; the helper did not start";
+                return;
+            }
+            var response = await _elevation.SendAsync(new IpcRequest
+            {
+                Command = IpcCommand.RunLatencyScan,
+                Args = { ["durationSeconds"] = LatencyScanSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+            });
+            if (!response.Success)
+            {
+                LatencyStatus = "the scan failed: " + response.Error;
+                return;
+            }
+
+            // PLAY waits for the scan, but the game can still be started from Google Play Games.
+            // A trace that ran over its start measured the game loading, not the drivers at rest.
+            if (_presence.Current != GamePresence.NotRunning)
+            {
+                LatencyStatus = "Critical Ops started during the scan; close it and scan again";
+                return;
+            }
+
+            var drivers = response.Data.TryGetValue("drivers", out var json)
+                ? System.Text.Json.JsonSerializer.Deserialize<List<DriverLatency>>(json, IpcJson.Options) ?? []
+                : [];
+            var result = DriverLatencyScan.ToResult(drivers, LatencyScanSeconds);
+            if (_latency is not null)
+            {
+                Results.Remove(_latency);
+            }
+            _latency = result;
+            // A "run all" in progress cleared the list and adds this row itself when it ends.
+            if (!IsRunning)
+            {
+                Results.Add(result);
+                UpdateSummary();
+            }
+            foreach (var report in DriverLatencyScan.Reports(result))
+            {
+                _issues.Report(report);
+            }
+            LatencyStatus = "scanned at " + DateTime.Now.ToString("HH:mm:ss");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "The driver latency scan failed");
+            LatencyStatus = "the scan failed; its error is on the Log tab";
+        }
+        finally
+        {
+            IsLatencyScanning = false;
         }
     }
 

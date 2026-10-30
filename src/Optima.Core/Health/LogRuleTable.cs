@@ -53,6 +53,11 @@ public static class LogRuleTable
     {
         ["POWER_PLAN_UNAVAILABLE"] = IssueSeverity.Note,
         ["UNCLEAN_EXIT"] = IssueSeverity.Note,
+        // Settings of Windows that cost frame rate but are the player's to choose, not faults.
+        ["MEMORY_INTEGRITY_ON"] = IssueSeverity.Note,
+        ["HYPERVISOR_SCHEDULER_NOT_ROOT"] = IssueSeverity.Note,
+        // A driver call past 500 us is worth knowing; only past a millisecond is it the issue.
+        ["DRIVER_LATENCY_ELEVATED"] = IssueSeverity.Note,
     };
 
     /// <summary>Every code a template rule or a check can raise, for the test that holds the guide to them.</summary>
@@ -65,6 +70,10 @@ public static class LogRuleTable
         "HYPERVISOR_OFF",
         "DISK_SPACE_LOW",
         "VDD_RESTORE_PENDING",
+        "MEMORY_INTEGRITY_ON",
+        "HYPERVISOR_SCHEDULER_NOT_ROOT",
+        "DRIVER_LATENCY_HIGH",
+        "DRIVER_LATENCY_ELEVATED",
     ];
 
     /// <summary>The weight an issue of this code has, whoever reported it and at whatever level.</summary>

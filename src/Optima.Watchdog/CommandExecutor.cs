@@ -4,6 +4,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Optima.Core.Detection;
 using Optima.Core.Ipc;
 using Optima.Core.Models;
 
@@ -14,6 +15,9 @@ public sealed partial class CommandExecutor : IAsyncDisposable
 {
     private const string AllowedVddPipe = "MTTVirtualDisplayPipe";
     private static readonly string[] AllowedVddCommands = ["RELOAD_DRIVER"];
+
+    /// <summary>The hardware id the virtual display's root node is created with (same as the app's PnpDeviceLocator).</summary>
+    private const string VddHardwareId = @"Root\MttVDD";
 
     [GeneratedRegex(@"^[A-Za-z0-9\\&_.{}\-]+$")]
     private static partial Regex SafeInstanceIdPattern();
@@ -64,6 +68,7 @@ public sealed partial class CommandExecutor : IAsyncDisposable
 
             case IpcCommand.EnableDevice:
             case IpcCommand.DisableDevice:
+            case IpcCommand.RestartDevice:
             {
                 if (!request.Args.TryGetValue("instanceId", out var instanceId) || instanceId.Length is 0 or > 200
                     || !SafeInstanceIdPattern().IsMatch(instanceId))
@@ -82,6 +87,17 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     // after a restart, because the install leaves the device disabled.
                     var cr = DeviceInstaller.EnableDevice(instanceId);
                     return cr == 0 ? ok(null) : fail($"Configuration Manager could not enable the device (CR 0x{cr:X}).");
+                }
+
+                if (request.Command == IpcCommand.RestartDevice)
+                {
+                    var (disableCr, enableCr) = DeviceInstaller.RestartDevice(instanceId);
+                    HelperLog.Write($"RestartDevice {instanceId}: disable CR 0x{disableCr:X}, enable CR 0x{enableCr:X}");
+                    // The enable is what matters: a refused disable (CR_NOT_DISABLEABLE) followed by a
+                    // good enable leaves the device on, and the caller probes its state either way.
+                    return enableCr == 0
+                        ? ok(null)
+                        : fail($"Configuration Manager could not restart the device (disable CR 0x{disableCr:X}, enable CR 0x{enableCr:X}).");
                 }
 
                 var (exitCode, output) = await RunProcessAsync("pnputil.exe", $"/disable-device \"{instanceId}\"", ct);
@@ -199,6 +215,20 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                 return ok(data);
             }
 
+            case IpcCommand.RunLatencyScan:
+            {
+                if (!TryReadInt(request.Args, "durationSeconds", out var scanSeconds) || scanSeconds is < 3 or > 30)
+                {
+                    return fail("durationSeconds must be between 3 and 30.");
+                }
+                var drivers = await EtwLatencyScan.RunAsync(TimeSpan.FromSeconds(scanSeconds), ct);
+                return ok(new Dictionary<string, string>
+                {
+                    ["drivers"] = JsonSerializer.Serialize(drivers, IpcJson.Options),
+                    ["durationSeconds"] = scanSeconds.ToString(CultureInfo.InvariantCulture),
+                });
+            }
+
             case IpcCommand.InstallDriver:
             {
                 if (!request.Args.TryGetValue("infPath", out var infPath) || !IsAcceptableInfPath(infPath))
@@ -216,7 +246,9 @@ public sealed partial class CommandExecutor : IAsyncDisposable
                     return fail("That is not the driver Optima ships.");
                 }
 
-                var installed = await InstallDriverPackageAsync(infPath, hardwareId, ct);
+                // Set by the Display page's Install driver: always rebuild, see VddRootNodes.CanKeep.
+                var rebuild = request.Args.TryGetValue("rebuild", out var rebuildText) && rebuildText == "1";
+                var installed = await InstallDriverPackageAsync(infPath, hardwareId, ct, rebuild);
                 return installed.Success
                     ? ok(new Dictionary<string, string> { ["restartRequired"] = installed.RebootRequired ? "1" : "0" })
                     : fail(installed.Error);
@@ -524,11 +556,13 @@ public sealed partial class CommandExecutor : IAsyncDisposable
     /// <summary>
     /// Stages a driver package and gives it a device node. Both callers go through here: the
     /// InstallDriver command from the running app, and the installer's one-shot mode, which runs
-    /// the elevated helper directly. Re-running it is safe, because the device node is only
-    /// created when no present device carries the hardware id yet.
+    /// the elevated helper directly. Re-running it is safe: one working (or only disabled) node is
+    /// kept, and anything else (a node without a driver, a node with a fault, or several nodes) is
+    /// removed and created again, because updating the package never repairs such a node.
+    /// <paramref name="rebuild"/> rebuilds even a node that looks keepable (see VddRootNodes.CanKeep).
     /// </summary>
     internal static async Task<(bool Success, bool RebootRequired, bool AlreadyPresent, string Error)> InstallDriverPackageAsync(
-        string infPath, string hardwareId, CancellationToken ct)
+        string infPath, string hardwareId, CancellationToken ct, bool rebuild = false)
     {
         var (stageCode, stageOutput) = await RunProcessAsync("pnputil.exe", $"/add-driver \"{infPath}\" /install", ct);
         HelperLog.Write($"pnputil /add-driver exit={stageCode}: {Truncate(stageOutput)}");
@@ -541,26 +575,68 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         }
         var stageNeedsRestart = stageCode == 3010;
 
-        if (DeviceInstaller.RootDeviceExists(hardwareId))
+        var existing = DeviceInstaller.GetRootDevices(hardwareId);
+        LogNodes("Existing", existing);
+        if (VddRootNodes.CanKeep(existing, rebuild))
         {
-            HelperLog.Write($"A present device already carries {hardwareId}; the package was updated in place");
-            return (true, stageNeedsRestart, true, string.Empty);
+            HelperLog.Write($"Keeping {existing[0].InstanceId}; the package was updated in place");
+            return (true, stageNeedsRestart || VddRootNodes.NeedsRestart(existing), true, string.Empty);
+        }
+
+        if (existing.Count > 0)
+        {
+            var (removedOk, removed, removeError) = DeviceInstaller.RemoveRootDevices(hardwareId);
+            HelperLog.Write($"Rebuilding: removed {removed} of {existing.Count} node(s) ok={removedOk} {removeError}");
+            if (!removedOk)
+            {
+                return (false, false, false, $"The broken virtual display device could not be removed. {removeError}");
+            }
+            // RemoveRootDevices reports success when the device list opened, not when every node went:
+            // a vetoed or reboot-deferred DIF_REMOVE leaves its node. Creating another one then would
+            // add a node on every install, and each becomes a virtual display after a restart.
+            var left = DeviceInstaller.GetRootDevices(hardwareId);
+            if (left.Count > 0)
+            {
+                LogNodes("Left after removal", left);
+                return (false, true, false,
+                    $"Windows could not remove the old virtual display device ({string.Join(", ", left.Select(n => n.InstanceId))}). "
+                    + "Restart the PC to finish removing it, then install the driver again.");
+            }
         }
 
         var (created, reboot, createError) = DeviceInstaller.CreateRootDevice(hardwareId, infPath);
         HelperLog.Write($"CreateRootDevice created={created} reboot={reboot} error={createError}");
+        if (!created)
+        {
+            return (false, false, false, createError);
+        }
+
+        // Checked before the disable below, which would turn every problem code into 22.
+        var fresh = DeviceInstaller.GetRootDevices(hardwareId);
+        LogNodes("Created", fresh);
+        var restartPending = reboot || stageNeedsRestart || VddRootNodes.NeedsRestart(fresh);
+        var freshProblem = VddRootNodes.CheckFresh(fresh, restartPending);
 
         // A new device node comes up enabled, which puts a virtual monitor on the desktop the moment
         // the driver is installed, with no session asking for one. Installed means available, not
         // on: a session (or the Display page) enables the device when it wants the display.
-        if (created && SafeInstanceIdPattern().IsMatch(hardwareId))
+        if (SafeInstanceIdPattern().IsMatch(hardwareId))
         {
             var (disableCode, disableOutput) = await RunProcessAsync("pnputil.exe", $"/disable-device /deviceid \"{hardwareId}\"", ct);
             HelperLog.Write($"pnputil /disable-device after create exit={disableCode}: {Truncate(disableOutput)}");
         }
-        return created
-            ? (true, reboot || stageNeedsRestart, false, string.Empty)
-            : (false, false, false, createError);
+        return freshProblem is null
+            ? (true, restartPending, false, string.Empty)
+            : (false, restartPending, false, freshProblem);
+    }
+
+    private static void LogNodes(string label, IReadOnlyList<VddRootNodes.Node> nodes)
+    {
+        HelperLog.Write($"{label} virtual display nodes: {nodes.Count}");
+        foreach (var node in nodes)
+        {
+            HelperLog.Write($"  {node.InstanceId}: problem code {node.ProblemCode}, driver bound {node.HasDriver}");
+        }
     }
 
     private static bool IsAcceptableInfPath(string path)
@@ -616,19 +692,30 @@ public sealed partial class CommandExecutor : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// A Display-class device named as a virtual display, or a root node carrying the driver's own
+    /// hardware id. The second covers a node without a bound driver: it has no friendly name and may
+    /// have no class, yet it is exactly the node a restart has to reach.
+    /// </summary>
     private static Task<bool> IsVirtualDisplayDeviceAsync(string instanceId, CancellationToken ct)
         => Task.Run(() =>
         {
             try
             {
                 using var searcher = new System.Management.ManagementObjectSearcher(
-                    "SELECT PNPDeviceID, Name FROM Win32_PnPEntity WHERE PNPClass = 'Display'");
+                    "SELECT PNPDeviceID, Name, HardwareID FROM Win32_PnPEntity "
+                    + "WHERE PNPClass = 'Display' OR PNPDeviceID LIKE 'ROOT\\\\%'");
                 foreach (var entity in searcher.Get())
                 {
                     var id = entity["PNPDeviceID"]?.ToString();
+                    if (!string.Equals(id, instanceId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
                     var name = entity["Name"]?.ToString() ?? string.Empty;
-                    if (string.Equals(id, instanceId, StringComparison.OrdinalIgnoreCase)
-                        && name.Contains("Virtual Display", StringComparison.OrdinalIgnoreCase))
+                    var hardwareIds = entity["HardwareID"] as string[] ?? [];
+                    if (name.Contains("Virtual Display", StringComparison.OrdinalIgnoreCase)
+                        || hardwareIds.Contains(VddHardwareId, StringComparer.OrdinalIgnoreCase))
                     {
                         return true;
                     }

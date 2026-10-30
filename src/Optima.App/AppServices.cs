@@ -56,6 +56,7 @@ public static class AppServices
         services.AddSingleton<ITimerResolution, WindowsTimerResolution>();
         services.AddSingleton<IBackgroundDemoter, WindowsBackgroundDemoter>();
         services.AddSingleton<IGameExtras, WindowsGameExtras>();
+        services.AddSingleton<IWifiScanPause, WindowsWifiScanPause>();
         services.AddSingleton<IGameTerminator, WindowsGameTerminator>();
         services.AddSingleton<ITweakService, WindowsTweakService>();
         services.AddSingleton<IBackgroundCleanupService, WindowsBackgroundCleanupService>();
@@ -80,6 +81,7 @@ public static class AppServices
         services.AddSingleton<IGameLauncher, BootstrapperExeLauncher>();
         services.AddSingleton<IGameLauncher, ShortcutLauncher>();
         services.AddSingleton<IGameLauncher, CustomCommandLauncher>();
+        services.AddSingleton<Optima.Core.Boost.BoostSessionRecorder>();
         services.AddSingleton<LaunchOrchestrator>();
         services.AddSingleton<GamePresenceService>();
         services.AddSingleton<GameWatchService>();
@@ -142,6 +144,11 @@ public static class AppServices
             System.IO.Path.Combine(paths.Root, "boost-coreparking.json"),
             sp.GetRequiredService<ILogger<Optima.Core.Launch.GameExtrasService>>(),
             sp.GetRequiredService<SettingsService>()));
+        services.AddSingleton(sp => new Optima.Core.Launch.WifiScanService(
+            sp.GetRequiredService<IWifiScanPause>(),
+            sp.GetRequiredService<GamePresenceService>(),
+            () => sp.GetRequiredService<SettingsService>().Current?.BoostEffective(),
+            sp.GetRequiredService<ILogger<Optima.Core.Launch.WifiScanService>>()));
         services.AddSingleton<Optima.Core.News.CopsNewsService>();
         // The update check: GitHub's releases at start and every few hours, and the signed setup installed by itself.
         services.AddSingleton(sp => new Optima.Core.Updates.UpdateService(
@@ -197,7 +204,6 @@ public static class AppServices
                 ? sp.GetRequiredService<MockMetricsProvider>()
                 : sp.GetRequiredService<EtwMetricsProviderClient>());
         services.AddSingleton<ISessionStore, SqliteSessionStore>();
-        services.AddSingleton<IGameWindowLocator, WindowsGameWindowLocator>();
         services.AddSingleton<IRemoteEndpointSource, WindowsEndpointDiscovery>();
         services.AddSingleton<INetworkQualityMonitor, NetworkQualityMonitor>();
 
@@ -215,6 +221,10 @@ public static class AppServices
         services.AddSingleton<IDiagnosticCheck, AdminPermissionsCheck>();
         services.AddSingleton<IDiagnosticCheck, OptimaOverheadCheck>();
         services.AddSingleton<IDiagnosticCheck, PowerPlanCheck>();
+        services.AddSingleton<IHostTuningProbe, WindowsHostTuningProbe>();
+        services.AddSingleton<IDiagnosticCheck, MemoryIntegrityCheck>();
+        services.AddSingleton<IDiagnosticCheck, HypervisorSchedulerCheck>();
+        services.AddSingleton<IDiagnosticCheck, GpuInterruptModeCheck>();
         // Asked lazily: the orchestrator is built long after the checks are listed.
         services.AddSingleton<IDiagnosticCheck>(sp => new StaleDisplayRestoreCheck(
             paths, () => sp.GetRequiredService<LaunchOrchestrator>().IsSessionActive));
@@ -276,6 +286,5 @@ public static class AppServices
         services.AddSingleton<DeveloperViewModel>();
         services.AddSingleton<NewsViewModel>();
         services.AddSingleton<UpdateLogViewModel>();
-        services.AddSingleton<OverlayViewModel>();
     }
 }

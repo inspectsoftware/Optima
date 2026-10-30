@@ -45,4 +45,12 @@ public interface IVirtualDisplayProvider
     Task<DisplayInfo?> GetDisplayInfoAsync(CancellationToken ct = default);
 
     Task RestoreOriginalStateAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Whether the driver's device was already switched on when <see cref="InitializeAsync"/> ran.
+    /// A session only records that it switched the device on when it was off: a device that was on
+    /// with its display merely off the desktop, or one Windows has no driver for, must not be switched
+    /// off by the recovery at the end. False when the provider has no device to switch.
+    /// </summary>
+    bool DeviceWasEnabledInitially => false;
 }

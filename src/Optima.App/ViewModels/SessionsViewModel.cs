@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Optima.Core.Abstractions;
+using Optima.Core.Boost;
 using Optima.Core.Configuration;
 using Optima.Core.Models;
 using Optima.Core.Statistics;
@@ -55,6 +56,22 @@ public sealed record ProfileTrendRow(string ProfileName, double AverageFps, doub
     public string CountText => SessionCount == 1 ? "1 session" : $"{SessionCount} sessions";
 }
 
+/// <summary>One Boost switch in the WHAT HELPS panel: medians with it working and with it off, or why there are none.</summary>
+public sealed record BoostEffectRow(BoostEffect Effect)
+{
+    public string Name => Effect.Name;
+    public bool HasEnough => Effect.HasEnough;
+    public string CountText => $"{Effect.SessionsOn} on · {Effect.SessionsOff} off";
+    public string LowText => Effect.HasEnough
+        ? $"1% low {Effect.OnePercentLowOn:F0} vs {Effect.OnePercentLowOff:F0} ({Signed(Effect.OnePercentLowDelta)})"
+        : $"too few sessions · needs {BoostEffectComparer.MinimumSessions} on and {BoostEffectComparer.MinimumSessions} off";
+    public string AverageText => Effect.HasEnough
+        ? $"avg {Effect.AverageFpsOn:F0} vs {Effect.AverageFpsOff:F0} ({Signed(Effect.AverageFpsDelta)})"
+        : string.Empty;
+
+    private static string Signed(double? value) => (value ?? 0).ToString("+0;-0;0", CultureInfo.InvariantCulture);
+}
+
 /// <summary>
 /// SESSIONS page (§13/§14): history and trends over the recorded sessions, per-session drill-down of the persisted
 /// per-second FPS series, and benchmark comparison.
@@ -66,6 +83,7 @@ public sealed partial class SessionsViewModel : ObservableObject
     private readonly ISessionStore _sessions;
     private readonly ProfileService _profiles;
     private readonly SessionStatsRefresher _statsRefresher;
+    private readonly SettingsService _settings;
     private readonly ILogger<SessionsViewModel> _logger;
 
     public SessionsViewModel(
@@ -73,8 +91,10 @@ public sealed partial class SessionsViewModel : ObservableObject
         ProfileService profiles,
         GuidedBenchmarkViewModel guided,
         SessionStatsRefresher statsRefresher,
+        SettingsService settings,
         ILogger<SessionsViewModel> logger)
     {
+        _settings = settings;
         _sessions = sessions;
         _profiles = profiles;
         Guided = guided;
@@ -86,6 +106,8 @@ public sealed partial class SessionsViewModel : ObservableObject
 
     public ObservableCollection<SessionRowViewModel> Rows { get; } = [];
     public ObservableCollection<ProfileTrendRow> ProfileTrends { get; } = [];
+    public ObservableCollection<BoostEffectRow> BoostEffects { get; } = [];
+    [ObservableProperty] private bool _hasBoostRecords;
     public ObservableCollection<LaunchProfile> Profiles { get; } = [];
 
     [ObservableProperty] private string _trendSparkline = string.Empty;
@@ -348,6 +370,7 @@ public sealed partial class SessionsViewModel : ObservableObject
         BuildTrend(trend);
         BuildProfileTrends(history);
         BuildWeeklyDigest(history);
+        BuildBoostEffects(history);
 
         // Left alone when unchanged for the same reason: clearing it blanks the profile boxes.
         BoundRows.Replace(Profiles, await _profiles.GetProfilesAsync(ct));
@@ -484,6 +507,17 @@ public sealed partial class SessionsViewModel : ObservableObject
         {
             ProfileTrends.Add(new ProfileTrendRow(group.Name, group.Stats.AverageFps, max, group.Count));
         }
+    }
+
+    /// <summary>
+    /// The WHAT HELPS panel, for the player tracked now: the comparison only ever sets one player's
+    /// sessions against each other, since two players' frame rates say nothing about a switch.
+    /// </summary>
+    private void BuildBoostEffects(IReadOnlyList<SessionRecord> history)
+    {
+        var players = _settings.Current is { } settings ? BoostSessionRecorder.PlayerKeys(settings) : [string.Empty];
+        HasBoostRecords = history.Any(s => s.Boost is not null);
+        BoundRows.Replace(BoostEffects, BoostEffectComparer.Compare(history, players).Select(e => new BoostEffectRow(e)).ToList());
     }
 
     partial void OnSelectedRowChanged(SessionRowViewModel? value)

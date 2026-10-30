@@ -4,6 +4,67 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-10-30 - 0.8.7: a bigger Boost, a virtual display that says what is wrong, a new Discord card and the FPS overlay is gone
+
+- BOOST:
+- New in Settings, General: "Boost at start". It turns Boost on by itself each time Optima opens, as if the dial had been pressed. It is off by default. A feature that needs the administrator prompt still waits until you press "start the helper" on its card.
+- New on BOOST, in the cores card: "Best cores for the game". While Critical Ops is on screen, the Google Play Games emulator, whose virtual processors are threads of its own, runs on a set of cores Optima picks for it.
+- Which cores: the performance cores on a processor with efficiency cores; the die with the larger cache on a dual-die X3D; then the fastest cores by Windows' own ranking. The core of processor 0, where most interrupts land, and the slowest core are left to Windows and everything else. The game never gets fewer than six cores, so on a six-core processor nothing changes and the card says so.
+- Both threads of a core always go to the game together.
+- A processor with fewer than six performance cores, such as most thin laptops, keeps its efficiency cores in the set.
+- It is a Windows CPU set on the emulator's process and needs no administrator rights. It is taken off when the game leaves, when the switch or Boost goes off and when Optima closes. The emulator outlives the game, so the placed processes are written down as well, and the next start after a crash takes the set off any that still run.
+- It is kept, not set once: every five seconds while the game is on screen Optima reads the placement back from Windows and puts it right if anything changed it. A thread of the emulator that was given cores of its own, which would take it off the chosen ones, is given the chosen cores again. The card counts how often this happened.
+- Whatever cores the emulator, one of its threads or a listed program had before, set by Windows, the emulator or a tool such as Process Lasso, are put back afterwards, and after a crash too. If something else changed them again during the match, its choice is the one that stays.
+- If Windows refuses to take the placement off, Optima keeps a note and tries again instead of forgetting it.
+- A thread the emulator pins to cores outside the chosen ones is not changed, because Windows follows such a pin over any choice of cores. The card says how many there are, so you know when that is happening.
+- With Background programs on as well, the programs on its list are sent to the cores the game does not use, so they stay off the game's cores. They get their cores back when the game leaves, or as soon as you take them off the list.
+- The cores card's cells show the logical processors the game runs on, and the card's light reads ACTIVE while the game is placed.
+- The switch shares gear 05 on the dial with core parking.
+- PCs with more than 64 logical processors are left alone for now.
+- New on BOOST, in card 05: "Power floor". While Critical Ops is on screen, the active power plan keeps the processor at full speed on mains, so it does not clock down between frames and ramp up again, and USB selective suspend is off, so Windows does not put an idle mouse, keyboard or headset to sleep and miss the first input after it.
+- On battery the processor is left as your plan has it, so a laptop off the charger does not run hot for nothing. USB selective suspend is off on battery too.
+- Each value is changed only where your plan does not have it already. Your plan's own values come back when the game leaves, when you switch it off or when Optima closes, and a start after a crash puts them back too.
+- Card 05 now has three switches. They share gear 05 on the dial. It needs no administrator rights.
+- New on BOOST, in card 04: "Wi-Fi scans paused". Even while connected, Windows looks for other Wi-Fi networks about once a minute, and each look shows as a ping spike in a match. While Critical Ops is on screen, Optima asks Windows to skip those looks and to keep your Wi-Fi in its streaming mode.
+- Card 04 is now called Background and has two switches: "Programs held back", which is the old Background programs switch, and the new Wi-Fi one. They share gear 04 on the dial.
+- The line under the switch names your Wi-Fi adapter and says which of the two Windows accepted. Windows may refuse the scan pause without administrator rights, and Optima does not ask for them.
+- Nothing is changed for good: both end when the game leaves, when the switch or Boost goes off and when Optima closes, and Windows drops them by itself if Optima crashes or your Wi-Fi disconnects. If your Wi-Fi drops and comes back mid-match, Optima asks again within 30 seconds.
+- On a cable, or on a PC without Wi-Fi, the card says so and does nothing.
+- New on BOOST, in card 06: "Higher GPU priority". While Critical Ops is on screen, Windows runs the Google Play Games emulator's work on the graphics card ahead of other programs', such as a browser, a stream or a recording, so a frame waits less behind theirs.
+- Card 06 is now called Graphics and has two switches: "High-performance adapter", which is the old Graphics adapter switch, and the new one. They share gear 06 on the dial.
+- It uses high priority, never realtime, which can starve Windows' own drawing. It needs no administrator rights. If Windows refuses it on your PC, the card says so and nothing is changed.
+- It is kept, not set once: every five seconds while the game is on screen Optima checks it and raises it again if something lowered it.
+- Nothing is changed for good: the emulator gets back the exact priority it had when the game leaves, when the switch or Boost goes off and when Optima closes. The emulator outlives the game, so Optima writes down what it changed, and the next start after a crash puts it back. If something else changed the priority after the match, its choice is the one that stays.
+- VIRTUAL DISPLAY:
+- Optima now reads the problem Windows reports for the virtual display device and acts on it, instead of waiting and giving up with the same error. It enables a disabled device, restarts one that failed to start, and otherwise names the problem: no driver, driver blocked, restart needed, or device not working, each with its own fix.
+- A display the driver offers but Windows keeps off the desktop is now added beside your screens. It is never made the main screen. If Windows makes it the main screen anyway and cannot be moved back, Optima stops rather than run the game on a screen nobody can see.
+- Install driver on the Display page now removes a broken device and creates a new one. Before, any leftover device counted as already installed, so a reinstall did nothing.
+- Optima now finds the driver's settings file where the driver reads it, including when another program has pointed the driver at a different folder.
+- On a new PC where the driver arrived after Optima's first start, the virtual display is no longer left off for good.
+- DISCORD:
+- A new Discord card: it says whether you are idling, launching or playing. During a match it names the map and says Ranked or Casual.
+- Optima reads this from the log Google Play Games already writes, and never touches the game. Team deathmatch, casual defuse and custom games all show as Casual, because the log does not tell them apart.
+- SESSIONS:
+- Every saved session now remembers which Boost switches were on and which of them actually did something during it. A switch that was on but had nothing to do, like core parking on a High Performance plan, a graphics card you had already set to high performance yourself, or a memory cleaner that never needed to purge, counts as neither on nor off. So does a switch you turned on or off while the game was running.
+- New on Sessions: "What helps". For each Boost switch it shows the median 1% low and average fps of your sessions with it working against your sessions with it off, and the difference.
+- Only your own sessions with the player tracked now are compared (whether they were saved under your name or your account id), only sessions longer than 3 minutes, and only once there are at least 3 with the switch on and 3 with it off. Until then it says "too few sessions".
+- Sessions saved before this update have no record and are left out.
+- It is a hint, not a proof: the map, the server and whatever else your PC was doing also change from one session to the next.
+- DEBUG:
+- New on DEBUG, on the Checks tab: "driver latency (10s)". It records for 10 seconds how long every driver holds the processor when its device calls (its DPCs and ISRs, the same thing LatencyMon measures) and lists the drivers with the longest single call and the most time in all, in microseconds.
+- A driver that held the processor for more than a millisecond at once becomes an issue that names the driver file. That is long enough to feel as a stutter or hear as a crackle. Updating that driver from the maker of the device, or rolling it back if the trouble started with an update, is what usually helps. Wi-Fi, audio, RGB and storage drivers are the usual causes.
+- Over half a millisecond is a note: not enough for a stutter on its own, but the first driver to look at if the game hitches.
+- It only runs when you press the button, never on its own and never with "run all" or "scan now". It needs administrator rights, so it asks at most once, and it waits until Critical Ops is closed.
+- PLAY waits for the 10 seconds of the scan. If Critical Ops is started some other way during it, the result is thrown away, because it measured the game loading and not your drivers.
+- New on DEBUG: "Memory Integrity". It says whether Windows' Memory Integrity (Core isolation) is on. It protects Windows from drivers that were tampered with, and it often costs some frame rate. That trade is yours: it is listed as a note, not a problem, it tells you where to find the switch in Windows Security, and Optima never changes it.
+- New on DEBUG: "Hypervisor Scheduler". Windows writes down at every start which scheduler the hypervisor runs. The root scheduler is the one Windows on a home PC uses, and it is what lets Optima's core placement reach the game. Any other one gets a note that core placement may not reach the game.
+- New on DEBUG: "GPU Interrupt Mode". It lists each graphics card and whether it uses message-signaled interrupts (MSI). It is for information only: changing it by hand needs a restart and can stop the card from starting, so Optima never offers to.
+- All three only read. Each shows what Windows said, so you can see where the answer came from.
+- REMOVED:
+- The FPS overlay is gone, with its Settings page and the Alt+F10 shortcut. Frametime capture and session history stay. The ping target moved to Settings, General.
+- SIDEBAR:
+- The sidebar shows how many copies of Optima are open right now. Each running copy sends a random id, made new at every start, once a minute. Nothing else is sent.
+
 ## 2026-10-25 - 0.8.6: hotfix, the virtual display is on before the game starts
 
 - Fixed: Critical Ops did not pick up the virtual display's refresh rate, so its FPS cap stayed at your own monitor's. The display came on only once the game was seen running, after the game had already read the screens.

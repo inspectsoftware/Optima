@@ -68,6 +68,7 @@ public sealed class LaunchOrchestrator
     private readonly ILaunchSupport? _support;
     private readonly IElevationBroker? _elevation;
     private readonly IDriverInstaller? _driver;
+    private readonly Boost.BoostSessionRecorder? _boost;
     private readonly ILogger<LaunchOrchestrator> _logger;
 
     private int _running;
@@ -137,8 +138,10 @@ public sealed class LaunchOrchestrator
         SettingsService? settings = null,
         ILaunchSupport? support = null,
         IElevationBroker? elevation = null,
-        IDriverInstaller? driver = null)
+        IDriverInstaller? driver = null,
+        Boost.BoostSessionRecorder? boost = null)
     {
+        _boost = boost;
         _support = support;
         _elevation = elevation;
         _driver = driver;
@@ -548,27 +551,35 @@ public sealed class LaunchOrchestrator
         context.Snapshot = context.Snapshot with { VirtualDisplayConfigured = true };
         await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
 
+        // Captured before the display is switched on or attached, as Check my setup does: a device
+        // that was already on gets its display attached below with nothing recorded as switched on
+        // by us, and only a layout from before that attach takes it off the desktop again at exit.
+        var topology = await _displayService.CaptureTopologyAsync(ct).ConfigureAwait(false);
+        context.Snapshot = context.Snapshot with { DisplayTopology = topology };
+        await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+
         await _virtualDisplay.InitializeAsync(ct).ConfigureAwait(false);
 
         var wasActive = await _virtualDisplay.IsDisplayActiveAsync(ct).ConfigureAwait(false);
         if (!wasActive)
         {
-            // Written down before the device is switched on, not after. The helper switches it on in
-            // its own process, and an Optima killed while the enable waits for the display would
-            // otherwise leave a snapshot that says nothing was switched on, so the next start's
-            // restore would leave the display on for good. Switching off a device that never came
-            // on does nothing.
-            context.Snapshot = context.Snapshot with { VirtualDisplayEnabledByUs = true };
-            await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+            // Only a device that was off is recorded: one that was on (its display merely off the
+            // desktop, or no driver bound) must end the session as it started, not switched off.
+            if (!_virtualDisplay.DeviceWasEnabledInitially)
+            {
+                // Written down before the device is switched on, not after. The helper switches it on in
+                // its own process, and an Optima killed while the enable waits for the display would
+                // otherwise leave a snapshot that says nothing was switched on, so the next start's
+                // restore would leave the display on for good. Switching off a device that never came
+                // on does nothing.
+                context.Snapshot = context.Snapshot with { VirtualDisplayEnabledByUs = true };
+                await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
+            }
             await RunWithRepairAsync(() => _virtualDisplay.EnableDisplayAsync(ct), ct).ConfigureAwait(false);
         }
 
         await _virtualDisplay.SetModeAsync(display.Mode, ct).ConfigureAwait(false);
         _logger.LogInformation("Resolution applied: {Mode} on virtual display", display.Mode);
-
-        var topology = await _displayService.CaptureTopologyAsync(ct).ConfigureAwait(false);
-        context.Snapshot = context.Snapshot with { DisplayTopology = topology };
-        await _recovery.UpdatePendingAsync(context.Snapshot, ct).ConfigureAwait(false);
 
         // Never made the main screen, whatever an old profile says: the game window opens on the
         // player's own monitor, and Windows would move it onto a new main screen that nobody can see.
@@ -608,6 +619,7 @@ public sealed class LaunchOrchestrator
         Report(LaunchPhase.Monitoring, "Critical Ops is running.");
         var stopwatch = Stopwatch.StartNew();
         var startedAt = DateTimeOffset.Now;
+        _boost?.Begin(_settings?.Current);
         var candidatePids = await CollectCandidatePidsAsync(emulatorPid, ct).ConfigureAwait(false);
 
         if (captureAllowed && await _metrics.IsAvailableAsync(ct).ConfigureAwait(false))
@@ -666,6 +678,8 @@ public sealed class LaunchOrchestrator
             ProfileHash = LaunchProfileHasher.ComputeHash(profile),
             LaunchKind = kind,
             Network = networkStats,
+            // Taken after the restore on purpose: the recorder kept what worked while the game ran.
+            Boost = _boost?.End(_settings?.Current),
         };
         // Everything is restored by now. A history that cannot be written must not turn a finished
         // session into a failed one, nor send the catch-all through a second restore.

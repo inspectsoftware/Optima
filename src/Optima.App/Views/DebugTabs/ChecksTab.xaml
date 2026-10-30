@@ -9,6 +9,14 @@
           <StackPanel Orientation="Horizontal">
             <ctl:AsciiSpinner Cells="10" Margin="0,0,12,0"
                               Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}" />
+            <!-- Its own button, never part of "run all": the kernel trace needs administrator rights. -->
+            <TextBlock Text="{Binding LatencyStatus}" Style="{StaticResource Text.Micro}"
+                       Foreground="{DynamicResource Brush.TextMuted}" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <ctl:AsciiSpinner Cells="10" Margin="0,0,12,0"
+                              Visibility="{Binding IsLatencyScanning, Converter={StaticResource BoolToVis}}" />
+            <Button Style="{StaticResource GhostButton}" Content="driver latency (10s)"
+                    Command="{Binding ScanDriverLatencyCommand}" Padding="6,0" Margin="0,0,8,0"
+                    ToolTip="Records every driver's DPCs and ISRs for 10 seconds and names the ones that hold the processor longest. Needs administrator rights; close the game first." />
             <Button Style="{StaticResource SecondaryButton}" Content="run all"
                     Command="{Binding RunAllCommand}" Padding="10,3" />
           </StackPanel>

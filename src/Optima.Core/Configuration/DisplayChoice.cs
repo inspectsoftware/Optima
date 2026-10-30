@@ -35,7 +35,11 @@ public static class DisplayChoice
     {
         if (settings.VirtualDisplayEnabled is not null)
         {
-            return settings;
+            // Left off on a new PC only because the driver was not there yet, and nobody has chosen since:
+            // the first start that finds the driver gives the display the new PC would have had.
+            return settings.VirtualDisplayAwaitsDriver && driverInstalled
+                ? settings with { VirtualDisplayEnabled = true, VirtualDisplayAwaitsDriver = false }
+                : settings;
         }
 
         if (RetiredBuiltIns.TryGetValue(settings.SelectedProfileName, out var retired))
@@ -55,7 +59,8 @@ public static class DisplayChoice
         // driver is there for it, and plays on its real screen when it is not: a launch must
         // never fail for a driver nobody installed.
         return With(settings, enabled: freshInstall && driverInstalled,
-            new DisplayMode(settings.VirtualDisplayWidth, settings.VirtualDisplayHeight, settings.VirtualDisplayRefreshRate));
+            new DisplayMode(settings.VirtualDisplayWidth, settings.VirtualDisplayHeight, settings.VirtualDisplayRefreshRate))
+            with { VirtualDisplayAwaitsDriver = freshInstall && !driverInstalled };
     }
 
     private static AppSettings With(AppSettings settings, bool enabled, DisplayMode mode) => settings with

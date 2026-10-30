@@ -186,6 +186,8 @@ public sealed partial class DisplayViewModel : ObservableObject
             await _settings.UpdateSettingsAsync(s => s with
             {
                 VirtualDisplayEnabled = enabled,
+                // Switched on here, any later off is the player's own choice, not the missing driver's.
+                VirtualDisplayAwaitsDriver = s.VirtualDisplayAwaitsDriver && !enabled,
                 VirtualDisplayWidth = mode.Width,
                 VirtualDisplayHeight = mode.Height,
                 VirtualDisplayRefreshRate = mode.RefreshRate,

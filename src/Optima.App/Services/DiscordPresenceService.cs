@@ -2,6 +2,7 @@ using System.Windows;
 using DiscordRPC;
 using Optima.Core.Abstractions;
 using Optima.Core.Configuration;
+using Optima.Core.Crashes;
 using Optima.Core.Discord;
 using Optima.Core.Models;
 using Optima.Core.Monitoring;
@@ -63,8 +64,14 @@ public sealed class DiscordPresenceService : IDisposable
         new Button { Label = "Beta", Url = "https://github.com/inspectsoftware/Optima/releases" },
     ];
 
+    /// <summary>How often GPG's logcat file is read for match start and end while the game runs.</summary>
+    private static readonly TimeSpan MatchPollInterval = TimeSpan.FromSeconds(3);
+
+    private readonly MatchLogTailer _matchTailer;
+
     private DiscordRpcClient? _client;
     private Timer? _tick;
+    private Timer? _matchPoll;
 
     private volatile bool _enabled;
     private volatile bool _inLauncherEnabled;
@@ -81,7 +88,6 @@ public sealed class DiscordPresenceService : IDisposable
     // Cached from the last ApplySettings call so composition never blocks on settings I/O.
     private string _playerIgn = "";
     private long? _playerAccountId;
-    private string _profileName = "";
 
     // Which art the application really has, read once per application id. Empty means "nothing known
     // yet", which is not the same as "nothing uploaded": both fall back to the public artwork, and the
@@ -106,6 +112,7 @@ public sealed class DiscordPresenceService : IDisposable
         SettingsService settings,
         CopsApiClient cops,
         DiscordArtCatalog artCatalog,
+        GpgLogReader gpgLogs,
         ILogger<DiscordPresenceService> logger)
     {
         _presence = presence;
@@ -113,6 +120,7 @@ public sealed class DiscordPresenceService : IDisposable
         _cops = cops;
         _artCatalog = artCatalog;
         _logger = logger;
+        _matchTailer = new MatchLogTailer(gpgLogs.SerialLogPath);
     }
 
     public async Task StartAsync()
@@ -126,6 +134,7 @@ public sealed class DiscordPresenceService : IDisposable
             _subscribed = true;
         }
         _tick ??= new Timer(_ => UpdatePresence(), null, TickInterval, TickInterval);
+        SyncMatchPolling();
     }
 
     public void AttachLauncherWindow(Window window)
@@ -169,7 +178,6 @@ public sealed class DiscordPresenceService : IDisposable
     {
         _playerIgn = settings.PlayerIgn;
         _playerAccountId = settings.PlayerAccountId;
-        _profileName = settings.SelectedProfileName;
         _enabled = settings.DiscordPresenceEnabled;
         _inLauncherEnabled = settings.DiscordPresenceInLauncher;
         _options = settings.EffectivePresenceOptions;
@@ -211,7 +219,45 @@ public sealed class DiscordPresenceService : IDisposable
         {
             _artRetryAt = DateTimeOffset.MinValue;
         }
+        SyncMatchPolling();
         UpdatePresence();
+    }
+
+    /// <summary>
+    /// GPG's logcat file is read only while the game is running: it is what says a match started
+    /// (and on which map) or ended. Stopping forgets the position, so the next run starts from the
+    /// end of the file rather than replaying the last session's matches.
+    /// </summary>
+    private void SyncMatchPolling()
+    {
+        lock (_matchTailer)
+        {
+            if (_presence.Current == GamePresence.InGame)
+            {
+                _matchPoll ??= new Timer(_ => PollMatch(), null, TimeSpan.Zero, MatchPollInterval);
+                return;
+            }
+            _matchPoll?.Dispose();
+            _matchPoll = null;
+            _matchTailer.Reset();
+        }
+    }
+
+    private void PollMatch()
+    {
+        bool changed;
+        lock (_matchTailer)
+        {
+            if (_matchPoll is null || !_enabled)
+            {
+                return;
+            }
+            changed = _matchTailer.Poll(DateTimeOffset.Now);
+        }
+        if (changed)
+        {
+            UpdatePresence();
+        }
     }
 
     private void UpdatePresence()
@@ -264,14 +310,19 @@ public sealed class DiscordPresenceService : IDisposable
         switch (_presence.Current)
         {
             case GamePresence.InGame:
-                return (PresenceComposer.Compose(GamePresence.InGame, _badge, _profileName, _options),
-                    _options.ShowElapsedTime ? _presence.InGameSince ?? DateTimeOffset.Now : null);
+                // A match has its own clock; between matches the timer is the whole session's.
+                var match = _matchTailer.State;
+                var since = match is { Phase: MatchPhase.InMatch, Since: { } matchStart }
+                    ? matchStart
+                    : _presence.InGameSince ?? DateTimeOffset.Now;
+                return (PresenceComposer.Compose(GamePresence.InGame, _badge, _options, match),
+                    _options.ShowElapsedTime ? since : null);
             case GamePresence.Starting:
-                return (PresenceComposer.Compose(GamePresence.Starting, _badge, _profileName, _options), null);
+                return (PresenceComposer.Compose(GamePresence.Starting, _badge, _options), null);
             default:
                 if (_inLauncherEnabled && _launcherEverShown)
                 {
-                    return (PresenceComposer.Compose(GamePresence.NotRunning, _badge, null, _options),
+                    return (PresenceComposer.Compose(GamePresence.NotRunning, _badge, _options),
                         _options.ShowElapsedTime ? _launcherVisibleSince : null);
                 }
                 return null;
@@ -522,6 +573,11 @@ public sealed class DiscordPresenceService : IDisposable
         }
         _tick?.Dispose();
         _tick = null;
+        lock (_matchTailer)
+        {
+            _matchPoll?.Dispose();
+            _matchPoll = null;
+        }
         SafeClear();
         TearDownClient();
     }

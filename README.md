@@ -51,11 +51,11 @@ flowchart LR
 - **Virtual display**: a bundled virtual display driver, installed by the setup with one
   administrator prompt (or any time from the Display page) for high-refresh modes the monitor
   cannot offer.
-- **FPS overlay and session history**: external frametime capture, average / 1% / 0.1% lows,
+- **Session history**: external frametime capture, average / 1% / 0.1% lows,
   per-session network quality, trends and an A-vs-B benchmark that refuses to call noise a gain.
 - **Watch mode**: start the game any way you like and Optima applies the profile from the tray.
 - **Windows tweaks** with an on/off toggle each, originals captured and restored.
-- **Kill switch** (Ctrl+Alt+K), floating log console (Alt+F9), overlay toggle (Alt+F10).
+- **Kill switch** (Ctrl+Alt+K) and floating log console (Alt+F9).
 - **Debug page**: one place for what went wrong. Optima reads its own log as it is written and
   runs quick checks in the background, and lists every problem once as an issue, with what it
   means, how to put it right and its evidence; no error goes by unlisted. What it can repair it

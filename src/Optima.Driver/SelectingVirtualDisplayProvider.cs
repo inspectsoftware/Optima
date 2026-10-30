@@ -34,6 +34,8 @@ public sealed class SelectingVirtualDisplayProvider : IVirtualDisplayProvider, I
 
     public string Name => _selected?.Name ?? "(not selected yet)";
 
+    public bool DeviceWasEnabledInitially => _selected?.DeviceWasEnabledInitially ?? false;
+
     public async Task<IVirtualDisplayProvider> GetActiveProviderAsync(CancellationToken ct = default)
     {
         if (_selected is { } chosen)

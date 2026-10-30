@@ -32,6 +32,8 @@ public abstract class VirtualDisplayProviderBase : IVirtualDisplayProvider
 
     public abstract Task RestoreOriginalStateAsync(CancellationToken ct = default);
 
+    public virtual bool DeviceWasEnabledInitially => false;
+
     public async Task SetResolutionAsync(int width, int height, CancellationToken ct = default)
     {
         var current = await GetCurrentModeAsync(ct).ConfigureAwait(false);
