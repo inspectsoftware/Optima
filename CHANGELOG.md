@@ -4,7 +4,7 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
-## 2026-11-01 - Custom resolution without the virtual display
+## 2026-11-01 - 0.8.8: custom resolution without the virtual display
 
 - New on the Display page: "Custom resolution". A separate window sets your own monitor to a resolution such as 1920 x 1440, and the virtual display is not used.
 - Nothing is saved to Windows. The change lasts until you press Restore in the same window or restart the PC.
