@@ -112,6 +112,17 @@ public sealed class WindowsDisplayService : IDisplayService
             _logger.LogInformation("Resolution applied: {Mode} on {Device}", mode, deviceName);
         }, ct);
 
+    public Task<DisplayMode?> GetSavedModeAsync(string deviceName, CancellationToken ct = default)
+        => Task.Run<DisplayMode?>(() =>
+        {
+            var mode = DEVMODE.Create();
+            if (!EnumDisplaySettingsEx(deviceName, ENUM_REGISTRY_SETTINGS, ref mode, 0) || mode.dmPelsWidth == 0 || mode.dmPelsHeight == 0)
+            {
+                return null;
+            }
+            return new DisplayMode((int)mode.dmPelsWidth, (int)mode.dmPelsHeight, (int)mode.dmDisplayFrequency);
+        }, ct);
+
     /// <summary>
     /// Makes one display the main screen for now: the one whose desktop starts at 0,0, which is
     /// where Windows opens a program that has no place of its own yet, the game included.

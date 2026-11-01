@@ -197,6 +197,20 @@
         </StackPanel>
       </HeaderedContentControl>
 
+      <!-- A size on the player's own monitor, for when the virtual display is not wanted at all. -->
+      <HeaderedContentControl Style="{StaticResource Section}" Header="CUSTOM RESOLUTION">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Style="{StaticResource Text.Prose}" TextWrapping="Wrap" VerticalAlignment="Center"
+                     Text="Sets your own monitor to a resolution such as 1920 x 1440, without the virtual display. Lasts until you restore it in the same window or restart the PC." />
+          <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Content="Custom resolution" Padding="16,8"
+                  Margin="16,0,0,0" VerticalAlignment="Center" Command="{Binding OpenCustomResolutionCommand}" />
+        </Grid>
+      </HeaderedContentControl>
+
       <!-- The screens Windows knows, folded away: naming and ordering them is for Optima's own lists only. -->
       <Expander Header="{Binding MonitorsHeader}" Margin="0,14,0,0">
         <StackPanel Margin="0,8,0,0">

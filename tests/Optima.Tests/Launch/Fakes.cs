@@ -53,6 +53,8 @@ internal sealed class FakeDisplayService : IDisplayService
         Log.Add($"apply:{deviceName}:{mode}");
         return Task.CompletedTask;
     }
+    public Task<DisplayMode?> GetSavedModeAsync(string deviceName, CancellationToken ct = default)
+        => Task.FromResult<DisplayMode?>(null);
     public Task MakePrimaryAsync(string deviceName, CancellationToken ct = default)
     {
         Log.Add($"primary:{deviceName}");

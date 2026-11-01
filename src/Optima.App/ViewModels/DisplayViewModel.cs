@@ -259,7 +259,7 @@ public sealed partial class DisplayViewModel : ObservableObject
             return;
         }
         // It moves screens around. Under a running game that is the game's window going with them.
-        if (_orchestrator.IsSessionActive || _presence.Current != GamePresence.NotRunning)
+        if (GameIsRunning)
         {
             StatusMessage = "Not while Critical Ops is running: this switches your screens around. Close the game first.";
             return;
@@ -368,6 +368,22 @@ public sealed partial class DisplayViewModel : ObservableObject
         _safetyTopology = null;
     });
 
+    private bool GameIsRunning => _orchestrator.IsSessionActive || _presence.Current != GamePresence.NotRunning;
+
+    // ------------------------------------------------------------------ custom resolution
+
+    /// <summary>The window that changes a real monitor's resolution, for a size the virtual display is not wanted for.</summary>
+    [RelayCommand]
+    private async Task OpenCustomResolutionAsync()
+    {
+        new Views.CustomResolutionWindow(_displayService, () => GameIsRunning, _logger)
+        {
+            Owner = System.Windows.Application.Current?.MainWindow,
+        }.ShowDialog();
+        await RefreshAsync();
+        await _status.RefreshAsync();
+    }
+
     // ------------------------------------------------------------------ driver commands
 
     [RelayCommand]
@@ -437,7 +453,7 @@ public sealed partial class DisplayViewModel : ObservableObject
     }
 
     /// <summary>An error as the page says it: what happened, why, and every way out the error names.</summary>
-    private static string Describe(UserFriendlyError error)
+    internal static string Describe(UserFriendlyError error)
         => string.Join(Environment.NewLine, new[] { error.Title, error.Explanation }
             .Where(text => !string.IsNullOrWhiteSpace(text))
             .Concat(error.SuggestedFixes.Select(fix => "· " + fix)));

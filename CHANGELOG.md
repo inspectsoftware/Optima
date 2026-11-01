@@ -4,6 +4,14 @@ Newest build first. This file ships next to Optima.exe and is rendered by the UP
 page in the app, so keep the format: one `## date - title` heading per build, `-` bullets
 under it, plain text, no em dashes.
 
+## 2026-11-01 - Custom resolution without the virtual display
+
+- New on the Display page: "Custom resolution". A separate window sets your own monitor to a resolution such as 1920 x 1440, and the virtual display is not used.
+- Nothing is saved to Windows. The change lasts until you press Restore in the same window or restart the PC.
+- After Apply you have 15 seconds to press Keep. If you do not, for example because the screen went black, the old resolution comes back by itself.
+- Windows only accepts sizes on your monitor's list. The window says when a size is not on it. Add the size once in NVIDIA Control Panel, AMD Software, Intel Graphics Command Center or Custom Resolution Utility (CRU), then apply it.
+- It cannot be used while Critical Ops is running.
+
 ## 2026-10-30 - 0.8.7: a bigger Boost, a virtual display that says what is wrong, a new Discord card and the FPS overlay is gone
 
 - BOOST:

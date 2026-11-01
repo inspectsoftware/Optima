@@ -11,6 +11,9 @@ public interface IDisplayService
 
     Task ApplyModeAsync(string deviceName, DisplayMode mode, CancellationToken ct = default);
 
+    /// <summary>The mode Windows has saved for this display, which a temporary change does not touch. Null when it has none.</summary>
+    Task<DisplayMode?> GetSavedModeAsync(string deviceName, CancellationToken ct = default);
+
     Task MakePrimaryAsync(string deviceName, CancellationToken ct = default);
 
     /// <summary>
